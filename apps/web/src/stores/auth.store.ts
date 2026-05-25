@@ -49,6 +49,13 @@ function parseUser(accessToken: string): AuthUser | null {
   }
 }
 
+// Security note (Phase 1 accepted tradeoff):
+// Both tokens are persisted to localStorage, which is readable by any JS on the
+// page (XSS risk). For this private family app the attack surface is very low,
+// so we accept the tradeoff for development velocity. If threat-modelling demands
+// it before Phase 1 ships, the safer option is to have the backend issue
+// refreshToken as an HttpOnly cookie (never touches JS). Tracked for Phase 1
+// pre-launch review.
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({

@@ -3,6 +3,8 @@
  *
  * - Injects Bearer token on every request.
  * - On 401, attempts a silent token refresh then retries once.
+ *   A concurrency lock ensures only one refresh call is in-flight at a time;
+ *   subsequent 401s queue their retries and are flushed once the refresh settles.
  * - On refresh failure, wipes auth state (triggers redirect via protected route).
  */
 
@@ -29,10 +31,39 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ── Response: refresh on 401 ─────────────────────────────────────────────────
+// ── Response: refresh on 401 (with concurrency queue) ────────────────────────
+//
+// Problem: if multiple requests fire simultaneously while the access token is
+// expired, each one gets a 401 and naively each would kick off its own refresh
+// call.  Cognito may revoke the refresh token on the second concurrent use,
+// locking the user out even though the first refresh succeeded.
+//
+// Solution: a module-level `isRefreshing` flag + `failedQueue` ensure that
+// only one /auth/refresh call is in flight.  Every other 401 that arrives while
+// the refresh is pending pushes a resolver into the queue; when the refresh
+// settles the queue is flushed with either the new token or the error.
 
 interface RetryConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
+}
+
+interface QueueEntry {
+  resolve: (token: string) => void;
+  reject: (reason: unknown) => void;
+}
+
+let isRefreshing = false;
+let failedQueue: QueueEntry[] = [];
+
+function flushQueue(error: unknown, token: string | null) {
+  for (const entry of failedQueue) {
+    if (error) {
+      entry.reject(error);
+    } else {
+      entry.resolve(token!);
+    }
+  }
+  failedQueue = [];
 }
 
 api.interceptors.response.use(
@@ -51,17 +82,35 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // If a refresh is already running, queue this request to retry once it resolves.
+    if (isRefreshing) {
+      return new Promise<string>((resolve, reject) => {
+        failedQueue.push({ resolve, reject });
+      }).then((newToken) => {
+        config.headers.Authorization = `Bearer ${newToken}`;
+        return api.request(config);
+      });
+    }
+
+    // We're the first — take the lock and kick off the refresh.
     config._retry = true;
+    isRefreshing = true;
+
     try {
       const res = await axios.post<{ accessToken: string }>(`${BASE_URL}/auth/refresh`, {
         refreshToken,
       });
-      useAuthStore.getState().setAccessToken(res.data.accessToken);
-      config.headers.Authorization = `Bearer ${res.data.accessToken}`;
+      const newToken = res.data.accessToken;
+      useAuthStore.getState().setAccessToken(newToken);
+      config.headers.Authorization = `Bearer ${newToken}`;
+      flushQueue(null, newToken);
       return api.request(config);
-    } catch {
+    } catch (refreshError) {
+      flushQueue(refreshError, null);
       useAuthStore.getState().clearAuth();
       return Promise.reject(error);
+    } finally {
+      isRefreshing = false;
     }
   },
 );
