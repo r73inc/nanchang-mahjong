@@ -1,0 +1,39 @@
+export const configuration = () => ({
+  port: parseInt(process.env.PORT ?? '3001', 10),
+  nodeEnv: process.env.NODE_ENV ?? 'development',
+
+  jwt: {
+    secret: process.env.JWT_SECRET ?? 'dev-secret-change-in-prod',
+    expiresIn: process.env.JWT_EXPIRES_IN ?? '1h',
+    refreshSecret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret-change-in-prod',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
+  },
+
+  aws: {
+    region: process.env.AWS_REGION ?? 'ap-east-1',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    endpoints: {
+      dynamodb: process.env.AWS_ENDPOINT_URL_DYNAMODB,
+      cognitoIdp: process.env.AWS_ENDPOINT_URL_COGNITO_IDP,
+      s3: process.env.AWS_ENDPOINT_URL_S3,
+    },
+  },
+
+  dynamodb: {
+    tableName: process.env.DYNAMODB_TABLE_NAME ?? 'nanchang_main',
+  },
+
+  cognito: {
+    userPoolId: process.env.COGNITO_USER_POOL_ID ?? '',
+    clientId: process.env.COGNITO_CLIENT_ID ?? '',
+  },
+
+  rateLimit: {
+    ttlMs: parseInt(process.env.RATE_LIMIT_TTL_MS ?? '60000', 10),
+    maxPublic: parseInt(process.env.RATE_LIMIT_MAX_PUBLIC ?? '5', 10),
+    maxAuth: parseInt(process.env.RATE_LIMIT_MAX_AUTHED ?? '60', 10),
+  },
+});
+
+export type AppConfig = ReturnType<typeof configuration>;
