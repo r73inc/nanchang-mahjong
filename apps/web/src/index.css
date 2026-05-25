@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    @apply bg-mj-bg-page text-mj-bone;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  input,
+  button {
+    font-family: inherit;
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+}
+
+@layer utilities {
+  /* Shimmer skeleton utility */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(245, 239, 223, 0.04) 25%,
+      rgba(245, 239, 223, 0.08) 50%,
+      rgba(245, 239, 223, 0.04) 75%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  /* Ink opacity helpers matching the handoff token names */
+  .text-ink-mute {
+    color: rgba(245, 239, 223, 0.65);
+  }
+  .text-ink-dim {
+    color: rgba(245, 239, 223, 0.45);
+  }
+
+  /* Border helpers */
+  .border-subtle {
+    border-color: rgba(245, 239, 223, 0.1);
+  }
+  .border-subtle-2 {
+    border-color: rgba(245, 239, 223, 0.18);
+  }
+}
