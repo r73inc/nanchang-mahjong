@@ -44,6 +44,20 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+  i18n-parity:
+    name: i18n Key Parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check locale key parity (EN ↔ ZH)
+        run: node scripts/check-i18n-parity.mjs
+
   test:
     name: Test
     runs-on: ubuntu-latest

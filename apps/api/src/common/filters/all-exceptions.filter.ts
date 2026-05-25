@@ -5,16 +5,25 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Injectable,
 } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { I18nService } from '../../i18n/i18n.service';
 
 @Catch()
+@Injectable()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  constructor(private readonly i18n: I18nService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const reply = ctx.getResponse<FastifyReply>();
+    const request = ctx.getRequest<FastifyRequest>();
+
+    // Resolve preferred language from the request.
+    const lang = this.i18n.parseLang(request.headers['accept-language'] as string | undefined);
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let error = 'INTERNAL_SERVER_ERROR';
@@ -38,6 +47,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error('Unknown exception', String(exception));
     }
 
-    reply.status(statusCode).send({ statusCode, error, message });
+    // Translate the message to the caller's preferred language.
+    const translatedMessage = this.i18n.translateMessage(message, lang);
+
+    reply.status(statusCode).send({ statusCode, error, message: translatedMessage });
   }
 }
