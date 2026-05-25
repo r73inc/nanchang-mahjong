@@ -1,0 +1,41 @@
+{
+  "name": "nanchang-mahjong",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n api,web -c yellow,cyan \"pnpm --filter @nanchang/api dev\" \"pnpm --filter @nanchang/web dev\"",
+    "build": "pnpm -r --filter './packages/**' build && pnpm -r --filter './apps/**' build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.18.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.4.2",
+    "typescript": "~5.7.2",
+    "typescript-eslint": "^8.21.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --max-warnings 0",
+      "prettier --write"
+    ],
+    "*.{js,mjs,cjs,json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "esbuild"
+    ]
+  }
+}
