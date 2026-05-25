@@ -1,0 +1,84 @@
+# ── Node / pnpm ─────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnp.*
+.yarn/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Build output ────────────────────────────────────────────
+dist/
+build/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# ── Vite ────────────────────────────────────────────────────
+.vite/
+vite.config.*.timestamp-*
+
+# ── Test / coverage ─────────────────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+test-results/
+.playwright/
+
+# ── Env / secrets ───────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+.secrets/
+
+# ── AWS CDK ─────────────────────────────────────────────────
+cdk.out/
+cdk.context.json
+.cdk.staging/
+
+# ── Terraform (in case we ever) ─────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# ── Docker ──────────────────────────────────────────────────
+docker-compose.override.yml
+.docker-data/
+
+# ── LocalStack / DynamoDB Local volumes ─────────────────────
+.localstack/
+shared-local-instance.db
+
+# ── IDE / editors ───────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Logs ────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── OS / misc ───────────────────────────────────────────────
+*.tmp
+*.temp
+.cache-loader/

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>Nanchang Mahjong — Family Web App</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --mj-bg-page: #0a0a0a;
+      --mj-bg-frame: radial-gradient(ellipse at top, #1a1a1a 0%, #0a0a0a 100%);
+      --mj-nav-h: 56px;
+      --mj-vp-max-w: 460px;
+      --mj-gold: #c9a961;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--mj-bg-page);
+      color: #f5efdf;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    #root { min-height: 100vh; min-height: 100dvh; }
+    * { -webkit-tap-highlight-color: transparent; }
+    input, button { font-family: inherit; }
+
+    /* ── Context nav (designer/QA helper) ─────────────────── */
+    .mj-context-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+      padding: 10px 14px;
+      background: rgba(10,10,10,0.88);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; gap: 12px;
+      overflow: hidden;
+    }
+    .mj-brand {
+      display: flex; align-items: baseline; gap: 8px;
+      flex-shrink: 0; padding-right: 8px;
+      border-right: 1px solid rgba(255,255,255,0.08);
+    }
+    .mj-brand-cn {
+      font-family: 'Noto Serif SC', serif;
+      color: var(--mj-gold); font-size: 16px; font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .mj-brand-en {
+      color: rgba(245,239,223,0.85); font-size: 13px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .mj-handoff-link {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+      color: rgba(201,169,97,0.85);
+      text-decoration: none;
+      padding: 4px 8px; border-radius: 8px;
+      background: rgba(201,169,97,0.08);
+      border: 1px solid rgba(201,169,97,0.3);
+      margin-left: 4px;
+    }
+    .mj-handoff-link:hover {
+      background: rgba(201,169,97,0.15);
+      color: var(--mj-gold);
+    }
+    .mj-flow-row {
+      flex: 1; display: flex; gap: 4px; align-items: center;
+      justify-content: flex-end;
+      overflow-x: auto; min-width: 0;
+      scrollbar-width: none;
+    }
+    .mj-flow-row::-webkit-scrollbar { display: none; }
+    .mj-flow-btn {
+      padding: 6px 10px; border-radius: 8px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      font-family: inherit;
+    }
+    .mj-flow-btn:hover { color: #f5efdf; border-color: rgba(255,255,255,0.18); }
+    .mj-flow-btn.is-active {
+      background: rgba(201,169,97,0.18);
+      border-color: rgba(201,169,97,0.5);
+      color: var(--mj-gold);
+    }
+    @media (max-width: 600px) {
+      .mj-brand-en, .mj-handoff-link { display: none; }
+    }
+
+    /* ── App stage + viewport ─────────────────────────────── */
+    .mj-app-stage {
+      min-height: 100vh; min-height: 100dvh;
+      padding-top: var(--mj-nav-h);
+      display: flex; align-items: flex-start; justify-content: center;
+      background: var(--mj-bg-page);
+    }
+    .mj-app-viewport {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-height: calc(100vh - var(--mj-nav-h));
+      min-height: calc(100dvh - var(--mj-nav-h));
+      background: #051a13;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    /* Phone-shaped column on tablets+ */
+    @media (min-width: 600px) {
+      .mj-app-stage {
+        padding: calc(var(--mj-nav-h) + 24px) 24px 24px;
+        background: var(--mj-bg-frame);
+      }
+      .mj-app-viewport {
+        max-width: var(--mj-vp-max-w);
+        min-height: min(900px, calc(100vh - var(--mj-nav-h) - 48px));
+        height: min(900px, calc(100vh - var(--mj-nav-h) - 48px));
+        border-radius: 24px;
+        box-shadow:
+          0 30px 80px rgba(0,0,0,0.6),
+          0 0 0 1px rgba(201,169,97,0.15),
+          inset 0 1px 0 rgba(255,255,255,0.04);
+      }
+    }
+    /* On phones / portrait, fill the viewport */
+    @media (max-width: 599.99px) {
+      .mj-app-stage { padding: var(--mj-nav-h) 0 0; }
+      .mj-app-viewport {
+        min-height: calc(100vh - var(--mj-nav-h));
+        min-height: calc(100dvh - var(--mj-nav-h));
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <!-- App scripts (order matters: low-level → high-level) -->
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="i18n.jsx"></script>
+  <script type="text/babel" src="theme.jsx"></script>
+  <script type="text/babel" src="tile.jsx"></script>
+  <script type="text/babel" src="states.jsx"></script>
+  <script type="text/babel" src="onboarding.jsx"></script>
+  <script type="text/babel" src="account-flows.jsx"></script>
+  <script type="text/babel" src="game.jsx"></script>
+  <script type="text/babel" src="wildcard.jsx"></script>
+  <script type="text/babel" src="screens.jsx"></script>
+  <script type="text/babel" src="replay.jsx"></script>
+  <script type="text/babel" src="learn.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

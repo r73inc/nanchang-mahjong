@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nanchang Mahjong — Design Handoff</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Surfaces */
+      --bg:        #0a0a0a;
+      --bg-card:   #141414;
+      --bg-elev:   #1c1c1c;
+      --border:    rgba(245,239,223,0.10);
+      --border-2:  rgba(245,239,223,0.18);
+
+      /* Brand */
+      --gold:      #c9a961;
+      --gold-2:    #a88a45;
+      --jade:      #0d3b2e;
+      --jade-deep: #051a13;
+
+      /* Ink */
+      --fg:        #f5efdf;
+      --fg-mute:   rgba(245,239,223,0.65);
+      --fg-dim:    rgba(245,239,223,0.45);
+
+      /* Semantic */
+      --win:       #7fc299;
+      --loss:      #e88080;
+      --warn:      #c0392b;
+      --info:      #5a7d8c;
+
+      /* Spacing scale (4px base) */
+      --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
+      --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 48px; --s-9: 64px;
+
+      /* Radius */
+      --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px; line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: var(--s-9);
+    }
+    code, .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.9em; }
+    a { color: var(--gold); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--s-7) var(--s-6);
+    }
+    header.hero {
+      padding: var(--s-9) var(--s-6) var(--s-7);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--s-8);
+    }
+    header.hero .brand-cn {
+      font-family: 'Noto Serif SC', serif;
+      font-size: 56px; font-weight: 700; color: var(--gold);
+      letter-spacing: 2px; line-height: 1;
+      margin-bottom: var(--s-2);
+    }
+    header.hero h1 {
+      font-size: 32px; font-weight: 700; letter-spacing: -0.5px;
+      margin: 0 0 var(--s-3);
+    }
+    header.hero .deck {
+      font-size: 16px; color: var(--fg-mute); max-width: 640px;
+      line-height: 1.6;
+    }
+    header.hero .meta {
+      margin-top: var(--s-5);
+      display: flex; gap: var(--s-3); flex-wrap: wrap;
+      font-size: 12px; color: var(--fg-dim);
+    }
+    header.hero .meta span {
+      padding: 4px 10px; border-radius: var(--r-pill);
+      background: rgba(245,239,223,0.04);
+      border: 1px solid var(--border);
+    }
+    header.hero .meta a {
+      padding: 4px 12px; border-radius: var(--r-pill);
+      background: rgba(201,169,97,0.1);
+      border: 1px solid rgba(201,169,97,0.35);
+      color: var(--gold); font-weight: 600;
+    }
+
+    section { margin-bottom: var(--s-9); }
+    h2 {
+      font-size: 11px; letter-spacing: 2px; font-weight: 700;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin: 0 0 var(--s-2);
+    }
+    h3 {
+      font-size: 24px; font-weight: 700; letter-spacing: -0.3px;
+      margin: 0 0 var(--s-3);
+    }
+    .lede {
+      font-size: 15px; color: var(--fg-mute);
+      max-width: 720px; margin-bottom: var(--s-6);
+      line-height: 1.6;
+    }
+
+    /* ── Generic card ───────────────────────────────────── */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--s-5);
+    }
+    .grid { display: grid; gap: var(--s-3); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-5 { grid-template-columns: repeat(5, 1fr); }
+    @media (max-width: 800px) {
+      .grid-3, .grid-4, .grid-5 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
+    }
+
+    /* ── Decisions (locked) ─────────────────────────────── */
+    .decisions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+    @media (max-width: 800px) { .decisions { grid-template-columns: 1fr; } }
+    .decision {
+      padding: var(--s-5);
+      background: linear-gradient(160deg, rgba(201,169,97,0.08), rgba(201,169,97,0.02));
+      border: 1px solid rgba(201,169,97,0.35);
+      border-radius: var(--r-lg);
+    }
+    .decision .tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 10px; letter-spacing: 2px; font-weight: 700;
+      color: var(--gold);
+      padding: 3px 8px;
+      background: rgba(201,169,97,0.15);
+      border: 1px solid rgba(201,169,97,0.4);
+      border-radius: var(--r-pill);
+      text-transform: uppercase;
+      margin-bottom: var(--s-3);
+    }
+    .decision h4 {
+      margin: 0 0 var(--s-2);
+      font-size: 18px; font-weight: 700;
+    }
+    .decision p {
+      margin: 0 0 var(--s-3);
+      color: var(--fg-mute); font-size: 13px; line-height: 1.6;
+    }
+    .decision .alt {
+      font-size: 11px; color: var(--fg-dim);
+      padding-top: var(--s-3);
+      border-top: 1px solid var(--border);
+    }
+    .decision .alt strong { color: var(--fg-mute); font-weight: 600; }
+
+    /* ── Color swatches ─────────────────────────────────── */
+    .swatch {
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: var(--s-3);
+      display: flex; flex-direction: column; gap: var(--s-2);
+      background: var(--bg-card);
+    }
+    .swatch .chip {
+      height: 72px; border-radius: var(--r-sm);
+      border: 1px solid var(--border);
+    }
+    .swatch .name {
+      font-size: 12px; font-weight: 600;
+    }
+    .swatch .hex {
+      font-size: 11px; color: var(--fg-dim);
+    }
+    .swatch .use {
+      font-size: 11px; color: var(--fg-mute); line-height: 1.4;
+      margin-top: 4px;
+    }
+
+    /* ── Type specimens ─────────────────────────────────── */
+    .type-row {
+      display: grid; grid-template-columns: 160px 1fr 240px;
+      gap: var(--s-5);
+      padding: var(--s-4) var(--s-5);
+      border-bottom: 1px solid var(--border);
+      align-items: baseline;
+    }
+    .type-row:last-child { border-bottom: none; }
+    .type-row .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--gold); letter-spacing: 1px;
+      font-weight: 700;
+    }
+    .type-row .specimen { color: var(--fg); }
+    .type-row .meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--fg-dim); line-height: 1.6;
+    }
+    @media (max-width: 800px) {
+      .type-row { grid-template-columns: 1fr; gap: var(--s-2); }
+    }
+
+    /* ── Spacing & radius ───────────────────────────────── */
+    .spacing-list, .radius-list {
+      display: flex; flex-wrap: wrap; gap: var(--s-5);
+    }
+    .spacing-tile, .radius-tile {
+      display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2);
+    }
+    .spacing-bar {
+      height: 24px; background: var(--gold);
+      border-radius: 2px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+    }
+    .radius-vis {
+      width: 72px; height: 72px;
+      background: linear-gradient(160deg, var(--gold), var(--gold-2));
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .spacing-tile .name, .radius-tile .name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: 1px;
+    }
+    .spacing-tile .val, .radius-tile .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; color: var(--fg-dim);
+    }
+
+    /* ── Motion table ───────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table thead th {
+      text-align: left;
+      font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--fg-dim); font-weight: 700;
+      padding: var(--s-2) var(--s-3);
+      border-bottom: 1px solid var(--border-2);
+    }
+    table tbody td {
+      padding: var(--s-3);
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table tbody tr:last-child td { border-bottom: none; }
+    table .mono { color: var(--gold); }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px; border-radius: var(--r-pill);
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+      background: rgba(201,169,97,0.12);
+      border: 1px solid rgba(201,169,97,0.35);
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+    .pill.warn { background: rgba(192,57,43,0.15); border-color: rgba(192,57,43,0.4); color: var(--loss); }
+    .pill.info { background: rgba(90,125,140,0.18); border-color: rgba(90,125,140,0.45); color: #8eb2c1; }
+    .pill.win  { background: rgba(127,194,153,0.15); border-color: rgba(127,194,153,0.45); color: var(--win); }
+
+    /* ── Motion preview boxes ───────────────────────────── */
+    .motion-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-4); }
+    @media (max-width: 800px) { .motion-grid { grid-template-columns: repeat(2, 1fr); } }
+    .motion-demo {
+      padding: var(--s-4);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      text-align: center;
+    }
+    .motion-demo .stage {
+      height: 80px; position: relative;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: var(--s-3);
+    }
+    .motion-demo .ball {
+      width: 32px; height: 32px; border-radius: var(--r-sm);
+      background: var(--gold);
+    }
+    .motion-demo .name {
+      font-size: 12px; font-weight: 700;
+    }
+    .motion-demo .desc {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--fg-dim); margin-top: 2px;
+    }
+
+    @keyframes m-fast       { 50% { transform: translateX(40px); } }
+    @keyframes m-base       { 50% { transform: translateX(50px); } }
+    @keyframes m-emphasized { 50% { transform: translateX(60px) scale(1.1); } }
+    @keyframes m-pulse      { 50% { transform: scale(1.2); box-shadow: 0 0 24px var(--gold); } }
+    .m-fast       .ball { animation: m-fast       0.32s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .m-base       .ball { animation: m-base       0.50s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+    .m-emphasized .ball { animation: m-emphasized 0.60s cubic-bezier(0.2, 0, 0, 1) infinite; }
+    .m-pulse      .ball { animation: m-pulse      1.60s ease-in-out infinite; }
+
+    /* ── A11y notes ─────────────────────────────────────── */
+    .check {
+      display: flex; align-items: flex-start; gap: var(--s-3);
+      padding: var(--s-3) 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .check:last-child { border-bottom: none; }
+    .check .status {
+      flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      margin-top: 2px;
+    }
+    .check .status.ok   { background: rgba(127,194,153,0.18); color: var(--win); border: 1px solid rgba(127,194,153,0.4); }
+    .check .status.todo { background: rgba(201,169,97,0.15); color: var(--gold); border: 1px solid rgba(201,169,97,0.35); }
+    .check .status.warn { background: rgba(192,57,43,0.12); color: var(--loss); border: 1px solid rgba(192,57,43,0.4); }
+    .check .body { font-size: 13px; line-height: 1.55; }
+    .check .body strong { color: var(--fg); font-weight: 600; }
+    .check .body div { color: var(--fg-mute); margin-top: 2px; }
+
+    /* ── Footer ─────────────────────────────────────────── */
+    footer {
+      margin-top: var(--s-9);
+      padding: var(--s-6) 0;
+      border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--fg-dim);
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: var(--s-3);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="hero">
+      <div class="brand-cn">南昌</div>
+      <h1>Nanchang Mahjong — Design Handoff</h1>
+      <p class="deck">
+        Token reference, motion spec, and accessibility checklist for the family-mahjong webapp.
+        Mobile web, Android-first; renders as a responsive site on desktop too.
+      </p>
+      <div class="meta">
+        <span>Version 1.0 · prototype lock</span>
+        <span>Platform: Web · mobile-first</span>
+        <span>Target: Chrome / Android WebView / desktop browsers</span>
+        <a href="Nanchang Mahjong.html">← Back to prototype</a>
+      </div>
+    </header>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>01 · Locked decisions</h2>
+      <h3>What the prototype is committing to</h3>
+      <p class="lede">
+        Two interaction patterns were explored as Tweaks; both have been locked.
+        Alternative variants have been removed from the code.
+      </p>
+
+      <div class="decisions">
+        <div class="decision">
+          <span class="tag">Tile discard</span>
+          <h4>Tap a tile, then press Discard</h4>
+          <p>
+            Player taps the tile they want to discard — it lifts and a gold pill <code>出牌 / Discard ↑</code>
+            appears above the hand. A second tap on Discard sends it. This double-confirm prevents
+            misfires (the #1 complaint in family-mahjong forums) and reads cleanly to first-time players.
+          </p>
+          <div class="alt">
+            <strong>Alternates considered:</strong> drag-up-to-discard (felt natural but fired too easily during scroll on long hands);
+            tap-tap-confirm (same number of taps but no explicit affordance).
+          </div>
+        </div>
+
+        <div class="decision">
+          <span class="tag">Call prompts</span>
+          <h4>Pung / Kong / Chow on the right rail</h4>
+          <p>
+            When another player's discard creates a possible call, the buttons stack on the right
+            edge with a circular timer ring above them. The hand stays fully visible (no bottom-sheet
+            occlusion), and the rail thumb-reaches naturally on a right-handed grip.
+          </p>
+          <div class="alt">
+            <strong>Alternates considered:</strong> bottom action sheet (covered the player's hand at the exact moment
+            they need to see it); floating action buttons (no room for the urgency timer + context label).
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>02 · Colors</h2>
+      <h3>Tokens</h3>
+      <p class="lede">
+        Warm gold + jade green is the brand pair. Surfaces ladder up in dark mode; ink is bone-warm.
+        Semantic colors are reused for win/loss/info; nothing else gets a new color without discussion.
+      </p>
+
+      <h4 style="margin-top: var(--s-6); font-size: 13px; color: var(--fg-mute); font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Brand</h4>
+      <div class="grid grid-4" style="margin-bottom: var(--s-6);">
+        <div class="swatch">
+          <div class="chip" style="background: #c9a961;"></div>
+          <div class="name">Gold · primary</div>
+          <div class="hex mono">#c9a961</div>
+          <div class="use">Primary CTAs, brand glyph, active states, jing accent.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: linear-gradient(180deg, #c9a961, #a88a45);"></div>
+          <div class="name">Gold gradient</div>
+          <div class="hex mono">#c9a961 → #a88a45</div>
+          <div class="use">Used on filled primary buttons.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #0d3b2e;"></div>
+          <div class="name">Jade · felt</div>
+          <div class="hex mono">#0d3b2e</div>
+          <div class="use">Default felt color &amp; brand surface.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #051a13;"></div>
+          <div class="name">Jade deep</div>
+          <div class="hex mono">#051a13</div>
+          <div class="use">App bg gradient bottom stop, modals base.</div>
+        </div>
+      </div>
+
+      <h4 style="font-size: 13px; color: var(--fg-mute); font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Ink &amp; surface</h4>
+      <div class="grid grid-5" style="margin-bottom: var(--s-6);">
+        <div class="swatch">
+          <div class="chip" style="background: #f5efdf;"></div>
+          <div class="name">Bone · ink</div>
+          <div class="hex mono">#f5efdf</div>
+          <div class="use">Tile face fill, primary text on dark.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #1f2937;"></div>
+          <div class="name">Slate · ink</div>
+          <div class="hex mono">#1f2937</div>
+          <div class="use">Primary text on gold; tile glyphs.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: rgba(245,239,223,0.65); border: 1px dashed rgba(245,239,223,0.3);"></div>
+          <div class="name">Ink mute (65%)</div>
+          <div class="hex mono">rgba(245,239,223,0.65)</div>
+          <div class="use">Secondary text on dark.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: rgba(245,239,223,0.45); border: 1px dashed rgba(245,239,223,0.3);"></div>
+          <div class="name">Ink dim (45%)</div>
+          <div class="hex mono">rgba(245,239,223,0.45)</div>
+          <div class="use">Tertiary text, disabled labels.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: rgba(245,239,223,0.06); border: 1px solid rgba(245,239,223,0.18);"></div>
+          <div class="name">Ink wash</div>
+          <div class="hex mono">rgba(245,239,223,0.06)</div>
+          <div class="use">Card / list-row background on dark.</div>
+        </div>
+      </div>
+
+      <h4 style="font-size: 13px; color: var(--fg-mute); font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Semantic</h4>
+      <div class="grid grid-4">
+        <div class="swatch">
+          <div class="chip" style="background: #7fc299;"></div>
+          <div class="name">Win green</div>
+          <div class="hex mono">#7fc299</div>
+          <div class="use">Win badge, positive score delta, ready check.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #1f7a4d;"></div>
+          <div class="name">Win green deep</div>
+          <div class="hex mono">#1f7a4d</div>
+          <div class="use">Ink for "ready" pill border / dot tone.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #c0392b;"></div>
+          <div class="name">Loss red</div>
+          <div class="hex mono">#c0392b</div>
+          <div class="use">Destructive CTAs (delete, concede), error icon.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #e88080;"></div>
+          <div class="name">Loss red light</div>
+          <div class="hex mono">#e88080</div>
+          <div class="use">Error text/labels on dark surfaces.</div>
+        </div>
+      </div>
+
+      <h4 style="font-size: 13px; color: var(--fg-mute); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-top: var(--s-6);">Player avatars (compass winds)</h4>
+      <div class="grid grid-4">
+        <div class="swatch">
+          <div class="chip" style="background: #c9a961;"></div>
+          <div class="name">East · 東 · gold</div>
+          <div class="hex mono">#c9a961</div>
+          <div class="use">The player (you), bottom seat.</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #a36d3e;"></div>
+          <div class="name">South · 南 · amber</div>
+          <div class="hex mono">#a36d3e</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #5a7d8c;"></div>
+          <div class="name">West · 西 · slate</div>
+          <div class="hex mono">#5a7d8c</div>
+        </div>
+        <div class="swatch">
+          <div class="chip" style="background: #7d4f4f;"></div>
+          <div class="name">North · 北 · rust</div>
+          <div class="hex mono">#7d4f4f</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>03 · Typography</h2>
+      <h3>Three families, one role each</h3>
+      <p class="lede">
+        Inter for UI text, Noto Serif SC for Chinese characters and brand display, JetBrains Mono for
+        codes, counters, and small caps labels. Keep the families orthogonal: one role per face.
+      </p>
+
+      <div class="card" style="padding: 0;">
+        <div class="type-row">
+          <div class="label">DISPLAY · BRAND</div>
+          <div class="specimen" style="font-family: 'Noto Serif SC', serif; font-size: 56px; font-weight: 700; color: var(--gold); line-height: 1;">南昌</div>
+          <div class="meta">Noto Serif SC 700 · 56px · 1.0<br>letter-spacing 2px</div>
+        </div>
+        <div class="type-row">
+          <div class="label">H1 · SCREEN TITLE</div>
+          <div class="specimen" style="font-size: 22px; font-weight: 700; letter-spacing: 0.2px;">Welcome back, Wei Chen</div>
+          <div class="meta">Inter 700 · 22px · 1.3</div>
+        </div>
+        <div class="type-row">
+          <div class="label">H2 · CARD HEADING</div>
+          <div class="specimen" style="font-size: 17px; font-weight: 700; letter-spacing: 0.2px;">Private Room</div>
+          <div class="meta">Inter 700 · 17px · 1.35</div>
+        </div>
+        <div class="type-row">
+          <div class="label">BODY</div>
+          <div class="specimen" style="font-size: 14px;">Your win rate, fan and recent games will appear here once you finish your first match.</div>
+          <div class="meta">Inter 400 · 14px · 1.55</div>
+        </div>
+        <div class="type-row">
+          <div class="label">BODY · STRONG</div>
+          <div class="specimen" style="font-size: 13px; font-weight: 600;">All Pungs · 對對胡 · ×2</div>
+          <div class="meta">Inter 600 · 13px · 1.4</div>
+        </div>
+        <div class="type-row">
+          <div class="label">CAPTION</div>
+          <div class="specimen" style="font-size: 12px; color: var(--fg-mute);">4-day streak · Jade III · 1842 pts</div>
+          <div class="meta">Inter 400/500 · 12px · 1.5</div>
+        </div>
+        <div class="type-row">
+          <div class="label">EYEBROW</div>
+          <div class="specimen" style="font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--fg-mute); text-transform: uppercase;">ROUND SETTINGS</div>
+          <div class="meta">Inter 700 · 11px · 1.4<br>letter-spacing 1px · uppercase</div>
+        </div>
+        <div class="type-row">
+          <div class="label">NUMERIC</div>
+          <div class="specimen" style="font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: 700; color: var(--gold); letter-spacing: 4px;">NX-3K8M</div>
+          <div class="meta">JetBrains Mono 700 · 30px · 1.0<br>letter-spacing 4px</div>
+        </div>
+        <div class="type-row">
+          <div class="label">META · MONO</div>
+          <div class="specimen" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-dim); letter-spacing: 0.5px;">42 / 38 · +186 · 30D</div>
+          <div class="meta">JetBrains Mono 500 · 11px · 1.4</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>04 · Spacing</h2>
+      <h3>4-pixel grid</h3>
+      <p class="lede">
+        All paddings, gaps, and margins step on a 4px scale. Card padding lives at <code>s-5</code> (20px);
+        list-row padding at <code>s-3 / s-4</code> (12–16px). Bigger jumps (<code>s-7+</code>) are for
+        section breaks and modal layouts only.
+      </p>
+
+      <div class="card spacing-list">
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 4px;"></div><div class="name">s-1</div><div class="val">4px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 8px;"></div><div class="name">s-2</div><div class="val">8px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 12px;"></div><div class="name">s-3</div><div class="val">12px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 16px;"></div><div class="name">s-4</div><div class="val">16px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 20px;"></div><div class="name">s-5</div><div class="val">20px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 24px;"></div><div class="name">s-6</div><div class="val">24px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 32px;"></div><div class="name">s-7</div><div class="val">32px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 48px;"></div><div class="name">s-8</div><div class="val">48px</div></div>
+        <div class="spacing-tile"><div class="spacing-bar" style="width: 64px;"></div><div class="name">s-9</div><div class="val">64px</div></div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>05 · Radius</h2>
+      <h3>Soft but not pillowy</h3>
+      <p class="lede">
+        Cards use <code>r-md</code> (12) or <code>r-lg</code> (16). Sheets and modals use <code>r-xl</code> (22).
+        Pills are full-rounded. Tiles get a snug 6px corner; never visualize a square tile.
+      </p>
+
+      <div class="card radius-list">
+        <div class="radius-tile"><div class="radius-vis" style="border-radius: 4px;"></div><div class="name">r-xs</div><div class="val">4px · tile inner</div></div>
+        <div class="radius-tile"><div class="radius-vis" style="border-radius: 8px;"></div><div class="name">r-sm</div><div class="val">8px · chips, small btns</div></div>
+        <div class="radius-tile"><div class="radius-vis" style="border-radius: 12px;"></div><div class="name">r-md</div><div class="val">12px · standard card</div></div>
+        <div class="radius-tile"><div class="radius-vis" style="border-radius: 16px;"></div><div class="name">r-lg</div><div class="val">16px · hero card</div></div>
+        <div class="radius-tile"><div class="radius-vis" style="border-radius: 22px;"></div><div class="name">r-xl</div><div class="val">22px · modal, sheet</div></div>
+        <div class="radius-tile"><div class="radius-vis" style="border-radius: 999px;"></div><div class="name">r-pill</div><div class="val">999px · pills, badges</div></div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>06 · Elevation</h2>
+      <h3>Three levels, that's it</h3>
+      <p class="lede">
+        We have very few elevations because the felt + dark surface does most of the depth work.
+        Save shadows for things that need to "lift off the table".
+      </p>
+
+      <div class="grid grid-3">
+        <div class="card" style="padding: var(--s-5);">
+          <div style="height: 80px; background: rgba(245,239,223,0.06); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: var(--s-3);"></div>
+          <div style="font-weight: 700; font-size: 14px;">Flat · 0</div>
+          <div style="font-size: 12px; color: var(--fg-mute); margin-top: 4px;">List rows, settings rows, tile-back bg. No shadow; relies on border only.</div>
+        </div>
+        <div class="card" style="padding: var(--s-5);">
+          <div style="height: 80px; background: var(--gold); border-radius: var(--r-md); margin-bottom: var(--s-3); box-shadow: 0 6px 18px rgba(201,169,97,0.3);"></div>
+          <div style="font-weight: 700; font-size: 14px;">CTA · 6/18</div>
+          <div style="font-size: 12px; color: var(--fg-mute); margin-top: 4px;">Primary CTAs glow softly. <code>0 6px 18px rgba(gold,0.3)</code></div>
+        </div>
+        <div class="card" style="padding: var(--s-5);">
+          <div style="height: 80px; background: rgba(20,46,38,0.95); border: 1px solid rgba(201,169,97,0.35); border-radius: var(--r-md); margin-bottom: var(--s-3); box-shadow: 0 12px 40px rgba(0,0,0,0.55);"></div>
+          <div style="font-weight: 700; font-size: 14px;">Overlay · 12/40</div>
+          <div style="font-size: 12px; color: var(--fg-mute); margin-top: 4px;">Modals &amp; sheets sit on a deep shadow. <code>0 12px 40px rgba(0,0,0,0.55)</code></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>07 · Motion</h2>
+      <h3>Restrained, with one star</h3>
+      <p class="lede">
+        Standard UI moves are 200–500ms on the Material standard curve. Reserve "emphasized" easing
+        for high-stakes moments — the Jing reveal and the win banner. Everything else is fast and forgettable.
+      </p>
+
+      <table style="margin-bottom: var(--s-6);">
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Duration</th>
+            <th>Easing</th>
+            <th>Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="pill">fast</span></td>
+            <td class="mono">120–200ms</td>
+            <td class="mono">cubic-bezier(0.4, 0, 0.2, 1)</td>
+            <td>Toggle flips, button presses, focus rings.</td>
+          </tr>
+          <tr>
+            <td><span class="pill">base</span></td>
+            <td class="mono">250–400ms</td>
+            <td class="mono">cubic-bezier(0.4, 0, 0.2, 1)</td>
+            <td>Overlay / sheet entry &amp; exit, tab switches.</td>
+          </tr>
+          <tr>
+            <td><span class="pill">emphasized</span></td>
+            <td class="mono">500–800ms</td>
+            <td class="mono">cubic-bezier(0.2, 0, 0, 1)</td>
+            <td>Jing reveal, end-game banner, tile flip-in.</td>
+          </tr>
+          <tr>
+            <td><span class="pill">ambient</span></td>
+            <td class="mono">1.2–1.6s loop</td>
+            <td class="mono">ease-in-out</td>
+            <td>Last-discard pulse, AFK dot, skeleton shimmer.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="motion-grid">
+        <div class="motion-demo m-fast"><div class="stage"><div class="ball"></div></div><div class="name">Fast</div><div class="desc">200ms · standard</div></div>
+        <div class="motion-demo m-base"><div class="stage"><div class="ball"></div></div><div class="name">Base</div><div class="desc">400ms · standard</div></div>
+        <div class="motion-demo m-emphasized"><div class="stage"><div class="ball"></div></div><div class="name">Emphasized</div><div class="desc">600ms · emphasized</div></div>
+        <div class="motion-demo m-pulse"><div class="stage"><div class="ball"></div></div><div class="name">Ambient pulse</div><div class="desc">1.6s loop</div></div>
+      </div>
+
+      <h4 style="margin-top: var(--s-7); font-size: 13px; color: var(--fg-mute); font-weight: 600; letter-spacing: 1px; text-transform: uppercase;">Key choreographed moments</h4>
+      <table>
+        <thead><tr><th>Moment</th><th>Spec</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Tile discard</strong></td>
+            <td class="mono">scale 1 → 0.9 → 0 · 280ms · base</td>
+            <td>Tile fades into the discard pool position; subtle clack audio (depends on Sound Pack).</td>
+          </tr>
+          <tr>
+            <td><strong>Call prompt enter</strong></td>
+            <td class="mono">opacity 0 → 1, ty 8 → 0 · 250ms · base</td>
+            <td>Side rail buttons stagger by 40ms. Timer ring starts at 8s.</td>
+          </tr>
+          <tr>
+            <td><strong>Jing reveal</strong></td>
+            <td class="mono">flip+scale · 700ms · emphasized</td>
+            <td>The hero moment. Tile lifts off the deck, rotates Y axis, lands in the status bar.</td>
+          </tr>
+          <tr>
+            <td><strong>Win banner</strong></td>
+            <td class="mono">backdrop blur in 600ms · 胡 char scales 0.85 → 1 · 700ms · emphasized</td>
+            <td>Hold the moment. Confetti / sound only on self-drawn win.</td>
+          </tr>
+          <tr>
+            <td><strong>Last-discard pulse</strong></td>
+            <td class="mono">box-shadow loop · 1.6s · ambient</td>
+            <td>The most recent discard pulses gold until a call is made or it ages out.</td>
+          </tr>
+          <tr>
+            <td><strong>Skeleton shimmer</strong></td>
+            <td class="mono">background-position · 1.4s · linear</td>
+            <td>Standard placeholder shimmer; never longer than 3 seconds before swap.</td>
+          </tr>
+          <tr>
+            <td><strong>Reconnecting</strong></td>
+            <td class="mono">spinner 0.9s linear · backdrop fade 250ms</td>
+            <td>Surface only if disconnect &gt; 1.5s; otherwise stay quiet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>08 · Accessibility</h2>
+      <h3>What needs to be true before ship</h3>
+      <p class="lede">
+        This dark + gold palette is generally OK, but tile glyphs and small mono labels need attention.
+        Mahjong is also a tile-recognition game — screen-reader users need a non-visual path.
+      </p>
+
+      <div class="card">
+        <div class="check">
+          <div class="status ok">✓</div>
+          <div class="body">
+            <strong>Touch targets ≥ 44 × 44 dp</strong>
+            <div>Action buttons (Pung/Kong/Win) are 60 wide × 56 tall; bottom nav items are 44 tall; Discard pill is 36 tall but 88 wide — within Android Material guideline (48dp recommended, 44 minimum).</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status ok">✓</div>
+          <div class="body">
+            <strong>Primary text on dark passes AA</strong>
+            <div>Bone (#f5efdf) on Jade (#0d3b2e) = 13.7:1. Bone on Slate (#1f2937) = 14.9:1. Gold (#c9a961) on Jade = 5.8:1 — passes AA at all text sizes.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status warn">!</div>
+          <div class="body">
+            <strong>Tile glyph color contrast on dark face</strong>
+            <div>The "Onyx" tile face (#1f2937 ink on #1f2937 face) breaks contrast. Bug, not a feature — must inverted-ink before ship. Theme.jsx already does this for face palettes &lt; 0.4 luminance; verify on the Slate felt + Onyx face combo specifically.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status warn">!</div>
+          <div class="body">
+            <strong>Ink-dim (45%) caption is borderline</strong>
+            <div>4.2:1 against Jade. Usable for ≥14px non-essential meta (date, "vs Mei, Wei, Lin"), but never use it on body or for critical info.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Screen-reader tile labels</strong>
+            <div>Every <code>&lt;MahjongTile&gt;</code> must render an <code>aria-label</code>. Use the canonical name (e.g. "5 Bamboo", "East Wind", "Red Dragon"). Don't rely on the SVG glyph alone.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Focus order on Gameplay</strong>
+            <div>Tab order: Menu → status bar → opponent nameplates (clockwise from top) → hand (left to right) → drawn tile → call rail → Discard. The current DOM order matches this; needs a keyboard pass to confirm. Add a visible focus ring (2px gold outline) to every interactive.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Reduced motion</strong>
+            <div>Wrap the Jing reveal, last-discard pulse, and skeleton shimmer in <code>@media (prefers-reduced-motion: reduce)</code> stubs that swap to a static state. Tile discard animation stays (it conveys info).</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Auto-discard timer announcement</strong>
+            <div>When the 8-second timer crosses 3s, fire a polite ARIA live announcement: "3 seconds left to discard". Don't fire under 3s — too chatty.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Color-only state indicators</strong>
+            <div>Ready/Not ready pill in the room lobby relies on color + label (good). Win/loss row stripes rely on color only — pair with a small ✓/✗ glyph or a leading "+/−" sign for color-blind players.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Form field labeling</strong>
+            <div>Auth/Forgot-pw/Change-pw use eyebrow-style labels above the input. Make sure each is wired as a proper <code>&lt;label&gt;</code> with <code>htmlFor</code> (or wraps the input) — not just visual.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">○</div>
+          <div class="body">
+            <strong>Language switcher</strong>
+            <div>The LangToggle should set <code>document.documentElement.lang</code> when switched, so screen-readers swap voices for Chinese text.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>09 · Component coverage</h2>
+      <h3>What states each screen ships with</h3>
+      <p class="lede">
+        Every screen that hits the network has loading, error, and (where it makes sense) empty
+        variants. Toggle them via the Tweaks panel in the prototype.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Screen</th>
+            <th>Normal</th>
+            <th>Loading</th>
+            <th>Empty</th>
+            <th>Error</th>
+            <th>Other</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Onboarding</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class="pill">skip</span></td>
+          </tr>
+          <tr>
+            <td><strong>Auth / Forgot / Change PW</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td><span class="pill win">submitting</span></td>
+            <td>—</td>
+            <td><span class="pill win">field</span></td>
+            <td><span class="pill">2-step sent</span></td>
+          </tr>
+          <tr>
+            <td><strong>Home</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td><span class="pill win">skeleton</span></td>
+            <td>—</td>
+            <td><span class="pill win">offline</span></td>
+            <td><span class="pill">learn nudge</span></td>
+          </tr>
+          <tr>
+            <td><strong>Room</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td><span class="pill win">skeleton</span></td>
+            <td><span class="pill win">waiting (1/4)</span></td>
+            <td><span class="pill win">not found</span></td>
+            <td><span class="pill warn">host left</span></td>
+          </tr>
+          <tr>
+            <td><strong>Gameplay</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td>n/a</td>
+            <td>n/a</td>
+            <td><span class="pill win">disconnected</span></td>
+            <td><span class="pill warn">reconnecting · AFK · player left · concede</span></td>
+          </tr>
+          <tr>
+            <td><strong>End game</strong></td>
+            <td><span class="pill win">win · lose · draw</span></td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class="pill">rematch strip</span></td>
+          </tr>
+          <tr>
+            <td><strong>History</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td><span class="pill win">skeleton</span></td>
+            <td><span class="pill win">no games yet</span></td>
+            <td><span class="pill win">offline</span></td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td><strong>Replay</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td>(reuses History)</td>
+            <td>—</td>
+            <td>(reuses History)</td>
+            <td><span class="pill">share hand modal</span></td>
+          </tr>
+          <tr>
+            <td><strong>Friends</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td><span class="pill win">skeleton</span></td>
+            <td><span class="pill win">no friends</span></td>
+            <td><span class="pill win">offline</span></td>
+            <td><span class="pill">requests tab</span></td>
+          </tr>
+          <tr>
+            <td><strong>Account / Customize / Learn</strong></td>
+            <td><span class="pill win">✓</span></td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class="pill warn">delete · 2-step</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────────────────────────────────────────────── -->
+    <section>
+      <h2>10 · Open questions for dev</h2>
+      <h3>Things to confirm before implementation</h3>
+      <p class="lede">
+        These didn't fit cleanly into the design and want a conversation. Most have a default
+        recommendation; mark them up if you disagree.
+      </p>
+
+      <div class="card">
+        <div class="check">
+          <div class="status todo">?</div>
+          <div class="body">
+            <strong>Auto-discard at timeout — what gets discarded?</strong>
+            <div>Recommendation: the drawn tile (least surprising; matches most online clients). Alternative: the rightmost tile in hand.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">?</div>
+          <div class="body">
+            <strong>Simultaneous claims (two players Pung the same discard)</strong>
+            <div>Recommendation: priority is Win &gt; Pung/Kong &gt; Chow (standard rules). Surface a 600ms "two players called Pung" toast before resolution so the loser knows why.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">?</div>
+          <div class="body">
+            <strong>Replay storage</strong>
+            <div>The Replay screen assumes a flat move log on the server. Confirm format (we're proposing a JSON stream per match, ~38 entries × ~80 bytes = &lt;4KB/game).</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">?</div>
+          <div class="body">
+            <strong>Share link routing</strong>
+            <div>Replay share copies <code>https://nanchang.mj/replay/{id}</code>. Confirm: is the path public, family-friends-only, or requires auth?</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">?</div>
+          <div class="body">
+            <strong>Push notifications</strong>
+            <div>Not designed yet. Likely needed for "your turn after reconnecting", "friend invited you", "rematch ready". Treat as a follow-up.</div>
+          </div>
+        </div>
+        <div class="check">
+          <div class="status todo">?</div>
+          <div class="body">
+            <strong>Landscape / tablet</strong>
+            <div>Out of scope for v1. The current layout is portrait phone + centered column on desktop. If iPad-on-the-table emerges as a use case, the game screen specifically needs a wider rework.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div>南昌麻将 · v1.0 prototype lock · for the family</div>
+      <div><a href="Nanchang Mahjong.html">← Back to prototype</a></div>
+    </footer>
+
+  </div>
+</body>
+</html>
