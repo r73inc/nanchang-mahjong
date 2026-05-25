@@ -8,6 +8,47 @@
 
 ## 0. Scope & Ground Rules
 
+### 0.0 Branching & PR workflow
+**`main` is protected. No direct pushes.** Every change — feature, fix, doc, infra — lands via pull request from a branch.
+
+**Branch naming** (lowercase, kebab-case):
+- `feat/phase-<N>-<slug>` — phase feature work (e.g. `feat/phase-1-auth-invites`)
+- `feat/phase-<N>-<slug>-be` / `-fe` — when a phase is split into backend-first then frontend
+- `fix/<slug>` — bug fixes
+- `chore/<slug>` — tooling, config, deps, docs-only
+- `infra/<slug>` — CDK / Docker / CI changes
+- `engine/<slug>` — pure-engine changes in `packages/engine`
+
+**PR rules**:
+1. Branch off latest `main`. Rebase (not merge) to stay current.
+2. PR must be green: lint + typecheck + unit tests + (where applicable) E2E.
+3. Every PR updates or adds the feature-keyed tests listed in the relevant phase.
+4. Locale parity check (EN/ZH key sets) must pass from Phase 2 onward.
+5. Squash-merge into `main` (one commit per PR, clean history).
+6. Delete the branch on merge.
+
+**Frontend / backend split**:
+Features cut **vertically** (an "auth" feature has both API and UI), so the default is **one feature branch per phase** that touches both `apps/api` and `apps/web`. For the bigger phases listed below, the API surface needs to settle before UI work, so they ship as **two sequenced PRs**:
+
+| Phase | Default split |
+|---|---|
+| 0 Foundation | one PR (tooling) |
+| 1 Auth + invites | **BE-first PR → FE PR** |
+| 2 i18n + theming | one PR (mostly FE; minor BE for error i18n) |
+| 3 Admin page | **BE-first PR → FE PR** |
+| 4 Home / Profile / Friends | **BE-first PR → FE PR** |
+| 5 Game engine | one PR (pure `packages/engine`, no UI/API) |
+| 6 Room / Lobby | **BE-first PR → FE PR** |
+| 7 Real-time gameplay | **BE-first PR → FE PR** (largest phase — may split further) |
+| 8 End game / Stats / History | **BE-first PR → FE PR** |
+| 9 Replay | **BE-first PR → FE PR** |
+| 10 Learn | one PR (mostly FE + content) |
+| 11 Customize | one PR (mostly FE) |
+| 12 Push + a11y | **BE-first PR → FE PR** |
+| 13 Production deploy | infra PR(s) |
+
+"BE-first" means the backend PR ships endpoints + tests with no UI consumer yet (verified via API tests); the FE PR follows immediately and wires the screens. Both PRs reference the same phase.
+
 ### 0.1 Product summary
 A mobile-first, browser-accessible web app for playing **Nanchang Mahjong (南昌麻将)** — a regional Chinese mahjong variant — with close family and friends. Real-time 4-player matches, replays, friends, stats, tutorial, and customization. Dark/gold theme locked by design.
 
