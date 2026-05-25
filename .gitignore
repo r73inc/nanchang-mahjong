@@ -78,6 +78,9 @@ desktop.ini
 logs/
 *.log
 
+# ── Claude Code local state ─────────────────────────────────
+.claude/
+
 # ── OS / misc ───────────────────────────────────────────────
 *.tmp
 *.temp
