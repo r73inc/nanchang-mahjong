@@ -1,15 +1,38 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthPage } from './pages/auth/auth-page';
+import { ForgotPasswordPage } from './pages/auth/forgot-password-page';
+import { ConfirmResetPage } from './pages/auth/confirm-reset-page';
+import { HomeStubPage } from './pages/home/home-stub-page';
+import { ChangePasswordPage } from './pages/settings/change-password-page';
+import { DeleteAccountPage } from './pages/settings/delete-account-page';
+import { ProtectedRoute } from './components/layout/protected-route';
+
+/**
+ * Route tree for the app.
+ *
+ * BrowserRouter and global providers (QueryClientProvider, I18nProvider)
+ * live in main.tsx so this component is testable with MemoryRouter.
+ */
 export default function App() {
   return (
-    <div className="min-h-screen bg-mj-bg-page flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="font-serif text-5xl font-bold text-mj-gold tracking-widest mb-2">
-          南昌麻将
-        </h1>
-        <p className="font-sans text-sm text-ink-mute tracking-wide">Nanchang Mahjong</p>
-        <p className="font-mono text-xs text-ink-dim mt-6 tracking-wider uppercase">
-          Phase 0 · Foundation
-        </p>
-      </div>
-    </div>
+    <Routes>
+      {/* Root: redirect to /home; ProtectedRoute will send unauthenticated users to /auth */}
+      <Route path="/" element={<Navigate to="/home" replace />} />
+
+      {/* Public routes */}
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/confirm-reset" element={<ConfirmResetPage />} />
+
+      {/* Protected routes — unauthenticated users are redirected to /auth */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/home" element={<HomeStubPage />} />
+        <Route path="/settings/change-password" element={<ChangePasswordPage />} />
+        <Route path="/settings/delete-account" element={<DeleteAccountPage />} />
+      </Route>
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/home" replace />} />
+    </Routes>
   );
 }
