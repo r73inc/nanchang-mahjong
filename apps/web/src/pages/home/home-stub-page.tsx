@@ -42,6 +42,25 @@ export function HomeStubPage() {
           <p className="text-sm text-mj-bone/55 leading-relaxed">{t('comingSoon')}</p>
         </div>
 
+        {/* Admin panel link — only visible to admins */}
+        {user?.role === 'admin' && (
+          <div className="mb-4">
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px] text-sm text-mj-gold"
+              style={{
+                background: 'rgba(201,169,97,0.08)',
+                border: '1px solid rgba(201,169,97,0.2)',
+              }}
+            >
+              <span>{t('adminPanel')}</span>
+              <span className="text-mj-gold/50" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Settings actions */}
         <div className="space-y-2 mb-6">
           <button
