@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { InvitesModule } from './invites/invites.module';
 import { AdminModule } from './admin/admin.module';
+import { FriendsModule } from './friends/friends.module';
 import { HealthController } from './health/health.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { I18nModule } from './i18n/i18n.module';
@@ -33,6 +34,7 @@ import { I18nModule } from './i18n/i18n.module';
     UsersModule,
     InvitesModule,
     AdminModule,
+    FriendsModule,
   ],
   controllers: [HealthController],
   providers: [

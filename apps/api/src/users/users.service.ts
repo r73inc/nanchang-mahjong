@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import type { UserRole } from '../common/interfaces/authenticated-user.interface';
 
@@ -11,6 +12,17 @@ export interface UserProfile {
   createdAt: string;
   updatedAt: string;
   disabled: boolean;
+  /** Placeholder stats — real aggregates computed in Phase 8. */
+  gamesPlayed?: number;
+  gamesWon?: number;
+  rating?: number;
+  streak?: number;
+}
+
+export interface PublicProfile {
+  sub: string;
+  handle: string;
+  displayName: string;
 }
 
 export interface CreateProfileInput {
@@ -133,6 +145,88 @@ export class UsersService {
     const profile = await this.findBySub(sub);
     if (!profile) throw new NotFoundException('User not found');
     return profile;
+  }
+
+  /**
+   * Update a user's mutable profile fields (displayName and/or handle).
+   * Handle changes require swapping the handle-lock item atomically.
+   */
+  async updateProfile(
+    sub: string,
+    data: { displayName?: string; handle?: string },
+  ): Promise<UserProfile> {
+    const profile = await this.getOrThrow(sub);
+    const now = new Date().toISOString();
+
+    const handleChanged = data.handle && data.handle.toLowerCase() !== profile.handle.toLowerCase();
+    const newHandle = data.handle?.toLowerCase() ?? profile.handle;
+    const newDisplayName = data.displayName ?? profile.displayName;
+
+    if (handleChanged) {
+      // Atomically: create new handle lock + delete old one + update profile.
+      try {
+        await this.db.transactWrite({
+          TransactItems: [
+            {
+              Put: {
+                TableName: this.db.tableName,
+                Item: { ...DK.handleLock(newHandle), ownerSub: sub, createdAt: now },
+                ConditionExpression: 'attribute_not_exists(PK)',
+              },
+            },
+            {
+              Delete: {
+                TableName: this.db.tableName,
+                Key: DK.handleLock(profile.handle),
+              },
+            },
+            {
+              Update: {
+                TableName: this.db.tableName,
+                Key: DK.userProfile(sub),
+                UpdateExpression: 'SET handle = :h, displayName = :dn, updatedAt = :now',
+                ExpressionAttributeValues: { ':h': newHandle, ':dn': newDisplayName, ':now': now },
+                ConditionExpression: 'attribute_exists(PK)',
+              },
+            },
+          ],
+        });
+      } catch (err) {
+        if (err instanceof TransactionCanceledException) {
+          throw new ConflictException('Handle is already taken');
+        }
+        throw err;
+      }
+    } else {
+      await this.db.update({
+        Key: DK.userProfile(sub),
+        UpdateExpression: 'SET displayName = :dn, updatedAt = :now',
+        ExpressionAttributeValues: { ':dn': newDisplayName, ':now': now },
+        ConditionExpression: 'attribute_exists(PK)',
+      });
+    }
+
+    return { ...profile, handle: newHandle, displayName: newDisplayName, updatedAt: now };
+  }
+
+  /**
+   * Search users by handle prefix. Returns only public fields (no email).
+   * Used for friend search — safe to expose to any authenticated user.
+   */
+  async searchPublic(query: string): Promise<PublicProfile[]> {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const res = await this.db.scan({
+      FilterExpression: 'begins_with(PK, :pkPrefix) AND SK = :sk AND contains(handle, :q)',
+      ExpressionAttributeValues: { ':pkPrefix': 'USER#', ':sk': 'PROFILE', ':q': q },
+      ProjectionExpression: '#sub, handle, displayName',
+      ExpressionAttributeNames: { '#sub': 'sub' },
+    });
+    return (res.Items ?? []).map((item) => ({
+      sub: item.sub as string,
+      handle: item.handle as string,
+      displayName: item.displayName as string,
+    }));
   }
 
   /**

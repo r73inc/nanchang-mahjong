@@ -12,6 +12,10 @@
   "admin.cannotTargetSelf": "You cannot perform this action on your own account.",
   "admin.inviteNotRevokable": "Invite code not found or cannot be revoked.",
   "admin.expiresAtPast": "Expiry date must be in the future.",
+  "friends.selfFriend": "You cannot add yourself as a friend.",
+  "friends.requestExists": "A friend request already exists.",
+  "friends.requestNotFound": "Friend request not found.",
+  "friends.notFriends": "You are not friends with this user.",
   "common.error": "An unexpected error occurred.",
   "common.tooManyRequests": "Too many requests — please slow down."
 }

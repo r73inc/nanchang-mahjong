@@ -86,4 +86,8 @@ export const DK = {
   invite: (code: string) => ({ PK: `INVITE#${code.toUpperCase()}`, SK: 'META' }),
   invitesByStatus: (status: string) => ({ gsi1pk: `INVITE_STATUS#${status}` }),
   auditLog: (ts: string) => ({ PK: `AUDIT#${ts}`, SK: 'LOG' }),
+  friendship: (sub: string, friendSub: string) => ({
+    PK: `USER#${sub}`,
+    SK: `FRIEND#${friendSub}`,
+  }),
 } as const;
