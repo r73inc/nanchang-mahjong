@@ -6,6 +6,9 @@ import { HomeStubPage } from './pages/home/home-stub-page';
 import { ChangePasswordPage } from './pages/settings/change-password-page';
 import { DeleteAccountPage } from './pages/settings/delete-account-page';
 import { AdminPage } from './pages/admin/admin-page';
+import { ProfilePage } from './pages/profile/profile-page';
+import { FriendsPage } from './pages/friends/friends-page';
+import { CustomizeStubPage } from './pages/customize/customize-stub-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
 
@@ -29,6 +32,9 @@ export default function App() {
       {/* Protected routes — unauthenticated users are redirected to /auth */}
       <Route element={<ProtectedRoute />}>
         <Route path="/home" element={<HomeStubPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/friends" element={<FriendsPage />} />
+        <Route path="/customize" element={<CustomizeStubPage />} />
         <Route path="/settings/change-password" element={<ChangePasswordPage />} />
         <Route path="/settings/delete-account" element={<DeleteAccountPage />} />
       </Route>
