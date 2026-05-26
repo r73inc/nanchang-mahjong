@@ -35,6 +35,11 @@ const MESSAGE_TO_KEY: Record<string, I18nKey> = {
   'Cannot disable your own account': 'admin.cannotTargetSelf',
   'Cannot revoke: invite not found or already redeemed/revoked': 'admin.inviteNotRevokable',
   'expiresAt must be a future date': 'admin.expiresAtPast',
+  // friends.service.ts
+  'Cannot add yourself as a friend': 'friends.selfFriend',
+  'Friend request already exists': 'friends.requestExists',
+  'Friend request not found': 'friends.requestNotFound',
+  'Not friends': 'friends.notFriends',
   // generic
   'An unexpected error occurred': 'common.error',
 };

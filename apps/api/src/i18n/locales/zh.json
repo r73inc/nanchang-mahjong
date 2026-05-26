@@ -12,6 +12,10 @@
   "admin.cannotTargetSelf": "无法对自己的账号执行此操作。",
   "admin.inviteNotRevokable": "邀请码不存在或无法撤销。",
   "admin.expiresAtPast": "过期时间必须是未来的日期。",
+  "friends.selfFriend": "无法添加自己为好友。",
+  "friends.requestExists": "好友请求已存在。",
+  "friends.requestNotFound": "未找到好友请求。",
+  "friends.notFriends": "你与该用户还不是好友。",
   "common.error": "服务器错误，请稍后重试。",
   "common.tooManyRequests": "请求过于频繁，请稍后再试。"
 }
