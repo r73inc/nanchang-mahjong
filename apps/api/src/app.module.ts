@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { InvitesModule } from './invites/invites.module';
 import { HealthController } from './health/health.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { I18nModule } from './i18n/i18n.module';
 
 @Module({
   imports: [
@@ -22,6 +23,9 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     // Rate limiting — default bucket: 60 req / min per IP.
     // Individual routes override with @Throttle({ default: { ttl, limit } }).
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
+
+    // i18n — global service for translating error messages per Accept-Language.
+    I18nModule,
 
     DatabaseModule,
     AuthModule,

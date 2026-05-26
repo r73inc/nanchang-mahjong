@@ -10,7 +10,7 @@ import { Spinner } from '../../components/ui/spinner';
 import { useI18n } from '../../i18n';
 
 export function ForgotPasswordPage() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const { mutateAsync, isPending } = useForgotPassword();
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -93,7 +93,7 @@ export function ForgotPasswordPage() {
             className="mt-5 w-full py-3 rounded-md text-sm font-medium text-mj-bone/70
                        bg-transparent border border-mj-bone/15"
           >
-            {lang === 'zh' ? '已有验证码 →' : 'I have my code →'}
+            {t('haveMyCode')}
           </button>
         </div>
       </ScreenShell>

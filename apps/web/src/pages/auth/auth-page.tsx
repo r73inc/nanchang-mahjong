@@ -8,10 +8,13 @@ import { FormField } from '../../components/ui/form-field';
 import { Spinner } from '../../components/ui/spinner';
 import { LangToggle, useI18n } from '../../i18n';
 
+// Decorative brand hanzi — part of the logo mark, not i18n-translatable copy.
+const BRAND_HANZI = '南昌';
+
 // ── Sign-In form ─────────────────────────────────────────────────────────────
 
 function SignInForm({ onSuccess }: { onSuccess: () => void }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const { mutateAsync, isPending } = useSignin();
   const [apiError, setApiError] = useState('');
 
@@ -52,7 +55,7 @@ function SignInForm({ onSuccess }: { onSuccess: () => void }) {
 
       <div className="flex justify-end mb-1 -mt-1">
         <Link to="/forgot-password" className="text-[12px] font-semibold text-mj-gold">
-          {lang === 'zh' ? '忘记密码?' : t('forgotPassword')}
+          {t('forgotPassword')}
         </Link>
       </div>
 
@@ -200,7 +203,7 @@ export function AuthPage() {
             className="font-serif text-[56px] text-mj-gold leading-none"
             aria-label="南昌麻将 Nanchang Mahjong"
           >
-            南昌
+            {BRAND_HANZI}
           </div>
           <div className="font-mono text-[11px] tracking-[4px] mt-1.5 text-mj-bone/70 font-semibold">
             {t('appNameShort')}
