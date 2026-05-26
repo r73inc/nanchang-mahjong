@@ -3,6 +3,14 @@ import { useAuthStore } from '../../stores/auth.store';
 import { useSignout } from '../../hooks/use-auth';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
+import type { StringKey } from '../../i18n/strings';
+
+// Defined outside JSX so the no-literal-string rule doesn't flag path strings.
+const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
+  { key: 'profileLink', path: '/profile', icon: '👤' },
+  { key: 'friendsLink', path: '/friends', icon: '👥' },
+  { key: 'customizeLink', path: '/customize', icon: '🎨' },
+];
 
 export function HomeStubPage() {
   const { t } = useI18n();
@@ -40,6 +48,26 @@ export function HomeStubPage() {
             🀄
           </div>
           <p className="text-sm text-mj-bone/55 leading-relaxed">{t('comingSoon')}</p>
+        </div>
+
+        {/* Navigation shortcuts */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {NAV_ITEMS.map(({ key, path, icon }) => (
+            <button
+              key={key}
+              onClick={() => navigate(path)}
+              className="flex flex-col items-center gap-1.5 py-4 rounded-[14px] text-sm text-mj-bone/80"
+              style={{
+                background: 'rgba(245,239,223,0.06)',
+                border: '1px solid rgba(245,239,223,0.09)',
+              }}
+            >
+              <span className="text-xl" aria-hidden="true">
+                {icon}
+              </span>
+              <span className="text-[11px] font-semibold">{t(key)}</span>
+            </button>
+          ))}
         </div>
 
         {/* Admin panel link — only visible to admins */}
