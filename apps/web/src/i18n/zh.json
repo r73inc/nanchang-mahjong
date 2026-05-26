@@ -77,5 +77,26 @@
   "goBack": "返回",
   "error": "操作失败，请重试。",
   "loading": "加载中…",
-  "required": "此项为必填。"
+  "required": "此项为必填。",
+
+  "adminPanel": "管理面板",
+  "adminInvites": "邀请码",
+  "adminCount": "数量",
+  "adminNote": "备注",
+  "adminNotePlaceholder": "例：给 Alice 的",
+  "adminExpiry": "过期时间",
+  "adminGenerate": "生成",
+  "adminGenerating": "生成中…",
+  "adminRevoke": "撤销",
+  "adminRevoking": "撤销中…",
+  "adminNoInvites": "暂无邀请码。",
+  "adminUsers": "用户",
+  "adminSearchPlaceholder": "用户名或邮箱",
+  "adminNoUsers": "未找到用户。",
+  "adminMakeAdmin": "设为管理员",
+  "adminMakeUser": "设为普通用户",
+  "adminDisable": "停用",
+  "adminEnable": "启用",
+  "adminSaving": "保存中…",
+  "adminDisabledBadge": "已停用"
 }

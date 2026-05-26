@@ -5,7 +5,9 @@ import { ConfirmResetPage } from './pages/auth/confirm-reset-page';
 import { HomeStubPage } from './pages/home/home-stub-page';
 import { ChangePasswordPage } from './pages/settings/change-password-page';
 import { DeleteAccountPage } from './pages/settings/delete-account-page';
+import { AdminPage } from './pages/admin/admin-page';
 import { ProtectedRoute } from './components/layout/protected-route';
+import { AdminRoute } from './components/layout/admin-route';
 
 /**
  * Route tree for the app.
@@ -29,6 +31,11 @@ export default function App() {
         <Route path="/home" element={<HomeStubPage />} />
         <Route path="/settings/change-password" element={<ChangePasswordPage />} />
         <Route path="/settings/delete-account" element={<DeleteAccountPage />} />
+      </Route>
+
+      {/* Admin-only routes — non-admins are redirected to /home */}
+      <Route element={<AdminRoute />}>
+        <Route path="/admin" element={<AdminPage />} />
       </Route>
 
       {/* Fallback */}

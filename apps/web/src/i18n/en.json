@@ -77,5 +77,26 @@
   "goBack": "Go back",
   "error": "Something went wrong. Please try again.",
   "loading": "Loading…",
-  "required": "This field is required."
+  "required": "This field is required.",
+
+  "adminPanel": "Admin Panel",
+  "adminInvites": "Invite Codes",
+  "adminCount": "Count",
+  "adminNote": "Note",
+  "adminNotePlaceholder": "e.g. For Alice",
+  "adminExpiry": "Expiry",
+  "adminGenerate": "Generate",
+  "adminGenerating": "Generating…",
+  "adminRevoke": "Revoke",
+  "adminRevoking": "Revoking…",
+  "adminNoInvites": "No invite codes yet.",
+  "adminUsers": "Users",
+  "adminSearchPlaceholder": "Handle or email",
+  "adminNoUsers": "No users found.",
+  "adminMakeAdmin": "Make admin",
+  "adminMakeUser": "Make user",
+  "adminDisable": "Disable",
+  "adminEnable": "Enable",
+  "adminSaving": "Saving…",
+  "adminDisabledBadge": "Disabled"
 }
