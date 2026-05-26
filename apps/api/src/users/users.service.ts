@@ -135,12 +135,21 @@ export class UsersService {
     return profile;
   }
 
-  async listAll(): Promise<UserProfile[]> {
-    // Full table scan — acceptable at <50 users; add pagination in Phase 3
-    const res = await this.db.query({
-      IndexName: 'gsi1',
-      KeyConditionExpression: 'gsi1sk = :sk',
-      ExpressionAttributeValues: { ':sk': 'USER' },
+  /**
+   * List all user profiles. Optionally filter by handle or email substring.
+   * Uses a table Scan — acceptable at ≤50 users. Add a GSI partition key
+   * (e.g. gsi2pk='USERS') for cursor-based pagination if the user count grows.
+   */
+  async listAll(search?: string): Promise<UserProfile[]> {
+    const filter = search?.trim().toLowerCase();
+    const res = await this.db.scan({
+      FilterExpression: filter
+        ? 'begins_with(PK, :pkPrefix) AND SK = :sk AND (contains(handle, :s) OR contains(#em, :s))'
+        : 'begins_with(PK, :pkPrefix) AND SK = :sk',
+      ExpressionAttributeValues: filter
+        ? { ':pkPrefix': 'USER#', ':sk': 'PROFILE', ':s': filter }
+        : { ':pkPrefix': 'USER#', ':sk': 'PROFILE' },
+      ...(filter && { ExpressionAttributeNames: { '#em': 'email' } }),
     });
     return (res.Items ?? []) as UserProfile[];
   }

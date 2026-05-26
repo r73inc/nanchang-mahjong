@@ -6,6 +6,9 @@ import {
   AdminSetUserPasswordCommand,
   AdminDeleteUserCommand,
   AdminGetUserCommand,
+  AdminDisableUserCommand,
+  AdminEnableUserCommand,
+  AdminUpdateUserAttributesCommand,
   InitiateAuthCommand,
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
@@ -150,6 +153,31 @@ export class CognitoService implements OnModuleInit {
   async adminDeleteUser(email: string): Promise<void> {
     await this.client.send(
       new AdminDeleteUserCommand({ UserPoolId: this.userPoolId, Username: email }),
+    );
+  }
+
+  /** Disable a Cognito user by sub — they cannot exchange credentials for new tokens. */
+  async adminDisableUser(sub: string): Promise<void> {
+    await this.client.send(
+      new AdminDisableUserCommand({ UserPoolId: this.userPoolId, Username: sub }),
+    );
+  }
+
+  /** Re-enable a previously disabled Cognito user. */
+  async adminEnableUser(sub: string): Promise<void> {
+    await this.client.send(
+      new AdminEnableUserCommand({ UserPoolId: this.userPoolId, Username: sub }),
+    );
+  }
+
+  /** Update the custom:role attribute on a Cognito user so future tokens carry the new role. */
+  async adminSetRole(sub: string, role: 'user' | 'admin'): Promise<void> {
+    await this.client.send(
+      new AdminUpdateUserAttributesCommand({
+        UserPoolId: this.userPoolId,
+        Username: sub,
+        UserAttributes: [{ Name: 'custom:role', Value: role }],
+      }),
     );
   }
 

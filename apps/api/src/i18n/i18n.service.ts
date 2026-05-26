@@ -30,6 +30,11 @@ const MESSAGE_TO_KEY: Record<string, I18nKey> = {
   'Invite code has been revoked': 'auth.inviteInactive',
   'Invite code has expired': 'auth.inviteInactive',
   'Invite code is no longer valid': 'auth.inviteInactive',
+  // admin.service.ts
+  'Cannot change your own role': 'admin.cannotTargetSelf',
+  'Cannot disable your own account': 'admin.cannotTargetSelf',
+  'Cannot revoke: invite not found or already redeemed/revoked': 'admin.inviteNotRevokable',
+  'expiresAt must be a future date': 'admin.expiresAtPast',
   // generic
   'An unexpected error occurred': 'common.error',
 };

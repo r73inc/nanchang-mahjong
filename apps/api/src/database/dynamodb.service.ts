@@ -8,12 +8,14 @@ import {
   UpdateCommand,
   DeleteCommand,
   QueryCommand,
+  ScanCommand,
   TransactWriteCommand,
   type GetCommandInput,
   type PutCommandInput,
   type UpdateCommandInput,
   type DeleteCommandInput,
   type QueryCommandInput,
+  type ScanCommandInput,
   type TransactWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
 import type { AppConfig } from '../config/configuration';
@@ -64,6 +66,10 @@ export class DynamoDBService implements OnModuleInit {
 
   query(params: Omit<QueryCommandInput, 'TableName'>) {
     return this.docClient.send(new QueryCommand({ TableName: this.tableName, ...params }));
+  }
+
+  scan(params: Omit<ScanCommandInput, 'TableName'>) {
+    return this.docClient.send(new ScanCommand({ TableName: this.tableName, ...params }));
   }
 
   transactWrite(params: TransactWriteCommandInput) {
