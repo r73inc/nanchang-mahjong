@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { InvitesService, type InviteRecord } from '../invites/invites.service';
@@ -49,6 +49,9 @@ export class AdminService {
     expiresAt?: string,
     note?: string,
   ): Promise<InviteRecord[]> {
+    if (expiresAt && new Date(expiresAt) <= new Date()) {
+      throw new BadRequestException('expiresAt must be a future date');
+    }
     const results = await Promise.all(
       Array.from({ length: count }, () =>
         this.invites.create({ adminSub: actorSub, expiresAt, note }),

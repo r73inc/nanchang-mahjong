@@ -11,6 +11,7 @@
   "auth.wrongCurrentPassword": "Current password is incorrect.",
   "admin.cannotTargetSelf": "You cannot perform this action on your own account.",
   "admin.inviteNotRevokable": "Invite code not found or cannot be revoked.",
+  "admin.expiresAtPast": "Expiry date must be in the future.",
   "common.error": "An unexpected error occurred.",
   "common.tooManyRequests": "Too many requests — please slow down."
 }

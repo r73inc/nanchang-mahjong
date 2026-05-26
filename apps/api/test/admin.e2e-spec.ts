@@ -352,6 +352,17 @@ describe('Admin (e2e)', () => {
       expect(res.statusCode).toBe(400);
     });
 
+    it('returns 400 when expiresAt is in the past', async () => {
+      const pastDate = new Date(Date.now() - 60_000).toISOString();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/admin/invites',
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { count: 1, expiresAt: pastDate },
+      });
+      expect(res.statusCode).toBe(400);
+    });
+
     it('writes an AUDIT# item to DDB for the creation', async () => {
       ddbStub.put.mockClear();
       await app.inject({

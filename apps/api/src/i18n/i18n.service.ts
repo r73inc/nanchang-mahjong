@@ -34,6 +34,7 @@ const MESSAGE_TO_KEY: Record<string, I18nKey> = {
   'Cannot change your own role': 'admin.cannotTargetSelf',
   'Cannot disable your own account': 'admin.cannotTargetSelf',
   'Cannot revoke: invite not found or already redeemed/revoked': 'admin.inviteNotRevokable',
+  'expiresAt must be a future date': 'admin.expiresAtPast',
   // generic
   'An unexpected error occurred': 'common.error',
 };
