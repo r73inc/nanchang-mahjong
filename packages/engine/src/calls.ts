@@ -75,7 +75,8 @@ export function canKongFromDiscard(
  */
 export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): TileType[] {
   const { naturals, jingCount } = separateJing(hand, jingTypes);
-  if (hand.length < 14) return [];
+  // Note: no hand-length guard — concealed kongs are valid for any hand size
+  // (a player with open melds holds fewer than 14 concealed tiles).
 
   const options: TileType[] = [];
   const seen = new Set<TileType>();
@@ -103,6 +104,26 @@ export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): T
   if (jingCount >= 1) {
     for (const [t, cnt] of counts) {
       if (cnt >= 3 && !seen.has(t)) {
+        options.push(t);
+        seen.add(t);
+      }
+    }
+  }
+
+  // 2 naturals + 2 jings
+  if (jingCount >= 2) {
+    for (const [t, cnt] of counts) {
+      if (cnt >= 2 && !seen.has(t)) {
+        options.push(t);
+        seen.add(t);
+      }
+    }
+  }
+
+  // 1 natural + 3 jings
+  if (jingCount >= 3) {
+    for (const [t, cnt] of counts) {
+      if (cnt >= 1 && !seen.has(t)) {
         options.push(t);
         seen.add(t);
       }

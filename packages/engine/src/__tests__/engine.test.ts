@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../engine';
 import { isWinningHand } from '../hand';
-import type { TileType } from '../types';
+import type { TileType, GameState, Meld } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,15 @@ describe('GameEngine lifecycle', () => {
     const g = startedGame(42);
     expect(g.state.jingPrimary).not.toBeNull();
     expect(g.state.jingSecondary).not.toBeNull();
+  });
+
+  it('revealJing removes the indicator from deadWall, leaving 3 replacement tiles', () => {
+    const afterDeal = GameEngine.create(42).deal();
+    expect(afterDeal.state.deadWall).toHaveLength(4);
+    const afterReveal = afterDeal.revealJing();
+    expect(afterReveal.state.deadWall).toHaveLength(3);
+    // The indicator (index 0) must no longer be the first replacement tile
+    expect(afterReveal.state.deadWall[0]).not.toBe(afterDeal.state.deadWall[0]);
   });
 
   it('jingIndicator is set after revealJing()', () => {
@@ -304,6 +313,42 @@ describe('Engine·win', () => {
       }
     }
     if (!foundWin) expect(true).toBe(true);
+  });
+
+  it('declareWin succeeds when the winner has open melds (full hand reconstructed correctly)', () => {
+    // Inject a state where seat 0 has 1 open pung + 11 concealed tiles that together form a win:
+    // full hand: 1m1m1m (open pung) + 2p3p4p + 5p6p7p + 8s8s8s + east east = 14 tiles ✓
+    const g = startedGame(42);
+    const openPung: Meld = { kind: 'pung', tiles: ['1m', '1m', '1m'], concealed: false };
+    const concealedHand: TileType[] = [
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8s',
+      '8s',
+      '8s',
+      'east',
+      'east',
+    ];
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: concealedHand, openMelds: [openPung] };
+    const injectedState: GameState = {
+      ...g.state,
+      phase: 'playing',
+      currentSeat: 0,
+      // Use tiles absent from the test hand as jing types so no wildcards fire
+      jingPrimary: 'bai',
+      jingSecondary: 'zhong',
+      seats: patchedSeats,
+    };
+    // @ts-expect-error — accessing private constructor for testing
+    const engine = new GameEngine(injectedState, g.events);
+    const finished = engine.declareWin(0);
+    expect(finished.state.phase).toBe('finished');
+    expect(finished.events.some((e: { kind: string }) => e.kind === 'win')).toBe(true);
   });
 });
 

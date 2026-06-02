@@ -213,6 +213,30 @@ describe('concealedKongOptions', () => {
     const opts = concealedKongOptions(hand, JINGS);
     expect(opts).toContain('7p');
   });
+
+  it('works for a player with open melds (hand shorter than 14 tiles)', () => {
+    // After one open pung the concealed hand has 11 tiles — must still find the kong.
+    const hand: TileType[] = ['7p', '7p', '7p', '7p', '1m', '2m', '3m', '4m', '5m', '6m', 'east'];
+    const opts = concealedKongOptions(hand, NO_JINGS);
+    expect(opts).toContain('7p');
+  });
+
+  it('identifies kong with 2 naturals + 2 jings', () => {
+    const JING1: TileType = '5m';
+    const JING2: TileType = '6m';
+    const hand: TileType[] = ['7p', '7p', JING1, JING2, '1m', '2m', '3m', '4m'];
+    const opts = concealedKongOptions(hand, [JING1, JING2]);
+    expect(opts).toContain('7p');
+  });
+
+  it('identifies kong with 1 natural + 3 jings', () => {
+    const JING1: TileType = '5m';
+    const JING2: TileType = '6m';
+    // jingCount = 3: two JING1 copies + one JING2
+    const hand: TileType[] = ['7p', JING1, JING1, JING2, '1m', '2m', '3m'];
+    const opts = concealedKongOptions(hand, [JING1, JING2]);
+    expect(opts).toContain('7p');
+  });
 });
 
 // ── chowOptions ───────────────────────────────────────────────────────────────

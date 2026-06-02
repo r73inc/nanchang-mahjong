@@ -201,6 +201,8 @@ export class GameEngine {
         jingIndicator: indicator,
         jingPrimary,
         jingSecondary,
+        // Consume the indicator tile so it never re-enters play as a kong replacement.
+        deadWall: this.state.deadWall.slice(1),
         currentSeat: 0, // East goes first (has 14 tiles, needs to discard)
       },
       [event],
@@ -314,8 +316,14 @@ export class GameEngine {
     const winType: WinType = isTsumo ? 'tsumo' : 'ron';
     const winnerSeat = this.state.seats[seatIdx];
 
-    // For Ron: add the discard to hand to verify winning condition
-    const winningHand = isRon ? [...winnerSeat.hand, this.state.pendingDiscard!] : winnerSeat.hand;
+    // Reconstruct the full 14-tile hand: open melds + concealed tiles + (ron) discard.
+    // isWinningHand requires exactly 14 tiles, so open-meld tiles must be included.
+    const openMeldTiles = winnerSeat.openMelds.flatMap((m) => [...m.tiles]);
+    const winningHand: TileType[] = [
+      ...openMeldTiles,
+      ...winnerSeat.hand,
+      ...(isRon ? [this.state.pendingDiscard!] : []),
+    ];
 
     if (!isWinningHand(winningHand, this.jingTypes)) {
       throw new Error('Hand is not a winning hand');

@@ -46,7 +46,7 @@ export function typeIndex(type: TileType): number {
   return idx;
 }
 
-/** Sort an array of TileTypes in canonical order (mutates the original). */
+/** Returns a new copy of the array sorted in canonical order; does not mutate the input. */
 export function sortTypes(types: TileType[]): TileType[] {
   return types.slice().sort((a, b) => typeIndex(a) - typeIndex(b));
 }
@@ -157,10 +157,11 @@ export function getHonorChowsContaining(t: TileType): [TileType, TileType, TileT
   const result: [TileType, TileType, TileType][] = [];
   for (const chow of WIND_CHOWS) {
     if ((chow as readonly TileType[]).includes(t))
-      result.push(chow as [TileType, TileType, TileType]);
+      // Spread into a fresh array so callers cannot accidentally mutate the global constant.
+      result.push([...chow] as [TileType, TileType, TileType]);
   }
   if ((DRAGON_CHOW as readonly TileType[]).includes(t))
-    result.push(DRAGON_CHOW as [TileType, TileType, TileType]);
+    result.push([...DRAGON_CHOW] as [TileType, TileType, TileType]);
   return result;
 }
 

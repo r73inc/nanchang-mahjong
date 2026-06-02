@@ -195,8 +195,11 @@ function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
   let pairs = 0;
   let singles = 0;
   for (const cnt of counts.values()) {
-    pairs += Math.floor(cnt / 2);
-    singles += cnt % 2;
+    // Seven Pairs requires 7 DISTINCT pairs — each tile type contributes at most 1 pair.
+    // 3+ copies of the same type wastes the extras and makes Seven Pairs impossible.
+    if (cnt > 2) return false;
+    pairs += Math.floor(cnt / 2); // 2 → 1 pair; 1 → 0 pairs
+    singles += cnt % 2; // 1 → 1 single; 2 → 0 singles
   }
 
   // Each single natural tile needs 1 jing to become a pair
@@ -454,7 +457,7 @@ function countPartialMelds(naturals: TileType[], jings: number): number {
     Math.floor(remaining.filter((t, i, a) => a.indexOf(t) !== i).length),
   );
   score += Math.min(4 - score, pairBonus);
-  score += Math.min(4 - score, Math.floor(jings / 1)); // each jing can complete a partial
+  score += Math.min(4 - score, jings); // each jing can complete a partial
 
   return Math.min(4, score);
 }
