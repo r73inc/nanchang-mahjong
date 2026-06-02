@@ -36,6 +36,8 @@ export {
   SUIT_SOU,
   WINDS,
   DRAGONS,
+  WIND_CHOWS,
+  DRAGON_CHOW,
   typeOf,
   idOf,
   typeIndex,
@@ -48,6 +50,7 @@ export {
   getRank,
   stepAbove,
   suitDistance,
+  getHonorChowsContaining,
   buildWall,
 } from './tiles';
 
@@ -57,7 +60,7 @@ export { mulberry32, seededShuffle } from './prng';
 
 // ── Jing (wildcard) ───────────────────────────────────────────────────────────
 
-export { jingTypeFromIndicator, jingTypeFromIndicatorId, isJing, separateJing } from './jing';
+export { jingTypeFromIndicator, jingTypesFromIndicator, isJing, separateJing } from './jing';
 
 // ── Hand analysis ─────────────────────────────────────────────────────────────
 

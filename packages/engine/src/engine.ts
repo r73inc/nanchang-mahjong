@@ -12,7 +12,7 @@
  */
 import { buildWall, typeOf, sortTypes } from './tiles';
 import { seededShuffle } from './prng';
-import { jingTypeFromIndicator, separateJing } from './jing';
+import { jingTypesFromIndicator, separateJing } from './jing';
 import { isWinningHand, decomposeHand } from './hand';
 import { canPung, canKongFromDiscard, concealedKongOptions, chowOptions } from './calls';
 import { calculateFan, calculateSevenPairsFan, calculatePayment } from './scoring';
@@ -71,7 +71,8 @@ export class GameEngine {
       phase: 'dealing',
       seed,
       jingIndicator: null,
-      jingType: null,
+      jingPrimary: null,
+      jingSecondary: null,
       wall: [],
       deadWall: [],
       seats: [blankSeat('east'), blankSeat('south'), blankSeat('west'), blankSeat('north')],
@@ -86,9 +87,25 @@ export class GameEngine {
 
   // ── Private helpers ──────────────────────────────────────────────────────────
 
-  private get jingType(): TileType {
-    if (!this.state.jingType) throw new Error('Jing not yet determined');
-    return this.state.jingType;
+  private get jingTypes(): TileType[] {
+    if (!this.state.jingPrimary || !this.state.jingSecondary) {
+      throw new Error('Jing not yet determined');
+    }
+    return [this.state.jingPrimary, this.state.jingSecondary];
+  }
+
+  /**
+   * Remove `n` jing tiles from `hand`, choosing whichever jing type is available.
+   */
+  private removeJings(hand: TileType[], n: number): TileType[] {
+    const jts = this.jingTypes;
+    let h = hand;
+    for (let i = 0; i < n; i++) {
+      const jt = jts.find((j) => h.includes(j));
+      if (!jt) throw new Error('Not enough jings in hand');
+      h = removeFromHand(h, jt);
+    }
+    return h;
   }
 
   private seatOf(wind: SeatWind): SeatState {
@@ -164,7 +181,9 @@ export class GameEngine {
   // ── Jing reveal ──────────────────────────────────────────────────────────────
 
   /**
-   * Reveal the Jing indicator and determine the wildcard tile.
+   * Reveal the Jing indicator and determine both wildcard tile types.
+   * Primary Spirit (正精): the indicator tile itself.
+   * Secondary Spirit (副精): the tile one rank above the indicator.
    * Transitions to 'playing', with East to act first (they have 14 tiles).
    */
   revealJing(): GameEngine {
@@ -172,15 +191,16 @@ export class GameEngine {
 
     const indicatorId = this.state.deadWall[0];
     const indicator = typeOf(indicatorId);
-    const jingType = jingTypeFromIndicator(indicator);
+    const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);
 
-    const event: GameEvent = { kind: 'jing_indicator', indicator, jingType };
+    const event: GameEvent = { kind: 'jing_indicator', indicator, jingPrimary, jingSecondary };
 
     return this.withState(
       {
         phase: 'playing',
         jingIndicator: indicator,
-        jingType,
+        jingPrimary,
+        jingSecondary,
         currentSeat: 0, // East goes first (has 14 tiles, needs to discard)
       },
       [event],
@@ -297,15 +317,15 @@ export class GameEngine {
     // For Ron: add the discard to hand to verify winning condition
     const winningHand = isRon ? [...winnerSeat.hand, this.state.pendingDiscard!] : winnerSeat.hand;
 
-    if (!isWinningHand(winningHand, this.jingType)) {
+    if (!isWinningHand(winningHand, this.jingTypes)) {
       throw new Error('Hand is not a winning hand');
     }
 
     // Find best decomposition for scoring
-    const decompositions = decomposeHand(winningHand, this.jingType);
-    const decomp = decompositions[0]; // first valid standard decomp (undefined for 7-pairs/orphans)
+    const decompositions = decomposeHand(winningHand, this.jingTypes);
+    const decomp = decompositions[0]; // first valid standard decomp (undefined for 7-pairs/misfits)
 
-    const { jingCount: winJings } = separateJing(winningHand, this.jingType);
+    const { jingCount: winJings } = separateJing(winningHand, this.jingTypes);
 
     let fanResult: FanResult;
     if (decomp) {
@@ -320,7 +340,7 @@ export class GameEngine {
         openMelds: winnerSeat.openMelds,
       });
     } else {
-      // Seven Pairs or Thirteen Orphans — use pair-based scoring
+      // Seven Pairs or Thirteen Misfits — use pair-based scoring
       fanResult = calculateSevenPairsFan({
         winType,
         seatWind: winnerSeat.wind,
@@ -372,23 +392,23 @@ export class GameEngine {
     const tile = this.state.pendingDiscard!;
     const seat = this.state.seats[seatIdx];
 
-    if (!canPung(seat.hand, tile, this.jingType)) {
+    if (!canPung(seat.hand, tile, this.jingTypes)) {
       throw new Error(`Cannot pung ${tile}`);
     }
 
     // Remove 2 matching tiles from hand (natural or jing)
     let hand = [...seat.hand];
-    const { naturals } = separateJing(hand, this.jingType);
+    const { naturals } = separateJing(hand, this.jingTypes);
     const naturalCount = naturals.filter((t) => t === tile).length;
 
     if (naturalCount >= 2) {
       hand = removeFromHandN(hand, tile, 2);
     } else if (naturalCount === 1) {
       hand = removeFromHand(hand, tile);
-      hand = removeFromHand(hand, this.jingType);
+      hand = this.removeJings(hand, 1);
     } else {
       // 0 naturals: use 2 jings
-      hand = removeFromHandN(hand, this.jingType, 2);
+      hand = this.removeJings(hand, 2);
     }
 
     const meld: Meld = {
@@ -429,7 +449,7 @@ export class GameEngine {
     const tile = this.state.pendingDiscard!;
     const seat = this.state.seats[seatIdx];
 
-    const options = chowOptions(seat.hand, tile, this.jingType);
+    const options = chowOptions(seat.hand, tile, this.jingTypes);
     const valid = options.some((opt) => opt.every((t, i) => t === sequence[i]));
     if (!valid) throw new Error(`Cannot chow ${tile} with ${sequence.join(',')}`);
 
@@ -441,7 +461,7 @@ export class GameEngine {
       if (hand.includes(t)) {
         hand = removeFromHand(hand, t);
       } else {
-        hand = removeFromHand(hand, this.jingType);
+        hand = this.removeJings(hand, 1);
       }
     }
 
@@ -477,26 +497,26 @@ export class GameEngine {
     const tile = this.state.pendingDiscard!;
     const seat = this.state.seats[seatIdx];
 
-    if (!canKongFromDiscard(seat.hand, tile, this.jingType)) {
+    if (!canKongFromDiscard(seat.hand, tile, this.jingTypes)) {
       throw new Error(`Cannot kong ${tile} from discard`);
     }
 
     // Remove 3 tiles from hand
     let hand = [...seat.hand];
-    const { naturals: kNaturals, jingCount: kJingCount } = separateJing(hand, this.jingType);
+    const { naturals: kNaturals, jingCount: kJingCount } = separateJing(hand, this.jingTypes);
     const naturalCount = kNaturals.filter((t) => t === tile).length;
-    const jingCount = kJingCount;
 
-    if (naturalCount >= 3) hand = removeFromHandN(hand, tile, 3);
-    else if (naturalCount === 2 && jingCount >= 1) {
+    if (naturalCount >= 3) {
+      hand = removeFromHandN(hand, tile, 3);
+    } else if (naturalCount === 2 && kJingCount >= 1) {
       hand = removeFromHandN(hand, tile, 2);
-      hand = removeFromHand(hand, this.jingType);
-    } else if (naturalCount === 1 && jingCount >= 2) {
+      hand = this.removeJings(hand, 1);
+    } else if (naturalCount === 1 && kJingCount >= 2) {
       hand = removeFromHand(hand, tile);
-      hand = removeFromHandN(hand, this.jingType, 2);
+      hand = this.removeJings(hand, 2);
     } else {
       // 0 naturals, 3 jings
-      hand = removeFromHandN(hand, this.jingType, 3);
+      hand = this.removeJings(hand, 3);
     }
 
     const meld: Meld = {
@@ -535,7 +555,7 @@ export class GameEngine {
     if (seatIdx !== this.state.currentSeat) throw new Error('Not your turn');
 
     const seat = this.state.seats[seatIdx];
-    const options = concealedKongOptions(seat.hand, this.jingType);
+    const options = concealedKongOptions(seat.hand, this.jingTypes);
     if (!options.includes(tile)) throw new Error(`Cannot declare concealed kong of ${tile}`);
 
     // Remove 4 tiles from hand
@@ -547,7 +567,7 @@ export class GameEngine {
     } else {
       const jingsNeeded = 4 - naturalCount;
       hand = removeFromHandN(hand, tile, naturalCount);
-      hand = removeFromHandN(hand, this.jingType, jingsNeeded);
+      hand = this.removeJings(hand, jingsNeeded);
     }
 
     const meld: Meld = {

@@ -136,8 +136,10 @@ export interface GameState {
   seed: number;
   /** The indicator tile drawn for Jing determination. */
   jingIndicator: TileType | null;
-  /** The Jing (wildcard) tile type for this game. */
-  jingType: TileType | null;
+  /** Primary Spirit (正精): the indicator tile itself — all 4 copies are wildcards. */
+  jingPrimary: TileType | null;
+  /** Secondary Spirit (副精): the tile one rank above the indicator — all 4 copies are wildcards. */
+  jingSecondary: TileType | null;
   /** Remaining live wall tile IDs (in draw order). */
   wall: TileId[];
   /** Dead wall (for Kong replacements). */
@@ -159,7 +161,7 @@ export interface GameState {
 
 export type GameEvent =
   | { kind: 'deal'; seed: number; hands: [TileType[], TileType[], TileType[], TileType[]] }
-  | { kind: 'jing_indicator'; indicator: TileType; jingType: TileType }
+  | { kind: 'jing_indicator'; indicator: TileType; jingPrimary: TileType; jingSecondary: TileType }
   | { kind: 'draw'; seat: 0 | 1 | 2 | 3; tile: TileType; fromDeadWall: boolean }
   | { kind: 'discard'; seat: 0 | 1 | 2 | 3; tile: TileType }
   | { kind: 'pung'; seat: 0 | 1 | 2 | 3; tile: TileType }

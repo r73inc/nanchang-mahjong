@@ -28,9 +28,10 @@ describe('GameEngine lifecycle', () => {
     expect(g.state.phase).toBe('playing');
   });
 
-  it('jingType is set after revealJing()', () => {
+  it('jingPrimary and jingSecondary are set after revealJing()', () => {
     const g = startedGame(42);
-    expect(g.state.jingType).not.toBeNull();
+    expect(g.state.jingPrimary).not.toBeNull();
+    expect(g.state.jingSecondary).not.toBeNull();
   });
 
   it('jingIndicator is set after revealJing()', () => {
@@ -258,7 +259,8 @@ describe('Engine·win', () => {
   it('Engine·illegal-moves: cannot win with non-winning hand (tsumo)', () => {
     const g = startedGame(42);
     // East has 14 tiles, almost certainly not winning immediately
-    if (!isWinningHand(g.state.seats[0].hand, g.state.jingType!)) {
+    const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
+    if (!isWinningHand(g.state.seats[0].hand, jts)) {
       expect(() => g.declareWin(0)).toThrow();
     } else {
       expect(true).toBe(true); // very rare immediate win
@@ -273,8 +275,8 @@ describe('Engine·win', () => {
     for (let seed = 0; seed < 10000; seed++) {
       const g = GameEngine.create(seed).deal().revealJing();
       const hand = g.state.seats[0].hand;
-      const jt = g.state.jingType!;
-      if (isWinningHand(hand, jt)) {
+      const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
+      if (isWinningHand(hand, jts)) {
         const finished = g.declareWin(0);
         expect(finished.state.phase).toBe('finished');
         expect(finished.events.some((e) => e.kind === 'win')).toBe(true);
@@ -293,7 +295,8 @@ describe('Engine·win', () => {
     for (let seed = 0; seed < 10000; seed++) {
       const g = GameEngine.create(seed).deal().revealJing();
       const hand = g.state.seats[0].hand;
-      if (isWinningHand(hand, g.state.jingType!)) {
+      const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
+      if (isWinningHand(hand, jts)) {
         const finished = g.declareWin(0);
         expect(finished.state.seats[0].score).toBeGreaterThan(0);
         foundWin = true;

@@ -1,10 +1,10 @@
 /**
  * Call eligibility: can a player Pung, Kong, Chow, or Win off a discard?
  *
- * All functions are pure. jingType is required so wildcard-assisted calls
+ * All functions are pure. jingTypes is required so wildcard-assisted calls
  * are evaluated correctly (e.g., pung with 1 natural + 1 Jing + 1 discarded).
  */
-import { getRank, isHonor, TILE_TYPES } from './tiles';
+import { getRank, isHonor, TILE_TYPES, getHonorChowsContaining } from './tiles';
 import { isWinningHand } from './hand';
 import { separateJing } from './jing';
 import type { TileType } from './types';
@@ -14,9 +14,9 @@ import type { TileType } from './types';
 /**
  * True if adding `tile` to `hand` (13 tiles) creates a winning hand.
  */
-export function canWin(hand: TileType[], tile: TileType, jingType: TileType): boolean {
+export function canWin(hand: TileType[], tile: TileType, jingTypes: TileType[]): boolean {
   if (hand.length !== 13) return false;
-  return isWinningHand([...hand, tile], jingType);
+  return isWinningHand([...hand, tile], jingTypes);
 }
 
 // ── Pung ──────────────────────────────────────────────────────────────────────
@@ -31,8 +31,8 @@ export function canWin(hand: TileType[], tile: TileType, jingType: TileType): bo
  *   - The resulting 11-tile hand must be shapeable towards a win (not enforced here —
  *     callers are responsible for ensuring the call makes sense strategically).
  */
-export function canPung(hand: TileType[], discarded: TileType, jingType: TileType): boolean {
-  const { naturals, jingCount } = separateJing(hand, jingType);
+export function canPung(hand: TileType[], discarded: TileType, jingTypes: TileType[]): boolean {
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   const naturalCount = naturals.filter((t) => t === discarded).length;
 
   // Option 1: 2 naturals matching the discard
@@ -56,9 +56,9 @@ export function canPung(hand: TileType[], discarded: TileType, jingType: TileTyp
 export function canKongFromDiscard(
   hand: TileType[],
   discarded: TileType,
-  jingType: TileType,
+  jingTypes: TileType[],
 ): boolean {
-  const { naturals, jingCount } = separateJing(hand, jingType);
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   const naturalCount = naturals.filter((t) => t === discarded).length;
 
   if (naturalCount >= 3) return true;
@@ -73,8 +73,8 @@ export function canKongFromDiscard(
  * Find all tile types the player can declare a **concealed Kong** with (from their draw).
  * Returns the list of tile types that have 4 copies in hand (natural or jing-counted).
  */
-export function concealedKongOptions(hand: TileType[], jingType: TileType): TileType[] {
-  const { naturals, jingCount } = separateJing(hand, jingType);
+export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): TileType[] {
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (hand.length < 14) return [];
 
   const options: TileType[] = [];
@@ -82,7 +82,7 @@ export function concealedKongOptions(hand: TileType[], jingType: TileType): Tile
   const counts = new Map<TileType, number>();
   for (const t of naturals) counts.set(t, (counts.get(t) ?? 0) + 1);
 
-  // All 4 naturals
+  // All 4 naturals of the same type
   for (const [t, cnt] of counts) {
     if (cnt >= 4 && !seen.has(t)) {
       options.push(t);
@@ -90,16 +90,22 @@ export function concealedKongOptions(hand: TileType[], jingType: TileType): Tile
     }
   }
 
-  // 4 jings → jing kong (special)
-  if (jingCount >= 4) {
-    options.push(jingType);
+  // 4 of the same jing type → Spirit Kong (杠精)
+  for (const jt of jingTypes) {
+    const jtCount = hand.filter((t) => t === jt).length;
+    if (jtCount >= 4 && !seen.has(jt)) {
+      options.push(jt);
+      seen.add(jt);
+    }
   }
 
   // 3 naturals + 1 jing
-  for (const [t, cnt] of counts) {
-    if (cnt >= 3 && jingCount >= 1 && !seen.has(t)) {
-      options.push(t);
-      seen.add(t);
+  if (jingCount >= 1) {
+    for (const [t, cnt] of counts) {
+      if (cnt >= 3 && !seen.has(t)) {
+        options.push(t);
+        seen.add(t);
+      }
     }
   }
 
@@ -108,18 +114,21 @@ export function concealedKongOptions(hand: TileType[], jingType: TileType): Tile
 
 /**
  * Find all tile types the player can add to an existing open Pung to make a Kong.
- * `pungTiles` is the TileType of the open Pung.
+ * `openPungTile` is the TileType of the open Pung.
  */
 export function addToKongOptions(
   hand: TileType[],
   openPungTile: TileType,
-  jingType: TileType,
+  jingTypes: TileType[],
 ): TileType[] {
-  const { naturals, jingCount } = separateJing(hand, jingType);
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   // Has the natural tile in hand?
   if (naturals.includes(openPungTile)) return [openPungTile];
   // Has a jing to fill in?
-  if (jingCount > 0) return [jingType]; // player can add their jing (treated as the pung tile)
+  if (jingCount > 0) {
+    const availableJing = jingTypes.find((jt) => hand.includes(jt));
+    return availableJing ? [availableJing] : [];
+  }
   return [];
 }
 
@@ -131,15 +140,38 @@ export function addToKongOptions(
  *
  * Each returned array is a [lower, mid, upper] TileType triple forming the chow.
  * The discard can appear at any position in the triple.
+ *
+ * Honor Chow: In Nanchang Mahjong, three non-repeating Wind tiles or the three
+ * Dragon tiles also form a valid Chow sequence.
  */
 export function chowOptions(
   hand: TileType[],
   discarded: TileType,
-  jingType: TileType,
+  jingTypes: TileType[],
 ): Array<[TileType, TileType, TileType]> {
-  if (isHonor(discarded)) return []; // honors can't form chows
+  if (isHonor(discarded)) {
+    // Honor Chow: check all wind/dragon sequences containing the discarded tile
+    const { naturals: hn, jingCount: hjCount } = separateJing(hand, jingTypes);
+    const honorChows = getHonorChowsContaining(discarded);
+    return honorChows.filter((chow) => {
+      let jingsNeeded = 0;
+      const naturalsLeft = [...hn];
+      for (const tile of chow) {
+        if (tile === discarded) continue; // this comes from the discard, not the hand
+        const idx = naturalsLeft.indexOf(tile);
+        if (idx !== -1) {
+          naturalsLeft.splice(idx, 1);
+        } else if (jingsNeeded < hjCount) {
+          jingsNeeded++;
+        } else {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
 
-  const { naturals, jingCount } = separateJing(hand, jingType);
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   const rank = getRank(discarded)!;
   const suit = discarded[1]; // 'm' | 'p' | 's'
 
@@ -186,18 +218,14 @@ export function chowOptions(
  * True if the player's 13-tile hand is in tenpai (one tile away from winning).
  * Returns the set of tiles that would complete the hand.
  */
-export function tenpaiTiles(hand: TileType[], jingType: TileType): TileType[] {
+export function tenpaiTiles(hand: TileType[], jingTypes: TileType[]): TileType[] {
   if (hand.length !== 13) return [];
 
   const winning: TileType[] = [];
-
-  // Try every possible draw
   for (const candidate of TILE_TYPES) {
-    if (canWin(hand, candidate, jingType)) {
+    if (canWin(hand, candidate, jingTypes)) {
       winning.push(candidate);
     }
-    // Also try jing itself as a draw
-    if (candidate === jingType) continue; // already tried above
   }
 
   return [...new Set(winning)];
@@ -206,6 +234,6 @@ export function tenpaiTiles(hand: TileType[], jingType: TileType): TileType[] {
 /**
  * True if a player's 13-tile hand can win off any tile (is in tenpai).
  */
-export function isTenpai(hand: TileType[], jingType: TileType): boolean {
-  return tenpaiTiles(hand, jingType).length > 0;
+export function isTenpai(hand: TileType[], jingTypes: TileType[]): boolean {
+  return tenpaiTiles(hand, jingTypes).length > 0;
 }

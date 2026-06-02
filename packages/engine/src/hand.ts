@@ -8,7 +8,7 @@
  *   2. Each meld must contain ≥1 natural tile.
  *   3. Jing × Jing pure-wildcard pairs are allowed only in Seven Pairs.
  */
-import { sortTypes, isSuit, getRank, isHonor } from './tiles';
+import { sortTypes, isSuit, getRank, isHonor, getHonorChowsContaining } from './tiles';
 import { separateJing } from './jing';
 import type { TileType, Meld, Decomposition } from './types';
 
@@ -135,8 +135,9 @@ function tryMelds(
     results.push(...sub);
   }
 
-  // ── Try Chow (3 consecutive suit tiles) ───────────────────────────────────
+  // ── Try Chow ──────────────────────────────────────────────────────────────
   if (isSuit(first)) {
+    // Suit Chow: 3 consecutive tiles in the same suit
     const chowResult = tryChow(sorted, first, wildsLeft);
     if (chowResult) {
       const sub = tryMelds(
@@ -146,6 +147,33 @@ function tryMelds(
         jingsUsedAcc + chowResult.jingsUsed,
       );
       results.push(...sub);
+    }
+  } else {
+    // Honor Chow: try all valid wind/dragon sequences containing `first`
+    const honorChows = getHonorChowsContaining(first);
+    for (const chow of honorChows) {
+      let rest = sorted;
+      let jingsUsedInChow = 0;
+      let possible = true;
+      for (const tile of chow) {
+        if (rest.includes(tile)) {
+          rest = removeOne(rest, tile);
+        } else if (wildsLeft > jingsUsedInChow) {
+          jingsUsedInChow++;
+        } else {
+          possible = false;
+          break;
+        }
+      }
+      if (possible) {
+        const sub = tryMelds(
+          rest,
+          wildsLeft - jingsUsedInChow,
+          [...meldsAcc, { kind: 'chow', tiles: chow, concealed: true }],
+          jingsUsedAcc + jingsUsedInChow,
+        );
+        results.push(...sub);
+      }
     }
   }
 
@@ -181,58 +209,50 @@ function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
   return pairs + singles + jingPairs === 7;
 }
 
-// ── Thirteen Orphans ──────────────────────────────────────────────────────────
+// ── Thirteen Misfits (十三烂) ─────────────────────────────────────────────────
 
-const THIRTEEN_ORPHAN_TYPES = new Set<TileType>([
-  '1m',
-  '9m',
-  '1p',
-  '9p',
-  '1s',
-  '9s',
-  'east',
-  'south',
-  'west',
-  'north',
-  'zhong',
-  'fa',
-  'bai',
-]);
-
-function checkThirteenOrphans(hand: TileType[], jingType: TileType): boolean {
-  const { naturals, jingCount } = separateJing(hand, jingType);
+/**
+ * Check if the hand qualifies as Thirteen Misfits (十三烂):
+ *   - Must be fully natural (no Jing wildcards).
+ *   - All honor tiles must be unique (no duplicate wind or dragon types).
+ *   - Within each suit, adjacent tile ranks (when sorted) must have a gap > 2.
+ *     Example: 1, 4, 7 is valid (gaps of 3); 1, 3, 5 is not (gap of 2).
+ */
+function checkThirteenMisfits(naturals: TileType[], jingCount: number): boolean {
   if (naturals.length + jingCount !== 14) return false;
-  // Must have each of the 13 orphan types (wildcards can fill gaps)
-  const counts = new Map<TileType, number>();
-  for (const t of naturals) {
-    if (THIRTEEN_ORPHAN_TYPES.has(t)) counts.set(t, (counts.get(t) ?? 0) + 1);
+  if (jingCount > 0) return false; // wildcards cannot be used in Thirteen Misfits
+
+  // All honor tiles must be unique
+  const honors = naturals.filter(isHonor);
+  if (honors.length !== new Set(honors).size) return false;
+
+  // Within each suit, sorted adjacent ranks must have gap > 2
+  for (const suit of ['m', 'p', 's'] as const) {
+    const ranks = naturals
+      .filter((t) => !isHonor(t) && t[1] === suit)
+      .map((t) => getRank(t)!)
+      .sort((a, b) => a - b);
+    for (let i = 1; i < ranks.length; i++) {
+      if (ranks[i] - ranks[i - 1] <= 2) return false;
+    }
   }
-  let missing = 0;
-  for (const t of THIRTEEN_ORPHAN_TYPES) {
-    if (!counts.has(t)) missing++;
-  }
-  if (missing > jingCount) return false;
-  // After filling missing, must have at least one duplicate (pair)
-  // pairs from naturals:
-  let naturalPairs = 0;
-  for (const cnt of counts.values()) if (cnt >= 2) naturalPairs++;
-  const jingsLeft = jingCount - missing;
-  return naturalPairs + jingsLeft > 0;
+
+  return true;
 }
 
 // ── Primary decomposition ─────────────────────────────────────────────────────
 
 /**
  * Try to decompose a 14-tile hand into all valid winning configurations
- * (standard 4-meld + pair). Does NOT include Seven Pairs or Thirteen Orphans
+ * (standard 4-meld + pair). Does NOT include Seven Pairs or Thirteen Misfits
  * (those are checked separately in `isWinningHand`).
  *
  * Wildcard constraints:
  *   - Pair must have ≥1 natural tile.
  *   - Each meld must have ≥1 natural tile.
  */
-export function decomposeHand(hand: TileType[], jingType: TileType): Decomposition[] {
-  const { naturals, jingCount } = separateJing(hand, jingType);
+export function decomposeHand(hand: TileType[], jingTypes: TileType[]): Decomposition[] {
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (naturals.length + jingCount !== 14) return [];
 
   const sorted = sortTypes(naturals);
@@ -281,20 +301,20 @@ export function decomposeHand(hand: TileType[], jingType: TileType): Decompositi
 
 /**
  * True if `hand` (exactly 14 TileTypes) is a winning hand.
- * Handles: standard 4-meld+pair, Seven Pairs, Thirteen Orphans.
+ * Handles: standard 4-meld+pair, Seven Pairs, Thirteen Misfits.
  */
-export function isWinningHand(hand: TileType[], jingType: TileType): boolean {
+export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean {
   if (hand.length !== 14) return false;
 
   // Standard decomposition
-  if (decomposeHand(hand, jingType).length > 0) return true;
+  if (decomposeHand(hand, jingTypes).length > 0) return true;
 
   // Seven Pairs
-  const { naturals, jingCount } = separateJing(hand, jingType);
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (checkSevenPairs(naturals, jingCount)) return true;
 
-  // Thirteen Orphans
-  if (checkThirteenOrphans(hand, jingType)) return true;
+  // Thirteen Misfits
+  if (checkThirteenMisfits(naturals, jingCount)) return true;
 
   return false;
 }
@@ -305,14 +325,13 @@ export function isWinningHand(hand: TileType[], jingType: TileType): boolean {
  *
  * Uses a simplified estimate sufficient for UI hint purposes.
  */
-export function shantenNumber(hand: TileType[], jingType: TileType): number {
+export function shantenNumber(hand: TileType[], jingTypes: TileType[]): number {
   if (hand.length < 13) return 8;
 
   // Winning?
-  const h14 = hand.length === 14 ? hand : hand;
-  if (hand.length === 14 && isWinningHand(h14, jingType)) return -1;
+  if (hand.length === 14 && isWinningHand(hand, jingTypes)) return -1;
 
-  const { naturals, jingCount } = separateJing(hand, jingType);
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
 
   // ── Standard hand shanten ─────────────────────────────────────────────────
   const bestStd = computeStdShanten(naturals, jingCount);

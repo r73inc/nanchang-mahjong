@@ -129,6 +129,41 @@ export function suitDistance(from: TileType, to: TileType): number | null {
   return d >= 0 ? d : null;
 }
 
+// ── Honor Chow sequences ──────────────────────────────────────────────────────
+
+/**
+ * All valid Wind chow sequences (including wrap-around).
+ * In Nanchang Mahjong, three non-repeating Wind tiles form a valid Chow.
+ */
+export const WIND_CHOWS: readonly [TileType, TileType, TileType][] = [
+  ['east', 'south', 'west'],
+  ['south', 'west', 'north'],
+  ['west', 'north', 'east'],
+  ['north', 'east', 'south'],
+];
+
+/**
+ * The Dragon chow sequence: zhong → fa → bai.
+ * In Nanchang Mahjong, the three different Dragon tiles form a valid Chow.
+ */
+export const DRAGON_CHOW: readonly [TileType, TileType, TileType] = ['zhong', 'fa', 'bai'];
+
+/**
+ * Return all honor Chow sequences (wind or dragon) that contain tile `t`.
+ * Returns an empty array if `t` is not an honor tile.
+ */
+export function getHonorChowsContaining(t: TileType): [TileType, TileType, TileType][] {
+  if (!isHonor(t)) return [];
+  const result: [TileType, TileType, TileType][] = [];
+  for (const chow of WIND_CHOWS) {
+    if ((chow as readonly TileType[]).includes(t))
+      result.push(chow as [TileType, TileType, TileType]);
+  }
+  if ((DRAGON_CHOW as readonly TileType[]).includes(t))
+    result.push(DRAGON_CHOW as [TileType, TileType, TileType]);
+  return result;
+}
+
 // ── Wall factory ──────────────────────────────────────────────────────────────
 
 /**

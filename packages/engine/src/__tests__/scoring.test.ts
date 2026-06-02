@@ -3,15 +3,16 @@ import { calculateFan, calculatePayment, calculateSevenPairsFan } from '../scori
 import { decomposeHand } from '../hand';
 import type { ScoringContext, TileType } from '../types';
 
-const NO_JING: TileType = 'bai';
+/** Empty jing array = no wildcards in play. */
+const NO_JINGS: TileType[] = [];
 
 // Helper: build a basic scoring context for testing
 function makeCtx(
   hand: TileType[],
-  jingType: TileType,
+  jingTypes: TileType[],
   overrides: Partial<ScoringContext> = {},
 ): ScoringContext {
-  const decomps = decomposeHand(hand, jingType);
+  const decomps = decomposeHand(hand, jingTypes);
   if (!decomps[0]) throw new Error('No decomposition for test hand');
   return {
     winType: 'ron',
@@ -46,7 +47,7 @@ describe('Engine·scoring-tsumo', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, { winType: 'tsumo' });
+    const ctx = makeCtx(hand, NO_JINGS, { winType: 'tsumo' });
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Tsumo')).toBe(true);
     expect(result.total).toBeGreaterThanOrEqual(1);
@@ -71,7 +72,7 @@ describe('Engine·scoring-concealed-ron', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, { winType: 'ron', openMelds: [] });
+    const ctx = makeCtx(hand, NO_JINGS, { winType: 'ron', openMelds: [] });
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Concealed Ron')).toBe(true);
   });
@@ -93,7 +94,7 @@ describe('Engine·scoring-concealed-ron', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, {
+    const ctx = makeCtx(hand, NO_JINGS, {
       winType: 'ron',
       openMelds: [{ kind: 'pung', tiles: ['east', 'east', 'east'], concealed: false }],
     });
@@ -120,7 +121,7 @@ describe('Engine·scoring-last-tile', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, { isLastTile: true });
+    const ctx = makeCtx(hand, NO_JINGS, { isLastTile: true });
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Last Tile')).toBe(true);
   });
@@ -144,7 +145,7 @@ describe('Engine·scoring-after-kong', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, { winType: 'tsumo', isAfterKong: true });
+    const ctx = makeCtx(hand, NO_JINGS, { winType: 'tsumo', isAfterKong: true });
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'After Kong')).toBe(true);
   });
@@ -168,7 +169,7 @@ describe('Engine·scoring-rob-kong', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, { isRobKong: true });
+    const ctx = makeCtx(hand, NO_JINGS, { isRobKong: true });
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Rob Kong')).toBe(true);
   });
@@ -195,7 +196,7 @@ describe('Engine·scoring-all-simples (断幺)', () => {
       '8s',
       '8s',
     ];
-    const ctx = makeCtx(hand, NO_JING);
+    const ctx = makeCtx(hand, NO_JINGS);
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'All Simples')).toBe(true);
   });
@@ -217,7 +218,7 @@ describe('Engine·scoring-all-simples (断幺)', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING);
+    const ctx = makeCtx(hand, NO_JINGS);
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'All Simples')).toBe(false);
   });
@@ -241,7 +242,7 @@ describe('Engine·scoring-all-pungs (对对胡)', () => {
       'east',
       'east',
     ];
-    const ctx = makeCtx(hand, NO_JING);
+    const ctx = makeCtx(hand, NO_JINGS);
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'All Pungs')).toBe(true);
     const allPungsFan = result.items.find((i) => i.name === 'All Pungs');
@@ -267,7 +268,7 @@ describe('Engine·scoring-full-flush (清一色)', () => {
       '5m',
       '5m',
     ];
-    const ctx = makeCtx(hand, NO_JING);
+    const ctx = makeCtx(hand, NO_JINGS);
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Full Flush')).toBe(true);
     expect(result.items.some((i) => i.name === 'Half Flush')).toBe(false);
@@ -292,7 +293,7 @@ describe('Engine·scoring-half-flush (混一色)', () => {
       'north',
       'north',
     ];
-    const ctx = makeCtx(hand, NO_JING);
+    const ctx = makeCtx(hand, NO_JINGS);
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Half Flush')).toBe(true);
     expect(result.items.some((i) => i.name === 'Full Flush')).toBe(false);
@@ -317,8 +318,8 @@ describe('Engine·scoring-three-dragons (三元刻)', () => {
       '9p',
       '9p',
     ];
-    // '1s' as jingType — not present in this hand, so no tiles become wildcards
-    const ctx = makeCtx(hand, '1s');
+    // no wildcards — no tiles in this hand become jings
+    const ctx = makeCtx(hand, NO_JINGS);
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Three Dragons')).toBe(true);
   });
@@ -342,7 +343,7 @@ describe('Engine·scoring-small-four-winds (小四喜)', () => {
       '2m',
       '3m',
     ];
-    const ctx = makeCtx(hand, NO_JING, {
+    const ctx = makeCtx(hand, NO_JINGS, {
       decomposition: {
         pair: 'north',
         melds: [
@@ -406,7 +407,7 @@ describe('Engine·scoring-clean-win (净胡)', () => {
       '9s',
       '9s',
     ];
-    const ctx = makeCtx(hand, NO_JING, { winType: 'tsumo' });
+    const ctx = makeCtx(hand, NO_JINGS, { winType: 'tsumo' });
     const result = calculateFan(ctx);
     expect(result.items.some((i) => i.name === 'Clean Win')).toBe(true);
   });
