@@ -13,6 +13,13 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // Forward Socket.IO handshake + WebSocket traffic to the NestJS server.
+      // socket.io-client connects to the current host; Vite proxies to localhost:3001.
+      '/socket.io': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        ws: true, // enable WebSocket proxying
+      },
     },
   },
 });
