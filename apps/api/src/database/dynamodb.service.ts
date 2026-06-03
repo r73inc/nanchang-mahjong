@@ -90,4 +90,10 @@ export const DK = {
     PK: `USER#${sub}`,
     SK: `FRIEND#${friendSub}`,
   }),
+  room: (id: string) => ({ PK: `ROOM#${id}`, SK: 'META' }),
+  roomSeat: (id: string, n: number) => ({ PK: `ROOM#${id}`, SK: `SEAT#${n}` }),
+  roomByCode: (code: string) => ({
+    gsi1pk: `ROOM_CODE#${code.replace(/-/g, '').toUpperCase()}`,
+    gsi1sk: 'META',
+  }),
 } as const;
