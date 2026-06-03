@@ -51,7 +51,13 @@ const HOST_ROOM: RoomState = {
     { seatIdx: 2, userId: null, handle: null, displayName: null, ready: false, isHost: false },
     { seatIdx: 3, userId: null, handle: null, displayName: null, ready: false, isHost: false },
   ],
-  settings: { rounds: 'east+south', timerSecs: 8, minFan: 3 },
+  settings: {
+    rounds: 'east+south',
+    terminationType: 'rounds',
+    startingScore: 0,
+    timerSecs: 30,
+    minFan: 1,
+  },
   createdAt: '2024-01-01T00:00:00.000Z',
 };
 

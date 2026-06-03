@@ -5,7 +5,7 @@
  * Use the seed + event log for replay; the engine re-derives any past state.
  */
 
-export const ENGINE_VERSION = '0.1.0';
+export const ENGINE_VERSION = '0.2.0';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -15,10 +15,11 @@ export type {
   MeldKind,
   Meld,
   Decomposition,
+  HandType,
   WinType,
   ScoringContext,
-  FanItem,
-  FanResult,
+  MultiplierItem,
+  WinPaymentResult,
   Payment,
   SeatWind,
   GamePhase,
@@ -79,10 +80,10 @@ export {
   isTenpai,
 } from './calls';
 
-// ── Scoring ───────────────────────────────────────────────────────────────────
+// ── Scoring (locked rules §6) ─────────────────────────────────────────────────
 
-export { calculateFan, calculateSevenPairsFan, calculatePayment } from './scoring';
+export { calculateWinPayout, instantKongPayment, calculateSpiritSettlement } from './scoring';
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
-export { GameEngine } from './engine';
+export { GameEngine, nextDealer } from './engine';
