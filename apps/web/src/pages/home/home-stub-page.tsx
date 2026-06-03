@@ -36,19 +36,24 @@ export function HomeStubPage() {
           )}
         </div>
 
-        {/* Coming-soon game lobby placeholder */}
-        <div
-          className="rounded-2xl px-5 py-8 mb-6 text-center"
+        {/* Play with Friends — now live (Phase 6) */}
+        <button
+          onClick={() => navigate('/lobby')}
+          className="w-full mb-6 px-5 py-5 rounded-2xl font-bold text-lg text-mj-ink flex items-center justify-between"
           style={{
-            background: 'rgba(245,239,223,0.04)',
-            border: '1px solid rgba(201,169,97,0.12)',
+            background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+            border: '1px solid rgba(255,255,255,0.3)',
+            boxShadow: '0 8px 24px rgba(201,169,97,0.35)',
           }}
         >
-          <div className="text-4xl mb-3" aria-hidden="true">
-            🀄
+          <div className="text-left">
+            <div>{t('playFriends')}</div>
+            <div className="text-sm opacity-70 font-normal mt-0.5">{t('playFriendsSub')}</div>
           </div>
-          <p className="text-sm text-mj-bone/55 leading-relaxed">{t('comingSoon')}</p>
-        </div>
+          <span className="text-2xl" aria-hidden="true">
+            →
+          </span>
+        </button>
 
         {/* Navigation shortcuts */}
         <div className="grid grid-cols-3 gap-2 mb-4">

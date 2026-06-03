@@ -9,6 +9,9 @@ import { AdminPage } from './pages/admin/admin-page';
 import { ProfilePage } from './pages/profile/profile-page';
 import { FriendsPage } from './pages/friends/friends-page';
 import { CustomizeStubPage } from './pages/customize/customize-stub-page';
+import { LobbyPage } from './pages/lobby/lobby-page';
+import { RoomPage } from './pages/room/room-page';
+import { JingRevealStubPage } from './pages/game/jing-reveal-stub-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
 
@@ -32,6 +35,9 @@ export default function App() {
       {/* Protected routes — unauthenticated users are redirected to /auth */}
       <Route element={<ProtectedRoute />}>
         <Route path="/home" element={<HomeStubPage />} />
+        <Route path="/lobby" element={<LobbyPage />} />
+        <Route path="/room/:code" element={<RoomPage />} />
+        <Route path="/game/:id" element={<JingRevealStubPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/customize" element={<CustomizeStubPage />} />
