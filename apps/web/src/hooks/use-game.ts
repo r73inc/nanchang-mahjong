@@ -1,0 +1,223 @@
+/**
+ * use-game.ts — socket subscription and action helpers for the live game.
+ *
+ * Call `useGame(gameId)` inside GamePage. It:
+ *  - Emits game:join to subscribe (and re-emits on reconnect to resync).
+ *  - Subscribes to all game:* events and writes them to the Zustand store.
+ *  - Manages the 1.5s reconnecting overlay timer (PLAN §7.5).
+ *  - Returns typed action functions (discard, claim, pass, concede, revealJing).
+ *
+ * The hook never calls connectSocket() — the socket is already alive from the
+ * Room page. On each mount it calls getSocket() and subscribes; cleanup on
+ * unmount removes all listeners.
+ */
+
+import { useEffect, useRef, useCallback } from 'react';
+import { getSocket } from '../lib/socket';
+import { useGameStore } from '../stores/game.store';
+import type { TileType } from '@nanchang/shared';
+
+// Delay before showing the reconnecting overlay (PLAN §7.5: 1.5s)
+const RECONNECT_OVERLAY_DELAY_MS = 1500;
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+export function useGame(gameId: string, spectate = false) {
+  const {
+    snapshot,
+    ended,
+    selectedTileIdx,
+    claimWindow,
+    connection,
+    pendingMove,
+    toast,
+    setSnapshot,
+    setEnded,
+    setConnection,
+    setClaimWindow,
+    selectTile,
+    setPendingMove,
+    setToast,
+    reset,
+  } = useGameStore();
+
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      // Not yet connected (e.g. test environment) — skip
+      return;
+    }
+
+    const s = socket;
+
+    // ── Join ──────────────────────────────────────────────────────────────────
+    s.emit('game:join', { gameId, spectate });
+
+    // ── Game state events ─────────────────────────────────────────────────────
+    const handleSnapshot = (payload: { state: Parameters<typeof setSnapshot>[0] }) => {
+      setSnapshot(payload.state);
+    };
+
+    const handleClaimWindow = (payload: {
+      actions: import('@nanchang/shared').ClaimAction[];
+      deadline: number;
+    }) => {
+      setClaimWindow({ actions: payload.actions, deadline: payload.deadline });
+    };
+
+    const handleContested = (payload: {
+      kind: 'win' | 'pung' | 'kong' | 'chow';
+      seat: 0 | 1 | 2 | 3;
+    }) => {
+      setToast(payload);
+      setTimeout(() => setToast(null), 600);
+    };
+
+    const handleEnded = (payload: Parameters<typeof setEnded>[0]) => {
+      setEnded(payload);
+    };
+
+    // AFK warning — broadcast to the affected seat's socket (handled server-side);
+    // on the FE we just need a toast/alert if it's us.
+    // We rely on game:snapshot reflecting the afk flag; no extra state needed here.
+
+    s.on('game:snapshot', handleSnapshot);
+    s.on('game:claim-window', handleClaimWindow);
+    s.on('game:rob-kong-window', handleClaimWindow); // same UI
+    s.on('game:contested', handleContested);
+    s.on('game:ended', handleEnded);
+
+    // ── Connection management ─────────────────────────────────────────────────
+    const handleDisconnect = () => {
+      // Start the 1.5s timer before showing the overlay (PLAN §7.5)
+      reconnectTimerRef.current = setTimeout(() => {
+        setConnection('reconnecting');
+      }, RECONNECT_OVERLAY_DELAY_MS);
+    };
+
+    const handleConnect = () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      setConnection('live');
+      // Re-join to get a fresh snapshot (PLAN §7.5: reconnection = re-join)
+      s.emit('game:join', { gameId, spectate });
+    };
+
+    const handleConnectError = () => {
+      setConnection('lost');
+    };
+
+    s.on('disconnect', handleDisconnect);
+    s.on('connect', handleConnect);
+    s.on('connect_error', handleConnectError);
+
+    // ── Cleanup ───────────────────────────────────────────────────────────────
+    return () => {
+      s.off('game:snapshot', handleSnapshot);
+      s.off('game:claim-window', handleClaimWindow);
+      s.off('game:rob-kong-window', handleClaimWindow);
+      s.off('game:contested', handleContested);
+      s.off('game:ended', handleEnded);
+      s.off('disconnect', handleDisconnect);
+      s.off('connect', handleConnect);
+      s.off('connect_error', handleConnectError);
+
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+
+      reset();
+    };
+  }, [gameId, spectate]); // only re-subscribe when the game or spectate flag changes
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  const discard = useCallback(
+    (tile: TileType) => {
+      setPendingMove(true);
+      selectTile(null);
+      try {
+        getSocket().emit('game:discard', { tile });
+      } catch {
+        setPendingMove(false);
+      }
+    },
+    [setPendingMove, selectTile],
+  );
+
+  const claim = useCallback(
+    (kind: 'win' | 'pung' | 'kong' | 'chow', sequence?: [TileType, TileType, TileType]) => {
+      setClaimWindow(null); // optimistically close the window
+      try {
+        getSocket().emit('game:claim', { kind, sequence });
+      } catch {
+        /* ignore — server will time out */
+      }
+    },
+    [setClaimWindow],
+  );
+
+  const pass = useCallback(() => {
+    setClaimWindow(null);
+    try {
+      getSocket().emit('game:pass', {});
+    } catch {
+      /* ignore */
+    }
+  }, [setClaimWindow]);
+
+  const concede = useCallback(() => {
+    try {
+      getSocket().emit('game:concede', {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const revealJing = useCallback(() => {
+    try {
+      getSocket().emit('game:reveal-jing', { gameId });
+    } catch {
+      /* ignore */
+    }
+  }, [gameId]);
+
+  const kongConcealed = useCallback((tile: TileType) => {
+    try {
+      getSocket().emit('game:kong-concealed', { tile });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const kongAdd = useCallback((tile: TileType) => {
+    try {
+      getSocket().emit('game:kong-add', { tile });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  return {
+    snapshot,
+    ended,
+    selectedTileIdx,
+    claimWindow,
+    connection,
+    pendingMove,
+    toast,
+    // Actions
+    selectTile,
+    discard,
+    claim,
+    pass,
+    concede,
+    revealJing,
+    kongConcealed,
+    kongAdd,
+  };
+}
