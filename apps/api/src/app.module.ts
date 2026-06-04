@@ -19,10 +19,13 @@ import { I18nModule } from './i18n/i18n.module';
 
 @Module({
   imports: [
-    // Config — global, loaded from env; no .env file in prod (injected by App Runner / ECS)
+    // Config — global, loaded from env; no .env file in prod (injected by App Runner / ECS).
+    // In dev, pnpm sets CWD to apps/api/ so we look for .env there first, then fall
+    // back to the monorepo root (where .env.example and the actual .env live).
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
+      envFilePath: ['.env', '../../.env'],
       ignoreEnvFile: process.env.NODE_ENV === 'production',
     }),
 
