@@ -277,6 +277,14 @@
   "replayEventConcede": "认输",
   "replayEventDrawGame": "荒牌",
 
+  "pushNotifications": "出牌提醒",
+  "pushNotificationsDesc": "轮到你出牌时收到通知",
+  "pushEnable": "开启",
+  "pushDisable": "关闭",
+  "pushEnabled": "已开启",
+  "pushDenied": "已被浏览器屏蔽",
+  "pushDeniedHint": "请在浏览器设置中允许通知权限。",
+
   "learnTitle": "规则",
   "learnLink": "规则",
   "learnNudge": "第一次玩？",

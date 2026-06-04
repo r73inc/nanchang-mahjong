@@ -4,6 +4,7 @@ import { useSignout } from '../../hooks/use-auth';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
+import { usePushNotifications } from '../../hooks/use-push-notifications';
 
 // Defined outside JSX so the no-literal-string rule doesn't flag path strings.
 const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
@@ -18,6 +19,8 @@ export function HomeStubPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const signout = useSignout();
+  const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
+    usePushNotifications();
 
   return (
     <ScreenShell title={t('homeTitle')}>
@@ -115,6 +118,48 @@ export function HomeStubPage() {
 
         {/* Settings actions */}
         <div className="space-y-2 mb-6">
+          {/* Push notification toggle — only shown when browser supports it */}
+          {isSupported && (
+            <div
+              className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px]"
+              style={{
+                background: 'rgba(245,239,223,0.06)',
+                border: '1px solid rgba(245,239,223,0.08)',
+              }}
+            >
+              <div className="flex-1 min-w-0 mr-3">
+                <p className="text-sm text-mj-bone">{t('pushNotifications')}</p>
+                {permission === 'denied' ? (
+                  <p className="text-[11px] text-mj-loss-light/80 mt-0.5">{t('pushDenied')}</p>
+                ) : (
+                  <p className="text-[11px] text-mj-bone/40 mt-0.5">{t('pushNotificationsDesc')}</p>
+                )}
+              </div>
+              {permission === 'denied' ? (
+                <span className="text-[11px] text-mj-bone/30 shrink-0">{t('pushDenied')}</span>
+              ) : (
+                <button
+                  onClick={() => void (isSubscribed ? unsubscribe() : subscribe())}
+                  disabled={isLoading}
+                  aria-pressed={isSubscribed}
+                  className="relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50"
+                  style={{
+                    background: isSubscribed ? '#c9a961' : 'rgba(245,239,223,0.15)',
+                    border: isSubscribed ? 'none' : '1px solid rgba(245,239,223,0.2)',
+                  }}
+                >
+                  <span
+                    className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+                    style={{
+                      transform: isSubscribed ? 'translateX(20px)' : 'translateX(0)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    }}
+                  />
+                </button>
+              )}
+            </div>
+          )}
+
           <button
             onClick={() => navigate('/settings/change-password')}
             className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px] text-sm text-mj-bone"

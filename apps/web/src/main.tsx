@@ -1,6 +1,15 @@
 // i18n must be initialized before any component renders.
 import './i18n/i18n';
 
+// Register service worker for push notifications (best-effort — safe if unsupported).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker
+      .register('/sw.js')
+      .catch((err) => console.warn('SW registration failed:', err));
+  });
+}
+
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
