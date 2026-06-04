@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { configuration } from './config/configuration';
+import type { AppConfig } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './auth/auth.module';
@@ -29,9 +30,16 @@ import { I18nModule } from './i18n/i18n.module';
       ignoreEnvFile: process.env.NODE_ENV === 'production',
     }),
 
-    // Rate limiting — default bucket: 60 req / min per IP.
-    // Individual routes override with @Throttle({ default: { ttl, limit } }).
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 60 }]),
+    // Rate limiting — skipped entirely in non-production so local testing is
+    // never blocked. In production: 60 req / min per IP globally; individual
+    // routes can tighten with @Throttle({ default: { ttl, limit } }).
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfig, true>) => ({
+        skipIf: () => config.get('nodeEnv', { infer: true }) !== 'production',
+        throttlers: [{ name: 'default', ttl: 60_000, limit: 60 }],
+      }),
+    }),
 
     // i18n — global service for translating error messages per Accept-Language.
     I18nModule,
