@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { TILE_TYPES } from '@nanchang/engine';
+import { replayHand } from '@nanchang/engine';
 import type {
   TileType,
   SeatWind,
@@ -20,6 +21,7 @@ import type {
   WinType,
   GameEvent,
   GameState,
+  ReplayHandConfig,
 } from '@nanchang/engine';
 
 // Re-export engine types so consumers only need one import source.
@@ -33,7 +35,10 @@ export type {
   WinType,
   GameEvent,
   GameState,
+  ReplayHandConfig,
 };
+// Re-export replay utility so web only needs @nanchang/shared.
+export { replayHand };
 
 // ── Shared primitive schemas ──────────────────────────────────────────────────
 

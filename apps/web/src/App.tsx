@@ -13,6 +13,7 @@ import { LobbyPage } from './pages/lobby/lobby-page';
 import { RoomPage } from './pages/room/room-page';
 import { GamePage } from './pages/game/game-page';
 import { HistoryPage } from './pages/history/history-page';
+import { ReplayPage } from './pages/replay/replay-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/room/:code" element={<RoomPage />} />
         <Route path="/game/:id" element={<GamePage />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/replay/:id" element={<ReplayPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/customize" element={<CustomizeStubPage />} />
