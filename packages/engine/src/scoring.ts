@@ -1,180 +1,264 @@
 /**
- * Fan (番) calculation and payment for Nanchang Mahjong.
+ * Scoring for Nanchang Mahjong — locked rules (§6).
  *
- * Fan system (additive):
- *   Each qualifying pattern contributes its fan count to the total.
- *   Minimum: 1 fan (hands that calculate to 0 pay at 1-fan rate).
+ * Payment model: Base (1) × Multipliers (§6.3 / §6.4).
  *
- * Payment: units = 2^(fan−1), capped at 64 (for 6+ fan).
+ * ── Winning payout ────────────────────────────────────────────────────────────
+ *   Tsumo:     each of 3 losers pays  (base × multiplier × 2)
+ *   Ron:       discarder pays          (base × multiplier × 2)
+ *              each other non-winner   (base × multiplier × 1)
+ *   Rob Kong:  same structure as Tsumo, but only the konger pays (all 3 shares)
+ *   Heavenly / Earthly Win: flat 20 from each loser — overrides all multipliers
+ *
+ * ── Multipliers (stackable) ───────────────────────────────────────────────────
+ *   Hand type:  Seven Pairs ×2 · All Triplets ×2 · Thirteen Misfits ×2 · Seven Star ×4
+ *   German:     ×2  (+5 flat per loser)
+ *   True German: ×4  (+5 flat per loser) — supersedes German ×2
+ *   Spirit Fishing: ×2
+ *   Dealer win: ×2  (when winner is the current dealer)
+ *   Dealer loss: discarder pays ×2 extra on their own portion (ron, discarder is dealer)
+ *
+ * ── Instant payouts (separate from win, called per-event) ────────────────────
+ *   Open/Supplement Kong: 1 pt from each other player  (§6.1)
+ *   Concealed Kong:       2 pts from each other player (§6.1)
+ *
+ * ── Spirit settlement (end of every hand, all players) ───────────────────────
+ *   Primary Spirit held: 2 pts from each other player
+ *   Secondary Spirit held: 1 pt from each other player
+ *   Spirit Kong (4 of one spirit type as a kong): +10 pts from each other player
+ *   Explosive Spirit (total ≥ 5): formula effectiveScore = raw × (raw − 3)
+ *   Indomitable Spirit (only one player has spirits): double their score
  */
-import { isHonor, isTerminalOrHonor, isSuit, getSuit, WINDS, DRAGONS } from './tiles';
-import type { FanItem, FanResult, Meld, Payment, ScoringContext, TileType, WinType } from './types';
 
-// ── Fan catalogue ─────────────────────────────────────────────────────────────
+import type {
+  MultiplierItem,
+  WinPaymentResult,
+  ScoringContext,
+  SeatState,
+  TileType,
+} from './types';
 
-function fan(name: string, nameZh: string, f: number): FanItem {
-  return { name, nameZh, fan: f };
-}
+// ── Win payout ────────────────────────────────────────────────────────────────
 
 /**
- * Compute all applicable fans for a winning hand.
+ * Calculate the win payment for a completed hand using the locked rules
+ * Base × Multiplier system.
+ *
+ * Returns a zero-sum score delta for all four seats and a breakdown of
+ * multiplier items for display / Phase 8 history.
  */
-export function calculateFan(ctx: ScoringContext): FanResult {
-  const { winType, isLastTile, isAfterKong, isRobKong, decomposition, openMelds } = ctx;
-  const { pair, melds, jingsUsed } = decomposition;
+export function calculateWinPayout(ctx: ScoringContext): WinPaymentResult {
+  const {
+    winType,
+    handType,
+    winnerSeat,
+    dealerSeat,
+    discarderSeat,
+    kongSeat,
+    isRobKong,
+    isGerman,
+    isTrueGerman,
+    isSpiritFishing,
+    isHeavenlyWin,
+    isEarthlyWin,
+  } = ctx;
 
-  const items: FanItem[] = [];
+  // ── Heavenly / Earthly Win — flat 20 from each, overrides everything ─────────
+  if (isHeavenlyWin || isEarthlyWin) {
+    const flat = 20;
+    const scoreDelta: [number, number, number, number] = [0, 0, 0, 0];
+    for (let i = 0; i < 4; i++) {
+      scoreDelta[i] = i === winnerSeat ? flat * 3 : -flat;
+    }
+    return {
+      items: [
+        {
+          name: isHeavenlyWin ? 'Heavenly Win' : 'Earthly Win',
+          nameZh: isHeavenlyWin ? '天胡' : '地胡',
+          multiplier: 1,
+          flatPerLoser: flat,
+        },
+      ],
+      totalMultiplier: 1,
+      flatBonusPerLoser: flat,
+      scoreDelta,
+      winnerTotal: flat * 3,
+    };
+  }
 
-  // All melds in the hand (including open melds from the game state)
-  const allMelds: Meld[] = [...openMelds, ...melds];
+  // ── Build multiplier stack ─────────────────────────────────────────────────
 
-  // ── Situational fans ────────────────────────────────────────────────────────
+  const items: MultiplierItem[] = [];
+  let multiplier = 1;
+  let flatBonusPerLoser = 0;
 
-  if (winType === 'tsumo') {
-    items.push(fan('Tsumo', '自摸', 1));
+  // Hand-type multiplier (§6.3)
+  switch (handType) {
+    case 'seven_pairs':
+      items.push({ name: 'Seven Pairs', nameZh: '七对子', multiplier: 2, flatPerLoser: 0 });
+      multiplier *= 2;
+      break;
+    case 'all_triplets':
+      items.push({
+        name: 'All Triplets',
+        nameZh: '大七对',
+        multiplier: 2,
+        flatPerLoser: 0,
+      });
+      multiplier *= 2;
+      break;
+    case 'thirteen_misfits':
+      items.push({
+        name: 'Thirteen Misfits',
+        nameZh: '十三烂',
+        multiplier: 2,
+        flatPerLoser: 0,
+      });
+      multiplier *= 2;
+      break;
+    case 'seven_star_thirteen':
+      items.push({
+        name: 'Seven Star Thirteen Misfits',
+        nameZh: '七星十三烂',
+        multiplier: 4,
+        flatPerLoser: 0,
+      });
+      multiplier *= 4;
+      break;
+    // 'standard': no hand-type multiplier
+  }
+
+  // German / True German (§6.4) — True German supersedes German
+  if (isTrueGerman) {
+    items.push({ name: 'True German', nameZh: '德中德', multiplier: 4, flatPerLoser: 5 });
+    multiplier *= 4;
+    flatBonusPerLoser += 5;
+  } else if (isGerman) {
+    items.push({ name: 'German', nameZh: '德国', multiplier: 2, flatPerLoser: 5 });
+    multiplier *= 2;
+    flatBonusPerLoser += 5;
+  }
+
+  // Spirit Fishing (§6.4)
+  if (isSpiritFishing) {
+    items.push({ name: 'Spirit Fishing', nameZh: '精钓', multiplier: 2, flatPerLoser: 0 });
+    multiplier *= 2;
+  }
+
+  // Dealer win (§6.3): winner is the current dealer → ×2 on the whole hand
+  const isDealer = winnerSeat === dealerSeat;
+  if (isDealer) {
+    items.push({ name: 'Dealer', nameZh: '庄家', multiplier: 2, flatPerLoser: 0 });
+    multiplier *= 2;
+  }
+
+  // ── Compute per-seat score delta ─────────────────────────────────────────────
+
+  const scoreDelta: [number, number, number, number] = [0, 0, 0, 0];
+
+  if (isRobKong && kongSeat !== undefined) {
+    // Rob Kong (§6.3): treated as tsumo; konger pays all three shares
+    const kongerPays = multiplier * 2 * 3 + flatBonusPerLoser * 3;
+    scoreDelta[winnerSeat] += kongerPays;
+    scoreDelta[kongSeat] -= kongerPays;
+    // The other two seats pay nothing
+  } else if (winType === 'tsumo') {
+    // Self-draw: everyone pays ×2 (§6.3)
+    const perLoser = multiplier * 2 + flatBonusPerLoser;
+    for (let i = 0; i < 4; i++) {
+      scoreDelta[i] = i === winnerSeat ? perLoser * 3 : -perLoser;
+    }
   } else {
-    // Fully concealed off discard: all melds must be concealed
-    const isConcealed = openMelds.length === 0;
-    if (isConcealed) items.push(fan('Concealed Ron', '门清', 1));
-  }
+    // Ron: discarder pays ×2, each other non-winner pays ×1 (§6.3)
+    const discarder = discarderSeat!;
+    // Dealer loss (§6.3): if discarder is the dealer but winner is not, discarder pays ×2 extra
+    const isDiscarderDealer = discarder === dealerSeat && !isDealer;
+    const discarderPays = multiplier * 2 * (isDiscarderDealer ? 2 : 1) + flatBonusPerLoser;
+    const otherPays = multiplier * 1 + flatBonusPerLoser;
 
-  if (isLastTile) items.push(fan('Last Tile', '海底捞月', 1));
-  if (isAfterKong) items.push(fan('After Kong', '杠上花', 1));
-  if (isRobKong) items.push(fan('Rob Kong', '抢杠', 1));
-
-  // ── Jing fans ───────────────────────────────────────────────────────────────
-
-  if (jingsUsed === 0) {
-    items.push(fan('Clean Win', '净胡', 1));
-  }
-
-  // Concealed kongs count
-  const concealedKongs = allMelds.filter((m) => m.kind === 'kong' && m.concealed).length;
-  for (let i = 0; i < concealedKongs; i++) {
-    items.push(fan('Concealed Kong', '暗杠', 1));
-  }
-
-  // Four Jing kongs (special)
-  // (Jing-kong detection: a kong where all 4 are jing — marked by engine separately)
-
-  // ── Hand composition fans ───────────────────────────────────────────────────
-
-  const isAllPungs = allMelds.every((m) => m.kind === 'pung' || m.kind === 'kong');
-  if (isAllPungs) items.push(fan('All Pungs', '对对胡', 2));
-
-  // No terminals or honors (断幺)
-  const pairIsSimple = !isTerminalOrHonor(pair);
-  const meldsAreSimple = allMelds.every((m) => m.tiles.every((t) => !isTerminalOrHonor(t)));
-  if (pairIsSimple && meldsAreSimple) {
-    items.push(fan('All Simples', '断幺', 1));
-  }
-
-  // All terminals or honors in every meld (全带幺)
-  const allToh =
-    allMelds.every((m) => m.tiles.some((t) => isTerminalOrHonor(t))) && isTerminalOrHonor(pair);
-  if (allToh) items.push(fan('All Terminals/Honors', '全带幺', 4));
-
-  // Flush checks
-  const suitTiles = [
-    ...allMelds.flatMap((m) => m.tiles).filter(isSuit),
-    ...(isSuit(pair) ? [pair] : []),
-  ];
-  const honorTiles = [
-    ...allMelds.flatMap((m) => m.tiles).filter(isHonor),
-    ...(isHonor(pair) ? [pair] : []),
-  ];
-
-  if (suitTiles.length > 0) {
-    const suits = new Set(suitTiles.map((t) => getSuit(t)));
-    if (suits.size === 1) {
-      if (honorTiles.length === 0) {
-        items.push(fan('Full Flush', '清一色', 4));
-      } else {
-        items.push(fan('Half Flush', '混一色', 2));
-      }
+    for (let i = 0; i < 4; i++) {
+      if (i === winnerSeat) continue;
+      const pays = i === discarder ? discarderPays : otherPays;
+      scoreDelta[i] -= pays;
+      scoreDelta[winnerSeat] += pays;
     }
   }
 
-  // Dragons (三元刻): all 3 dragon types as pungs/kongs
-  const dragonPungs = new Set(
-    allMelds
-      .filter((m) => m.kind === 'pung' || m.kind === 'kong')
-      .map((m) => m.tiles[0])
-      .filter((t) => DRAGONS.includes(t as TileType)),
-  );
-  if (dragonPungs.size === 3) items.push(fan('Three Dragons', '三元刻', 5));
-
-  // Wind pungs
-  const windPungs = new Set(
-    allMelds
-      .filter((m) => m.kind === 'pung' || m.kind === 'kong')
-      .map((m) => m.tiles[0])
-      .filter((t) => WINDS.includes(t as TileType)),
-  );
-  const pairIsWind = WINDS.includes(pair as TileType);
-
-  if (windPungs.size === 4) {
-    items.push(fan('Big Four Winds', '大四喜', 8));
-  } else if (windPungs.size === 3 && pairIsWind) {
-    items.push(fan('Small Four Winds', '小四喜', 4));
-  }
-
-  // ── Total ───────────────────────────────────────────────────────────────────
-
-  const total = Math.max(
-    1,
-    items.reduce((sum, i) => sum + i.fan, 0),
-  );
-  return { items, total };
+  return {
+    items,
+    totalMultiplier: multiplier,
+    flatBonusPerLoser,
+    scoreDelta,
+    winnerTotal: scoreDelta[winnerSeat],
+  };
 }
 
+// ── Instant Kong payout (§6.1) ────────────────────────────────────────────────
+
 /**
- * Calculate the seven-pairs fan result.
+ * Points each OTHER player pays to the kong declarer immediately when a kong
+ * is declared (before any draw, independent of who wins).
+ *
+ * Open (from discard) or Supplement (add-to-pung): 1 point from each.
+ * Concealed: 2 points from each.
+ *
+ * The engine applies this in kongFromDiscard / kongConcealed / addToKong.
  */
-export function calculateSevenPairsFan(
-  ctx: Omit<ScoringContext, 'decomposition'> & {
-    jingsUsed: number;
-    hasLongPair: boolean; // one of the pairs is 4-of-a-kind (龙七对)
-  },
-): FanResult {
-  const { winType, isLastTile, isAfterKong, isRobKong, jingsUsed, hasLongPair } = ctx;
-  const items: FanItem[] = [];
-
-  if (winType === 'tsumo') items.push(fan('Tsumo', '自摸', 1));
-  if (isLastTile) items.push(fan('Last Tile', '海底捞月', 1));
-  if (isAfterKong) items.push(fan('After Kong', '杠上花', 1));
-  if (isRobKong) items.push(fan('Rob Kong', '抢杠', 1));
-  if (jingsUsed === 0) items.push(fan('Clean Win', '净胡', 1));
-
-  if (hasLongPair) {
-    items.push(fan('Dragon Seven Pairs', '龙七对', 3));
-  } else {
-    items.push(fan('Seven Pairs', '七对子', 2));
-  }
-
-  const total = Math.max(
-    1,
-    items.reduce((sum, i) => sum + i.fan, 0),
-  );
-  return { items, total };
+export function instantKongPayment(kind: 'open' | 'concealed'): number {
+  return kind === 'open' ? 1 : 2;
 }
 
-// ── Payment ───────────────────────────────────────────────────────────────────
+// ── Spirit settlement (§6.2) ──────────────────────────────────────────────────
 
 /**
- * Calculate payment amounts given a fan total and win type.
+ * Calculate the per-player spirit tile settlement at end of each hand.
  *
- * Units formula: 2^(fan − 1), capped at 64 (fan 6+).
+ * Every player pays every other player based on the spirit tiles the other
+ * player holds (in hand + open melds).
  *
- * Ron: discarder pays `unitsPerPayer`; others pay 0.
- *     totalReceived = unitsPerPayer.
- * Tsumo: each of 3 losers pays `unitsPerPayer`.
- *     totalReceived = unitsPerPayer × 3.
+ * Settlement formula (zero-sum):
+ *   scoreDelta[i] = (4 × effectiveScore[i]) − totalEffectiveSpirits
+ *
+ * effectiveScore per player:
+ *   rawScore = (primaryTileCount × 2) + (secondaryTileCount × 1) + (spiritKongs × 10)
+ *   if rawScore ≥ 5: effectiveScore = rawScore × (rawScore − 3)   [Explosive Spirit]
+ *   else:             effectiveScore = rawScore
+ *   if only ONE player has spirits: effectiveScore × 2              [Indomitable Spirit]
+ *
+ * Returns a [number, number, number, number] score delta (zero-sum).
  */
-export function calculatePayment(fan: number, winType: WinType): Payment {
-  const clampedFan = Math.min(fan, 6);
-  const unitsPerPayer = Math.floor(Math.pow(2, clampedFan - 1));
+export function calculateSpiritSettlement(
+  seats: readonly [SeatState, SeatState, SeatState, SeatState],
+  jingPrimary: TileType,
+  jingSecondary: TileType,
+): [number, number, number, number] {
+  const rawScores = seats.map((seat) => {
+    // All tiles the player holds: concealed hand + all tiles in open melds
+    const allTiles: TileType[] = [
+      ...seat.hand,
+      ...(seat.openMelds.flatMap((m) => m.tiles) as TileType[]),
+    ];
 
-  const totalReceived = winType === 'tsumo' ? unitsPerPayer * 3 : unitsPerPayer;
-  return { unitsPerPayer, totalReceived };
+    const primaryCount = allTiles.filter((t) => t === jingPrimary).length;
+    const secondaryCount = allTiles.filter((t) => t === jingSecondary).length;
+
+    // Spirit Kong: a kong meld whose tiles are all one spirit type
+    const spiritKongs = seat.openMelds.filter(
+      (m) => m.kind === 'kong' && (m.tiles[0] === jingPrimary || m.tiles[0] === jingSecondary),
+    ).length;
+
+    const raw = primaryCount * 2 + secondaryCount * 1 + spiritKongs * 10;
+
+    // Explosive Spirit (§6.2): total ≥ 5 → raw × (raw − 3)
+    return raw >= 5 ? raw * (raw - 3) : raw;
+  });
+
+  // Indomitable Spirit (§6.2): if exactly ONE player has spirits, double their score
+  const playersWithSpirits = rawScores.filter((s) => s > 0).length;
+  const effectiveScores = rawScores.map((s) => (playersWithSpirits === 1 ? s * 2 : s));
+
+  const totalSpirits = effectiveScores.reduce((sum, s) => sum + s, 0);
+
+  // scoreDelta[i] = 4 × effectiveScores[i] − totalSpirits  (zero-sum proof: Σ = 0)
+  return effectiveScores.map((s) => 4 * s - totalSpirits) as [number, number, number, number];
 }
