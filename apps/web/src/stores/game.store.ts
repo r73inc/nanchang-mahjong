@@ -35,6 +35,9 @@ interface GameStore {
   // ── Derived from game:ended (available for end-screen) ────────────────────
   ended: GameEndedPayload | null;
 
+  // ── Rematch: roomCode delivered by game:rematch-ready ─────────────────────
+  rematchRoomCode: string | null;
+
   // ── UI state ───────────────────────────────────────────────────────────────
   /** Index into snapshot.seats[viewerSeat].hand of the selected tile. */
   selectedTileIdx: number | null;
@@ -54,6 +57,7 @@ interface GameStore {
   // ── Actions ────────────────────────────────────────────────────────────────
   setSnapshot: (s: ClientGameState) => void;
   setEnded: (e: GameEndedPayload) => void;
+  setRematchRoomCode: (code: string) => void;
   setConnection: (s: ConnectionStatus) => void;
   setClaimWindow: (w: ClaimWindowState | null) => void;
   selectTile: (idx: number | null) => void;
@@ -65,6 +69,7 @@ interface GameStore {
 const initialState = {
   snapshot: null,
   ended: null,
+  rematchRoomCode: null,
   selectedTileIdx: null,
   pendingMove: false,
   claimWindow: null,
@@ -85,6 +90,8 @@ export const useGameStore = create<GameStore>()((set) => ({
     }),
 
   setEnded: (ended) => set({ ended }),
+
+  setRematchRoomCode: (rematchRoomCode) => set({ rematchRoomCode }),
 
   setConnection: (connection) => set({ connection }),
 

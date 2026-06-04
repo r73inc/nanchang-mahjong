@@ -26,6 +26,7 @@ export function useGame(gameId: string, spectate = false) {
   const {
     snapshot,
     ended,
+    rematchRoomCode,
     selectedTileIdx,
     claimWindow,
     connection,
@@ -33,6 +34,7 @@ export function useGame(gameId: string, spectate = false) {
     toast,
     setSnapshot,
     setEnded,
+    setRematchRoomCode,
     setConnection,
     setClaimWindow,
     selectTile,
@@ -81,6 +83,10 @@ export function useGame(gameId: string, spectate = false) {
       setEnded(payload);
     };
 
+    const handleRematchReady = (payload: { roomId: string; roomCode: string }) => {
+      setRematchRoomCode(payload.roomCode);
+    };
+
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
     // on the FE we just need a toast/alert if it's us.
     // We rely on game:snapshot reflecting the afk flag; no extra state needed here.
@@ -90,6 +96,7 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:rob-kong-window', handleClaimWindow); // same UI
     s.on('game:contested', handleContested);
     s.on('game:ended', handleEnded);
+    s.on('game:rematch-ready', handleRematchReady);
 
     // ── Connection management ─────────────────────────────────────────────────
     const handleDisconnect = () => {
@@ -124,6 +131,7 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:rob-kong-window', handleClaimWindow);
       s.off('game:contested', handleContested);
       s.off('game:ended', handleEnded);
+      s.off('game:rematch-ready', handleRematchReady);
       s.off('disconnect', handleDisconnect);
       s.off('connect', handleConnect);
       s.off('connect_error', handleConnectError);
@@ -186,6 +194,14 @@ export function useGame(gameId: string, spectate = false) {
     }
   }, [gameId]);
 
+  const requestRematch = useCallback(() => {
+    try {
+      getSocket().emit('game:rematch', {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const kongConcealed = useCallback((tile: TileType) => {
     try {
       getSocket().emit('game:kong-concealed', { tile });
@@ -205,6 +221,7 @@ export function useGame(gameId: string, spectate = false) {
   return {
     snapshot,
     ended,
+    rematchRoomCode,
     selectedTileIdx,
     claimWindow,
     connection,
@@ -219,5 +236,6 @@ export function useGame(gameId: string, spectate = false) {
     revealJing,
     kongConcealed,
     kongAdd,
+    requestRematch,
   };
 }

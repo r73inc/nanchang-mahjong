@@ -12,6 +12,7 @@ import { CustomizeStubPage } from './pages/customize/customize-stub-page';
 import { LobbyPage } from './pages/lobby/lobby-page';
 import { RoomPage } from './pages/room/room-page';
 import { GamePage } from './pages/game/game-page';
+import { HistoryPage } from './pages/history/history-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
 
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/lobby" element={<LobbyPage />} />
         <Route path="/room/:code" element={<RoomPage />} />
         <Route path="/game/:id" element={<GamePage />} />
+        <Route path="/history" element={<HistoryPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/customize" element={<CustomizeStubPage />} />
