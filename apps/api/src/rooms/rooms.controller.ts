@@ -26,6 +26,7 @@ import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.
 import { RoomsService } from './rooms.service';
 import { RoomsGateway } from './rooms.gateway';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { GameService } from '../game/game.service';
 
 @Controller('rooms')
 @UseGuards(JwtGuard)
@@ -33,6 +34,7 @@ export class RoomsController {
   constructor(
     private readonly service: RoomsService,
     private readonly gateway: RoomsGateway,
+    private readonly gameService: GameService,
   ) {}
 
   // ── Create ─────────────────────────────────────────────────────────────────
@@ -111,10 +113,19 @@ export class RoomsController {
 
   // ── Start ──────────────────────────────────────────────────────────────────
 
-  /** Host starts the game. Emits room:started to all connected clients. */
+  /** Host starts the game. Creates the authoritative GameSession and emits room:started. */
   @Post(':roomId/start')
   async startGame(@CurrentUser() user: AuthenticatedUser, @Param('roomId') roomId: string) {
     const { room, gameId } = await this.service.startGame(roomId, user.sub);
+
+    // Build the seat map (4 players, sorted by seat index — all occupied by this point).
+    const seatMap = ([0, 1, 2, 3] as const).map(
+      (i) => room.seats.find((s) => s.seatIdx === i)!.userId!,
+    ) as [string, string, string, string];
+
+    // Create the in-memory GameSession using the room's pre-assigned gameId.
+    await this.gameService.createGame(roomId, seatMap, room.settings, gameId);
+
     this.gateway.broadcastRoomUpdate(roomId, room);
     this.gateway.broadcastRoomStarted(roomId, gameId);
     return { roomId, gameId };

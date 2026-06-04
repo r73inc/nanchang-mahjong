@@ -36,7 +36,7 @@ import { I18nModule } from './i18n/i18n.module';
     InvitesModule,
     AdminModule,
     FriendsModule,
-    RoomsModule,
+    RoomsModule, // transitively imports GameModule
   ],
   controllers: [HealthController],
   providers: [
