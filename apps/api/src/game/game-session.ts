@@ -18,12 +18,22 @@
  */
 
 import { GameEngine } from '@nanchang/engine';
-import type { GameEvent } from '@nanchang/engine';
+import type { GameEvent, SeatWind } from '@nanchang/engine';
 import type { RoomSettings } from '@nanchang/shared';
 import type { ClaimAction } from '@nanchang/shared';
 import type { IncomingClaim, Seat4 } from './claim-resolver';
 
 export type { Seat4 };
+
+/** Metadata for one hand within a session — needed to reconstruct replay. */
+export interface HandMeta {
+  seed: number;
+  startingScores: [number, number, number, number];
+  dealerSeat: 0 | 1 | 2 | 3;
+  roundWind: SeatWind;
+  /** Inclusive start index into session.moveLog for this hand's events. */
+  eventStartIdx: number;
+}
 
 export interface ConnState {
   connected: boolean;
@@ -85,8 +95,11 @@ export class GameSession {
   /** Number of complete hands played so far. */
   handsPlayed = 0;
 
-  /** Full ordered move log (all hands). In-memory; serialized in Phase 9. */
+  /** Full ordered move log (all hands). Serialized to S3 on game end. */
   readonly moveLog: GameEvent[] = [];
+
+  /** Per-hand metadata for replay assembly. One entry per hand played. */
+  readonly handLog: HandMeta[] = [];
 
   /** Active claim/rob-kong window state (null when no window is open). */
   claimWindow: ClaimWindowState | null = null;
