@@ -4,7 +4,7 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize). **Phase 12 (Push + a11y) is next.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize) → 12 (Push + a11y). **Phase 13 (Production Deploy) is next.**
 
 ---
 
@@ -106,13 +106,20 @@ gh pr view <n> --comments
 - VAPID key pair in config; graceful no-op if keys not set.
 - `PushModule` (@Global) — `PushService` + `PushController`. Push subscriptions in DDB (`USER#<sub>/PUSH_SUB`). `GameService.startTurn()` fires turn notification when active seat has no live socket. 8 new tests (216 total API).
 
-### Next: Phase 12B — Push Frontend + A11y
+### Completed (Phase 12B — Push Frontend + A11y, PR #27)
 
 - `public/sw.js` service worker — `push`, `notificationclick`, `pushsubscriptionchange`.
 - `usePushNotifications` hook — SW registration, VAPID key fetch, permission flow, pushManager subscribe/unsubscribe.
 - Push notification toggle in Home settings section.
 - `prefers-reduced-motion` global CSS rule in `index.css`.
-- A11y tests: `A11y·tile-aria` + `A11y·reduced-motion`.
+- A11y tests: `A11y·tile-aria` (all 34 tiles) + `A11y·reduced-motion` (CSS check). 4 new tests (106 total web).
+
+### Next: Phase 13 — Production Deploy & Hardening
+
+- `apps/api/Dockerfile` — multi-stage build; `nest build --webpack` bundles everything into a single `dist/main.js` (avoids workspace TS resolution issues in production).
+- CDK stack expanded: DynamoDB (PITR + TTL + GSI1) · S3 replay bucket (Glacier lifecycle) · S3 web bucket + CloudFront OAC · ECR repository · App Runner service · WAF WebACL (in us-east-1 `NanchangGlobalStack`) · Cost alarm at $50.
+- `.github/workflows/deploy.yml` — triggered on push to `main`: build web → S3 sync + CloudFront invalidation; build Docker → ECR push → App Runner redeploy.
+- `test/e2e/smoke.spec.ts` — Playwright smoke tests run against prod after every deploy.
 
 ---
 

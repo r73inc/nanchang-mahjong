@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Dev tooling
+node_modules
+**/node_modules
+**/.cache
+
+# Build artifacts (rebuilt inside Docker)
+**/dist
+
+# Test files
+**/*.spec.ts
+**/*.test.ts
+**/*.e2e-spec.ts
+test/e2e
+
+# Local config
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+
+# Web app (not needed for API image)
+apps/web
+
+# Infra (not needed for API image)
+infra
