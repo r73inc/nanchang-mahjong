@@ -54,6 +54,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     'game:kong-add': { limit: 2, windowMs: 1_000 },
     'game:concede': { limit: 2, windowMs: 1_000 },
     'game:reveal-jing': { limit: 2, windowMs: 1_000 },
+    'game:rematch': { limit: 1, windowMs: 10_000 },
   });
 
   constructor(private readonly gameService: GameService) {}
@@ -190,6 +191,18 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
 
     this.gameService.handleConcede(socket, user.sub, gameId);
+  }
+
+  @SubscribeMessage('game:rematch')
+  async handleRematch(socket: Socket): Promise<void> {
+    if (!this.checkRate(socket, 'game:rematch')) return;
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = socket.data.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
+
+    await this.gameService.requestRematch(socket, user.sub, gameId);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
