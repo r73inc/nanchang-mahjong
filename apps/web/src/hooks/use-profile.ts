@@ -12,7 +12,6 @@ export interface MyProfile {
   createdAt: string;
   updatedAt: string;
   disabled: boolean;
-  /** Placeholder until Phase 8 aggregates are ready. */
   gamesPlayed: number;
   gamesWon: number;
   rating: number;
