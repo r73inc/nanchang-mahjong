@@ -9,13 +9,21 @@
  *   - Throws on illegal moves so callers always get explicit error feedback.
  *   - The engine does NOT handle networking, persistence, or timers —
  *     those are the responsibility of the Gateway layer (Phase 7).
+ *   - Instant Kong payouts and Spirit settlements are applied inside the engine
+ *     so the score on SeatState always reflects the full game ledger.
  */
 import { buildWall, typeOf, sortTypes } from './tiles';
 import { seededShuffle } from './prng';
 import { jingTypesFromIndicator, separateJing } from './jing';
 import { isWinningHand, decomposeHand } from './hand';
-import { canPung, canKongFromDiscard, concealedKongOptions, chowOptions } from './calls';
-import { calculateFan, calculateSevenPairsFan, calculatePayment } from './scoring';
+import {
+  canPung,
+  canKongFromDiscard,
+  concealedKongOptions,
+  addToKongOptions,
+  chowOptions,
+} from './calls';
+import { calculateWinPayout, instantKongPayment, calculateSpiritSettlement } from './scoring';
 import type {
   GameState,
   GameEvent,
@@ -24,20 +32,17 @@ import type {
   TileType,
   TileId,
   Meld,
-  FanResult,
-  WinType,
+  WinPaymentResult,
+  HandType,
+  Decomposition,
 } from './types';
 
 const SEAT_WINDS: SeatWind[] = ['east', 'south', 'west', 'north'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function blankSeat(wind: SeatWind): SeatState {
-  return { wind, hand: [], openMelds: [], discards: [], score: 0 };
-}
-
-function seatWindIndex(wind: SeatWind): 0 | 1 | 2 | 3 {
-  return SEAT_WINDS.indexOf(wind) as 0 | 1 | 2 | 3;
+function blankSeat(wind: SeatWind, score = 0): SeatState {
+  return { wind, hand: [], openMelds: [], discards: [], score };
 }
 
 function removeFromHand(hand: TileType[], tile: TileType): TileType[] {
@@ -52,6 +57,50 @@ function removeFromHandN(hand: TileType[], tile: TileType, n: number): TileType[
   return h;
 }
 
+// ── nextDealer ────────────────────────────────────────────────────────────────
+
+/**
+ * Pure helper: compute the dealer/wind state for the next hand.
+ *
+ * Rules (§2.2):
+ *   - Dealer wins or game is a draw (winnerSeat === null) → dealer retains.
+ *   - Otherwise → dealer advances to seat (dealerSeat + 1) % 4 (CCW play order).
+ *   - When the dealer rotation completes a full cycle back to seat 0, the round
+ *     wind advances (east → south → west → north).
+ *
+ * The session layer (Phase 7 GameService) should call this after every hand end
+ * to determine the starting state for the next GameEngine.create() call.
+ */
+export function nextDealer(
+  current: { dealerSeat: 0 | 1 | 2 | 3; roundWind: SeatWind },
+  winnerSeat: (0 | 1 | 2 | 3) | null,
+): {
+  dealerSeat: 0 | 1 | 2 | 3;
+  roundWind: SeatWind;
+  dealerChanged: boolean;
+  /** True when a full rotation of all 4 dealerships just completed. */
+  roundComplete: boolean;
+} {
+  // Dealer retains on win or draw
+  if (winnerSeat === null || winnerSeat === current.dealerSeat) {
+    return { ...current, dealerChanged: false, roundComplete: false };
+  }
+
+  const nextDealerSeat = ((current.dealerSeat + 1) % 4) as 0 | 1 | 2 | 3;
+
+  // A full rotation completes when the dealer cycles back to seat 0
+  // (assumes games always start with seat 0 as initial dealer)
+  const roundComplete = nextDealerSeat === 0;
+
+  let roundWind = current.roundWind;
+  if (roundComplete) {
+    const idx = SEAT_WINDS.indexOf(current.roundWind);
+    roundWind = SEAT_WINDS[(idx + 1) % 4];
+  }
+
+  return { dealerSeat: nextDealerSeat, roundWind, dealerChanged: true, roundComplete };
+}
+
 // ── GameEngine ────────────────────────────────────────────────────────────────
 
 export class GameEngine {
@@ -64,9 +113,28 @@ export class GameEngine {
 
   /**
    * Start a new game with the given seed.
-   * Returns an engine whose state is in the 'dealing' phase, ready for `deal()`.
+   *
+   * @param seed - Deterministic PRNG seed (store for replay).
+   * @param options.dealerSeat - Which seat is the dealer (default 0 = East).
+   * @param options.roundWind  - Prevailing round wind (default 'east').
+   * @param options.startingScores - Initial score for each seat (default all 0).
+   *   Set to [20,20,20,20] for bust-mode games.
    */
-  static create(seed: number): GameEngine {
+  static create(
+    seed: number,
+    options: {
+      dealerSeat?: 0 | 1 | 2 | 3;
+      roundWind?: SeatWind;
+      startingScores?: [number, number, number, number];
+    } = {},
+  ): GameEngine {
+    const { dealerSeat = 0, roundWind = 'east', startingScores = [0, 0, 0, 0] } = options;
+
+    // Seat winds are relative to the dealer (dealer = east, next in play order = south, …)
+    const seats = [0, 1, 2, 3].map((i) =>
+      blankSeat(SEAT_WINDS[(i - dealerSeat + 4) % 4], startingScores[i]),
+    ) as GameState['seats'];
+
     const state: GameState = {
       phase: 'dealing',
       seed,
@@ -75,12 +143,14 @@ export class GameEngine {
       jingSecondary: null,
       wall: [],
       deadWall: [],
-      seats: [blankSeat('east'), blankSeat('south'), blankSeat('west'), blankSeat('north')],
-      currentSeat: 0,
+      seats,
+      currentSeat: dealerSeat,
       pendingDiscard: null,
       discardedBySeat: null,
       kongsTotal: 0,
       isKongDraw: false,
+      dealerSeat,
+      roundWind,
     };
     return new GameEngine(state, []);
   }
@@ -108,10 +178,6 @@ export class GameEngine {
     return h;
   }
 
-  private seatOf(wind: SeatWind): SeatState {
-    return this.state.seats[seatWindIndex(wind)];
-  }
-
   private withState(patch: Partial<GameState>, extraEvents: GameEvent[] = []): GameEngine {
     return new GameEngine({ ...this.state, ...patch }, [...this.events, ...extraEvents]);
   }
@@ -120,6 +186,69 @@ export class GameEngine {
     const seats = [...this.state.seats] as GameState['seats'];
     seats[idx] = { ...seats[idx], ...patch };
     return seats;
+  }
+
+  /**
+   * The seat wind of a given seat index for the current hand.
+   * Dealer is always 'east'; subsequent seats in play order are south/west/north.
+   */
+  private seatWindOf(seatIdx: 0 | 1 | 2 | 3): SeatWind {
+    return SEAT_WINDS[(seatIdx - this.state.dealerSeat + 4) % 4];
+  }
+
+  /**
+   * Apply an instant Kong payout to scores (§6.1).
+   * Returns updated seats array with scores adjusted.
+   */
+  private applyKongPayment(
+    seatIdx: 0 | 1 | 2 | 3,
+    kind: 'open' | 'concealed',
+    seats: GameState['seats'],
+  ): GameState['seats'] {
+    const payment = instantKongPayment(kind);
+    const updated = [...seats] as GameState['seats'];
+    for (let i = 0; i < 4; i++) {
+      updated[i] = {
+        ...updated[i],
+        score: updated[i].score + (i === seatIdx ? payment * 3 : -payment),
+      };
+    }
+    return updated;
+  }
+
+  /**
+   * Detect the structural hand type for the winning hand.
+   * Used to select the correct multiplier in calculateWinPayout.
+   */
+  private detectHandType(
+    decompositions: Decomposition[],
+    openMelds: Meld[],
+    fullHand: TileType[],
+  ): HandType {
+    if (decompositions.length > 0) {
+      // All Triplets (大七对): every meld across open + concealed is a pung or kong
+      const openAllPungs = openMelds.every((m) => m.kind === 'pung' || m.kind === 'kong');
+      if (openAllPungs) {
+        const allPungsDecomp = decompositions.find((d) =>
+          d.melds.every((m) => m.kind === 'pung' || m.kind === 'kong'),
+        );
+        if (allPungsDecomp) return 'all_triplets';
+      }
+      return 'standard';
+    }
+
+    // No standard decomposition → Seven Pairs or Thirteen Misfits
+    const counts = new Map<TileType, number>();
+    for (const t of fullHand) counts.set(t, (counts.get(t) ?? 0) + 1);
+
+    // Seven Pairs: at least 7 tile types each appearing ≥2 times
+    const pairCombos = [...counts.values()].filter((c) => c >= 2).length;
+    if (pairCombos >= 7) return 'seven_pairs';
+
+    // Thirteen Misfits: check for Seven Star variant (all 7 unique honors present)
+    const honors: TileType[] = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai'];
+    const hasAllHonors = honors.every((h) => fullHand.includes(h));
+    return hasAllHonors ? 'seven_star_thirteen' : 'thirteen_misfits';
   }
 
   // ── Deal ─────────────────────────────────────────────────────────────────────
@@ -137,19 +266,17 @@ export class GameEngine {
     const deadWall = shuffled.slice(-4);
     const liveWall = shuffled.slice(0, -4);
 
-    // Deal: East 14, others 13 (deal in rotation of 4 tiles at a time, standard style)
+    // Deal: dealer gets 14, others get 13 (3 rounds of 4 + 1 each + 1 extra for dealer)
     const dealt: [TileId[], TileId[], TileId[], TileId[]] = [[], [], [], []];
     let wallIdx = 0;
-    // 3 rounds of 4 tiles each
     for (let round = 0; round < 3; round++) {
       for (let s = 0; s < 4; s++) {
         for (let t = 0; t < 4; t++) dealt[s].push(liveWall[wallIdx++]);
       }
     }
-    // 1 more tile each
     for (let s = 0; s < 4; s++) dealt[s].push(liveWall[wallIdx++]);
-    // East gets one extra
-    dealt[0].push(liveWall[wallIdx++]);
+    // Dealer gets one extra
+    dealt[this.state.dealerSeat].push(liveWall[wallIdx++]);
 
     const hands = dealt.map((ids) => sortTypes(ids.map(typeOf))) as [
       TileType[],
@@ -165,17 +292,9 @@ export class GameEngine {
       seats[i] = { ...seats[i], hand: hands[i] };
     }
 
-    const event: GameEvent = { kind: 'deal', seed: this.state.seed, hands };
-
-    return this.withState(
-      {
-        phase: 'jing_reveal',
-        wall: remainingWall,
-        deadWall,
-        seats,
-      },
-      [event],
-    );
+    return this.withState({ phase: 'jing_reveal', wall: remainingWall, deadWall, seats }, [
+      { kind: 'deal', seed: this.state.seed, hands },
+    ]);
   }
 
   // ── Jing reveal ──────────────────────────────────────────────────────────────
@@ -184,7 +303,7 @@ export class GameEngine {
    * Reveal the Jing indicator and determine both wildcard tile types.
    * Primary Spirit (正精): the indicator tile itself.
    * Secondary Spirit (副精): the tile one rank above the indicator.
-   * Transitions to 'playing', with East to act first (they have 14 tiles).
+   * Transitions to 'playing', with the dealer to act first (they have 14 tiles).
    */
   revealJing(): GameEngine {
     if (this.state.phase !== 'jing_reveal') throw new Error('Not in jing_reveal phase');
@@ -193,19 +312,16 @@ export class GameEngine {
     const indicator = typeOf(indicatorId);
     const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);
 
-    const event: GameEvent = { kind: 'jing_indicator', indicator, jingPrimary, jingSecondary };
-
     return this.withState(
       {
         phase: 'playing',
         jingIndicator: indicator,
         jingPrimary,
         jingSecondary,
-        // Consume the indicator tile so it never re-enters play as a kong replacement.
         deadWall: this.state.deadWall.slice(1),
-        currentSeat: 0, // East goes first (has 14 tiles, needs to discard)
+        currentSeat: this.state.dealerSeat,
       },
-      [event],
+      [{ kind: 'jing_indicator', indicator, jingPrimary, jingSecondary }],
     );
   }
 
@@ -225,36 +341,29 @@ export class GameEngine {
       throw new Error(`Tile ${tile} not in hand`);
     }
 
-    const newHand = removeFromHand(seat.hand, tile);
-
-    const event: GameEvent = { kind: 'discard', seat: seatIdx, tile };
-
     return this.withState(
       {
         phase: 'awaiting_claims',
         seats: this.patchSeat(seatIdx, {
-          hand: newHand,
+          hand: removeFromHand(seat.hand, tile),
           discards: [...seat.discards, tile],
         }),
         pendingDiscard: tile,
         discardedBySeat: seatIdx,
       },
-      [event],
+      [{ kind: 'discard', seat: seatIdx, tile }],
     );
   }
 
   // ── Pass (no claim) ───────────────────────────────────────────────────────────
 
-  /**
-   * All players pass — no one claims the discard. The next player draws.
-   */
+  /** All players pass — no one claims the discard. The next player draws. */
   passClaims(): GameEngine {
     if (this.state.phase !== 'awaiting_claims') throw new Error('Not awaiting claims');
 
     const fromSeat = this.state.discardedBySeat!;
     const nextSeat = ((fromSeat + 1) % 4) as 0 | 1 | 2 | 3;
 
-    // Wall exhausted → draw game
     if (this.state.wall.length === 0) {
       return this.withState({ phase: 'finished' }, [{ kind: 'draw_game' }]);
     }
@@ -273,51 +382,63 @@ export class GameEngine {
     const [tileId, ...remainingWall] = wall;
     const tile = typeOf(tileId);
     const seat = this.state.seats[seatIdx];
-
-    const event: GameEvent = { kind: 'draw', seat: seatIdx, tile, fromDeadWall };
-
-    const newSeats = this.patchSeat(seatIdx, {
-      hand: sortTypes([...seat.hand, tile]),
-    });
-
     const wallPatch = fromDeadWall ? { deadWall: remainingWall } : { wall: remainingWall };
 
     return this.withState(
       {
         phase: 'playing',
         ...wallPatch,
-        seats: newSeats,
+        seats: this.patchSeat(seatIdx, { hand: sortTypes([...seat.hand, tile]) }),
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
         isKongDraw: fromDeadWall,
       },
-      [event],
+      [{ kind: 'draw', seat: seatIdx, tile, fromDeadWall }],
     );
   }
 
   // ── Win ───────────────────────────────────────────────────────────────────────
 
   /**
-   * Declare a win. `seatIdx` is the winner.
-   * - Tsumo: winner is the current player, tile is the drawn tile.
-   * - Ron: winner is a non-current player, tile is the pending discard.
+   * Declare a win.
+   *
+   * @param seatIdx - The winning seat.
+   * @param options.isTrueGerman - Pass true from the session layer when no other
+   *   player holds any Jing tiles (requires inspecting all seats' hands).
+   * @param options.isSpiritFishing - Pass true when the winner was waiting on a
+   *   pair with 4 open melds (session layer detects this from tenpai state).
+   * @param options.robKongSeat - When a player wins by robbing an add-to-kong,
+   *   pass the seat index of the player whose kong was robbed.
    */
-  declareWin(seatIdx: 0 | 1 | 2 | 3): GameEngine {
+  declareWin(
+    seatIdx: 0 | 1 | 2 | 3,
+    options: {
+      isTrueGerman?: boolean;
+      isSpiritFishing?: boolean;
+      robKongSeat?: 0 | 1 | 2 | 3;
+    } = {},
+  ): GameEngine {
+    const { isTrueGerman = false, isSpiritFishing = false, robKongSeat } = options;
+
+    const isRobKong = robKongSeat !== undefined;
+
     const isRon =
+      !isRobKong &&
       this.state.phase === 'awaiting_claims' &&
       this.state.pendingDiscard !== null &&
       seatIdx !== this.state.discardedBySeat;
 
-    const isTsumo = this.state.phase === 'playing' && seatIdx === this.state.currentSeat;
+    const isTsumo =
+      !isRobKong && this.state.phase === 'playing' && seatIdx === this.state.currentSeat;
 
-    if (!isRon && !isTsumo) throw new Error('Invalid win declaration');
+    // Rob-kong wins happen from the 'playing' phase (after addToKong creates the window)
+    if (!isRon && !isTsumo && !isRobKong) throw new Error('Invalid win declaration');
 
-    const winType: WinType = isTsumo ? 'tsumo' : 'ron';
+    const winType = isRon ? 'ron' : 'tsumo';
     const winnerSeat = this.state.seats[seatIdx];
 
-    // Reconstruct the full 14-tile hand: open melds + concealed tiles + (ron) discard.
-    // isWinningHand requires exactly 14 tiles, so open-meld tiles must be included.
+    // Reconstruct full 14-tile hand: open melds + concealed + (ron) discard
     const openMeldTiles = winnerSeat.openMelds.flatMap((m) => [...m.tiles]);
     const winningHand: TileType[] = [
       ...openMeldTiles,
@@ -329,70 +450,96 @@ export class GameEngine {
       throw new Error('Hand is not a winning hand');
     }
 
-    // Find best decomposition for scoring
     const decompositions = decomposeHand(winningHand, this.jingTypes);
-    const decomp = decompositions[0]; // first valid standard decomp (undefined for 7-pairs/misfits)
+    const handType = this.detectHandType(decompositions, winnerSeat.openMelds, winningHand);
 
     const { jingCount: winJings } = separateJing(winningHand, this.jingTypes);
+    const isGerman = winJings === 0;
 
-    let fanResult: FanResult;
-    if (decomp) {
-      fanResult = calculateFan({
-        winType,
-        seatWind: winnerSeat.wind,
-        roundWind: 'east', // Phase 6 will track round wind
-        isLastTile: this.state.wall.length === 0,
-        isAfterKong: this.state.isKongDraw && isTsumo,
-        isRobKong: false, // Phase 7 will track this
-        decomposition: decomp,
-        openMelds: winnerSeat.openMelds,
-      });
-    } else {
-      // Seven Pairs or Thirteen Misfits — use pair-based scoring
-      fanResult = calculateSevenPairsFan({
-        winType,
-        seatWind: winnerSeat.wind,
-        roundWind: 'east',
-        isLastTile: this.state.wall.length === 0,
-        isAfterKong: this.state.isKongDraw && isTsumo,
-        isRobKong: false,
-        openMelds: winnerSeat.openMelds,
-        jingsUsed: winJings,
-        hasLongPair: false, // Dragon 7 pairs detection can be added later
-      });
-    }
+    // Heavenly Win: tsumo before any discard or draw has occurred
+    const isHeavenlyWin =
+      isTsumo &&
+      seatIdx === this.state.dealerSeat &&
+      !this.events.some((e) => e.kind === 'discard' || e.kind === 'draw');
 
-    const payment = calculatePayment(fanResult.total, winType);
+    // Earthly Win: ron on the very first discard, before any player has drawn
+    const isEarthlyWin =
+      isRon &&
+      this.events.filter((e) => e.kind === 'discard').length === 1 &&
+      !this.events.some((e) => e.kind === 'draw');
 
-    // Apply scores
+    const paymentResult: WinPaymentResult = calculateWinPayout({
+      winType,
+      handType,
+      winnerSeat: seatIdx,
+      dealerSeat: this.state.dealerSeat,
+      discarderSeat: isRon ? this.state.discardedBySeat! : undefined,
+      kongSeat: robKongSeat,
+      seatWind: this.seatWindOf(seatIdx),
+      roundWind: this.state.roundWind,
+      isRobKong,
+      isGerman,
+      isTrueGerman,
+      isSpiritFishing,
+      isHeavenlyWin,
+      isEarthlyWin,
+      isAfterKong: this.state.isKongDraw && isTsumo,
+      isLastTile: this.state.wall.length === 0,
+      jingsUsed: winJings,
+      openMelds: winnerSeat.openMelds,
+      decomposition: decompositions[0],
+    });
+
+    // Spirit settlement (§6.2) — applies to ALL players at hand end
+    const spiritDelta = calculateSpiritSettlement(
+      this.state.seats,
+      this.state.jingPrimary!,
+      this.state.jingSecondary!,
+    );
+
+    // Apply win payment + spirit settlement to all seat scores
     const seats = [...this.state.seats] as GameState['seats'];
-    if (winType === 'tsumo') {
-      for (let i = 0; i < 4; i++) {
-        if (i === seatIdx) {
-          seats[i] = { ...seats[i], score: seats[i].score + payment.totalReceived };
-        } else {
-          seats[i] = { ...seats[i], score: seats[i].score - payment.unitsPerPayer };
-        }
-      }
-    } else {
-      const discarderIdx = this.state.discardedBySeat!;
-      seats[seatIdx] = { ...seats[seatIdx], score: seats[seatIdx].score + payment.unitsPerPayer };
-      seats[discarderIdx] = {
-        ...seats[discarderIdx],
-        score: seats[discarderIdx].score - payment.unitsPerPayer,
+    for (let i = 0; i < 4; i++) {
+      seats[i] = {
+        ...seats[i],
+        score: seats[i].score + paymentResult.scoreDelta[i] + spiritDelta[i],
       };
     }
 
-    const event: GameEvent = { kind: 'win', seat: seatIdx, winType, fanResult };
+    const event: GameEvent = {
+      kind: 'win',
+      seat: seatIdx,
+      winType,
+      handType,
+      paymentResult,
+    };
 
     return this.withState({ phase: 'finished', seats }, [event]);
   }
 
-  // ── Pung ──────────────────────────────────────────────────────────────────────
+  // ── Concede ───────────────────────────────────────────────────────────────────
 
   /**
-   * Claim the pending discard as a Pung.
+   * A player concedes the hand.
+   *
+   * Per design (D5): score is unchanged (−0). The session layer is responsible
+   * for tracking streak breaks. The game is marked finished so the session can
+   * move to the next hand or end the session.
+   *
+   * The concede penalty value is intentionally kept at 0 to start and can be
+   * tuned by the session layer later without engine changes.
    */
+  concede(seatIdx: 0 | 1 | 2 | 3): GameEngine {
+    if (this.state.phase !== 'playing' && this.state.phase !== 'awaiting_claims') {
+      throw new Error('Cannot concede outside of an active hand');
+    }
+
+    return this.withState({ phase: 'finished' }, [{ kind: 'concede', seat: seatIdx }]);
+  }
+
+  // ── Pung ──────────────────────────────────────────────────────────────────────
+
+  /** Claim the pending discard as a Pung. */
   pung(seatIdx: 0 | 1 | 2 | 3): GameEngine {
     if (this.state.phase !== 'awaiting_claims') throw new Error('Not awaiting claims');
     if (seatIdx === this.state.discardedBySeat) throw new Error('Cannot pung own discard');
@@ -404,7 +551,6 @@ export class GameEngine {
       throw new Error(`Cannot pung ${tile}`);
     }
 
-    // Remove 2 matching tiles from hand (natural or jing)
     let hand = [...seat.hand];
     const { naturals } = separateJing(hand, this.jingTypes);
     const naturalCount = naturals.filter((t) => t === tile).length;
@@ -415,38 +561,30 @@ export class GameEngine {
       hand = removeFromHand(hand, tile);
       hand = this.removeJings(hand, 1);
     } else {
-      // 0 naturals: use 2 jings
       hand = this.removeJings(hand, 2);
     }
-
-    const meld: Meld = {
-      kind: 'pung',
-      tiles: [tile, tile, tile],
-      concealed: false,
-    };
-
-    const event: GameEvent = { kind: 'pung', seat: seatIdx, tile };
 
     return this.withState(
       {
         phase: 'playing',
         seats: this.patchSeat(seatIdx, {
           hand,
-          openMelds: [...seat.openMelds, meld],
+          openMelds: [
+            ...seat.openMelds,
+            { kind: 'pung', tiles: [tile, tile, tile], concealed: false },
+          ],
         }),
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
       },
-      [event],
+      [{ kind: 'pung', seat: seatIdx, tile }],
     );
   }
 
   // ── Chow ──────────────────────────────────────────────────────────────────────
 
-  /**
-   * Claim the pending discard as a Chow. `sequence` is the three-tile chow.
-   */
+  /** Claim the pending discard as a Chow. `sequence` is the three-tile chow. */
   chow(seatIdx: 0 | 1 | 2 | 3, sequence: [TileType, TileType, TileType]): GameEngine {
     if (this.state.phase !== 'awaiting_claims') throw new Error('Not awaiting claims');
 
@@ -458,14 +596,13 @@ export class GameEngine {
     const seat = this.state.seats[seatIdx];
 
     const options = chowOptions(seat.hand, tile, this.jingTypes);
-    const valid = options.some((opt) => opt.every((t, i) => t === sequence[i]));
-    if (!valid) throw new Error(`Cannot chow ${tile} with ${sequence.join(',')}`);
+    if (!options.some((opt) => opt.every((t, i) => t === sequence[i]))) {
+      throw new Error(`Cannot chow ${tile} with ${sequence.join(',')}`);
+    }
 
-    // Remove the two non-discard tiles from hand
     let hand = [...seat.hand];
     for (const t of sequence) {
-      if (t === tile) continue; // this is the discard, not from hand
-      // Try to use natural tile, fall back to jing
+      if (t === tile) continue;
       if (hand.includes(t)) {
         hand = removeFromHand(hand, t);
       } else {
@@ -473,26 +610,18 @@ export class GameEngine {
       }
     }
 
-    const meld: Meld = {
-      kind: 'chow',
-      tiles: sequence,
-      concealed: false,
-    };
-
-    const event: GameEvent = { kind: 'chow', seat: seatIdx, tile, sequence };
-
     return this.withState(
       {
         phase: 'playing',
         seats: this.patchSeat(seatIdx, {
           hand,
-          openMelds: [...seat.openMelds, meld],
+          openMelds: [...seat.openMelds, { kind: 'chow', tiles: sequence, concealed: false }],
         }),
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
       },
-      [event],
+      [{ kind: 'chow', seat: seatIdx, tile, sequence }],
     );
   }
 
@@ -509,7 +638,6 @@ export class GameEngine {
       throw new Error(`Cannot kong ${tile} from discard`);
     }
 
-    // Remove 3 tiles from hand
     let hand = [...seat.hand];
     const { naturals: kNaturals, jingCount: kJingCount } = separateJing(hand, this.jingTypes);
     const naturalCount = kNaturals.filter((t) => t === tile).length;
@@ -523,36 +651,32 @@ export class GameEngine {
       hand = removeFromHand(hand, tile);
       hand = this.removeJings(hand, 2);
     } else {
-      // 0 naturals, 3 jings
       hand = this.removeJings(hand, 3);
     }
 
-    const meld: Meld = {
-      kind: 'kong',
-      tiles: [tile, tile, tile, tile],
-      concealed: false,
-    };
-
-    const event: GameEvent = { kind: 'kong_open', seat: seatIdx, tile };
-
-    const newSeats = this.patchSeat(seatIdx, {
+    const newSeatsAfterMeld = this.patchSeat(seatIdx, {
       hand,
-      openMelds: [...seat.openMelds, meld],
+      openMelds: [
+        ...seat.openMelds,
+        { kind: 'kong', tiles: [tile, tile, tile, tile], concealed: false },
+      ],
     });
+
+    // Apply instant open-kong payment (§6.1): 1 pt from each other player
+    const seatsAfterPayment = this.applyKongPayment(seatIdx, 'open', newSeatsAfterMeld);
 
     const g = this.withState(
       {
         phase: 'playing',
-        seats: newSeats,
+        seats: seatsAfterPayment,
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
         kongsTotal: this.state.kongsTotal + 1,
       },
-      [event],
+      [{ kind: 'kong_open', seat: seatIdx, tile }],
     );
 
-    // Draw replacement tile from dead wall
     return g._drawFor(seatIdx, true);
   }
 
@@ -566,7 +690,6 @@ export class GameEngine {
     const options = concealedKongOptions(seat.hand, this.jingTypes);
     if (!options.includes(tile)) throw new Error(`Cannot declare concealed kong of ${tile}`);
 
-    // Remove 4 tiles from hand
     let hand = [...seat.hand];
     const naturalCount = hand.filter((t) => t === tile).length;
 
@@ -578,25 +701,76 @@ export class GameEngine {
       hand = this.removeJings(hand, jingsNeeded);
     }
 
-    const meld: Meld = {
-      kind: 'kong',
-      tiles: [tile, tile, tile, tile],
-      concealed: true,
-    };
-
-    const event: GameEvent = { kind: 'kong_concealed', seat: seatIdx, tile };
-
-    const newSeats = this.patchSeat(seatIdx, {
+    const newSeatsAfterMeld = this.patchSeat(seatIdx, {
       hand,
-      openMelds: [...seat.openMelds, meld],
+      openMelds: [
+        ...seat.openMelds,
+        { kind: 'kong', tiles: [tile, tile, tile, tile], concealed: true },
+      ],
     });
+
+    // Apply instant concealed-kong payment (§6.1): 2 pts from each other player
+    const seatsAfterPayment = this.applyKongPayment(seatIdx, 'concealed', newSeatsAfterMeld);
 
     const g = this.withState(
       {
-        seats: newSeats,
+        seats: seatsAfterPayment,
         kongsTotal: this.state.kongsTotal + 1,
       },
-      [event],
+      [{ kind: 'kong_concealed', seat: seatIdx, tile }],
+    );
+
+    return g._drawFor(seatIdx, true);
+  }
+
+  // ── Add to Kong ───────────────────────────────────────────────────────────────
+
+  /**
+   * Add a tile from hand to an existing open Pung, upgrading it to a Kong.
+   * Emits a rob-kong claim window opportunity to opponents (handled by gateway).
+   * Draws a replacement tile from the dead wall.
+   * Applies instant open-kong payment (§6.1).
+   */
+  addToKong(seatIdx: 0 | 1 | 2 | 3, tile: TileType): GameEngine {
+    if (this.state.phase !== 'playing') throw new Error('Not in playing phase');
+    if (seatIdx !== this.state.currentSeat) throw new Error('Not your turn');
+
+    const seat = this.state.seats[seatIdx];
+
+    // Find the open pung to upgrade
+    const pungIdx = seat.openMelds.findIndex((m) => m.kind === 'pung' && m.tiles[0] === tile);
+    if (pungIdx === -1) throw new Error(`No open pung of ${tile} to add to`);
+
+    // Validate: player must have the tile or a Jing that can fill it
+    const options = addToKongOptions(seat.hand, tile, this.jingTypes);
+    if (options.length === 0) throw new Error(`Cannot add to kong of ${tile}`);
+
+    const addedTile = options[0];
+    const newHand = removeFromHand(seat.hand, addedTile);
+
+    // Upgrade pung → kong
+    const kongMeld: Meld = {
+      kind: 'kong',
+      tiles: [tile, tile, tile, tile],
+      concealed: false,
+    };
+    const newMelds = [
+      ...seat.openMelds.slice(0, pungIdx),
+      kongMeld,
+      ...seat.openMelds.slice(pungIdx + 1),
+    ];
+
+    const newSeatsAfterMeld = this.patchSeat(seatIdx, { hand: newHand, openMelds: newMelds });
+
+    // Apply instant supplement-kong payment (§6.1): 1 pt from each other player
+    const seatsAfterPayment = this.applyKongPayment(seatIdx, 'open', newSeatsAfterMeld);
+
+    const g = this.withState(
+      {
+        seats: seatsAfterPayment,
+        kongsTotal: this.state.kongsTotal + 1,
+      },
+      [{ kind: 'kong_added', seat: seatIdx, tile }],
     );
 
     // Draw replacement tile from dead wall
