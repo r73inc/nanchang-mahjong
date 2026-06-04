@@ -5,9 +5,38 @@ import { z } from 'zod';
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 export const RoomSettingsSchema = z.object({
+  /**
+   * Which rounds to play.
+   * 'east' = East round only (4 dealerships).
+   * 'east+south' = East + South rounds (8 dealerships).
+   * Only applies when terminationType is 'rounds'.
+   */
   rounds: z.enum(['east', 'east+south']).default('east+south'),
-  timerSecs: z.number().int().min(5).max(30).default(8),
-  minFan: z.number().int().min(1).max(8).default(3),
+
+  /**
+   * How the session ends.
+   * 'rounds' — play the configured number of rounds, then settle scores.
+   * 'bust'   — play until any player's score drops below 0, then settle.
+   */
+  terminationType: z.enum(['rounds', 'bust']).default('rounds'),
+
+  /**
+   * Starting score for each player.
+   * Standard zero-sum: 0 (scores can go negative, settle at session end).
+   * Bust mode: typically 20 (session ends when any player goes negative).
+   * Configurable for tuning.
+   */
+  startingScore: z.number().int().min(0).max(1000).default(0),
+
+  /**
+   * Turn timer in seconds (per-turn limit).
+   * Reserved for future use — no turn timer is enforced at MVP (D1/D2).
+   * Value is stored so it can be activated later without a settings migration.
+   */
+  timerSecs: z.number().int().min(5).max(60).default(30),
+
+  /** Minimum fan required to win (reserved for future rule variants). */
+  minFan: z.number().int().min(1).max(8).default(1),
 });
 export type RoomSettings = z.infer<typeof RoomSettingsSchema>;
 
