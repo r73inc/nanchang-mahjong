@@ -79,38 +79,49 @@ docker compose up -d
 Write-Ok "Docker services started"
 
 # ---------------------------------------------------------------------------
+# Helper: wait for a TCP port to accept connections.
+# DynamoDB Local responds with HTTP 400 to plain GET requests (it only
+# accepts DynamoDB API calls), so an HTTP check always throws. A TCP check
+# is the correct approach: if the port is open the service is ready.
+# ---------------------------------------------------------------------------
+function Wait-Port {
+    param([string]$Name, [int]$Port, [int]$MaxRetries = 40, [switch]$Required)
+    $ready = $false
+    for ($i = 0; $i -lt $MaxRetries; $i++) {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        try {
+            $tcp.Connect('localhost', $Port)
+            $ready = $true
+            $tcp.Close()
+            break
+        } catch {
+            # Not ready yet
+        } finally {
+            $tcp.Dispose()
+        }
+        Start-Sleep -Seconds 2
+    }
+    if ($ready) {
+        Write-Ok "$Name ready (port $Port)"
+    } elseif ($Required) {
+        Write-Fail "$Name did not become ready in time. Check: docker compose logs"
+        exit 1
+    } else {
+        Write-Warn "$Name did not respond in time -- continuing anyway"
+    }
+}
+
+# ---------------------------------------------------------------------------
 # 4. Wait for DynamoDB
 # ---------------------------------------------------------------------------
 Write-Step "Waiting for DynamoDB Local (port 8000)"
-$ready = $false
-for ($i = 0; $i -lt 30; $i++) {
-    try {
-        $null = Invoke-WebRequest -Uri 'http://localhost:8000/' -UseBasicParsing -TimeoutSec 2
-        $ready = $true
-        break
-    } catch {
-        Start-Sleep -Seconds 2
-    }
-}
-if (-not $ready) {
-    Write-Fail "DynamoDB did not become ready in time. Check: docker compose logs dynamodb"
-    exit 1
-}
-Write-Ok "DynamoDB ready"
+Wait-Port -Name "DynamoDB" -Port 8000 -Required
 
 # ---------------------------------------------------------------------------
 # 5. Wait for Cognito Local
 # ---------------------------------------------------------------------------
 Write-Step "Waiting for Cognito Local (port 9229)"
-for ($i = 0; $i -lt 15; $i++) {
-    try {
-        $null = Invoke-WebRequest -Uri 'http://localhost:9229/' -UseBasicParsing -TimeoutSec 2
-        break
-    } catch {
-        Start-Sleep -Seconds 2
-    }
-}
-Write-Ok "Cognito ready"
+Wait-Port -Name "Cognito" -Port 9229
 
 # ---------------------------------------------------------------------------
 # 6. setup-local: create DDB table + Cognito User Pool
