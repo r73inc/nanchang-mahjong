@@ -38,6 +38,17 @@ export const configuration = () => ({
     maxPublic: parseInt(process.env.RATE_LIMIT_MAX_PUBLIC ?? '5', 10),
     maxAuth: parseInt(process.env.RATE_LIMIT_MAX_AUTHED ?? '60', 10),
   },
+
+  /**
+   * Web Push (VAPID) configuration.
+   * Generate a key pair with: npx web-push generate-vapid-keys
+   * Leave publicKey/privateKey empty to disable push in dev (graceful no-op).
+   */
+  vapid: {
+    subject: process.env.VAPID_SUBJECT ?? 'mailto:admin@nanchang.example.com',
+    publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+    privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+  },
 });
 
 export type AppConfig = ReturnType<typeof configuration>;

@@ -96,6 +96,8 @@ export const DK = {
     gsi1pk: `ROOM_CODE#${code.replace(/-/g, '').toUpperCase()}`,
     gsi1sk: 'META',
   }),
+  /** Web Push subscription for a user (stored when they opt in). */
+  userPushSub: (sub: string) => ({ PK: `USER#${sub}`, SK: 'PUSH_SUB' }),
   // ── Game keys ──────────────────────────────────────────────────────────────
   /** Primary record for a game session (written on create + milestones + end). */
   game: (id: string) => ({ PK: `GAME#${id}`, SK: 'META' }),
