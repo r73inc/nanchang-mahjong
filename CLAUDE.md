@@ -33,6 +33,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 - **Redaction at the edge.** `toClientSnapshot(state, viewer)` hides concealed hands. Spectators and opponents never see `TileType[]`.
 - **i18n: no literal strings in JSX.** All visible text goes through `t()`. EN and ZH keys must stay in parity.
 - **PR scope discipline.** Engine-only changes → engine branch. Schema/API/FE changes → separate PRs. Never mix.
+- **One PR at a time. Always.** Open one PR, push it, then stop and wait. Do not open a second PR, do not start a second branch, do not write any more code until the first PR has been reviewed, any requested changes made, and it is confirmed merged into `main`. Never branch a PR off another unmerged PR — if the first PR changes then the second branch becomes wasted or broken work. The only exception is if the user explicitly asks for a stacked PR approach; even then, ask first before doing it.
 
 ---
 
