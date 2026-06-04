@@ -50,7 +50,7 @@ function SkeletonCard() {
   );
 }
 
-function GameCard({ item }: { item: GameHistoryItem }) {
+function GameCard({ item, onReplay }: { item: GameHistoryItem; onReplay: () => void }) {
   const { t } = useI18n();
 
   const date = new Date(item.endedAt);
@@ -61,8 +61,9 @@ function GameCard({ item }: { item: GameHistoryItem }) {
   const scoreDisplay = item.finalScore >= 0 ? `+${item.finalScore}` : String(item.finalScore);
 
   return (
-    <div
-      className="rounded-xl px-4 py-3"
+    <button
+      onClick={onReplay}
+      className="w-full rounded-xl px-4 py-3 text-left"
       style={{ background: 'rgba(245,239,223,0.04)', border: '1px solid rgba(245,239,223,0.06)' }}
     >
       <div className="flex items-center justify-between">
@@ -83,15 +84,20 @@ function GameCard({ item }: { item: GameHistoryItem }) {
           </div>
           <p className="text-[11px] text-mj-bone/40 mt-0.5">{dateLine}</p>
         </div>
-        <span
-          className="text-base font-bold font-mono"
-          style={{ color: item.finalScore >= 0 ? '#7fc299' : '#e88080' }}
-          aria-label={`score ${scoreDisplay}`}
-        >
-          {scoreDisplay}
-        </span>
+        <div className="flex items-center gap-3">
+          <span
+            className="text-base font-bold font-mono"
+            style={{ color: item.finalScore >= 0 ? '#7fc299' : '#e88080' }}
+            aria-label={`score ${scoreDisplay}`}
+          >
+            {scoreDisplay}
+          </span>
+          <span className="text-[10px] font-bold text-mj-gold/60 tracking-wide">
+            {t('historyViewReplay')} →
+          </span>
+        </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -138,7 +144,11 @@ export function HistoryPage() {
 
         {/* Game list */}
         {allGames.map((item) => (
-          <GameCard key={`${item.gameId}`} item={item} />
+          <GameCard
+            key={item.gameId}
+            item={item}
+            onReplay={() => navigate(`/replay/${item.gameId}`)}
+          />
         ))}
 
         {/* Load more */}
