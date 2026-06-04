@@ -12,6 +12,7 @@ lerna-debug.log*
 # ── Build output ────────────────────────────────────────────
 dist/
 build/
+packages/*/dist/
 out/
 .next/
 .nuxt/

@@ -2,7 +2,7 @@
   "name": "nanchang-mahjong",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n api,web -c yellow,cyan \"pnpm --filter @nanchang/api dev\" \"pnpm --filter @nanchang/web dev\"",
+    "dev": "pnpm -r --filter './packages/**' run build && concurrently -n api,web -c yellow,cyan \"pnpm --filter @nanchang/api dev\" \"pnpm --filter @nanchang/web dev\"",
     "build": "pnpm -r --filter './packages/**' build && pnpm -r --filter './apps/**' build",
     "lint": "eslint .",
     "typecheck": "pnpm -r --if-present run typecheck",
