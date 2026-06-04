@@ -131,7 +131,8 @@ export function RoomPage() {
   const isHost = myUserId === room.hostUserId;
   const mySeat = room.seats.find((s) => s.userId === myUserId);
   const filledSeats = room.seats.filter((s) => s.userId !== null);
-  const allReady = filledSeats.length === 4 && filledSeats.every((s) => s.ready);
+  // Host is implicitly ready — they confirm readiness by clicking Start.
+  const allReady = filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.ready);
 
   return (
     <ScreenShell title={t('privateRoom')} onBack={handleLeave}>
@@ -237,12 +238,16 @@ export function RoomPage() {
                             .join(' ')}
                     </p>
                     <p className="text-[11px] text-mj-bone/60">
-                      {isEmpty ? t('openSeat') : seat.ready ? t('ready') : t('notReady')}
+                      {isEmpty
+                        ? t('openSeat')
+                        : seat.isHost || seat.ready
+                          ? t('ready')
+                          : t('notReady')}
                     </p>
                   </div>
 
-                  {/* Ready badge */}
-                  {!isEmpty && seat.ready && (
+                  {/* Ready badge — host is always shown as ready */}
+                  {!isEmpty && (seat.isHost || seat.ready) && (
                     <span
                       className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider"
                       style={{
@@ -352,7 +357,7 @@ export function RoomPage() {
           >
             {allReady
               ? t('startMatch')
-              : `${t('waiting')} ${filledSeats.filter((s) => !s.ready).length} ${t('notReady').toLowerCase()}`}
+              : `${t('waiting')} ${filledSeats.filter((s) => !s.isHost && !s.ready).length} ${t('notReady').toLowerCase()}`}
           </button>
         )}
       </div>
