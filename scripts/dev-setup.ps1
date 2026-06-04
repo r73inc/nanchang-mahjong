@@ -175,7 +175,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # ---------------------------------------------------------------------------
-# 8. Done
+# 8. Seed test users (player1-4)
+# ---------------------------------------------------------------------------
+Write-Step "Seeding test users (player1-4)"
+pnpm --filter @nanchang/api run seed:users
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "seed:users failed (see error above)."
+    Write-Warn "Run manually once the issue is fixed:"
+    Write-Warn "  pnpm --filter @nanchang/api run seed:users"
+    exit 1
+}
+
+# ---------------------------------------------------------------------------
+# 9. Done
 # ---------------------------------------------------------------------------
 Write-Host ""
 Write-Host "==========================================================" -ForegroundColor Green
@@ -184,8 +196,13 @@ Write-Host ""
 Write-Host "  Web app: http://localhost:5173"                            -ForegroundColor Green
 Write-Host ""
 Write-Host "  Admin login:"                                              -ForegroundColor Green
-Write-Host "    Email:    $AdminEmail"                                   -ForegroundColor Green
-Write-Host "    Password: $AdminPassword"                                -ForegroundColor Green
+Write-Host "    $AdminEmail  /  $AdminPassword"                         -ForegroundColor Green
+Write-Host ""
+Write-Host "  Test players (password: Player1234!):"                    -ForegroundColor Green
+Write-Host "    player1@nanchang.local  (@player1)"                     -ForegroundColor Green
+Write-Host "    player2@nanchang.local  (@player2)"                     -ForegroundColor Green
+Write-Host "    player3@nanchang.local  (@player3)"                     -ForegroundColor Green
+Write-Host "    player4@nanchang.local  (@player4)"                     -ForegroundColor Green
 Write-Host ""
 Write-Host "  Consoles:"                                                 -ForegroundColor Green
 Write-Host "    MinIO:   http://localhost:9001  (minioadmin / minioadmin)" -ForegroundColor Green

@@ -125,6 +125,21 @@ pnpm --filter @nanchang/api run seed:admin
 
 The script prints an **invite code** — share it with each family member so they can register.
 
+**6. Seed the four test players**
+
+```powershell
+pnpm --filter @nanchang/api run seed:users
+```
+
+Creates four regular player accounts for local testing:
+
+| Email                  | Password      | Handle   |
+| ---------------------- | ------------- | -------- |
+| player1@nanchang.local | `Player1234!` | @player1 |
+| player2@nanchang.local | `Player1234!` | @player2 |
+| player3@nanchang.local | `Player1234!` | @player3 |
+| player4@nanchang.local | `Player1234!` | @player4 |
+
 ---
 
 ## Day-to-day development
