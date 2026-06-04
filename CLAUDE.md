@@ -4,7 +4,7 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9A (replay backend). **Phase 9B (replay frontend) is next.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE). **Phase 10 (Learn/Tutorial) is next.**
 
 ---
 
@@ -16,7 +16,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 | Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                   |
 | Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                              |
 | API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (208 tests)          |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (83 tests) |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (86 tests) |
 | Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                  |
 | CI       | GitHub Actions: lint + typecheck + test on every PR                                        |
 
@@ -84,9 +84,14 @@ gh pr view <n> --comments
 
 - **9A Backend (PR #21):** `replayHand()` pure engine function mapping `GameEvent[]` back to sequential engine calls → `GameState[]` timeline. `GameSession.handLog[]` tracks per-hand seed/config. `endSession()` writes `ReplayGamePayload` JSON to S3 (MinIO locally). `GET /replays/:id` — player-or-accepted-friend access check via `FriendsService.areFriends()`. `StorageService` (@Global, auto-creates S3 bucket). `GameEvent` + `GameState` re-exported from `@nanchang/shared`. 9 new tests (4 engine Replay·deterministic + 5 API Replay·permission).
 
-### Next: Phase 9B — Replay Frontend
+### Completed (Phase 9 — Replay)
 
-- **9B Frontend:** `ReplayPage` at `/replay/:id` — scrub bar, play/pause, speed control (1×/2×/4×). Uses `replayHand()` from engine to pre-compute a `GameState[]` timeline client-side. History page cards link to `/replay/:id`. Share-link button (copies URL; viewing still requires auth). EN+ZH i18n keys.
+- **9A Backend (PR #21):** `replayHand()` pure engine function. `GameSession.handLog[]` per-hand. `endSession()` writes `ReplayGamePayload` to S3. `GET /replays/:id` access-gated. 9 new tests.
+- **9B Frontend (PR #23):** `ReplayPage` at `/replay/:id` — scrub bar, play/pause, 1×/2×/4× speed. `buildTimeline()` pre-computes `GameState[]` client-side. History cards → replay. Share sheet. 22 i18n keys EN+ZH, 3 tests.
+
+### Next: Phase 10 — Learn / Tutorial
+
+- **LearnPage** at `/learn` — tabbed rules reference: Overview, Tiles, Spirit, Gameplay, Hands, Scoring. Interactive tile examples using `MahjongTile`. "New to the game?" nudge on Home deep-links here. Full EN+ZH bilingual content from `docs/final-nanchang-mahjong-rules.md`.
 
 ---
 

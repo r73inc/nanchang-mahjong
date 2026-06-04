@@ -9,6 +9,7 @@ import type { StringKey } from '../../i18n/strings';
 const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
   { key: 'profileLink', path: '/profile', icon: '👤' },
   { key: 'friendsLink', path: '/friends', icon: '👥' },
+  { key: 'learnLink', path: '/learn', icon: '📖' },
   { key: 'customizeLink', path: '/customize', icon: '🎨' },
 ];
 
@@ -55,8 +56,26 @@ export function HomeStubPage() {
           </span>
         </button>
 
+        {/* Learn nudge */}
+        <button
+          onClick={() => navigate('/learn')}
+          className="w-full mb-6 px-4 py-3 rounded-xl flex items-center justify-between text-left"
+          style={{
+            background: 'rgba(245,239,223,0.05)',
+            border: '1px solid rgba(245,239,223,0.1)',
+          }}
+        >
+          <div>
+            <p className="text-sm font-semibold text-mj-bone/80">{t('learnNudge')}</p>
+            <p className="text-xs text-mj-bone/45 mt-0.5">{t('learnNudgeSub')}</p>
+          </div>
+          <span className="text-mj-bone/30 text-lg ml-4" aria-hidden="true">
+            ›
+          </span>
+        </button>
+
         {/* Navigation shortcuts */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="grid grid-cols-4 gap-2 mb-4">
           {NAV_ITEMS.map(({ key, path, icon }) => (
             <button
               key={key}
