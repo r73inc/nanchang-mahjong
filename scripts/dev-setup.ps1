@@ -1,7 +1,7 @@
-#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     First-time local dev setup for Nanchang Mahjong.
+    Compatible with Windows PowerShell 5.1+ and PowerShell 7+.
 
 .DESCRIPTION
     Automates the full first-time setup:
@@ -15,8 +15,8 @@
     Re-running this script is safe — all steps are idempotent.
 
 .EXAMPLE
-    pwsh scripts/dev-setup.ps1
-    pwsh scripts/dev-setup.ps1 -AdminEmail you@example.com -AdminPassword "Aa1!aaaa" -AdminHandle dad
+    powershell scripts/dev-setup.ps1
+    powershell scripts/dev-setup.ps1 -AdminEmail you@example.com -AdminPassword "Aa1!aaaa" -AdminHandle dad
 #>
 
 param(

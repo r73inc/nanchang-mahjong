@@ -20,12 +20,12 @@ A **private, invite-only** web app for playing Nanchang-style Mahjong with close
 
 ## Prerequisites
 
-| Tool               | Version | Install                                                                                         |
-| ------------------ | ------- | ----------------------------------------------------------------------------------------------- |
-| **Docker Desktop** | latest  | [docker.com](https://www.docker.com/products/docker-desktop/)                                   |
-| **Node.js**        | 22 LTS  | [nodejs.org](https://nodejs.org/) or `nvm install 22`                                           |
-| **pnpm**           | 10+     | `npm install -g pnpm@latest`                                                                    |
-| **PowerShell**     | 7+      | Windows: built-in or [github.com/PowerShell](https://github.com/PowerShell/PowerShell/releases) |
+| Tool               | Version | Install                                                                  |
+| ------------------ | ------- | ------------------------------------------------------------------------ |
+| **Docker Desktop** | latest  | [docker.com](https://www.docker.com/products/docker-desktop/)            |
+| **Node.js**        | 22 LTS  | [nodejs.org](https://nodejs.org/) or `nvm install 22`                    |
+| **pnpm**           | 10+     | `npm install -g pnpm@latest`                                             |
+| **PowerShell**     | 5.1+    | Windows: built-in (`powershell`). PS 7 (`pwsh`) also works if installed. |
 
 > **Windows note:** all commands in this guide use `pnpm --filter` workspace syntax. Never use `cd path && command` compound syntax — the project enforces a security rule that blocks it.
 
@@ -39,13 +39,13 @@ Run the setup script from the repo root. It handles everything in order.
 
 ```powershell
 # From the repo root
-pwsh scripts/dev-setup.ps1
+powershell scripts/dev-setup.ps1
 ```
 
 To use a custom admin account instead of the defaults:
 
 ```powershell
-pwsh scripts/dev-setup.ps1 `
+powershell scripts/dev-setup.ps1 `
   -AdminEmail  "you@example.com" `
   -AdminPassword "Aa1!aaaa" `
   -AdminHandle   "dad"
