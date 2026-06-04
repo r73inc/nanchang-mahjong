@@ -27,6 +27,7 @@ import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
+  AdminGetUserCommand,
   UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
@@ -119,23 +120,18 @@ async function main(): Promise<void> {
   } catch (err) {
     if (err instanceof UsernameExistsException) {
       console.log(`✓ Cognito user already exists: ${ADMIN_EMAIL}`);
-      // Attempt to look up sub from DDB profile (email GSI)
-      const existing = await db.send(
-        new GetCommand({
-          TableName: TABLE_NAME,
-          // We can't easily look up by email here without a query — just warn
-          Key: { PK: `HANDLE#${ADMIN_HANDLE}`, SK: 'LOCK' },
-        }),
+      // Retrieve the sub directly from Cognito — more reliable than a DDB lookup
+      // (DDB may have been reset while Cognito persists via Docker volume).
+      const getUserRes = await cognito.send(
+        new AdminGetUserCommand({ UserPoolId: USER_POOL_ID, Username: ADMIN_EMAIL }),
       );
-      if (existing.Item?.ownerSub) {
-        cognitoSub = existing.Item.ownerSub as string;
-        console.log(`  └─ Found existing sub via handle lock: ${cognitoSub}`);
-      } else {
-        console.warn(
-          '  └─ Could not resolve existing sub. DDB profile may already exist — exiting.',
-        );
+      const subAttr = getUserRes.UserAttributes?.find((a) => a.Name === 'sub');
+      if (!subAttr?.Value) {
+        console.error('❌ AdminGetUser did not return a sub attribute — cannot continue.');
         return;
       }
+      cognitoSub = subAttr.Value;
+      console.log(`  └─ Retrieved existing sub from Cognito: ${cognitoSub}`);
     } else {
       throw err;
     }
@@ -149,9 +145,10 @@ async function main(): Promise<void> {
     console.log('✓ Admin DDB profile already exists — skipping.');
   } else {
     const profileItem = {
-      ...profileKey,
-      ...DK.userByEmail(ADMIN_EMAIL),
-      ...DK.handleLock(ADMIN_HANDLE),
+      ...profileKey, // PK=USER#sub, SK=PROFILE
+      ...DK.userByEmail(ADMIN_EMAIL), // gsi1pk / gsi1sk for email lookup
+      // NOTE: do NOT spread DK.handleLock here — its PK/SK would overwrite the profile key.
+      // The handle lock is written as a separate DynamoDB item below.
       sub: cognitoSub,
       email: ADMIN_EMAIL.toLowerCase(),
       handle: ADMIN_HANDLE,
@@ -171,7 +168,7 @@ async function main(): Promise<void> {
       }),
     );
 
-    // Write handle lock
+    // Write handle lock — unconditional so re-runs are idempotent.
     await db.send(
       new PutCommand({
         TableName: TABLE_NAME,
@@ -180,7 +177,6 @@ async function main(): Promise<void> {
           ownerSub: cognitoSub,
           createdAt: now,
         },
-        ConditionExpression: 'attribute_not_exists(PK)',
       }),
     );
 

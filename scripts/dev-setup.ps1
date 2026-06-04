@@ -167,6 +167,12 @@ $env:ADMIN_HANDLE   = $AdminHandle
 $env:ADMIN_DISPLAY  = $AdminDisplay
 
 pnpm --filter @nanchang/api run seed:admin
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "seed:admin failed (see error above)."
+    Write-Warn "Your .env and Docker services are ready. Once the issue is fixed, run:"
+    Write-Warn "  pnpm --filter @nanchang/api run seed:admin"
+    exit 1
+}
 
 # ---------------------------------------------------------------------------
 # 8. Done
