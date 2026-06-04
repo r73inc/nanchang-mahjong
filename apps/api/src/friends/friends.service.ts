@@ -48,6 +48,17 @@ export class FriendsService {
   // ── Public API ──────────────────────────────────────────────────────────────
 
   /**
+   * Return true if `viewerSub` has an accepted friendship with at least one
+   * of the given `playerSubs`. Used for replay access control.
+   */
+  async areFriends(viewerSub: string, playerSubs: readonly string[]): Promise<boolean> {
+    const results = await Promise.all(
+      playerSubs.filter((p) => p !== viewerSub).map((p) => this.getEdge(viewerSub, p)),
+    );
+    return results.some((edge) => edge?.status === 'accepted');
+  }
+
+  /**
    * List all friendship edges for a user, enriched with the friend's public profile.
    */
   async listFriends(sub: string): Promise<FriendWithProfile[]> {

@@ -27,6 +27,7 @@ import { computeEligibleClaims, computeRobKongEligible, resolveClaims } from './
 import type { IncomingClaim } from './claim-resolver';
 import { toClientSnapshot } from './snapshot';
 import { StatsService } from './stats.service';
+import { StorageService } from '../storage/storage.service';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export class GameService {
   constructor(
     private readonly db: DynamoDBService,
     private readonly stats: StatsService,
+    private readonly storage: StorageService,
   ) {}
 
   /** Called by GameGateway.afterInit to wire in the Socket.IO server reference. */
@@ -97,6 +99,15 @@ export class GameService {
       settings,
       seatMap,
       startedAt: now,
+    });
+
+    // Record hand-0 metadata for replay
+    session.handLog.push({
+      seed,
+      startingScores,
+      dealerSeat: 0,
+      roundWind: 'east',
+      eventStartIdx: 0,
     });
 
     this.sessions.set(gameId, session);
@@ -731,11 +742,21 @@ export class GameService {
     const { dealerSeat, roundWind } = nextDealerInfo;
     const seed = (Math.random() * 0x7fff_ffff) >>> 0;
 
+    const startingScores = [...session.cumulativeScores] as [number, number, number, number];
     const newEngine = GameEngine.create(seed, {
-      startingScores: [...session.cumulativeScores] as [number, number, number, number],
+      startingScores,
       dealerSeat,
       roundWind,
     }).deal();
+
+    // Record hand metadata for replay
+    session.handLog.push({
+      seed,
+      startingScores,
+      dealerSeat,
+      roundWind,
+      eventStartIdx: session.moveLog.length,
+    });
 
     session.engine = newEngine;
     this.broadcastSnapshots(session);
@@ -837,6 +858,31 @@ export class GameService {
         .catch((err) => this.logger.error(`Failed to write user game index for ${userId}: ${err}`)),
     );
     await Promise.all(writes);
+
+    // ── Write replay to S3 ────────────────────────────────────────────────────
+    const replayPayload = {
+      gameId: session.gameId,
+      seatMap: session.seatMap,
+      settings: session.settings,
+      hands: session.handLog.map((meta, i) => ({
+        seed: meta.seed,
+        startingScores: meta.startingScores,
+        dealerSeat: meta.dealerSeat,
+        roundWind: meta.roundWind,
+        events: session.moveLog.slice(
+          meta.eventStartIdx,
+          session.handLog[i + 1]?.eventStartIdx ?? session.moveLog.length,
+        ),
+      })),
+      startedAt: session.startedAt,
+      endedAt,
+      finalScores,
+      placement,
+      result: actualResult,
+    };
+    await this.storage
+      .putReplay(session.gameId, replayPayload)
+      .catch((err) => this.logger.error(`Failed to write replay for ${session.gameId}: ${err}`));
 
     // ── Schedule session teardown ──────────────────────────────────────────────
     session.teardownTimer = setTimeout(

@@ -18,10 +18,22 @@ import type {
   WinPaymentResult,
   HandType,
   WinType,
+  GameEvent,
+  GameState,
 } from '@nanchang/engine';
 
 // Re-export engine types so consumers only need one import source.
-export type { TileType, SeatWind, GamePhase, Meld, WinPaymentResult, HandType, WinType };
+export type {
+  TileType,
+  SeatWind,
+  GamePhase,
+  Meld,
+  WinPaymentResult,
+  HandType,
+  WinType,
+  GameEvent,
+  GameState,
+};
 
 // ── Shared primitive schemas ──────────────────────────────────────────────────
 

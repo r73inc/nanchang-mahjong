@@ -4,12 +4,14 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { configuration } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
+import { StorageModule } from './storage/storage.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { InvitesModule } from './invites/invites.module';
 import { AdminModule } from './admin/admin.module';
 import { FriendsModule } from './friends/friends.module';
 import { RoomsModule } from './rooms/rooms.module';
+import { ReplayModule } from './replay/replay.module';
 import { HealthController } from './health/health.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { I18nModule } from './i18n/i18n.module';
@@ -31,12 +33,14 @@ import { I18nModule } from './i18n/i18n.module';
     I18nModule,
 
     DatabaseModule,
+    StorageModule,
     AuthModule,
     UsersModule,
     InvitesModule,
     AdminModule,
     FriendsModule,
     RoomsModule, // transitively imports GameModule
+    ReplayModule,
   ],
   controllers: [HealthController],
   providers: [

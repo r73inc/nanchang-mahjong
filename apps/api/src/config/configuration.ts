@@ -24,6 +24,10 @@ export const configuration = () => ({
     tableName: process.env.DYNAMODB_TABLE_NAME ?? 'nanchang_main',
   },
 
+  s3: {
+    replayBucket: process.env.S3_REPLAY_BUCKET ?? 'nanchang-replays',
+  },
+
   cognito: {
     userPoolId: process.env.COGNITO_USER_POOL_ID ?? '',
     clientId: process.env.COGNITO_CLIENT_ID ?? '',

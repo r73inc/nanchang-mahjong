@@ -87,3 +87,8 @@ export { calculateWinPayout, instantKongPayment, calculateSpiritSettlement } fro
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 export { GameEngine, nextDealer } from './engine';
+
+// ── Replay ────────────────────────────────────────────────────────────────────
+
+export { replayHand } from './replay';
+export type { ReplayHandConfig } from './replay';
