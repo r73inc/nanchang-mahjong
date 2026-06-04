@@ -19,7 +19,8 @@ export function ScreenShell({ children, title, onBack, headerRight }: ScreenShel
       <div
         className="relative w-full max-w-viewport flex flex-col"
         style={{
-          background: 'linear-gradient(180deg, #0d3b2e 0%, #051a13 100%)',
+          background:
+            'linear-gradient(180deg, var(--felt-top, #0d3b2e) 0%, var(--felt-bottom, #051a13) 100%)',
           color: '#f5efdf',
           fontFamily: '-apple-system, system-ui, sans-serif',
         }}
@@ -30,7 +31,7 @@ export function ScreenShell({ children, title, onBack, headerRight }: ScreenShel
             className="sticky top-0 z-10 flex items-center gap-2 px-4 pb-3"
             style={{
               paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-              background: 'rgba(8,30,23,0.6)',
+              background: 'var(--felt-header, rgba(8,30,23,0.6))',
               backdropFilter: 'blur(12px)',
               borderBottom: '1px solid rgba(201,169,97,0.15)',
             }}

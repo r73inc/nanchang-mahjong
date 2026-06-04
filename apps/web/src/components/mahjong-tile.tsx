@@ -62,24 +62,18 @@ const TILE_LABEL: Record<TileType, string> = {
   bai: '白',
 };
 
-const TILE_COLOR: Record<string, string> = {
-  man: '#c0392b',
-  pin: '#2563eb',
-  sou: '#15803d',
-  wind: '#64748b',
-  zhong: '#dc2626',
-  fa: '#16a34a',
-  bai: '#9ca3af',
-};
-
+/**
+ * Returns a CSS var reference (with hardcoded fallback) for the glyph colour.
+ * The actual values are injected into :root by applyTheme() in theme.utils.ts.
+ */
 function getTileColor(tile: TileType): string {
-  if (tile.endsWith('m')) return TILE_COLOR.man;
-  if (tile.endsWith('p')) return TILE_COLOR.pin;
-  if (tile.endsWith('s')) return TILE_COLOR.sou;
-  if (tile === 'zhong') return TILE_COLOR.zhong;
-  if (tile === 'fa') return TILE_COLOR.fa;
-  if (tile === 'bai') return TILE_COLOR.bai;
-  return TILE_COLOR.wind;
+  if (tile.endsWith('m')) return 'var(--tile-man, #c0392b)';
+  if (tile.endsWith('p')) return 'var(--tile-pin, #2563eb)';
+  if (tile.endsWith('s')) return 'var(--tile-sou, #15803d)';
+  if (tile === 'zhong') return 'var(--tile-zhong, #dc2626)';
+  if (tile === 'fa') return 'var(--tile-fa, #16a34a)';
+  if (tile === 'bai') return 'var(--tile-bai, #9ca3af)';
+  return 'var(--tile-wind, #64748b)';
 }
 
 // ── Jing glow (for spirit tiles in JingReveal screen) ────────────────────────
@@ -137,7 +131,8 @@ export function MahjongTile({
         borderRadius: 4,
       }
     : {
-        background: 'linear-gradient(165deg,#fffbeb 0%,#f5efdf 60%,#e8dfc5 100%)',
+        background:
+          'linear-gradient(165deg, var(--tile-face-top, #fffbeb) 0%, var(--tile-face-bottom, #e8dfc5) 100%)',
         border: isJing
           ? '2px solid #c9a961'
           : selected

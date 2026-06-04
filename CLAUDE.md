@@ -4,7 +4,7 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE). **Phase 10 (Learn/Tutorial) is next.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial). **Phase 11 (Customize) is next.**
 
 ---
 
@@ -16,7 +16,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 | Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                   |
 | Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                              |
 | API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (208 tests)          |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (86 tests) |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (92 tests) |
 | Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                  |
 | CI       | GitHub Actions: lint + typecheck + test on every PR                                        |
 
@@ -89,9 +89,17 @@ gh pr view <n> --comments
 - **9A Backend (PR #21):** `replayHand()` pure engine function. `GameSession.handLog[]` per-hand. `endSession()` writes `ReplayGamePayload` to S3. `GET /replays/:id` access-gated. 9 new tests.
 - **9B Frontend (PR #23):** `ReplayPage` at `/replay/:id` — scrub bar, play/pause, 1×/2×/4× speed. `buildTimeline()` pre-computes `GameState[]` client-side. History cards → replay. Share sheet. 22 i18n keys EN+ZH, 3 tests.
 
-### Next: Phase 10 — Learn / Tutorial
+### Completed (Phase 10 — Learn / Tutorial, PR #24)
 
-- **LearnPage** at `/learn` — tabbed rules reference: Overview, Tiles, Spirit, Gameplay, Hands, Scoring. Interactive tile examples using `MahjongTile`. "New to the game?" nudge on Home deep-links here. Full EN+ZH bilingual content from `docs/final-nanchang-mahjong-rules.md`.
+- **LearnPage** at `/learn` — 6-tab rules reference: Overview, Tiles, Spirit, Gameplay, Hands, Scoring. `MahjongTile` examples in every section. "New to the game?" nudge on Home. 48 i18n keys EN+ZH, 6 tests.
+
+### Next: Phase 11 — Customize
+
+- **`ThemeStore`** (Zustand persist) — `felt` (jade/crimson/slate/navy) + `tilePalette` (classic/sepia/dark) + `soundEnabled`. Persisted to `localStorage`.
+- **CSS custom properties** — `applyTheme()` writes `--felt-*` and `--tile-*` vars to `:root`; `ScreenShell` and `MahjongTile` read them so the entire app repaints when the theme changes.
+- **`CustomizePage`** at `/customize` — felt color swatches, tile palette preview, sound toggle.
+- **`contrastGuard(hex)`** — luminance check; auto-returns light/dark ink color for any tile-face background.
+- **`useSound`** hook — Web Audio API clack + chime (opt-in, off by default).
 
 ---
 
