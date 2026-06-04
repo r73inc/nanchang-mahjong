@@ -7,9 +7,19 @@ export class RoomSettingsDto {
   rounds?: 'east' | 'east+south';
 
   @IsOptional()
+  @IsIn(['rounds', 'bust'])
+  terminationType?: 'rounds' | 'bust';
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  startingScore?: number;
+
+  @IsOptional()
   @IsInt()
   @Min(5)
-  @Max(30)
+  @Max(60)
   timerSecs?: number;
 
   @IsOptional()

@@ -156,8 +156,10 @@ export class RoomsService {
 
     const settings: RoomSettings = {
       rounds: dto?.settings?.rounds ?? 'east+south',
-      timerSecs: dto?.settings?.timerSecs ?? 8,
-      minFan: dto?.settings?.minFan ?? 3,
+      terminationType: dto?.settings?.terminationType ?? 'rounds',
+      startingScore: dto?.settings?.startingScore ?? 0,
+      timerSecs: dto?.settings?.timerSecs ?? 30,
+      minFan: dto?.settings?.minFan ?? 1,
     };
 
     await this.db.transactWrite({
