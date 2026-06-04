@@ -15,12 +15,13 @@ services:
 
   # ── MinIO (S3-compatible) ────────────────────────────────────
   # Prod equivalent: AWS S3 (ap-east-1)
+  # Console UI → http://localhost:9001  (user: minioadmin / minioadmin)
   minio:
     image: minio/minio:latest
     container_name: mj-minio
     ports:
       - '9000:9000' # S3 API
-      - '9001:9001' # Console UI → http://localhost:9001
+      - '9001:9001' # Web console
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -28,10 +29,26 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9000/minio/health/live || exit 1']
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ── MinIO bucket init ────────────────────────────────────────
+  # Creates the nanchang-replays bucket on first start, then exits.
+  minio-init:
+    image: minio/mc:latest
+    container_name: mj-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing local/nanchang-replays &&
+        echo 'Bucket nanchang-replays ready.'
+      "
+    restart: 'no'
 
   # ── Cognito Local ────────────────────────────────────────────
   # Prod equivalent: AWS Cognito User Pool (ap-east-1)
@@ -45,16 +62,18 @@ services:
 
   # ── MailHog ──────────────────────────────────────────────────
   # Prod equivalent: AWS SES (ap-east-1)
+  # Catches all outbound email locally.
   # Web UI → http://localhost:8025
   mailhog:
     image: mailhog/mailhog:latest
     container_name: mj-mailhog
     ports:
-      - '1025:1025' # SMTP
-      - '8025:8025' # Web UI
+      - '1025:1025' # SMTP (API sends here)
+      - '8025:8025' # Web UI (read captured emails)
 
   # ── Redis ────────────────────────────────────────────────────
-  # Prod equivalent: ElastiCache Serverless Redis (added when concurrency demands it)
+  # Prod equivalent: ElastiCache Serverless Redis
+  # Used for Socket.IO multi-instance pub/sub and rate-limit state.
   redis:
     image: redis:7-alpine
     container_name: mj-redis
