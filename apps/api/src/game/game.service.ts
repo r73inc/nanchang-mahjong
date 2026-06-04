@@ -28,6 +28,7 @@ import type { IncomingClaim } from './claim-resolver';
 import { toClientSnapshot } from './snapshot';
 import { StatsService } from './stats.service';
 import { StorageService } from '../storage/storage.service';
+import { PushService } from '../push/push.service';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export class GameService {
     private readonly db: DynamoDBService,
     private readonly stats: StatsService,
     private readonly storage: StorageService,
+    private readonly push: PushService,
   ) {}
 
   /** Called by GameGateway.afterInit to wire in the Socket.IO server reference. */
@@ -266,6 +268,12 @@ export class GameService {
     const socketId = session.socketIdForSeat(activeSeat);
     if (socketId && this.server) {
       this.server.to(socketId).emit('game:your-turn', { seat: activeSeat });
+    }
+
+    // Player offline — fire a push notification (no-op if not subscribed or push disabled)
+    if (!socketId) {
+      const userId = session.seatMap[activeSeat];
+      void this.push.sendTurnNotification(userId, session.gameId);
     }
 
     // AFK warning: emit overlay every 20s of inactivity (D4, no forced action)

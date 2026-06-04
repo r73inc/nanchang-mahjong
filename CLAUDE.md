@@ -4,21 +4,21 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial). **Phase 11 (Customize) is next.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize). **Phase 12 (Push + a11y) is next.**
 
 ---
 
 ## 2. Tech Stack & Environment
 
-| Layer    | Stack                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------ |
-| Monorepo | pnpm workspaces, TypeScript throughout                                                     |
-| Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                   |
-| Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                              |
-| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (208 tests)          |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (92 tests) |
-| Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                  |
-| CI       | GitHub Actions: lint + typecheck + test on every PR                                        |
+| Layer    | Stack                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------- |
+| Monorepo | pnpm workspaces, TypeScript throughout                                                      |
+| Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                    |
+| Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                               |
+| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (208 tests)           |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (102 tests) |
+| Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                   |
+| CI       | GitHub Actions: lint + typecheck + test on every PR                                         |
 
 **Key files:** `PLAN.md` (phase roadmap), `PHASE-7-PLAN.md` (Phase 7 detailed brief), `docs/final-nanchang-mahjong-rules.md` (locked rules).
 
@@ -93,13 +93,30 @@ gh pr view <n> --comments
 
 - **LearnPage** at `/learn` — 6-tab rules reference: Overview, Tiles, Spirit, Gameplay, Hands, Scoring. `MahjongTile` examples in every section. "New to the game?" nudge on Home. 48 i18n keys EN+ZH, 6 tests.
 
-### Next: Phase 11 — Customize
+### Completed (Phase 11 — Customize, PR #25)
 
 - **`ThemeStore`** (Zustand persist) — `felt` (jade/crimson/slate/navy) + `tilePalette` (classic/sepia/dark) + `soundEnabled`. Persisted to `localStorage`.
 - **CSS custom properties** — `applyTheme()` writes `--felt-*` and `--tile-*` vars to `:root`; `ScreenShell` and `MahjongTile` read them so the entire app repaints when the theme changes.
 - **`CustomizePage`** at `/customize` — felt color swatches, tile palette preview, sound toggle.
-- **`contrastGuard(hex)`** — luminance check; auto-returns light/dark ink color for any tile-face background.
-- **`useSound`** hook — Web Audio API clack + chime (opt-in, off by default).
+- **`contrastGuard(hex)`** — WCAG luminance check; auto-returns light/dark ink color for any tile-face background.
+- **`useSound`** hook — Web Audio API clack + chime (opt-in, off by default). 14 i18n keys EN+ZH, 10 tests.
+
+### Next: Phase 12 — Push Notifications & Polish (split)
+
+**12A Backend (this PR):**
+
+- VAPID key pair in config; graceful no-op if keys not set.
+- `PushModule` (@Global) — `PushService` (subscribe/unsubscribe/sendToUser/sendTurnNotification) + `PushController` (`GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/unsubscribe`).
+- Push subscriptions stored in DynamoDB as `USER#<sub>/PUSH_SUB`.
+- `GameService.startTurn()` fires turn notification when the active seat has no live socket.
+
+**12B Frontend (next PR):**
+
+- Service worker (`sw.ts`) for receiving push events.
+- `usePushNotifications` hook — permission flow, subscribe/unsubscribe.
+- Permission toggle in Account Settings.
+- A11y pass: reduced-motion, focus rings, live regions.
+- Performance: lazy-loaded routes.
 
 ---
 
