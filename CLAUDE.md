@@ -4,7 +4,7 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay: engine extensions, backend gateway, frontend game table). **Phase 8 (ELO/history) is next.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history). **Phase 9 (Replay) is next.**
 
 ---
 
@@ -15,8 +15,8 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 | Monorepo | pnpm workspaces, TypeScript throughout                                                     |
 | Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                   |
 | Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                              |
-| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (193 tests)          |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (78 tests) |
+| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (203 tests)          |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (83 tests) |
 | Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                  |
 | CI       | GitHub Actions: lint + typecheck + test on every PR                                        |
 
@@ -73,18 +73,19 @@ gh pr view <n> --comments
 
 - **7.0 Engine extensions:** `addToKong`, rob-kong, dealer rotation + `nextDealer()`, `concede()`, locked-rules scoring (Base × Multipliers), spirit settlement, instant kong payouts. PR #14.
 - **7A Backend:** `GameService` turn loop (8s claim windows, rob-kong, AFK overlay every 20s no forced action), multi-hand sessions with spirit settlement, bust/rounds termination, `game:ended` payload for Phase 8 ELO. `GameGateway` with Zod validation + rate limiting. `toClientSnapshot` redaction. Tile-map + game event schemas in shared. PR #16.
-- **7B Frontend:** `GamePage` (jing-reveal → compass game table → end screen), `useGame` hook (1.5s reconnect overlay, optimistic discard), `MahjongTile` component (aria-labels, suit colours), `game.store.ts`, 34 i18n keys EN+ZH. PR #17 (merged).
+- **7B Frontend:** `GamePage` (jing-reveal → compass game table → end screen), `useGame` hook (1.5s reconnect overlay, optimistic discard), `MahjongTile` component (aria-labels, suit colours), `game.store.ts`, 34 i18n keys EN+ZH. PR #17.
 
-### In Progress: Phase 8 — ELO & Game History (PRs open, not yet merged)
+### Completed (Phase 8 — ELO & Game History)
 
 - **8A Backend (PR #18):** `EloService` (K=32 pairwise ELO), `StatsService` (gamesPlayed, gamesWon, streak, rating updated after each session), `GET /users/me/games` paginated history endpoint, `game:rematch` socket event + host-only `requestRematch()` that pre-creates a DDB room and emits `game:rematch-ready`. `ratingDeltas` added to `GameEndedPayload`. 10 new tests.
 - **8B Frontend (PR #19):** Enriched `GameEndScreen` (placement badge, ELO delta, rank markers, hands-played), `HistoryPage` at `/history` (skeleton/empty/list states, infinite scroll), `useGameHistory` hook, `game:rematch-ready` → auto-navigate to new room, 12 new i18n keys EN+ZH, 5 new tests.
 
 ### Next: Phase 9 — Replay
 
-- Decide storage: DDB per-move items vs. one S3 JSON blob per game (PLAN favours S3 at <4KB/game).
-- Replay player UI: scrub, play/pause, speed.
-- Share link `/replay/<id>` — auth-gated, viewer must be a player or friend.
+Per PLAN.md: S3 wins over per-move DDB items for replay storage (PLAN §9.1 — <4KB/game, cheaper and simpler).
+
+- **9A Backend:** Decide and implement replay storage. Write full move log to `s3://.../replays/<gameId>.json` on session end. `GET /replays/:id` endpoint — auth-gated, viewer must be a player in the game or a friend of one. Presigned URL or streamed response.
+- **9B Frontend:** Replay player UI at `/replay/:id` — scrub bar, play/pause, speed control. Reuses the engine to re-derive state from the move log + seed. Share-link flow (copies URL; viewing still requires auth).
 
 ---
 
