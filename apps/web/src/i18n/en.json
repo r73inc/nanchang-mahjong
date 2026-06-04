@@ -277,6 +277,14 @@
   "replayEventConcede": "conceded",
   "replayEventDrawGame": "draw",
 
+  "pushNotifications": "Turn Notifications",
+  "pushNotificationsDesc": "Get notified when it's your turn",
+  "pushEnable": "Enable",
+  "pushDisable": "Disable",
+  "pushEnabled": "On",
+  "pushDenied": "Blocked by browser",
+  "pushDeniedHint": "Allow notifications in your browser settings to enable this.",
+
   "learnTitle": "Learn",
   "learnLink": "Learn",
   "learnNudge": "New to the game?",

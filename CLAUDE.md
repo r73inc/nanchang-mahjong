@@ -101,22 +101,18 @@ gh pr view <n> --comments
 - **`contrastGuard(hex)`** — WCAG luminance check; auto-returns light/dark ink color for any tile-face background.
 - **`useSound`** hook — Web Audio API clack + chime (opt-in, off by default). 14 i18n keys EN+ZH, 10 tests.
 
-### Next: Phase 12 — Push Notifications & Polish (split)
-
-**12A Backend (this PR):**
+### Completed (Phase 12A — Push Backend, PR #26)
 
 - VAPID key pair in config; graceful no-op if keys not set.
-- `PushModule` (@Global) — `PushService` (subscribe/unsubscribe/sendToUser/sendTurnNotification) + `PushController` (`GET /push/vapid-public-key`, `POST /push/subscribe`, `DELETE /push/unsubscribe`).
-- Push subscriptions stored in DynamoDB as `USER#<sub>/PUSH_SUB`.
-- `GameService.startTurn()` fires turn notification when the active seat has no live socket.
+- `PushModule` (@Global) — `PushService` + `PushController`. Push subscriptions in DDB (`USER#<sub>/PUSH_SUB`). `GameService.startTurn()` fires turn notification when active seat has no live socket. 8 new tests (216 total API).
 
-**12B Frontend (next PR):**
+### Next: Phase 12B — Push Frontend + A11y
 
-- Service worker (`sw.ts`) for receiving push events.
-- `usePushNotifications` hook — permission flow, subscribe/unsubscribe.
-- Permission toggle in Account Settings.
-- A11y pass: reduced-motion, focus rings, live regions.
-- Performance: lazy-loaded routes.
+- `public/sw.js` service worker — `push`, `notificationclick`, `pushsubscriptionchange`.
+- `usePushNotifications` hook — SW registration, VAPID key fetch, permission flow, pushManager subscribe/unsubscribe.
+- Push notification toggle in Home settings section.
+- `prefers-reduced-motion` global CSS rule in `index.css`.
+- A11y tests: `A11y·tile-aria` + `A11y·reduced-motion`.
 
 ---
 
