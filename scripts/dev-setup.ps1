@@ -6,13 +6,14 @@
 .DESCRIPTION
     Automates the full first-time setup:
       1. Copies .env.example -> .env (if not present)
-      2. Starts Docker services
-      3. Waits for DynamoDB + Cognito to be healthy
-      4. Creates DynamoDB table + Cognito User Pool (idempotent)
-      5. Prompts for admin credentials and seeds the first admin user
-      6. Prints the initial invite code
+      2. Installs pnpm dependencies
+      3. Starts Docker services
+      4. Waits for DynamoDB + Cognito to be healthy
+      5. Creates DynamoDB table + Cognito User Pool (idempotent)
+      6. Patches .env with the Cognito IDs automatically
+      7. Seeds the first admin user and prints the initial invite code
 
-    Re-running this script is safe — all steps are idempotent.
+    Re-running this script is safe -- all steps are idempotent.
 
 .EXAMPLE
     powershell scripts/dev-setup.ps1
@@ -26,15 +27,16 @@ param(
     [string]$AdminDisplay  = 'Admin'
 )
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Step([string]$msg) { Write-Host "`n▶  $msg" -ForegroundColor Cyan }
-function Write-Ok([string]$msg)   { Write-Host "  ✓  $msg" -ForegroundColor Green }
-function Write-Warn([string]$msg) { Write-Host "  ⚠  $msg" -ForegroundColor Yellow }
-function Write-Fail([string]$msg) { Write-Host "  ✗  $msg" -ForegroundColor Red }
+function Write-Step { param([string]$msg) Write-Host "" ; Write-Host ">> $msg" -ForegroundColor Cyan }
+function Write-Ok   { param([string]$msg) Write-Host "   OK  $msg" -ForegroundColor Green }
+function Write-Warn { param([string]$msg) Write-Host "   WARN $msg" -ForegroundColor Yellow }
+function Write-Fail { param([string]$msg) Write-Host "   FAIL $msg" -ForegroundColor Red }
 
-# ── 0. Prerequisites check ────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 0. Prerequisites
+# ---------------------------------------------------------------------------
 Write-Step "Checking prerequisites"
 
 foreach ($cmd in @('docker', 'pnpm', 'node')) {
@@ -45,95 +47,108 @@ foreach ($cmd in @('docker', 'pnpm', 'node')) {
 }
 Write-Ok "docker, pnpm, node found"
 
-$nodeVer = (node --version) -replace 'v',''
+$nodeVer = (node --version) -replace 'v', ''
 if ([version]$nodeVer -lt [version]'22.0.0') {
-    Write-Warn "Node $nodeVer detected — Node 22+ is required. Consider using nvm."
+    Write-Warn "Node $nodeVer detected -- Node 22+ is required. Consider using nvm."
 }
 
-# ── 1. .env file ─────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 1. .env file
+# ---------------------------------------------------------------------------
 Write-Step "Checking .env"
 
-if (-not (Test-Path '.env')) {
+if (Test-Path '.env') {
+    Write-Ok ".env already exists -- skipping copy"
+} else {
     Copy-Item '.env.example' '.env'
     Write-Ok ".env created from .env.example"
-} else {
-    Write-Ok ".env already exists — skipping copy"
 }
 
-# ── 2. pnpm install ───────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 2. pnpm install
+# ---------------------------------------------------------------------------
 Write-Step "Installing dependencies"
 pnpm install --frozen-lockfile
 Write-Ok "Dependencies installed"
 
-# ── 3. Docker services ────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 3. Docker services
+# ---------------------------------------------------------------------------
 Write-Step "Starting Docker services"
 docker compose up -d
 Write-Ok "Docker services started"
 
-# ── 4. Wait for DynamoDB ──────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 4. Wait for DynamoDB
+# ---------------------------------------------------------------------------
 Write-Step "Waiting for DynamoDB Local (port 8000)"
-$retries = 0
-while ($retries -lt 30) {
+$ready = $false
+for ($i = 0; $i -lt 30; $i++) {
     try {
         $null = Invoke-WebRequest -Uri 'http://localhost:8000/' -UseBasicParsing -TimeoutSec 2
+        $ready = $true
         break
     } catch {
         Start-Sleep -Seconds 2
-        $retries++
     }
 }
-if ($retries -ge 30) {
+if (-not $ready) {
     Write-Fail "DynamoDB did not become ready in time. Check: docker compose logs dynamodb"
     exit 1
 }
 Write-Ok "DynamoDB ready"
 
-# ── 5. Wait for Cognito Local ─────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 5. Wait for Cognito Local
+# ---------------------------------------------------------------------------
 Write-Step "Waiting for Cognito Local (port 9229)"
-$retries = 0
-while ($retries -lt 30) {
+for ($i = 0; $i -lt 15; $i++) {
     try {
         $null = Invoke-WebRequest -Uri 'http://localhost:9229/' -UseBasicParsing -TimeoutSec 2
         break
     } catch {
         Start-Sleep -Seconds 2
-        $retries++
     }
-}
-if ($retries -ge 30) {
-    Write-Warn "Cognito Local did not respond — continuing anyway (it may not expose a root endpoint)"
 }
 Write-Ok "Cognito ready"
 
-# ── 6. setup-local: create DDB table + Cognito pool ──────────────────────────
+# ---------------------------------------------------------------------------
+# 6. setup-local: create DDB table + Cognito User Pool
+# ---------------------------------------------------------------------------
 Write-Step "Creating DynamoDB table + Cognito User Pool"
-$setupOutput = pnpm --filter @nanchang/api run setup:local 2>&1
-Write-Host $setupOutput
 
-# Extract pool-id and client-id from script output
-$poolIdLine   = ($setupOutput | Select-String 'COGNITO_USER_POOL_ID=').Line
-$clientIdLine = ($setupOutput | Select-String 'COGNITO_CLIENT_ID=').Line
+# Capture stdout only (no 2>&1 -- PS5.1 wraps native stderr as ErrorRecords)
+$setupLines = @()
+pnpm --filter @nanchang/api run setup:local | ForEach-Object {
+    Write-Host $_
+    $setupLines += $_
+}
+
+# Extract pool-id and client-id from printed output
+$poolIdLine   = $setupLines | Where-Object { $_ -match 'COGNITO_USER_POOL_ID=' } | Select-Object -First 1
+$clientIdLine = $setupLines | Where-Object { $_ -match 'COGNITO_CLIENT_ID='    } | Select-Object -First 1
 
 if ($poolIdLine -and $clientIdLine) {
-    $poolId   = ($poolIdLine   -split '=')[1].Trim()
-    $clientId = ($clientIdLine -split '=')[1].Trim()
+    $poolId   = ($poolIdLine   -split '=', 2)[1].Trim()
+    $clientId = ($clientIdLine -split '=', 2)[1].Trim()
 
     Write-Ok "Cognito User Pool: $poolId"
     Write-Ok "Cognito Client ID: $clientId"
 
-    # Patch .env in-place
-    (Get-Content '.env') `
-        -replace '^COGNITO_USER_POOL_ID=.*', "COGNITO_USER_POOL_ID=$poolId" `
-        -replace '^COGNITO_CLIENT_ID=.*',    "COGNITO_CLIENT_ID=$clientId" |
-        Set-Content '.env' -Encoding utf8
+    $envContent = Get-Content '.env' -Raw
+    $envContent = $envContent -replace '(?m)^COGNITO_USER_POOL_ID=.*', "COGNITO_USER_POOL_ID=$poolId"
+    $envContent = $envContent -replace '(?m)^COGNITO_CLIENT_ID=.*',    "COGNITO_CLIENT_ID=$clientId"
+    [System.IO.File]::WriteAllText((Resolve-Path '.env').Path, $envContent, [System.Text.Encoding]::UTF8)
 
     Write-Ok ".env updated with Cognito IDs"
 } else {
     Write-Warn "Could not auto-detect Cognito IDs from script output."
-    Write-Warn "If the pool was already created, the IDs are already in your .env — this is fine."
+    Write-Warn "If the pool already existed the IDs are in your .env -- this is fine."
 }
 
-# ── 7. seed:admin ─────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 7. Seed admin user
+# ---------------------------------------------------------------------------
 Write-Step "Seeding admin user"
 $env:ADMIN_EMAIL    = $AdminEmail
 $env:ADMIN_PASSWORD = $AdminPassword
@@ -142,22 +157,20 @@ $env:ADMIN_DISPLAY  = $AdminDisplay
 
 pnpm --filter @nanchang/api run seed:admin
 
-# ── 8. Done ───────────────────────────────────────────────────────────────────
-Write-Host @"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Setup complete! Start the app with:
-
-    pnpm dev
-
-  Then open: http://localhost:5173
-
-  Admin login:
-    Email:    $AdminEmail
-    Password: $AdminPassword
-
-  Local service consoles:
-    MinIO (S3):  http://localhost:9001  (minioadmin / minioadmin)
-    MailHog:     http://localhost:8025
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"@ -ForegroundColor Green
+# ---------------------------------------------------------------------------
+# 8. Done
+# ---------------------------------------------------------------------------
+Write-Host ""
+Write-Host "==========================================================" -ForegroundColor Green
+Write-Host "  Setup complete!  Start the app with:  pnpm dev"           -ForegroundColor Green
+Write-Host ""
+Write-Host "  Web app: http://localhost:5173"                            -ForegroundColor Green
+Write-Host ""
+Write-Host "  Admin login:"                                              -ForegroundColor Green
+Write-Host "    Email:    $AdminEmail"                                   -ForegroundColor Green
+Write-Host "    Password: $AdminPassword"                                -ForegroundColor Green
+Write-Host ""
+Write-Host "  Consoles:"                                                 -ForegroundColor Green
+Write-Host "    MinIO:   http://localhost:9001  (minioadmin / minioadmin)" -ForegroundColor Green
+Write-Host "    MailHog: http://localhost:8025"                          -ForegroundColor Green
+Write-Host "==========================================================" -ForegroundColor Green
