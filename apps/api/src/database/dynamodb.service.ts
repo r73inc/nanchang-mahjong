@@ -96,4 +96,17 @@ export const DK = {
     gsi1pk: `ROOM_CODE#${code.replace(/-/g, '').toUpperCase()}`,
     gsi1sk: 'META',
   }),
+  // ── Game keys ──────────────────────────────────────────────────────────────
+  /** Primary record for a game session (written on create + milestones + end). */
+  game: (id: string) => ({ PK: `GAME#${id}`, SK: 'META' }),
+  /** Per-move record (reserved for Phase 9 full replay; currently unused). */
+  gameMove: (id: string, n: number) => ({
+    PK: `GAME#${id}`,
+    SK: `MOVE#${String(n).padStart(4, '0')}`,
+  }),
+  /** Per-user game history index (written on session end; feeds Phase 8 stats). */
+  userGameIdx: (sub: string, ts: string, id: string) => ({
+    PK: `USER#${sub}`,
+    SK: `GAME#${ts}#${id}`,
+  }),
 } as const;
