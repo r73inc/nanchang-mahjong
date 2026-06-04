@@ -218,5 +218,26 @@
   "gameSelectDiscard": "Tap a tile to select",
   "gameConfirmDiscard": "Tap again to discard",
   "gameDrawRound": "Draw — No Winner",
-  "gameConceded": "Player Conceded"
+  "gameConceded": "Player Conceded",
+
+  "endGamePlacement1": "1st Place",
+  "endGamePlacement2": "2nd Place",
+  "endGamePlacement3": "3rd Place",
+  "endGamePlacement4": "4th Place",
+  "endGameHandsPlayed": "{{0}} hands played",
+  "endGameRatingDelta": "Rating",
+  "endGameRematch": "Play Again",
+
+  "historyTitle": "History",
+  "historyEmpty": "No games yet. Start your first match!",
+  "historyResultWin": "Win",
+  "historyResultDraw": "Draw",
+  "historyResultConcede": "Concede",
+  "historyResultBust": "Bust",
+  "historyPlacement1": "1st",
+  "historyPlacement2": "2nd",
+  "historyPlacement3": "3rd",
+  "historyPlacement4": "4th",
+  "historyPlayMore": "Start a Match",
+  "historyLoadMore": "Load more"
 }

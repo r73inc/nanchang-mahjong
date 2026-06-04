@@ -19,7 +19,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile, FaceDownTile } from '../../components/mahjong-tile';
 import { useI18n } from '../../i18n';
-import type { ClientGameState, TileType, SeatWind } from '@nanchang/shared';
+import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
 import type { ClaimWindowState } from '../../stores/game.store';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
@@ -119,27 +119,63 @@ function JingRevealScreen({
   );
 }
 
+const PLACEMENT_KEY = {
+  1: 'endGamePlacement1',
+  2: 'endGamePlacement2',
+  3: 'endGamePlacement3',
+  4: 'endGamePlacement4',
+} as const;
+
 /** Game-end screen (shown after phase=finished). */
 function GameEndScreen({
   snapshot,
+  ended,
   viewerSeat,
   onHome,
+  onRematch,
 }: {
   snapshot: ClientGameState;
+  ended: GameEndedPayload | null;
   viewerSeat: 0 | 1 | 2 | 3 | null;
   onHome: () => void;
+  onRematch: () => void;
 }) {
   const { t } = useI18n();
   const scores = snapshot.seats.map((s) => s.score);
   const sorted = [...scores].sort((a, b) => b - a);
   const myScore = viewerSeat !== null ? scores[viewerSeat] : null;
   const iWon = myScore !== null && myScore === sorted[0];
+  const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
+  const myRatingDelta =
+    viewerSeat !== null && ended?.ratingDeltas ? ended.ratingDeltas[viewerSeat] : null;
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">
+      {/* Placement badge */}
+      {myPlacement && (
+        <p
+          className="text-[13px] font-bold tracking-widest uppercase"
+          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
+        >
+          {t(PLACEMENT_KEY[myPlacement])}
+        </p>
+      )}
+
       <h1 className="text-3xl font-serif font-bold" style={{ color: iWon ? '#7fc299' : '#f5efdf' }}>
         {iWon ? t('gameYouWin') : t('gameSessionEnd')}
       </h1>
+
+      {/* Rating delta */}
+      {myRatingDelta !== null && (
+        <p
+          className="text-sm font-mono font-bold"
+          style={{ color: myRatingDelta >= 0 ? '#7fc299' : '#e88080' }}
+          aria-label={t('endGameRatingDelta')}
+        >
+          {myRatingDelta >= 0 ? '+' : ''}
+          {myRatingDelta} {t('endGameRatingDelta')}
+        </p>
+      )}
 
       {/* Final scores */}
       <div
@@ -149,36 +185,70 @@ function GameEndScreen({
         <p className="text-xs font-bold tracking-widest text-mj-gold/70 uppercase mb-3">
           {t('gameFinalScores')}
         </p>
-        {snapshot.seats.map((seat, i) => (
-          <div key={i} className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
+        {snapshot.seats.map((seat, i) => {
+          const seatPlacement = ended ? ended.placement[i] : null;
+          return (
+            <div key={i} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: WIND_COLOR[seat.wind] }}
+                />
+                <span className="text-mj-bone/70">{WIND_CHAR[seat.wind]}</span>
+                {seatPlacement && (
+                  <span
+                    className="text-[10px] font-bold"
+                    style={{ color: seatPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.3)' }}
+                  >
+                    #{seatPlacement}
+                  </span>
+                )}
+                {i === viewerSeat && (
+                  <span className="text-[10px] text-mj-gold/60">{t('youSuffix')}</span>
+                )}
+              </div>
               <span
-                className="w-2 h-2 rounded-full"
-                style={{ background: WIND_COLOR[seat.wind] }}
-              />
-              <span className="text-mj-bone/70">{WIND_CHAR[seat.wind]}</span>
-              {i === viewerSeat && (
-                <span className="text-[10px] text-mj-gold/60">{t('youSuffix')}</span>
-              )}
+                className="font-bold font-mono"
+                style={{ color: seat.score >= 0 ? '#7fc299' : '#e88080' }}
+              >
+                {seat.score >= 0 ? '+' : ''}
+                {seat.score}
+              </span>
             </div>
-            <span
-              className="font-bold font-mono"
-              style={{ color: seat.score >= 0 ? '#7fc299' : '#e88080' }}
-            >
-              {seat.score >= 0 ? '+' : ''}
-              {seat.score}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <button
-        onClick={onHome}
-        className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
-        style={{ border: '1px solid rgba(245,239,223,0.2)' }}
-      >
-        {t('gamePlayAgain')}
-      </button>
+      {/* Hands played */}
+      {ended && (
+        <p className="text-xs text-mj-bone/40">
+          {t('endGameHandsPlayed').replace('{{0}}', String(ended.handsPlayed))}
+        </p>
+      )}
+
+      {/* Actions */}
+      <div className="flex flex-col gap-3 w-full max-w-[280px]">
+        {/* Seat 0 (host) can trigger rematch */}
+        {viewerSeat === 0 && (
+          <button
+            onClick={onRematch}
+            className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+            style={{
+              background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+              boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
+            }}
+          >
+            {t('endGameRematch')}
+          </button>
+        )}
+        <button
+          onClick={onHome}
+          className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
+          style={{ border: '1px solid rgba(245,239,223,0.2)' }}
+        >
+          {t('gamePlayAgain')}
+        </button>
+      </div>
     </div>
   );
 }
@@ -687,6 +757,7 @@ export function GamePage() {
   const {
     snapshot,
     ended,
+    rematchRoomCode,
     connection,
     selectedTileIdx,
     claimWindow,
@@ -697,15 +768,17 @@ export function GamePage() {
     pass,
     concede,
     revealJing,
+    requestRematch,
   } = useGame(gameId ?? '', spectate);
 
-  // Navigate away once ended payload is received and user dismisses end screen
   const handleHome = useCallback(() => navigate('/lobby'), [navigate]);
 
-  // Show end screen once we have the ended payload
+  // When the server confirms a rematch room, navigate there immediately.
   useEffect(() => {
-    // Nothing extra to do — ended is shown by the 'finished' phase check below
-  }, [ended]);
+    if (rematchRoomCode) {
+      navigate(`/room/${rematchRoomCode}`);
+    }
+  }, [rematchRoomCode, navigate]);
 
   if (!gameId) {
     return <LoadingScreen />;
@@ -740,7 +813,13 @@ export function GamePage() {
       )}
 
       {snapshot.phase === 'finished' && (
-        <GameEndScreen snapshot={snapshot} viewerSeat={viewerSeat} onHome={handleHome} />
+        <GameEndScreen
+          snapshot={snapshot}
+          ended={ended}
+          viewerSeat={viewerSeat}
+          onHome={handleHome}
+          onRematch={requestRematch}
+        />
       )}
 
       {(snapshot.phase === 'dealing' ||
