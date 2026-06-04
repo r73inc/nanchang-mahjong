@@ -1,0 +1,100 @@
+/**
+ * game.store.ts — Zustand store for the live game state.
+ *
+ * The authoritative ClientGameState snapshot is replaced wholesale on every
+ * server push (server always wins). The only optimistic mutation is removing
+ * the discarded tile from the viewer's hand while the server confirms.
+ *
+ * Claim windows and the connection status are also held here so any component
+ * in the tree can read them without prop-drilling.
+ */
+
+import { create } from 'zustand';
+import type { ClientGameState, ClaimAction, GameEndedPayload } from '@nanchang/shared';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type ConnectionStatus = 'live' | 'reconnecting' | 'lost';
+
+export interface ClaimWindowState {
+  actions: ClaimAction[];
+  deadline: number;
+}
+
+export interface GameToast {
+  kind: 'win' | 'pung' | 'kong' | 'chow' | 'concede';
+  seat: 0 | 1 | 2 | 3;
+}
+
+// ── Store ─────────────────────────────────────────────────────────────────────
+
+interface GameStore {
+  // ── Server-authoritative state ─────────────────────────────────────────────
+  snapshot: ClientGameState | null;
+
+  // ── Derived from game:ended (available for end-screen) ────────────────────
+  ended: GameEndedPayload | null;
+
+  // ── UI state ───────────────────────────────────────────────────────────────
+  /** Index into snapshot.seats[viewerSeat].hand of the selected tile. */
+  selectedTileIdx: number | null;
+
+  /** Set while an optimistic discard is waiting for server confirmation. */
+  pendingMove: boolean;
+
+  /** Active claim window sent by the server (null between turns). */
+  claimWindow: ClaimWindowState | null;
+
+  /** Short-lived toast from game:contested (auto-cleared after 600ms). */
+  toast: GameToast | null;
+
+  /** Socket connection health. Drives the reconnecting overlay. */
+  connection: ConnectionStatus;
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+  setSnapshot: (s: ClientGameState) => void;
+  setEnded: (e: GameEndedPayload) => void;
+  setConnection: (s: ConnectionStatus) => void;
+  setClaimWindow: (w: ClaimWindowState | null) => void;
+  selectTile: (idx: number | null) => void;
+  setPendingMove: (v: boolean) => void;
+  setToast: (t: GameToast | null) => void;
+  reset: () => void;
+}
+
+const initialState = {
+  snapshot: null,
+  ended: null,
+  selectedTileIdx: null,
+  pendingMove: false,
+  claimWindow: null,
+  toast: null,
+  connection: 'live' as ConnectionStatus,
+};
+
+export const useGameStore = create<GameStore>()((set) => ({
+  ...initialState,
+
+  setSnapshot: (snapshot) =>
+    set({
+      snapshot,
+      // Server snapshot wins — clear any pending optimistic state
+      pendingMove: false,
+      // Clear claim window once snapshot arrives (it carries the new phase)
+      claimWindow: null,
+    }),
+
+  setEnded: (ended) => set({ ended }),
+
+  setConnection: (connection) => set({ connection }),
+
+  setClaimWindow: (claimWindow) => set({ claimWindow }),
+
+  selectTile: (selectedTileIdx) => set({ selectedTileIdx }),
+
+  setPendingMove: (pendingMove) => set({ pendingMove }),
+
+  setToast: (toast) => set({ toast }),
+
+  reset: () => set(initialState),
+}));
