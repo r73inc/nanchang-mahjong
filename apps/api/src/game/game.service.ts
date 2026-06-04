@@ -14,21 +14,19 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { Server, Socket } from 'socket.io';
 import { GameEngine, nextDealer, calculateSpiritSettlement } from '@nanchang/engine';
 import type { TileType, SeatWind, WinType, WinPaymentResult } from '@nanchang/engine';
-import type {
-  RoomSettings,
-  GameEndedPayload,
-  PublicGameEvent,
-  ClaimAction,
-} from '@nanchang/shared';
+import type { RoomSettings, GameEndedPayload } from '@nanchang/shared';
+import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { GameSession } from './game-session';
 import type { Seat4 } from './game-session';
 import { computeEligibleClaims, computeRobKongEligible, resolveClaims } from './claim-resolver';
 import type { IncomingClaim } from './claim-resolver';
 import { toClientSnapshot } from './snapshot';
+import { StatsService } from './stats.service';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -52,7 +50,10 @@ export class GameService {
   private readonly sessions = new Map<string, GameSession>();
   private server?: Server;
 
-  constructor(private readonly db: DynamoDBService) {}
+  constructor(
+    private readonly db: DynamoDBService,
+    private readonly stats: StatsService,
+  ) {}
 
   /** Called by GameGateway.afterInit to wire in the Socket.IO server reference. */
   setServer(server: Server): void {
@@ -776,6 +777,14 @@ export class GameService {
             ? 'bust'
             : 'win';
 
+    // ── Update player stats + compute ELO deltas (before broadcast so payload is rich) ──
+    const ratingDeltas = await this.stats
+      .updateAfterGame(session.seatMap, placement)
+      .catch((err) => {
+        this.logger.error(`Stats update failed for game ${session.gameId}: ${err}`);
+        return [0, 0, 0, 0] as [number, number, number, number];
+      });
+
     const payload: GameEndedPayload = {
       result: actualResult,
       winnerSeat: winnerSeat ?? undefined,
@@ -787,6 +796,7 @@ export class GameService {
       seatMap: session.seatMap,
       startedAt: session.startedAt,
       endedAt,
+      ratingDeltas,
     };
 
     // Broadcast game:ended to all in room
@@ -880,6 +890,101 @@ export class GameService {
 
   private emitError(socket: Socket, code: string, message?: string): void {
     socket.emit('game:error', { code, message: message ?? code });
+  }
+
+  // ── Rematch ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Host-only rematch: create a new room pre-populated with the same 4 players
+   * and the same settings, then emit game:rematch-ready to all sockets still in
+   * the game room. Clients navigate to the new room code.
+   *
+   * Only valid during the SESSION_TEARDOWN_DELAY_MS window after game:ended.
+   */
+  async requestRematch(socket: Socket, initiatorSub: string, gameId: string): Promise<void> {
+    const session = this.sessions.get(gameId);
+    if (!session) {
+      return this.emitError(socket, 'SESSION_EXPIRED');
+    }
+
+    if (session.getSeat(initiatorSub) !== 0) {
+      return this.emitError(socket, 'NOT_HOST');
+    }
+
+    const roomId = randomUUID();
+    const roomCode = this.generateRoomCode();
+    const now = new Date().toISOString();
+    const ttl = Math.floor(Date.now() / 1000) + 30 * 60;
+
+    // Fetch profiles for seat display info (handle/displayName)
+    const profileResults = await Promise.all(
+      session.seatMap.map((sub) => this.db.get({ Key: DK.userProfile(sub) })),
+    );
+
+    const roomCodeStripped = roomCode.replace(/-/g, '');
+    await this.db
+      .transactWrite({
+        TransactItems: [
+          {
+            Put: {
+              TableName: this.db.tableName,
+              Item: {
+                PK: `ROOM#${roomId}`,
+                SK: 'META',
+                roomId,
+                code: roomCode,
+                hostUserId: session.seatMap[0],
+                status: 'waiting',
+                settings: session.settings,
+                createdAt: now,
+                idleAt: now,
+                ttl,
+                gsi1pk: `ROOM_CODE#${roomCodeStripped}`,
+                gsi1sk: 'META',
+              },
+              ConditionExpression: 'attribute_not_exists(PK)',
+            },
+          },
+          ...session.seatMap.map((userId, i) => {
+            const p = profileResults[i].Item;
+            return {
+              Put: {
+                TableName: this.db.tableName,
+                Item: {
+                  PK: `ROOM#${roomId}`,
+                  SK: `SEAT#${i}`,
+                  roomId,
+                  seatIdx: i,
+                  userId,
+                  handle: (p?.handle as string | undefined) ?? userId,
+                  displayName: (p?.displayName as string | undefined) ?? userId,
+                  ready: false,
+                  joinedAt: now,
+                },
+              },
+            };
+          }),
+        ],
+      })
+      .catch((err) => {
+        this.logger.error(`Failed to create rematch room: ${err}`);
+        this.emitError(socket, 'REMATCH_FAILED');
+        throw err;
+      });
+
+    if (this.server) {
+      this.server.to(`game:${gameId}`).emit('game:rematch-ready', { roomId, roomCode });
+    }
+    this.logger.log(`Rematch: game ${gameId} → room ${roomId} (${roomCode})`);
+  }
+
+  private generateRoomCode(): string {
+    const chars = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+    let s = '';
+    for (let i = 0; i < 6; i++) {
+      s += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return `${s.slice(0, 2)}-${s.slice(2)}`;
   }
 }
 

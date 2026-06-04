@@ -1,4 +1,13 @@
-import { Controller, Get, Patch, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Body,
+  Query,
+  UseGuards,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -29,6 +38,17 @@ export class UsersController {
   @Patch('me')
   async updateMe(@CurrentUser() actor: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
     return this.users.updateProfile(actor.sub, dto);
+  }
+
+  /** GET /users/me/games — paginated game history for the authenticated user. */
+  @Get('me/games')
+  async getMyGames(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('cursor') cursor?: string,
+  ) {
+    const clampedLimit = Math.min(50, Math.max(1, limit));
+    return this.users.listGameHistory(actor.sub, clampedLimit, cursor);
   }
 
   /**

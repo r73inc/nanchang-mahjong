@@ -12,11 +12,18 @@ export interface UserProfile {
   createdAt: string;
   updatedAt: string;
   disabled: boolean;
-  /** Placeholder stats — real aggregates computed in Phase 8. */
   gamesPlayed?: number;
   gamesWon?: number;
   rating?: number;
   streak?: number;
+}
+
+export interface GameHistoryItem {
+  gameId: string;
+  placement: 1 | 2 | 3 | 4;
+  finalScore: number;
+  result: 'win' | 'draw' | 'concede' | 'bust';
+  endedAt: string;
 }
 
 export interface PublicProfile {
@@ -207,6 +214,43 @@ export class UsersService {
     }
 
     return { ...profile, handle: newHandle, displayName: newDisplayName, updatedAt: now };
+  }
+
+  /**
+   * Return a user's game history in reverse-chronological order.
+   * Uses the USER#<sub> / GAME#<ts>#<id> index written by GameService.endSession.
+   * Supports cursor-based pagination via DDB LastEvaluatedKey (base64-encoded).
+   */
+  async listGameHistory(
+    sub: string,
+    limit = 20,
+    cursor?: string,
+  ): Promise<{ games: GameHistoryItem[]; nextCursor?: string }> {
+    const exclusiveStartKey = cursor
+      ? (JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8')) as Record<string, unknown>)
+      : undefined;
+
+    const res = await this.db.query({
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :skPrefix)',
+      ExpressionAttributeValues: { ':pk': `USER#${sub}`, ':skPrefix': 'GAME#' },
+      ScanIndexForward: false,
+      Limit: limit,
+      ...(exclusiveStartKey && { ExclusiveStartKey: exclusiveStartKey }),
+    });
+
+    const games = (res.Items ?? []).map((item) => ({
+      gameId: item.gameId as string,
+      placement: item.placement as 1 | 2 | 3 | 4,
+      finalScore: item.finalScore as number,
+      result: item.result as 'win' | 'draw' | 'concede' | 'bust',
+      endedAt: item.endedAt as string,
+    }));
+
+    const nextCursor = res.LastEvaluatedKey
+      ? Buffer.from(JSON.stringify(res.LastEvaluatedKey)).toString('base64')
+      : undefined;
+
+    return { games, nextCursor };
   }
 
   /**

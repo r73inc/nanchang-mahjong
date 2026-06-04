@@ -170,6 +170,13 @@ export interface GameEndedPayload {
   startedAt: string;
   /** Session end ISO timestamp. */
   endedAt: string;
+  /** ELO rating deltas per seat [seat0, seat1, seat2, seat3]. Added by Phase 8. */
+  ratingDeltas?: [number, number, number, number];
+}
+
+export interface RematchReadyPayload {
+  roomId: string;
+  roomCode: string;
 }
 
 // ── Typed S→C payload wrappers ────────────────────────────────────────────────
