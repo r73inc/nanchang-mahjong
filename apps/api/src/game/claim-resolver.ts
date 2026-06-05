@@ -53,6 +53,8 @@ export function computeEligibleClaims(state: GameState): Map<Seat4, ClaimAction[
   }
 
   const jingTypes = getJingTypes(state);
+  // Rules §4.2: chow is only allowed by the player immediately after the discarder (CCW).
+  const nextSeat = ((discardedBySeat + 1) % 4) as Seat4;
 
   for (let i = 0; i < 4; i++) {
     const seat = i as Seat4;
@@ -65,9 +67,12 @@ export function computeEligibleClaims(state: GameState): Map<Seat4, ClaimAction[
     if (canPung(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'pung' });
     if (canKongFromDiscard(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'kong' });
 
-    const seqs = chowOptions(hand, pendingDiscard, jingTypes);
-    if (seqs.length > 0) {
-      actions.push({ kind: 'chow', sequences: seqs });
+    // Chow is restricted to the single seat immediately after the discarder.
+    if (seat === nextSeat) {
+      const seqs = chowOptions(hand, pendingDiscard, jingTypes);
+      if (seqs.length > 0) {
+        actions.push({ kind: 'chow', sequences: seqs });
+      }
     }
 
     if (actions.length > 0) result.set(seat, actions);
@@ -137,8 +142,8 @@ export function resolveClaims(claims: IncomingClaim[]): ClaimResolution {
   }
 
   if (chows.length > 0) {
-    // Only the next seat (CCW) can chow — the engine enforces this via chowOptions.
-    // If multiple chow claims arrive (shouldn't happen), take the first.
+    // Only one seat is ever offered a chow (computeEligibleClaims gates it to nextSeat).
+    // If somehow multiple arrive, take the lowest seat index as a safe fallback.
     const sorted = [...chows].sort((a, b) => a.seat - b.seat);
     return {
       winners: [],
