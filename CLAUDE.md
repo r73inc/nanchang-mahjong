@@ -44,6 +44,10 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 **⚠️ NEVER use `cd "absolute\path"; command` compound syntax in PowerShell. It triggers a hardcoded security block that no allowlist can override. Always use pnpm workspace filters instead.**
 
 ```powershell
+# Dev servers (local testing)
+pnpm --filter @nanchang/api run dev            # NestJS API with watch (nest start --watch)
+pnpm --filter @nanchang/web run dev            # Vite dev server
+
 # Tests
 pnpm --filter @nanchang/engine run test        # engine (Vitest)
 pnpm --filter @nanchang/api run test           # API (Jest)
