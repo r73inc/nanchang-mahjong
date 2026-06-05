@@ -28,6 +28,7 @@ import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
 import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
+import { GameTable2D } from '../../components/2d';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
@@ -957,10 +958,12 @@ function GameHistoryPanel({
 // ── Game Table ────────────────────────────────────────────────────────────────
 
 /**
- * Full game screen — 3D canvas fills the viewport; DOM overlays layer on top.
+ * Full game screen — table canvas fills the viewport; DOM overlays layer on top.
+ * viewMode === '3D' → GameCanvas (React Three Fiber)
+ * viewMode === '2D' → GameTable2D (Framer Motion DOM)
  *
  * Layer order (z-index):
- *   0   GameCanvas (fills inset-0, no z-index)
+ *   0   GameCanvas / GameTable2D (fills inset-0, no z-index)
  *   10  Status bar, SeatHUD, TurnIndicator
  *   15  ViewerHandHUD, GameHistoryPanel (above canvas, below claim rail)
  *   20  SideRail (claim window) — slides up from bottom, covers HUD
@@ -1061,11 +1064,11 @@ function GameTable({
 
   return (
     <div className="relative w-full h-dvh overflow-hidden bg-black">
-      {/* ── 3D canvas — fills entire screen ───────────────────────────────── */}
-      {/* GameScene reads snapshot directly from the Zustand store; the canvas */}
-      {/* re-renders only on game-state changes (not on toast / claim updates). */}
+      {/* ── Table renderer — fills entire screen ──────────────────────────── */}
+      {/* Branched on snapshot.viewMode set by the host before game start.    */}
+      {/* All overlays (z-10+) are identical in both modes.                   */}
       <div className="absolute inset-0" aria-hidden="true">
-        <GameCanvas />
+        {snapshot.viewMode === '2D' ? <GameTable2D /> : <GameCanvas />}
       </div>
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
