@@ -1,18 +1,20 @@
 /**
  * MahjongTile3D.tsx
  *
- * Atomic 3D tile component — renders one tile as a two-mesh composition:
+ * Atomic 3D tile component — renders one tile as a three-mesh group:
  *
- *   1. Body mesh  — the GLB geometry (beveled tile shape) with ceramic
- *                   MeshPhysicalMaterial (ivory, no texture).
- *   2. Face stamp — a PlaneGeometry child at FACE_STAMP_Z with the SVG
- *                   texture as its map. When tileType is null (face-down),
- *                   the back texture is used instead.
+ *   1. Jing outline shell — 1.04× GLB geometry, BackSide gold MeshBasicMaterial.
+ *                           Opacity 0 normally; fades to 0.6 for Jing tiles.
+ *                           Produces a gold rim around the tile edges.
+ *   2. Body mesh          — 1.0× GLB geometry, ceramic MeshPhysicalMaterial
+ *                           (ivory, no texture). Occludes the outline interior.
+ *   3. Face stamp         — PlaneGeometry at FACE_STAMP_Z carrying the SVG
+ *                           texture. Back texture used when tileType is null.
  *
  * Animations:
  *   - Position and rotation lerp toward the `pose` target at ~12 units/s.
  *   - Selected (viewer choosing a discard): tile lifts by 0.35u on Y.
- *   - Jing (spirit/wildcard): emissive gold pulse + floating "节" label.
+ *   - Jing (spirit/wildcard): emissive gold pulse + outline shell fade-in + "节" label.
  *
  * Pointer events:
  *   - An invisible boxGeometry hit-box handles onClick / hover so clicks
@@ -113,6 +115,29 @@ export function MahjongTile3D({
     };
   }, [faceMaterial]);
 
+  // ── Jing outline shell material ─────────────────────────────────────────────
+  // Created once — opacity is animated in useFrame rather than by recreating.
+  // BackSide renders the inside faces of a 1.04× shell, producing a gold rim
+  // visible around the tile edges when the body mesh (1.0×) occludes the rest.
+  const outlineMaterial = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color('#c9a961'),
+        side: THREE.BackSide,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false, // outline shouldn't write depth — prevents z-sorting artefacts
+      }),
+    [], // stable reference; opacity mutated imperatively in useFrame
+  );
+
+  // Dispose outline material on unmount
+  useEffect(() => {
+    return () => {
+      outlineMaterial.dispose();
+    };
+  }, [outlineMaterial]);
+
   // ── Pose target refs (avoids stale closure in useFrame) ─────────────────────
   const targetRef = useRef<TilePose>(pose ?? ORIGIN_POSE);
   const isSelectedRef = useRef(isSelected);
@@ -159,6 +184,10 @@ export function MahjongTile3D({
     if (isJing && faceMatRef.current) {
       faceMatRef.current.emissiveIntensity = 0.25 + 0.18 * Math.sin(Date.now() * 0.003);
     }
+
+    // Jing outline shell — smooth fade in (0 → 0.6) / fade out (0.6 → 0)
+    const targetOutlineOpacity = isJing ? 0.6 : 0;
+    outlineMaterial.opacity += (targetOutlineOpacity - outlineMaterial.opacity) * s;
   });
 
   // ── Hover cursor ─────────────────────────────────────────────────────────────
@@ -180,7 +209,17 @@ export function MahjongTile3D({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <group ref={groupRef}>
-      {/* 1. Body: GLB geometry at TILE_SCALE, ceramic material */}
+      {/* 1. Jing outline shell: same geometry at 1.04× scale, BackSide gold.
+           Rendered first (underneath body) so front faces of the body correctly
+           occlude it — only the gold rim peeks out around the edges.
+           Opacity animated in useFrame: 0 → 0.6 when Jing, 0.6 → 0 otherwise. */}
+      <mesh
+        geometry={geometry}
+        material={outlineMaterial}
+        scale={[TILE_SCALE * 1.04, TILE_SCALE * 1.04, TILE_SCALE * 1.04]}
+      />
+
+      {/* 2. Body: GLB geometry at TILE_SCALE, ceramic material */}
       <mesh
         geometry={geometry}
         material={bodyMaterial}
@@ -189,10 +228,10 @@ export function MahjongTile3D({
         receiveShadow
       />
 
-      {/* 2. Face stamp: PlaneGeometry proud of the front face, SVG texture */}
+      {/* 3. Face stamp: PlaneGeometry proud of the front face, SVG texture */}
       <mesh geometry={faceStampGeometry} material={faceMaterial} position={[0, 0, FACE_STAMP_Z]} />
 
-      {/* 3. Invisible hit-box for pointer events (only when interactive) */}
+      {/* 4. Invisible hit-box for pointer events (only when interactive) */}
       {interactive && (
         <mesh
           onClick={handleClick}
@@ -210,7 +249,7 @@ export function MahjongTile3D({
         </mesh>
       )}
 
-      {/* 4. Jing spirit label — floats above tile, DOM-rendered via Html */}
+      {/* 5. Jing spirit label — floats above tile, DOM-rendered via Html */}
       {isJing && (
         <Html
           position={[0, TILE_HEIGHT / 2 + 0.12, FACE_STAMP_Z]}
