@@ -60,10 +60,14 @@ export function computeEligibleClaims(state: GameState): Map<Seat4, ClaimAction[
     const seat = i as Seat4;
     if (seat === discardedBySeat) continue; // cannot claim own discard
 
-    const hand = state.seats[seat].hand; // 13 tiles for non-active seats in awaiting_claims
+    const seatState = state.seats[seat];
+    const hand = seatState.hand; // concealed tiles (fewer than 13 if the player has open melds)
+    // Flat tile list of all already-played open meld tiles for this seat.
+    // Needed so canWin can verify the claimed tile completes a full 14-tile hand.
+    const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles]);
     const actions: ClaimAction[] = [];
 
-    if (canWin(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'win' });
+    if (canWin(hand, pendingDiscard, jingTypes, openMeldTiles)) actions.push({ kind: 'win' });
     if (canPung(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'pung' });
     if (canKongFromDiscard(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'kong' });
 
@@ -95,9 +99,9 @@ export function computeRobKongEligible(state: GameState, kongTile: TileType): Se
     if (seat === kongSeat) continue;
 
     // A rob-kong win is treated like a ron win on the kong tile.
-    // The other player's hand is their current 13 tiles.
-    const hand = state.seats[seat].hand;
-    if (canWin(hand, kongTile, jingTypes)) {
+    const seatState = state.seats[seat];
+    const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles]);
+    if (canWin(seatState.hand, kongTile, jingTypes, openMeldTiles)) {
       eligible.add(seat);
     }
   }

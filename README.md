@@ -150,11 +150,43 @@ Creates four regular player accounts for local testing:
 docker compose up -d
 ```
 
-**Start both API and web in watch mode** (single terminal, concurrent output):
+> **⚠️ DynamoDB table after restart:** DynamoDB Local runs **in-memory** — the table and all user profiles are lost whenever the container stops or restarts. If you get a 500 or 401 "Invalid email or password" on login, re-create the table and restore the profiles (Cognito persists, so this is safe to re-run any time):
+>
+> ```powershell
+> pnpm --filter @nanchang/api run setup:local
+> pnpm --filter @nanchang/api run seed:admin
+> pnpm --filter @nanchang/api run seed:users
+> ```
+
+### Option A — single terminal (combined output)
 
 ```powershell
 pnpm dev
 ```
+
+### Option B — separate terminals (recommended for debugging)
+
+Run these in two separate terminals from the repo root:
+
+**Terminal 1 — API:**
+
+```powershell
+pnpm --filter @nanchang/api run dev
+```
+
+**Terminal 2 — Web:**
+
+```powershell
+pnpm --filter @nanchang/web run dev
+```
+
+> **First time with separate terminals:** the shared packages (`engine`, `shared`) must be built before the apps start. If you see import errors, run this once first:
+>
+> ```powershell
+> pnpm -r --filter './packages/**' run build
+> ```
+>
+> `pnpm dev` does this automatically; separate terminals do not.
 
 | Service | URL                   |
 | ------- | --------------------- |
@@ -166,7 +198,7 @@ The web Vite dev server proxies `/api/*` and `/socket.io/*` to the API automatic
 **Stop everything:**
 
 ```powershell
-# Stop Node processes: Ctrl+C in the pnpm dev terminal
+# Stop Node processes: Ctrl+C in each terminal (or the pnpm dev terminal)
 # Stop Docker:
 docker compose down
 ```
@@ -296,13 +328,24 @@ docker compose logs dynamodb # specific service
 docker compose ps            # check status
 ```
 
-### DynamoDB table missing after restart
+### DynamoDB table missing / 500 or 401 on login
 
-DynamoDB Local runs **in-memory** — the table is lost when the container stops. Re-run:
+DynamoDB Local runs **in-memory** — the table **and all user profile records** are lost whenever the container stops or restarts.
+
+Symptoms:
+
+- **500** on sign-in → `ResourceNotFoundException: Cannot do operations on a non-existent table` in API logs — table is missing
+- **401 "Invalid email or password"** on sign-in after the 500 is fixed → DDB table exists but user profiles are gone
+
+Fix (all three commands are idempotent — safe to run any time):
 
 ```powershell
-pnpm --filter @nanchang/api run setup:local
+pnpm --filter @nanchang/api run setup:local   # re-creates the table
+pnpm --filter @nanchang/api run seed:admin    # restores admin profile
+pnpm --filter @nanchang/api run seed:users    # restores player1-4 profiles
 ```
+
+Cognito persists user accounts in the `cognito-data` Docker volume, so the seed scripts detect the existing Cognito users, fetch their subs, and write only the missing DDB profiles. Passwords and invite codes are unaffected.
 
 ### "COGNITO_USER_POOL_ID is not set"
 

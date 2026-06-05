@@ -94,6 +94,53 @@ describe('canWin', () => {
     // Adding 9s → pair → 1m2m3m 4m JING 6m 7m8m9m 1p2p3p 9s9s → win!
     expect(canWin(h13, '9s', JINGS)).toBe(true);
   });
+
+  it('recognises a win when open melds reduce the concealed hand size', () => {
+    // Player has 3 open pungs on the table (9 tiles in open melds).
+    // Concealed hand: 4 tiles (a pung waiting + pair already held).
+    //
+    //   openMeldTiles: 1m1m1m 2m2m2m 3m3m3m  (9 tiles)
+    //   hand:          4m4m 5m5m               (4 tiles)
+    //   discard:       4m  → pung(4m) + pair(5m)  = win ✓
+    //   discard:       6m  → can't form 4 complete melds → not winning ✓
+    //   fullHand (4m case) = 9 + 4 + 1 = 14 tiles
+    const openMeldTiles: TileType[] = ['1m', '1m', '1m', '2m', '2m', '2m', '3m', '3m', '3m'];
+    const hand: TileType[] = ['4m', '4m', '5m', '5m'];
+    expect(canWin(hand, '4m', NO_JINGS, openMeldTiles)).toBe(true);
+    // 9s has no relationship to the manzu tiles in hand/melds → not a win
+    expect(canWin(hand, '9s', NO_JINGS, openMeldTiles)).toBe(false);
+  });
+
+  it('recognises pair-completion win with 4 open pungs', () => {
+    // Extreme case: 4 open pungs, 1 tile in concealed hand, discard completes pair.
+    //   openMeldTiles: 1m1m1m 2m2m2m 3m3m3m 4m4m4m  (12 tiles)
+    //   hand:          9s                             (1 tile)
+    //   discard:       9s                             → pair(9s)
+    //   fullHand = 12 + 1 + 1 = 14 tiles → 4 pungs + pair ✓
+    const openMeldTiles: TileType[] = [
+      '1m',
+      '1m',
+      '1m',
+      '2m',
+      '2m',
+      '2m',
+      '3m',
+      '3m',
+      '3m',
+      '4m',
+      '4m',
+      '4m',
+    ];
+    const hand: TileType[] = ['9s'];
+    expect(canWin(hand, '9s', NO_JINGS, openMeldTiles)).toBe(true);
+  });
+
+  it('rejects when open melds + hand + tile exceed 14 tiles', () => {
+    // 9 open meld tiles + 5 concealed + 1 discard = 15 → not 14 → reject
+    const openMeldTiles: TileType[] = ['1m', '1m', '1m', '2m', '2m', '2m', '3m', '3m', '3m'];
+    const hand: TileType[] = ['4m', '4m', '5m', '5m', '6m'];
+    expect(canWin(hand, '6m', NO_JINGS, openMeldTiles)).toBe(false);
+  });
 });
 
 // ── canPung ───────────────────────────────────────────────────────────────────

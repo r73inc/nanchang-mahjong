@@ -12,11 +12,26 @@ import type { TileType } from './types';
 // ── Win ───────────────────────────────────────────────────────────────────────
 
 /**
- * True if adding `tile` to `hand` (13 tiles) creates a winning hand.
+ * True if adding `tile` to `hand` creates a winning hand when combined with
+ * any already-played open meld tiles.
+ *
+ * `openMeldTiles` should be the flat list of all tile types in the player's
+ * open melds (e.g. three pungs → 9 tiles). Defaults to [] for a fully
+ * concealed hand where `hand` is expected to have 13 tiles.
+ *
+ * The total tile count must equal 14 (openMeldTiles + hand + tile = 14).
+ * This accounts for players who have melded sets and therefore hold fewer
+ * than 13 concealed tiles — a common source of missed win opportunities.
  */
-export function canWin(hand: TileType[], tile: TileType, jingTypes: TileType[]): boolean {
-  if (hand.length !== 13) return false;
-  return isWinningHand([...hand, tile], jingTypes);
+export function canWin(
+  hand: TileType[],
+  tile: TileType,
+  jingTypes: TileType[],
+  openMeldTiles: TileType[] = [],
+): boolean {
+  const fullHand = [...openMeldTiles, ...hand, tile];
+  if (fullHand.length !== 14) return false;
+  return isWinningHand(fullHand, jingTypes);
 }
 
 // ── Pung ──────────────────────────────────────────────────────────────────────

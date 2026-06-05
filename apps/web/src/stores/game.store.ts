@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import type { ClientGameState, ClaimAction, GameEndedPayload } from '@nanchang/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -87,31 +88,33 @@ const initialState = {
   connection: 'live' as ConnectionStatus,
 };
 
-export const useGameStore = create<GameStore>()((set) => ({
-  ...initialState,
+export const useGameStore = create<GameStore>()(
+  subscribeWithSelector((set) => ({
+    ...initialState,
 
-  setSnapshot: (snapshot) =>
-    set({
-      snapshot,
-      // Server snapshot wins — clear any pending optimistic state
-      pendingMove: false,
-      // Clear claim window once snapshot arrives (it carries the new phase)
-      claimWindow: null,
-    }),
+    setSnapshot: (snapshot) =>
+      set({
+        snapshot,
+        // Server snapshot wins — clear any pending optimistic state
+        pendingMove: false,
+        // Clear claim window once snapshot arrives (it carries the new phase)
+        claimWindow: null,
+      }),
 
-  setEnded: (ended) => set({ ended }),
+    setEnded: (ended) => set({ ended }),
 
-  setRematchRoomCode: (rematchRoomCode) => set({ rematchRoomCode }),
+    setRematchRoomCode: (rematchRoomCode) => set({ rematchRoomCode }),
 
-  setConnection: (connection) => set({ connection }),
+    setConnection: (connection) => set({ connection }),
 
-  setClaimWindow: (claimWindow) => set({ claimWindow }),
+    setClaimWindow: (claimWindow) => set({ claimWindow }),
 
-  selectTile: (selectedTileIdx) => set({ selectedTileIdx }),
+    selectTile: (selectedTileIdx) => set({ selectedTileIdx }),
 
-  setPendingMove: (pendingMove) => set({ pendingMove }),
+    setPendingMove: (pendingMove) => set({ pendingMove }),
 
-  setToast: (toast) => set({ toast }),
+    setToast: (toast) => set({ toast }),
 
-  reset: () => set(initialState),
-}));
+    reset: () => set(initialState),
+  })),
+);

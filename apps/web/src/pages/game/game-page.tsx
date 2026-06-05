@@ -2,29 +2,36 @@
  * GamePage — full real-time game screen.
  *
  * Route: /game/:id
- * Replaces JingRevealStubPage from Phase 6.
  *
- * Renders different sub-screens based on the snapshot phase:
- *   jing_reveal  → JingRevealScreen (host taps to reveal spirit tiles)
- *   playing      → GameTable
- *   awaiting_claims → GameTable (with side rail showing claim actions)
- *   finished     → GameEndScreen
- *   null (loading) → LoadingScreen
+ * Phase E: The DOM compass tile layout has been replaced by a React Three
+ * Fiber 3D canvas (GameCanvas). All DOM overlays are preserved as
+ * `position: absolute` elements layered on top of the canvas.
  *
- * The reconnecting overlay is shown on top of whatever screen is active.
+ * Sub-screens by snapshot.phase:
+ *   jing_reveal       → JingRevealScreen  (pure DOM)
+ *   playing / awaiting_claims → GameTable  (3D canvas + DOM overlays)
+ *   finished          → GameEndScreen     (pure DOM)
+ *   null (loading)    → LoadingScreen     (pure DOM)
+ *
+ * Accessibility: an sr-only AccessibleHand renders the viewer's tiles as
+ * DOM buttons so screen readers and automated tests can interact with them.
+ * The 3D canvas itself is aria-hidden (decorative — the DOM layer is the
+ * accessible interface).
  */
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
-import { MahjongTile, FaceDownTile } from '../../components/mahjong-tile';
+import { MahjongTile } from '../../components/mahjong-tile';
 import { useI18n } from '../../i18n';
+import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
 import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
-import type { ClaimWindowState } from '../../stores/game.store';
+import type { ClaimWindowState, GameToast } from '../../stores/game.store';
+import { GameCanvas } from '../../r3f/GameCanvas';
+import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
 
-/** Given the viewer's seat, compute the compass positions for the other seats. */
 function getCompassSeats(viewerSeat: 0 | 1 | 2 | 3) {
   return {
     right: ((viewerSeat + 1) % 4) as 0 | 1 | 2 | 3,
@@ -43,7 +50,6 @@ const WIND_COLOR: Record<SeatWind, string> = {
 
 // ── Sub-screens ───────────────────────────────────────────────────────────────
 
-/** Loading / connecting screen. */
 function LoadingScreen() {
   const { t } = useI18n();
   return (
@@ -53,7 +59,6 @@ function LoadingScreen() {
   );
 }
 
-/** Jing (Spirit) reveal screen shown before the first turn. */
 function JingRevealScreen({
   snapshot,
   isHost,
@@ -71,7 +76,6 @@ function JingRevealScreen({
       className="flex flex-col items-center justify-center gap-8 min-h-dvh px-8 text-center bg-mj-bg-page"
       aria-label={t('gameSpiritTiles')}
     >
-      {/* Title */}
       <div>
         <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
           {t('gameSpirit')}
@@ -79,7 +83,6 @@ function JingRevealScreen({
         <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('gameSpiritTiles')}</h1>
       </div>
 
-      {/* Spirit indicator tile */}
       {indicatorTile && (
         <div className="flex flex-col items-center gap-3">
           <p className="text-xs text-mj-bone/50">{t('gameSpirit')}</p>
@@ -87,12 +90,10 @@ function JingRevealScreen({
         </div>
       )}
 
-      {/* Description / waiting message */}
       <p className="text-sm text-mj-bone/60 max-w-[260px]">
         {isHost ? t('gameRevealSpirit') : t('gameWaitingReveal')}
       </p>
 
-      {/* Host: Reveal button; Others: waiting indicator */}
       {isHost ? (
         <button
           onClick={onReveal}
@@ -126,7 +127,6 @@ const PLACEMENT_KEY = {
   4: 'endGamePlacement4',
 } as const;
 
-/** Game-end screen (shown after phase=finished). */
 function GameEndScreen({
   snapshot,
   ended,
@@ -151,7 +151,6 @@ function GameEndScreen({
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">
-      {/* Placement badge */}
       {myPlacement && (
         <p
           className="text-[13px] font-bold tracking-widest uppercase"
@@ -165,7 +164,6 @@ function GameEndScreen({
         {iWon ? t('gameYouWin') : t('gameSessionEnd')}
       </h1>
 
-      {/* Rating delta */}
       {myRatingDelta !== null && (
         <p
           className="text-sm font-mono font-bold"
@@ -177,7 +175,6 @@ function GameEndScreen({
         </p>
       )}
 
-      {/* Final scores */}
       <div
         className="w-full max-w-[300px] rounded-xl p-4 space-y-2"
         style={{ background: 'rgba(245,239,223,0.05)', border: '1px solid rgba(245,239,223,0.1)' }}
@@ -219,16 +216,13 @@ function GameEndScreen({
         })}
       </div>
 
-      {/* Hands played */}
       {ended && (
         <p className="text-xs text-mj-bone/40">
           {t('endGameHandsPlayed').replace('{{0}}', String(ended.handsPlayed))}
         </p>
       )}
 
-      {/* Actions */}
       <div className="flex flex-col gap-3 w-full max-w-[280px]">
-        {/* Seat 0 (host) can trigger rematch */}
         {viewerSeat === 0 && (
           <button
             onClick={onRematch}
@@ -253,9 +247,9 @@ function GameEndScreen({
   );
 }
 
-// ── Game Table ────────────────────────────────────────────────────────────────
+// ── DOM overlays ──────────────────────────────────────────────────────────────
 
-/** Nameplate for a seat (opponent or viewer). Shows wind, score, dealer badge. */
+/** Single-seat nameplate chip — wind dot, dealer badge, score, AFK/disconnect. */
 function Nameplate({
   seat,
   seatIdx,
@@ -283,12 +277,10 @@ function Nameplate({
         boxShadow: isActive ? '0 0 8px rgba(201,169,97,0.2)' : 'none',
       }}
     >
-      {/* Wind indicator dot */}
       <span
         className="w-2 h-2 rounded-full shrink-0"
         style={{ background: WIND_COLOR[seat.wind] }}
       />
-      {/* Dealer badge — only on the actual dealer seat */}
       {isDealer && (
         <span
           className="text-[9px] font-bold px-1 rounded shrink-0"
@@ -311,130 +303,97 @@ function Nameplate({
   );
 }
 
-/** Renders a single open meld (pung = 3 tiles, kong = 4, chow = 3). */
-function MeldGroup({
-  meld,
-  size = 'xs',
-}: {
-  meld: import('@nanchang/shared').Meld;
-  size?: 'xs' | 'sm';
-}) {
+/**
+ * Four corner HUD nameplates — replaces the DOM compass nameplate chips that
+ * lived inside the old tile layout.
+ */
+function SeatHUD({ snapshot }: { snapshot: ClientGameState }) {
+  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+  const { right: rightSeat, across: acrossSeat, left: leftSeat } = getCompassSeats(viewerSeat);
+
   return (
-    <div className="flex gap-[2px] items-center">
-      {meld.tiles.map((tile, i) => (
-        <MahjongTile key={i} tile={tile} size={size} isJing={false} />
-      ))}
-    </div>
+    <>
+      {/* Across — top center (below the status bar) */}
+      <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <Nameplate
+          seat={snapshot.seats[acrossSeat]}
+          seatIdx={acrossSeat}
+          snapshot={snapshot}
+          compact
+        />
+      </div>
+      {/* Right — right edge, vertically centered */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+        <Nameplate
+          seat={snapshot.seats[rightSeat]}
+          seatIdx={rightSeat}
+          snapshot={snapshot}
+          compact
+        />
+      </div>
+      {/* Left — left edge, vertically centered */}
+      <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+        <Nameplate seat={snapshot.seats[leftSeat]} seatIdx={leftSeat} snapshot={snapshot} compact />
+      </div>
+      {/* Viewer — above the hand HUD (which is ~90px tall at bottom-0) */}
+      <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+        <Nameplate
+          seat={snapshot.seats[viewerSeat]}
+          seatIdx={viewerSeat}
+          snapshot={snapshot}
+          compact
+        />
+      </div>
+    </>
   );
 }
 
-/** All open melds for a seat, in a horizontal wrapping row. */
-function OpenMeldsDisplay({
-  openMelds,
-  size = 'xs',
-}: {
-  openMelds: import('@nanchang/shared').Meld[];
-  size?: 'xs' | 'sm';
-}) {
-  if (openMelds.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1 items-center justify-center">
-      {openMelds.map((meld, i) => (
-        <div
-          key={i}
-          className="flex gap-[2px] px-1 py-0.5 rounded"
-          style={{ background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)' }}
-        >
-          <MeldGroup meld={meld} size={size} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** The viewer's own hand + open melds at the bottom. */
-function ViewerHand({
-  snapshot,
+/**
+ * Visually hidden hand buttons — provides an accessible DOM interface for the
+ * viewer's tiles so screen readers and automated tests can interact.
+ * The 3D canvas tile meshes are the visual representation; these are the
+ * accessible one.
+ */
+function AccessibleHand({
+  hand,
   selectedTileIdx,
   onSelect,
   onDiscard,
-  pendingMove,
+  isMyTurn,
 }: {
-  snapshot: ClientGameState;
+  hand: TileType[];
   selectedTileIdx: number | null;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
-  pendingMove: boolean;
+  isMyTurn: boolean;
 }) {
-  const { t } = useI18n();
-  const viewerSeat = snapshot.viewerSeat;
-  if (viewerSeat === null) return null;
-
-  const mySeat = snapshot.seats[viewerSeat];
-  const hand = mySeat.hand ?? [];
-  const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
-  const isDealer = snapshot.dealerSeat === viewerSeat;
-  const drawnTile = isMyTurn && hand.length > 0 ? hand[hand.length - 1] : null;
-
-  const handleTileClick = (idx: number) => {
-    if (!isMyTurn || pendingMove) return;
-    if (selectedTileIdx === idx) {
-      onDiscard(hand[idx]);
-    } else {
-      onSelect(idx);
-    }
-  };
+  const { lang } = useI18n();
 
   return (
-    <div className="flex flex-col items-center gap-1.5 pb-2">
-      {/* Viewer nameplate row: wind dot + dealer badge + score */}
-      <div className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full" style={{ background: WIND_COLOR[mySeat.wind] }} />
-        {isDealer && (
-          <span
-            className="text-[9px] font-bold px-1 rounded"
-            style={{ background: 'rgba(201,169,97,0.3)', color: '#c9a961' }}
-          >
-            {t('gameDealerBadge')}
-          </span>
-        )}
-        <span className="text-[10px] text-mj-bone/50 font-mono">{mySeat.score}</span>
-      </div>
-
-      {/* Viewer's open melds (above hand, left-aligned) */}
-      {mySeat.openMelds.length > 0 && <OpenMeldsDisplay openMelds={mySeat.openMelds} size="xs" />}
-
-      {/* Instruction */}
-      <p className="text-[10px] text-mj-bone/40">
-        {isMyTurn
-          ? selectedTileIdx !== null
-            ? t('gameConfirmDiscard')
-            : t('gameSelectDiscard')
-          : t('gameWaitingTurn')}
-      </p>
-
-      {/* Hand tiles */}
-      <div
-        className="flex gap-[3px] px-3 overflow-x-auto max-w-full"
-        role="group"
-        aria-label={t('gameYourTurn')}
-      >
-        {hand.map((tile, idx) => (
-          <MahjongTile
-            key={`${tile}-${idx}`}
-            tile={tile}
-            size="lg"
-            selected={selectedTileIdx === idx}
-            isDrawn={tile === drawnTile && idx === hand.length - 1}
-            onClick={isMyTurn && !pendingMove ? () => handleTileClick(idx) : undefined}
-          />
-        ))}
-      </div>
+    <div className="sr-only" role="group" aria-label="Your hand">
+      {hand.map((tile, idx) => (
+        <button
+          key={`accessible-${tile}-${idx}`}
+          aria-label={tileAriaLabel(tile, lang)}
+          aria-pressed={selectedTileIdx === idx}
+          data-tile={engineToDesignTile(tile)}
+          onClick={() => {
+            if (!isMyTurn) return;
+            if (selectedTileIdx === idx) {
+              onDiscard(tile);
+            } else {
+              onSelect(idx);
+            }
+          }}
+        >
+          {tileAriaLabel(tile, lang)}
+        </button>
+      ))}
     </div>
   );
 }
 
-/** Floating action toast — announces pung, chow, kong, win, concede to all players. */
+/** Floating action toast — pung, chow, kong, win, concede announcements. */
 function ActionToast({
   toast,
   snapshot,
@@ -461,7 +420,7 @@ function ActionToast({
 
   return (
     <div
-      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
       aria-live="assertive"
       aria-atomic="true"
     >
@@ -489,35 +448,6 @@ function ActionToast({
           {label}
         </span>
       </div>
-    </div>
-  );
-}
-
-/** Compact discard pile for one seat. */
-function DiscardPile({
-  seat,
-  discards,
-  isLastDiscard,
-}: {
-  seat: SeatWind;
-  discards: TileType[];
-  isLastDiscard?: boolean;
-}) {
-  return (
-    <div className="flex flex-wrap gap-[2px] content-start" style={{ minHeight: 40 }}>
-      {discards.map((tile, i) => {
-        const isLast = i === discards.length - 1 && isLastDiscard;
-        return (
-          <MahjongTile
-            key={`${tile}-${i}`}
-            tile={tile}
-            size="xs"
-            isJing={false}
-            className={isLast ? 'animate-last-discard-pulse' : ''}
-            ariaHint={WIND_CHAR[seat]}
-          />
-        );
-      })}
     </div>
   );
 }
@@ -551,20 +481,19 @@ function SideRail({
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 flex flex-col items-center gap-3 p-4 max-w-viewport mx-auto animate-call-prompt-enter"
+      className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 p-4 max-w-viewport mx-auto animate-call-prompt-enter z-20"
       style={{ background: 'rgba(10,10,10,0.92)', backdropFilter: 'blur(12px)' }}
       role="dialog"
       aria-label={t('gameClaimWindow')}
     >
       <p className="text-[10px] text-mj-bone/40">{t('gameClaimWindowDesc', String(secLeft))}</p>
 
-      {/* Claim action buttons */}
       <div className="flex gap-3 w-full justify-center">
         {claimWindow.actions.map((action) => (
           <button
             key={action.kind}
             onClick={() => {
-              const seq = action.sequences?.[0]; // use first sequence for chow
+              const seq = action.sequences?.[0];
               onClaim(action.kind, seq);
             }}
             className="flex-1 max-w-[80px] py-3 rounded-xl font-bold text-sm text-mj-ink"
@@ -577,7 +506,6 @@ function SideRail({
           </button>
         ))}
 
-        {/* Pass button */}
         <button
           onClick={onPass}
           className="flex-1 max-w-[80px] py-3 rounded-xl font-bold text-sm text-mj-bone/60"
@@ -590,12 +518,12 @@ function SideRail({
   );
 }
 
-/** Reconnecting overlay (semi-transparent, non-blocking). */
+/** Reconnecting overlay. */
 function ReconnectingOverlay() {
   const { t } = useI18n();
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center z-50"
+      className="absolute inset-0 flex flex-col items-center justify-center z-50"
       style={{ background: 'rgba(10,10,10,0.75)', backdropFilter: 'blur(8px)' }}
       role="alert"
       aria-live="assertive"
@@ -620,7 +548,7 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   const { t } = useI18n();
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center"
+      className="absolute inset-0 z-40 flex items-end justify-center"
       style={{ background: 'rgba(10,10,10,0.6)' }}
     >
       <div
@@ -652,7 +580,394 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   );
 }
 
-/** Full game table — compass layout. */
+// ── History types ─────────────────────────────────────────────────────────────
+
+interface HistoryEntry {
+  id: number;
+  kind: 'discard' | 'pung' | 'chow' | 'kong' | 'win' | 'concede';
+  seatWind: SeatWind;
+  /** Absolute seat index (0–3) — used to derive compass position relative to viewer. */
+  seatIdx: number;
+  tile?: TileType;
+}
+
+// ── SVG hand tile ─────────────────────────────────────────────────────────────
+
+/**
+ * Single tile rendered as an SVG image in the viewer's hand HUD.
+ * Uses the same Regular SVG textures as the 3D tile face stamps, displayed
+ * on an ivory background that matches the 3D tile body colour.
+ */
+function SvgHandTile({
+  tile,
+  isJing = false,
+  isSelected = false,
+  isDrawn = false,
+}: {
+  tile: TileType;
+  isJing?: boolean;
+  isSelected?: boolean;
+  isDrawn?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: 46,
+        height: 62,
+        borderRadius: 5,
+        background: '#f5efe0',
+        border: isJing || isSelected ? '2px solid #c9a961' : '1.5px solid rgba(201,169,97,0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        boxShadow: isJing ? '0 0 8px rgba(201,169,97,0.5)' : '0 2px 6px rgba(0,0,0,0.4)',
+      }}
+    >
+      <img
+        src={tileTexturePath(tile, 'Regular')}
+        style={{ width: '85%', height: '85%', objectFit: 'contain' }}
+        draggable={false}
+        alt=""
+      />
+      {isDrawn && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 3,
+            right: 3,
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: '#c9a961',
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Viewer hand HUD ───────────────────────────────────────────────────────────
+
+/**
+ * DOM overlay at the bottom of the screen showing the viewer's tiles at a
+ * larger scale than the 3D scene would allow. Tiles are draggable to reorder.
+ *
+ * Interaction:
+ *   - Tap once  → select (tile lifts with CSS transform)
+ *   - Tap again → discard (confirmed with the server)
+ *   - Drag      → reorder display order (local only, no server effect)
+ *
+ * The `displayOrder` array maps display-position → hand-index. It is reset
+ * to natural order whenever the hand length changes (discard+draw cycle).
+ */
+function ViewerHandHUD({
+  hand,
+  selectedTileIdx,
+  onSelect,
+  onDiscard,
+  isMyTurn,
+  jingTypes,
+  pendingMove,
+}: {
+  hand: TileType[];
+  selectedTileIdx: number | null;
+  onSelect: (idx: number) => void;
+  onDiscard: (tile: TileType) => void;
+  isMyTurn: boolean;
+  jingTypes: Set<string>;
+  pendingMove: boolean;
+}) {
+  // displayOrder[displayIdx] = handIdx
+  const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const prevLenRef = useRef(hand.length);
+
+  // Sync displayOrder when hand length changes (new draw or discard confirmation).
+  useEffect(() => {
+    const prev = prevLenRef.current;
+    prevLenRef.current = hand.length;
+
+    if (hand.length === prev) return;
+
+    if (hand.length > prev) {
+      // A tile was drawn — append its index (hand.length - 1) at the end of
+      // the display so the newly drawn tile appears on the right.
+      setDisplayOrder((order) => [...order, hand.length - 1]);
+    } else {
+      // A tile was discarded — we can't cheaply determine which index was
+      // removed, so reset to natural order for the new hand.
+      setDisplayOrder(hand.map((_, i) => i));
+    }
+  }, [hand.length]);
+
+  const handleDragStart = (displayIdx: number) => {
+    setDragFrom(displayIdx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (dragFrom === null || dragFrom === targetIdx) return;
+    // Live reorder: move the dragged tile to the hovered slot immediately.
+    setDisplayOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragFrom, 1);
+      next.splice(targetIdx, 0, moved);
+      return next;
+    });
+    setDragFrom(targetIdx);
+  };
+
+  const handleDragEnd = () => setDragFrom(null);
+
+  const handleTileClick = (displayIdx: number) => {
+    if (!isMyTurn || pendingMove) return;
+    const handIdx = displayOrder[displayIdx];
+    if (selectedTileIdx === handIdx) {
+      onDiscard(hand[handIdx]);
+    } else {
+      onSelect(handIdx);
+    }
+  };
+
+  const drawnHandIdx = hand.length > 1 ? hand.length - 1 : -1;
+
+  return (
+    <div
+      className="absolute bottom-0 left-0 right-0 flex flex-col items-center pointer-events-auto"
+      style={{ zIndex: 15 }}
+      aria-hidden="true" // accessible version is the sr-only AccessibleHand
+    >
+      {/* Gradient fade so the HUD blends into the 3D canvas above it */}
+      <div
+        className="w-full flex justify-center px-2 pt-4 pb-2"
+        style={{
+          background: 'linear-gradient(to top, rgba(0,0,0,0.88) 60%, transparent 100%)',
+        }}
+      >
+        <div
+          className="flex gap-[3px] items-end"
+          style={{ overflowX: 'auto', scrollbarWidth: 'none', maxWidth: '100%' }}
+        >
+          {displayOrder.map((handIdx, displayIdx) => {
+            const tile = hand[handIdx];
+            if (tile === undefined) return null;
+            const isSelected = !pendingMove && selectedTileIdx === handIdx;
+            const isDrawn = handIdx === drawnHandIdx;
+            const isDragging = dragFrom === displayIdx;
+
+            return (
+              <div
+                key={`hud-${handIdx}`}
+                draggable
+                onDragStart={() => handleDragStart(displayIdx)}
+                onDragOver={(e) => handleDragOver(e, displayIdx)}
+                onDragEnd={handleDragEnd}
+                onClick={() => handleTileClick(displayIdx)}
+                style={{
+                  transition: 'transform 0.12s ease, opacity 0.12s ease',
+                  transform: isSelected ? 'translateY(-10px) scale(1.08)' : 'none',
+                  opacity: isDragging ? 0.45 : 1,
+                  cursor: isMyTurn && !pendingMove ? 'pointer' : 'default',
+                  flexShrink: 0,
+                }}
+              >
+                <SvgHandTile
+                  tile={tile}
+                  isJing={jingTypes.has(tile)}
+                  isSelected={isSelected}
+                  isDrawn={isDrawn}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Game history panel ────────────────────────────────────────────────────────
+
+/**
+ * Collapsible right-side panel showing a chronological event log for the
+ * current hand: discards, pungs, chows, kongs, wins, concedes.
+ *
+ * The panel slides in from the right edge. A thin tab button toggles it.
+ * When collapsed the tab sticks out on the right, always accessible.
+ * z-index 15: above the 3D canvas (z-0) and corner nameplates (z-10),
+ * below the claim rail (z-20) and overlays (z-30+).
+ */
+function GameHistoryPanel({
+  entries,
+  isOpen,
+  onToggle,
+  snapshot,
+}: {
+  entries: HistoryEntry[];
+  isOpen: boolean;
+  onToggle: () => void;
+  snapshot: ClientGameState;
+}) {
+  const { t } = useI18n();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to newest entry (bottom) when entries grow.
+  useEffect(() => {
+    if (isOpen && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [entries.length, isOpen]);
+
+  const PANEL_W = 210;
+
+  const ACTION_LABEL: Partial<Record<HistoryEntry['kind'], string>> = {
+    pung: t('gameActionPung'),
+    chow: t('gameActionChow'),
+    kong: t('gameActionKong'),
+    win: t('gameActionWin'),
+    concede: t('gameActionConcede'),
+  };
+
+  // Compass position label for each seat relative to the viewer.
+  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+  const POSITION_LABEL = [
+    t('gamePositionYou'),
+    t('gamePositionRight'),
+    t('gamePositionAcross'),
+    t('gamePositionLeft'),
+  ];
+
+  return (
+    <>
+      {/* Toggle tab — slides left when panel is open */}
+      <button
+        onClick={onToggle}
+        className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center"
+        style={{
+          right: isOpen ? PANEL_W : 0,
+          zIndex: 15,
+          width: 28,
+          height: 56,
+          background: 'rgba(14,14,14,0.92)',
+          border: '1px solid rgba(245,239,223,0.12)',
+          borderRight: 'none',
+          borderRadius: '6px 0 0 6px',
+          color: 'rgba(245,239,223,0.5)',
+          fontSize: 14,
+          transition: 'right 0.22s ease',
+          cursor: 'pointer',
+        }}
+        aria-label={t('gameHistoryTitle')}
+      >
+        {isOpen ? t('gameHistoryClose') : t('gameHistoryOpen')}
+      </button>
+
+      {/* Sliding panel */}
+      <div
+        className="absolute top-10 bottom-0 overflow-hidden"
+        style={{
+          right: isOpen ? 0 : -PANEL_W,
+          width: PANEL_W,
+          zIndex: 15,
+          background: 'rgba(8,8,8,0.93)',
+          borderLeft: '1px solid rgba(245,239,223,0.07)',
+          backdropFilter: 'blur(12px)',
+          transition: 'right 0.22s ease',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-3 py-2 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid rgba(245,239,223,0.07)' }}
+        >
+          <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
+            {t('gameHistoryTitle')}
+          </span>
+          <span className="text-[10px] text-mj-bone/30">{entries.length}</span>
+        </div>
+
+        {/* Scrollable event list */}
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto h-full pb-4"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {entries.length === 0 ? (
+            <p className="text-[10px] text-mj-bone/20 text-center mt-6 px-3">—</p>
+          ) : (
+            <div className="flex flex-col py-1">
+              {entries.map((entry) => {
+                // Compass offset from viewer's seat → position label.
+                const offset = (entry.seatIdx - viewerSeat + 4) % 4;
+                const posLabel = POSITION_LABEL[offset];
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-1 px-2 py-[5px]"
+                    style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
+                  >
+                    {/* Wind dot */}
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: WIND_COLOR[entry.seatWind] }}
+                    />
+                    {/* Position + wind — e.g. "You 南" or "Right 東" */}
+                    <span
+                      className="text-[10px] font-bold shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind] }}
+                    >
+                      {posLabel}
+                    </span>
+                    <span
+                      className="text-[9px] shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind], opacity: 0.7 }}
+                    >
+                      {WIND_CHAR[entry.seatWind]}
+                    </span>
+                    {/* Action label */}
+                    <span className="text-[10px] text-mj-bone/50 shrink-0">
+                      {entry.kind === 'discard'
+                        ? t('gameHistoryDiscard')
+                        : ACTION_LABEL[entry.kind]}
+                    </span>
+                    {/* Tile (if any) */}
+                    {entry.tile && (
+                      <MahjongTile
+                        tile={entry.tile}
+                        size="xs"
+                        isJing={
+                          entry.tile === snapshot.jingPrimary ||
+                          entry.tile === snapshot.jingSecondary
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Game Table ────────────────────────────────────────────────────────────────
+
+/**
+ * Full game screen — 3D canvas fills the viewport; DOM overlays layer on top.
+ *
+ * Layer order (z-index):
+ *   0   GameCanvas (fills inset-0, no z-index)
+ *   10  Status bar, SeatHUD, TurnIndicator
+ *   15  ViewerHandHUD, GameHistoryPanel (above canvas, below claim rail)
+ *   20  SideRail (claim window) — slides up from bottom, covers HUD
+ *   30  ActionToast
+ *   40  ConcedeSheet
+ *   50  ReconnectingOverlay
+ */
 function GameTable({
   snapshot,
   selectedTileIdx,
@@ -668,7 +983,7 @@ function GameTable({
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
   claimWindow: ClaimWindowState | null;
-  toast: import('../../stores/game.store').GameToast | null;
+  toast: GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
@@ -678,13 +993,66 @@ function GameTable({
 }) {
   const { t } = useI18n();
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const nextHistoryId = useRef(0);
+  const prevSnapshotRef = useRef<ClientGameState | null>(null);
 
-  const viewerSeat = snapshot.viewerSeat ?? 0;
-  const { right: rightSeat, across: acrossSeat, left: leftSeat } = getCompassSeats(viewerSeat);
-
-  const seatsData = snapshot.seats;
+  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
-  const hasClaimWindow = !!claimWindow;
+  const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
+
+  // Derive jing set for the viewer hand HUD tile highlighting.
+  const jingTypes = new Set<string>();
+  if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
+  if (snapshot.jingSecondary) jingTypes.add(snapshot.jingSecondary);
+
+  // ── History tracking ────────────────────────────────────────────────────────
+
+  const addHistory = useCallback((entry: Omit<HistoryEntry, 'id'>) => {
+    setHistoryEntries((prev) => [...prev, { ...entry, id: nextHistoryId.current++ }]);
+  }, []);
+
+  // Detect discards and new open melds by diffing snapshots.
+  useEffect(() => {
+    const prev = prevSnapshotRef.current;
+    prevSnapshotRef.current = snapshot;
+    if (!prev) return;
+
+    snapshot.seats.forEach((seat, i) => {
+      const prevSeat = prev.seats[i];
+      if (!prevSeat) return;
+
+      // New discard (last tile in discards array is the new one).
+      if (seat.discards.length > prevSeat.discards.length) {
+        const tile = seat.discards[seat.discards.length - 1];
+        addHistory({ kind: 'discard', seatWind: seat.wind, seatIdx: i, tile });
+      }
+
+      // New open meld (pung / chow / kong / kong_added).
+      if (seat.openMelds.length > prevSeat.openMelds.length) {
+        const newMeld = seat.openMelds[seat.openMelds.length - 1];
+        const kind: HistoryEntry['kind'] =
+          newMeld.kind === 'pung' ? 'pung' : newMeld.kind === 'chow' ? 'chow' : 'kong';
+        addHistory({ kind, seatWind: seat.wind, seatIdx: i, tile: newMeld.tiles[0] });
+      }
+    });
+  }, [snapshot, addHistory]);
+
+  // Detect wins and concedes via toast.
+  useEffect(() => {
+    if (!toast) return;
+    if (toast.kind === 'win' || toast.kind === 'concede') {
+      const wind = snapshot.seats[toast.seat]?.wind;
+      if (wind) {
+        addHistory({
+          kind: toast.kind === 'win' ? 'win' : 'concede',
+          seatWind: wind,
+          seatIdx: toast.seat,
+        });
+      }
+    }
+  }, [toast, snapshot, addHistory]);
 
   const handleConcede = () => {
     setShowConcedeSheet(false);
@@ -692,36 +1060,45 @@ function GameTable({
   };
 
   return (
-    <div className="flex flex-col h-dvh bg-mj-jade-deep overflow-hidden relative">
+    <div className="relative w-full h-dvh overflow-hidden bg-black">
+      {/* ── 3D canvas — fills entire screen ───────────────────────────────── */}
+      {/* GameScene reads snapshot directly from the Zustand store; the canvas */}
+      {/* re-renders only on game-state changes (not on toast / claim updates). */}
+      <div className="absolute inset-0" aria-hidden="true">
+        <GameCanvas />
+      </div>
+
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
       <div
-        className="flex items-center justify-between px-4 py-2 shrink-0"
+        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2"
         style={{
-          background: 'rgba(10,10,10,0.6)',
+          background: 'rgba(10,10,10,0.7)',
           borderBottom: '1px solid rgba(245,239,223,0.08)',
         }}
       >
-        {/* Round wind (dealer badge lives on the nameplates, not here) */}
-        <div className="flex items-center gap-2">
+        {/* Round wind + Jing indicator */}
+        <div className="flex items-center gap-3">
           <span
             className="text-xs font-bold font-serif"
             style={{ color: WIND_COLOR[snapshot.roundWind] }}
           >
             {WIND_CHAR[snapshot.roundWind]} {t('gameRound')}
           </span>
-        </div>
-
-        {/* Wall count + Jing */}
-        <div className="flex items-center gap-3 text-[10px] text-mj-bone/50">
-          <span>
-            {t('gameWallLeft')} {snapshot.wallCount}
-          </span>
           {snapshot.jingPrimary && (
-            <span className="text-mj-gold/70">
-              {t('gameSpirit')} {t('hostBadge')}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
+              <MahjongTile tile={snapshot.jingPrimary} size="xs" isJing />
+              {snapshot.jingSecondary && (
+                <MahjongTile tile={snapshot.jingSecondary} size="xs" isJing />
+              )}
+            </div>
           )}
         </div>
+
+        {/* Wall count */}
+        <span className="text-[10px] text-mj-bone/50">
+          {t('gameWallLeft')} {snapshot.wallCount}
+        </span>
 
         {/* Concede button */}
         <button
@@ -733,193 +1110,76 @@ function GameTable({
         </button>
       </div>
 
-      {/* ── Main game area ──────────────────────────────────────────────── */}
-      <div className="flex-1 relative flex flex-col overflow-hidden">
-        {/* ── Top opponent ─────────────────────────────────────────────── */}
-        <div className="flex flex-col items-center gap-1 pt-2 px-4 shrink-0">
-          <Nameplate
-            seat={seatsData[acrossSeat]}
-            seatIdx={acrossSeat}
-            snapshot={snapshot}
-            compact
-          />
-          <div
-            className="flex gap-[3px]"
-            aria-label={`${WIND_CHAR[seatsData[acrossSeat].wind]} ${t('gameWaitingTurn')}`}
-          >
-            {Array.from({ length: seatsData[acrossSeat].handCount }).map((_, i) => (
-              <FaceDownTile key={i} size="xs" />
-            ))}
-          </div>
-          {/* Open melds for top opponent */}
-          <OpenMeldsDisplay openMelds={seatsData[acrossSeat].openMelds} size="xs" />
-          <DiscardPile
-            seat={seatsData[acrossSeat].wind}
-            discards={seatsData[acrossSeat].discards}
-            isLastDiscard={snapshot.discardedBySeat === acrossSeat}
-          />
-        </div>
+      {/* ── Seat HUD — corner nameplates ───────────────────────────────────── */}
+      <SeatHUD snapshot={snapshot} />
 
-        {/* ── Middle row: left | center | right ────────────────────────── */}
-        <div className="flex flex-1 px-2 gap-1 min-h-0">
-          {/* Left opponent */}
-          <div className="flex flex-col items-end justify-center gap-1 w-[64px] shrink-0">
-            <Nameplate seat={seatsData[leftSeat]} seatIdx={leftSeat} snapshot={snapshot} compact />
-            <div
-              className="flex flex-col gap-[3px]"
-              aria-label={`${WIND_CHAR[seatsData[leftSeat].wind]} ${t('gameWaitingTurn')}`}
-            >
-              {Array.from({ length: Math.min(seatsData[leftSeat].handCount, 8) }).map((_, i) => (
-                <FaceDownTile key={i} size="xs" />
-              ))}
-            </div>
-            {/* Open melds for left opponent */}
-            {seatsData[leftSeat].openMelds.length > 0 && (
-              <div className="flex flex-col gap-0.5 items-end">
-                {seatsData[leftSeat].openMelds.map((meld, i) => (
-                  <div
-                    key={i}
-                    className="flex gap-[2px] px-0.5 py-0.5 rounded"
-                    style={{
-                      background: 'rgba(201,169,97,0.08)',
-                      border: '1px solid rgba(201,169,97,0.2)',
-                    }}
-                  >
-                    {meld.tiles.map((tile, j) => (
-                      <MahjongTile key={j} tile={tile} size="xs" isJing={false} />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Center: discard pools */}
-          <div className="flex-1 flex flex-col gap-1 min-w-0 overflow-hidden">
-            {/* Turn indicator — shows whose turn it is + how many turns until viewer's */}
-            <div className="flex flex-col items-center gap-0.5">
-              <span
-                className="text-[11px] font-bold px-3 py-1 rounded-full"
-                style={{
-                  background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
-                  color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
-                  border: isMyTurn
-                    ? '1px solid rgba(201,169,97,0.4)'
-                    : '1px solid rgba(245,239,223,0.1)',
-                }}
-              >
-                {isMyTurn
-                  ? t('gameYourTurn')
-                  : `${WIND_CHAR[seatsData[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
-              </span>
-              {/* "N turns away" helper — only shown when not your turn */}
-              {!isMyTurn && snapshot.viewerSeat !== null && (
-                <span className="text-[9px] text-mj-bone/30">
-                  {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
-                </span>
-              )}
-            </div>
-
-            {/* 4 discard piles in a 2×2 grid */}
-            <div className="grid grid-cols-2 gap-1 flex-1 overflow-hidden">
-              <DiscardPile
-                seat={seatsData[viewerSeat].wind}
-                discards={seatsData[viewerSeat].discards}
-                isLastDiscard={snapshot.discardedBySeat === viewerSeat}
-              />
-              <DiscardPile
-                seat={seatsData[rightSeat].wind}
-                discards={seatsData[rightSeat].discards}
-                isLastDiscard={snapshot.discardedBySeat === rightSeat}
-              />
-              <DiscardPile
-                seat={seatsData[leftSeat].wind}
-                discards={seatsData[leftSeat].discards}
-                isLastDiscard={snapshot.discardedBySeat === leftSeat}
-              />
-              <DiscardPile
-                seat={seatsData[acrossSeat].wind}
-                discards={seatsData[acrossSeat].discards}
-                isLastDiscard={snapshot.discardedBySeat === acrossSeat}
-              />
-            </div>
-
-            {/* Jing spirit tile display */}
-            {snapshot.jingPrimary && (
-              <div className="flex items-center justify-center gap-2 py-1">
-                <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
-                <MahjongTile tile={snapshot.jingPrimary} size="xs" isJing />
-                {snapshot.jingSecondary && (
-                  <MahjongTile tile={snapshot.jingSecondary} size="xs" isJing />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right opponent */}
-          <div className="flex flex-col items-start justify-center gap-1 w-[64px] shrink-0">
-            <Nameplate
-              seat={seatsData[rightSeat]}
-              seatIdx={rightSeat}
-              snapshot={snapshot}
-              compact
-            />
-            <div
-              className="flex flex-col gap-[3px]"
-              aria-label={`${WIND_CHAR[seatsData[rightSeat].wind]} ${t('gameWaitingTurn')}`}
-            >
-              {Array.from({ length: Math.min(seatsData[rightSeat].handCount, 8) }).map((_, i) => (
-                <FaceDownTile key={i} size="xs" />
-              ))}
-            </div>
-            {/* Open melds for right opponent */}
-            {seatsData[rightSeat].openMelds.length > 0 && (
-              <div className="flex flex-col gap-0.5 items-start">
-                {seatsData[rightSeat].openMelds.map((meld, i) => (
-                  <div
-                    key={i}
-                    className="flex gap-[2px] px-0.5 py-0.5 rounded"
-                    style={{
-                      background: 'rgba(201,169,97,0.08)',
-                      border: '1px solid rgba(201,169,97,0.2)',
-                    }}
-                  >
-                    {meld.tiles.map((tile, j) => (
-                      <MahjongTile key={j} tile={tile} size="xs" isJing={false} />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Viewer's hand ─────────────────────────────────────────────── */}
-        <div className="shrink-0 pb-2">
-          <ViewerHand
-            snapshot={snapshot}
-            selectedTileIdx={selectedTileIdx}
-            onSelect={onSelect}
-            onDiscard={onDiscard}
-            pendingMove={pendingMove}
-          />
-        </div>
+      {/* ── Turn indicator (sits above the hand HUD) ──────────────────────── */}
+      <div className="absolute bottom-40 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none">
+        <span
+          className="text-[11px] font-bold px-3 py-1 rounded-full"
+          style={{
+            background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
+            color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
+            border: isMyTurn ? '1px solid rgba(201,169,97,0.4)' : '1px solid rgba(245,239,223,0.1)',
+          }}
+        >
+          {isMyTurn
+            ? t('gameYourTurn')
+            : `${WIND_CHAR[snapshot.seats[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
+        </span>
+        {!isMyTurn && snapshot.viewerSeat !== null && (
+          <span className="text-[9px] text-mj-bone/30">
+            {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
+          </span>
+        )}
       </div>
 
-      {/* ── Action toast — floats center-screen, auto-dismissed ─────────── */}
-      {toast && !showConcedeSheet && <ActionToast toast={toast} snapshot={snapshot} />}
-
-      {/* ── Side rail (claim window overlay) ─────────────────────────────── */}
-      {hasClaimWindow && !showConcedeSheet && (
-        <SideRail claimWindow={claimWindow!} onClaim={onClaim} onPass={onPass} />
+      {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
+      {!showConcedeSheet && (
+        <ViewerHandHUD
+          hand={viewerHand}
+          selectedTileIdx={selectedTileIdx}
+          onSelect={onSelect}
+          onDiscard={onDiscard}
+          isMyTurn={isMyTurn}
+          jingTypes={jingTypes}
+          pendingMove={pendingMove}
+        />
       )}
 
-      {/* ── Concede sheet ─────────────────────────────────────────────────── */}
+      {/* ── Accessible hand — sr-only DOM buttons for a11y + tests ─────────── */}
+      <AccessibleHand
+        hand={viewerHand}
+        selectedTileIdx={pendingMove ? null : selectedTileIdx}
+        onSelect={onSelect}
+        onDiscard={onDiscard}
+        isMyTurn={isMyTurn && !pendingMove}
+      />
+
+      {/* ── Collapsible history panel ──────────────────────────────────────── */}
+      {!showConcedeSheet && (
+        <GameHistoryPanel
+          entries={historyEntries}
+          isOpen={historyOpen}
+          onToggle={() => setHistoryOpen((o) => !o)}
+          snapshot={snapshot}
+        />
+      )}
+
+      {/* ── Action toast ───────────────────────────────────────────────────── */}
+      {toast && !showConcedeSheet && <ActionToast toast={toast} snapshot={snapshot} />}
+
+      {/* ── Claim window rail ──────────────────────────────────────────────── */}
+      {claimWindow && !showConcedeSheet && (
+        <SideRail claimWindow={claimWindow} onClaim={onClaim} onPass={onPass} />
+      )}
+
+      {/* ── Concede sheet ──────────────────────────────────────────────────── */}
       {showConcedeSheet && (
         <ConcedeSheet onConfirm={handleConcede} onCancel={() => setShowConcedeSheet(false)} />
       )}
 
-      {/* ── Polite live region: turn timer announcement (PLAN §7.5) ──────── */}
+      {/* ── A11y live region ───────────────────────────────────────────────── */}
       <div aria-live="polite" aria-atomic="true" className="sr-only" id="game-live-region">
         {isMyTurn ? t('gameYourTurn') : ''}
       </div>
@@ -956,29 +1216,21 @@ export function GamePage() {
 
   const handleHome = useCallback(() => navigate('/lobby'), [navigate]);
 
-  // When the server confirms a rematch room, navigate there immediately.
   useEffect(() => {
     if (rematchRoomCode) {
       navigate(`/room/${rematchRoomCode}`);
     }
   }, [rematchRoomCode, navigate]);
 
-  if (!gameId) {
-    return <LoadingScreen />;
-  }
-
-  if (!snapshot) {
+  if (!gameId || !snapshot) {
     return <LoadingScreen />;
   }
 
   const viewerSeat = snapshot.viewerSeat;
-  // The dealer reveals jing — for hand 1 this is always seat 0, but using
-  // dealerSeat is more correct and survives dealer rotation in later hands.
   const isDealer = viewerSeat !== null && viewerSeat === snapshot.dealerSeat;
 
   return (
     <>
-      {/* Phase-based screen selection */}
       {snapshot.phase === 'jing_reveal' && (
         <JingRevealScreen snapshot={snapshot} isHost={isDealer} onReveal={revealJing} />
       )}
@@ -1013,7 +1265,6 @@ export function GamePage() {
         <LoadingScreen />
       )}
 
-      {/* Reconnecting overlay — shown on top of any screen */}
       {connection === 'reconnecting' && <ReconnectingOverlay />}
     </>
   );
