@@ -954,6 +954,7 @@ export class GameService {
       session.gameId,
       viewerSeat,
       session.connState,
+      session.settings.viewMode,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

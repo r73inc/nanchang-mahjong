@@ -27,6 +27,10 @@ export class RoomSettingsDto {
   @Min(1)
   @Max(8)
   minFan?: number;
+
+  @IsOptional()
+  @IsIn(['2D', '3D'])
+  viewMode?: '2D' | '3D';
 }
 
 export class CreateRoomDto {

@@ -68,6 +68,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
+    viewMode: '3D',
     seats: [
       {
         wind: 'east',

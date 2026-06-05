@@ -72,6 +72,7 @@ function makeSnapshot(overrides: {
     jingSecondary: null,
     viewerSeat,
     seats,
+    viewMode: '3D' as const,
   };
 }
 

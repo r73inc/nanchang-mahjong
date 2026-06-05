@@ -130,6 +130,8 @@ export interface ClientGameState {
   /** null = spectator */
   viewerSeat: (0 | 1 | 2 | 3) | null;
   seats: [ClientSeatState, ClientSeatState, ClientSeatState, ClientSeatState];
+  /** Which table renderer the host selected for this game. */
+  viewMode: '2D' | '3D';
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */

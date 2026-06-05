@@ -111,6 +111,20 @@ export class RoomsController {
     return room;
   }
 
+  // ── Settings ───────────────────────────────────────────────────────────────
+
+  /** Host updates mutable pre-game settings (e.g. viewMode). Broadcasts new room state. */
+  @Patch(':roomId/settings')
+  async updateSettings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('roomId') roomId: string,
+    @Body() body: { viewMode: '2D' | '3D' },
+  ) {
+    const room = await this.service.updateSettings(roomId, user.sub, body.viewMode);
+    this.gateway.broadcastRoomUpdate(roomId, room);
+    return room;
+  }
+
   // ── Start ──────────────────────────────────────────────────────────────────
 
   /** Host starts the game. Creates the authoritative GameSession and emits room:started. */
