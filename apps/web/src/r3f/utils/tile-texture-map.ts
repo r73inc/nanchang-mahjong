@@ -67,8 +67,12 @@ const TILE_TO_FLUFFY: Record<TileType, string> = {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** The two available FluffyStuff palette variants. */
-export type TilePaletteVariant = 'Regular' | 'Black';
+/**
+ * FluffyStuff palette variant.
+ * NOTE: The Black SVG set has been removed from the project — only 'Regular'
+ * (white-background tiles) is available. `themeToVariant` always returns 'Regular'.
+ */
+export type TilePaletteVariant = 'Regular';
 
 /**
  * Returns the public URL for a tile's face SVG texture.
@@ -142,8 +146,8 @@ export const ALL_TILE_TYPES: readonly TileType[] = [
 
 /**
  * Derives the correct TilePaletteVariant from the app's ThemeStore tilePalette.
- * 'dark' → 'Black'; everything else → 'Regular'.
+ * Always returns 'Regular' — the Black SVG asset folder has been removed.
  */
-export function themeToVariant(tilePalette: 'classic' | 'sepia' | 'dark'): TilePaletteVariant {
-  return tilePalette === 'dark' ? 'Black' : 'Regular';
+export function themeToVariant(_tilePalette: 'classic' | 'sepia' | 'dark'): TilePaletteVariant {
+  return 'Regular';
 }

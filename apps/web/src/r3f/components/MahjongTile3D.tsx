@@ -241,16 +241,14 @@ export function MahjongTile3D({
         raycast={NOOP_RAYCAST}
       />
 
-      {/* 2. Body: GLB geometry at TILE_SCALE, ceramic material.
-           NOOP_RAYCAST: hit-box covers all interaction; body never needs to
-           intercept rays and would double-count otherwise. */}
+      {/* 2. Body: GLB geometry at TILE_SCALE, flat ivory MeshBasicMaterial.
+           castShadow/receiveShadow removed — MeshBasicMaterial is unlit so
+           shadow pass has no effect. NOOP_RAYCAST: hit-box handles clicks. */}
       <mesh
         geometry={geometry}
         material={bodyMaterial}
         scale={[TILE_SCALE, TILE_SCALE, TILE_SCALE]}
         raycast={NOOP_RAYCAST}
-        castShadow
-        receiveShadow
       />
 
       {/* 3. Face stamp: PlaneGeometry proud of the front face, SVG texture.

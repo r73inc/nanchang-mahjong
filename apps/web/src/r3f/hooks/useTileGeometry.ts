@@ -117,8 +117,12 @@ export const FACE_STAMP_HEIGHT = TILE_HEIGHT * 0.82;
 export interface TileGeometryResult {
   /** Centered GLB geometry for the tile body. */
   geometry: THREE.BufferGeometry;
-  /** Ceramic ivory MeshPhysicalMaterial — clone before applying per-tile overrides. */
-  bodyMaterial: THREE.MeshPhysicalMaterial;
+  /**
+   * Flat ivory MeshBasicMaterial — unlit, always renders at full brightness.
+   * Using MeshBasicMaterial means lighting and clearcoat have zero effect on
+   * tile bodies, so they remain readable from any angle (IMP-02 / BUG-03 fix).
+   */
+  bodyMaterial: THREE.MeshBasicMaterial;
   /** PlaneGeometry for the face stamp — shared, do not dispose. */
   faceStampGeometry: THREE.PlaneGeometry;
 }
@@ -142,16 +146,12 @@ export function useTileGeometry(): TileGeometryResult {
     const geometry = mesh.geometry.clone();
     geometry.center(); // shifts bounding-box center to local origin
 
-    // Ceramic / melamine body material — matte with subtle sheen, ivory.
-    // IMP-02: reduced clearcoat (0.2 vs 0.75) and higher roughness (0.45 vs 0.18)
-    // so tiles look like matte melamine rather than polished lacquer under IBL.
-    const bodyMaterial = new THREE.MeshPhysicalMaterial({
+    // Flat ivory body — MeshBasicMaterial ignores all scene lighting and
+    // clearcoat, so the tile body is always evenly lit regardless of orientation
+    // or camera angle. Combined with the MeshBasicMaterial face stamp this
+    // ensures tiles are always fully legible (eliminates BUG-03 / IMP-02).
+    const bodyMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#f5efe0'),
-      roughness: 0.45,
-      metalness: 0.0,
-      clearcoat: 0.2,
-      clearcoatRoughness: 0.3,
-      reflectivity: 0.2,
     });
 
     // Shared face stamp geometry (PlaneGeometry reused for all tiles).
