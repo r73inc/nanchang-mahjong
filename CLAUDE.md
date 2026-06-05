@@ -4,7 +4,7 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize). **Phase 12 (Push + a11y) is next.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize) → 12A (Push Backend). **3D UI migration is active on `feat/3d-ui` branch. Phase 12B (Push Frontend + A11y) follows after 3D work merges.**
 
 ---
 
@@ -16,11 +16,12 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 | Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                    |
 | Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                               |
 | API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (208 tests)           |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (102 tests) |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (169 tests) |
+| 3D       | `three ^0.165`, `@react-three/fiber ^8.17`, `@react-three/drei ^9.109` — game table only    |
 | Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                   |
 | CI       | GitHub Actions: lint + typecheck + test on every PR                                         |
 
-**Key files:** `PLAN.md` (phase roadmap), `PHASE-7-PLAN.md` (Phase 7 detailed brief), `docs/final-nanchang-mahjong-rules.md` (locked rules), `BUG-LOG.md` (bug history and learnings — read before touching infra, scripts, or socket events).
+**Key files:** `PLAN.md` (phase roadmap), `PHASE-7-PLAN.md` (Phase 7 detailed brief), `docs/final-nanchang-mahjong-rules.md` (locked rules), `BUG-LOG.md` (bug history and learnings — read before touching infra, scripts, or socket events), `2dTo3d.md` (3D UI migration blueprint — phases A–I).
 
 ---
 
@@ -34,6 +35,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 - **i18n: no literal strings in JSX.** All visible text goes through `t()`. EN and ZH keys must stay in parity.
 - **PR scope discipline.** Engine-only changes → engine branch. Schema/API/FE changes → separate PRs. Never mix.
 - **One PR at a time. Always.** Open one PR, push it, then stop and wait. Do not open a second PR, do not start a second branch, do not write any more code until the first PR has been reviewed, any requested changes made, and it is confirmed merged into `main`. Never branch a PR off another unmerged PR — if the first PR changes then the second branch becomes wasted or broken work. The only exception is if the user explicitly asks for a stacked PR approach; even then, ask first before doing it.
+- **3D UI branch override (active).** `feat/3d-ui` is the integration branch for the 3D migration. Each migration phase gets its own sub-branch off `feat/3d-ui` (e.g. `feat/3d-ui-phaseG`) and PRs target `feat/3d-ui`, not `main`. Only after all phases are complete will a single PR merge `feat/3d-ui` → `main`. This overrides the "one PR at a time → main" rule for the duration of the 3D migration.
 
 ---
 
@@ -106,7 +108,25 @@ gh pr view <n> --comments
 - VAPID key pair in config; graceful no-op if keys not set.
 - `PushModule` (@Global) — `PushService` + `PushController`. Push subscriptions in DDB (`USER#<sub>/PUSH_SUB`). `GameService.startTurn()` fires turn notification when active seat has no live socket. 8 new tests (216 total API).
 
-### Next: Phase 12B — Push Frontend + A11y
+### Active: 3D UI Migration (`feat/3d-ui` integration branch)
+
+Replacing the DOM `GameTable` compass layout with a React Three Fiber 3D scene. All other routes/pages, overlays, backend, and the DOM `MahjongTile` component (used in Learn/Replay/History) remain untouched. See `2dTo3d.md` for the full blueprint.
+
+**Completed sub-phases (merged into `feat/3d-ui`):**
+
+- **Phase A (PR #32):** R3F deps installed (`three`, `@react-three/fiber`, `@react-three/drei`, `@types/three`). GLB model inspected (single node `empty_2`, no UVs → two-mesh strategy). `tile-texture-map.ts` (TileType → FluffyStuff SVG filename, `tileTexturePath()`, `themeToVariant()`). Vitest include pattern widened to `*.{test,spec}.{ts,tsx}`.
+- **Phase B (PR #33):** `useTileGeometry.ts` (GLB load, `geometry.center()`, ceramic `MeshPhysicalMaterial`, `faceStampGeometry`). `useTileTextures.ts` (`useTexture` bulk SVG load, `flipY=false`, SRGBColorSpace, max anisotropy). `table-layout.ts` (pure TS layout math, no Three.js — `computeTableLayout(snapshot)` → `TableLayout`). `useGameLayout.ts` (Zustand transient subscribe → `layoutRef`). Layout spec tests.
+- **Phase D (PR #34):** Full 3D component library — `MahjongTile3D` (two-mesh: GLB body + PlaneGeometry face stamp, `useFrame` lerp animation, jing emissive pulse + `<Html>` label, invisible box hit-area), `TileHand3D`, `OpponentHand3D`, `DiscardPool3D`, `OpenMelds3D`, `FeltSurface3D`.
+- **Phase E (PR #35 — open, targeting `feat/3d-ui`):** `GameCanvas.tsx` (`<Canvas>` wrapper with inner `GameScene` — lights, Environment IBL, all scene objects). `game-page.tsx` fully migrated: DOM compass layout removed, `GameCanvas` as `inset-0 aria-hidden` base layer, `SeatHUD` (4 corner nameplate chips), `AccessibleHand` (sr-only DOM buttons for viewer tiles — a11y + test harness). All overlay components preserved (SideRail z-20, ActionToast z-30, ConcedeSheet z-40, ReconnectingOverlay z-50). `GameCanvas` mocked in tests; snapshot-redaction test updated to query `AccessibleHand` buttons.
+
+**Remaining 3D phases (start from `feat/3d-ui` after PR #35 merges):**
+
+- **Phase G:** `subscribeWithSelector` middleware on `useGameStore`; wire `useGameLayout` ref into `GameCanvas` so tile position targets update via Zustand transient subscribe — zero React re-renders during animation.
+- **Phase H:** Gold shell outline for Jing tiles (second mesh scaled 1.04×, `BackSide`, `opacity: 0.6`). Bloom postprocessing via `@react-three/postprocessing` optional.
+- **Phase I:** Final interaction polish — hover cursor refinements, any remaining raycasting edge cases.
+- **Final:** Single PR merging `feat/3d-ui` → `main`.
+
+### Next after 3D: Phase 12B — Push Frontend + A11y
 
 - `public/sw.js` service worker — `push`, `notificationclick`, `pushsubscriptionchange`.
 - `usePushNotifications` hook — SW registration, VAPID key fetch, permission flow, pushManager subscribe/unsubscribe.

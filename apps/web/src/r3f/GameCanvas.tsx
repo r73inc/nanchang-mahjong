@@ -16,17 +16,23 @@
  * DOM overlays (status bar, SideRail, ActionToast, ConcedeSheet) live OUTSIDE
  * this component in game-page.tsx, layered over the canvas via `position: absolute`.
  *
+ * Phase G: GameScene no longer receives `snapshot` or `selectedTileIdx` as props.
+ * It reads them directly from the Zustand store using selector hooks, so the 3D
+ * scene only re-renders when those specific slices change — not when claimWindow,
+ * toast, connection status, or other unrelated state updates.
+ *
  * Camera: position (0, 14, 10), lookAt (0, 0, 0), FOV 48°
  *   Viewer's tiles at Z+5 project to the bottom of the viewport.
  *   Across opponent at Z-5 projects to the top.
  *   Right/left at X±5 project to the sides.
  */
 
-import { Suspense, useMemo } from 'react';
+import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import type { ClientGameState, TileType } from '@nanchang/shared';
+import type { TileType } from '@nanchang/shared';
+import { useGameStore } from '../stores/game.store';
 import { useThemeStore } from '../stores/theme.store';
 import { FELT_CONFIGS } from '../lib/theme.utils';
 import { themeToVariant } from './utils/tile-texture-map';
@@ -46,28 +52,47 @@ const WARM_LIGHT_COLOR = '#f5e6c0';
 // ── Inner scene (must be inside <Canvas> to call R3F hooks) ──────────────────
 
 interface GameSceneProps {
-  snapshot: ClientGameState;
-  selectedTileIdx: number | null;
+  /** Select-tile callback — invoked when viewer first taps a tile. */
   onSelectTile: (idx: number) => void;
+  /** Discard callback — invoked on the second tap of an already-selected tile. */
   onDiscard: (tile: TileType) => void;
 }
 
-function GameScene({ snapshot, selectedTileIdx, onSelectTile, onDiscard }: GameSceneProps) {
-  // Theme values (Zustand works inside Canvas — it's just React context)
+/**
+ * The R3F scene graph. Lives inside <Canvas> to access R3F context.
+ *
+ * Reads `snapshot` and `selectedTileIdx` directly from the Zustand store with
+ * selector hooks — re-renders only when those slices change, not when the
+ * parent GameTable re-renders due to claimWindow, toast, or connection updates.
+ */
+function GameScene({ onSelectTile, onDiscard }: GameSceneProps) {
+  // ── Store reads (slice selectors → re-render only on these changes) ─────────
+  const snapshot = useGameStore((s) => s.snapshot);
+  const selectedTileIdx = useGameStore((s) => s.selectedTileIdx);
+
+  // ── Theme ────────────────────────────────────────────────────────────────────
   const felt = useThemeStore((s) => s.felt);
   const tilePalette = useThemeStore((s) => s.tilePalette);
 
   const palette = themeToVariant(tilePalette);
   const feltColor = FELT_CONFIGS[felt].top;
 
+  // ── Asset loading ────────────────────────────────────────────────────────────
   // Load + configure all tile SVG textures. Suspends until all 35 are ready.
   const { faceMap, backTexture } = useTileTextures(palette);
 
-  // Compute tile world positions from the current snapshot.
-  // computeTableLayout is a cheap pure function — safe to call on every render.
+  // Guard — canvas may mount before the server sends the first snapshot.
+  // Return null so the Suspense fallback (canvas bg) shows instead of
+  // crashing on snapshot.seats access.
+  if (!snapshot) return null;
+
+  // ── Layout ───────────────────────────────────────────────────────────────────
+  // computeTableLayout is a cheap pure function — safe to call on every render
+  // of GameScene, which now only happens when `snapshot` or `selectedTileIdx`
+  // change (not on every game-page re-render).
   const layout = computeTableLayout(snapshot);
 
-  // Seat indices relative to the viewer
+  // ── Seat indices ─────────────────────────────────────────────────────────────
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const rightSeat = ((viewerSeat + 1) % 4) as 0 | 1 | 2 | 3;
   const acrossSeat = ((viewerSeat + 2) % 4) as 0 | 1 | 2 | 3;
@@ -76,13 +101,12 @@ function GameScene({ snapshot, selectedTileIdx, onSelectTile, onDiscard }: GameS
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
 
-  // Jing (spirit/wildcard) tile type set — recalculated only when jing changes
-  const jingTypes = useMemo(() => {
-    const s = new Set<string>();
-    if (snapshot.jingPrimary) s.add(snapshot.jingPrimary);
-    if (snapshot.jingSecondary) s.add(snapshot.jingSecondary);
-    return s;
-  }, [snapshot.jingPrimary, snapshot.jingSecondary]);
+  // ── Jing types ───────────────────────────────────────────────────────────────
+  // Derived inline — `snapshot` is already memoized by the selector;
+  // useMemo would add overhead without benefit here.
+  const jingTypes = new Set<string>();
+  if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
+  if (snapshot.jingSecondary) jingTypes.add(snapshot.jingSecondary);
 
   return (
     <>
@@ -177,9 +201,15 @@ function GameScene({ snapshot, selectedTileIdx, onSelectTile, onDiscard }: GameS
 // ── Public canvas component ───────────────────────────────────────────────────
 
 export interface GameCanvasProps {
-  snapshot: ClientGameState;
-  selectedTileIdx: number | null;
+  /**
+   * Callback invoked when the viewer first taps a tile (select mode).
+   * Lives in use-game.ts / game-page.tsx — no game logic here.
+   */
   onSelectTile: (idx: number) => void;
+  /**
+   * Callback invoked when the viewer taps an already-selected tile (discard).
+   * Lives in use-game.ts / game-page.tsx — no game logic here.
+   */
   onDiscard: (tile: TileType) => void;
 }
 
@@ -189,13 +219,13 @@ export interface GameCanvasProps {
  *
  * The canvas is `position: absolute; inset: 0` via the `style` prop so it fills
  * its parent without disturbing the normal document flow.
+ *
+ * `snapshot` and `selectedTileIdx` are intentionally NOT props — GameScene reads
+ * them directly from the Zustand store so the canvas only re-renders when game
+ * state changes, not when the parent re-renders for other reasons (claim window
+ * appearing, toast triggering, reconnect overlay, etc.).
  */
-export function GameCanvas({
-  snapshot,
-  selectedTileIdx,
-  onSelectTile,
-  onDiscard,
-}: GameCanvasProps) {
+export function GameCanvas({ onSelectTile, onDiscard }: GameCanvasProps) {
   return (
     <Canvas
       shadows
@@ -213,12 +243,7 @@ export function GameCanvas({
        * textures resolve. Both cases are brief on a normal connection.
        */}
       <Suspense fallback={null}>
-        <GameScene
-          snapshot={snapshot}
-          selectedTileIdx={selectedTileIdx}
-          onSelectTile={onSelectTile}
-          onDiscard={onDiscard}
-        />
+        <GameScene onSelectTile={onSelectTile} onDiscard={onDiscard} />
       </Suspense>
     </Canvas>
   );
