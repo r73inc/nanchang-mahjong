@@ -1,16 +1,40 @@
 /**
- * GameTable2D — 2.5D DOM game table (stub for Phase B).
+ * GameTable2D — 2.5D DOM game table compositor.
  *
- * Phase C will add FeltSurface2D and the seat-zone layout grid.
- * Phase D–G will progressively fill in tile components and animations.
+ * Phase C: FeltSurface2D background + 3×3 CSS Grid skeleton.
+ * Phase D–G: tile components and Framer Motion animations fill each zone.
+ *
+ * CSS Grid template areas (matches SeatRole values from layout-2d.ts):
+ *
+ *   "top-corner  top         top-corner"
+ *   "left        center      right"
+ *   "btm-corner  bottom      btm-corner"
  */
+
+import { FeltSurface2D } from './FeltSurface2D';
 
 export function GameTable2D() {
   return (
     <div
-      className="w-full h-full"
-      style={{ background: 'var(--felt-bg, #0d3b2e)' }}
+      className="w-full h-full relative overflow-hidden"
       data-testid="game-table-2d"
-    />
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '22% 56% 22%',
+        gridTemplateRows: '22% 56% 22%',
+        gridTemplateAreas: `
+          "top-corner top    top-corner"
+          "left       center right"
+          "btm-corner bottom btm-corner"
+        `,
+      }}
+    >
+      {/* Felt background spans the entire grid */}
+      <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', position: 'relative' }}>
+        <FeltSurface2D />
+      </div>
+
+      {/* Seat zones — populated in Phase F */}
+    </div>
   );
 }
