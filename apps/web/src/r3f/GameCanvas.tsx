@@ -21,10 +21,10 @@
  * scene only re-renders when those specific slices change — not when claimWindow,
  * toast, connection status, or other unrelated state updates.
  *
- * Camera: position (0, 14, 10), lookAt (0, 0, 0), FOV 48°
- *   Viewer's tiles at Z+5 project to the bottom of the viewport.
- *   Across opponent at Z-5 projects to the top.
- *   Right/left at X±5 project to the sides.
+ * Camera: position (0, 8, 13), lookAt (0, 0, 0), FOV 58°
+ *   Lower Y (8 vs 14) and larger Z pullback (13 vs 10) give a shallower,
+ *   more natural "sitting at the table" perspective (IMP-01 fix).
+ *   Wider FOV (58° vs 48°) keeps the full table in view.
  */
 
 import { Suspense } from 'react';
@@ -229,7 +229,7 @@ export function GameCanvas({ onSelectTile, onDiscard }: GameCanvasProps) {
   return (
     <Canvas
       shadows
-      camera={{ position: [0, 14, 10], fov: 48, near: 0.1, far: 80 }}
+      camera={{ position: [0, 8, 13], fov: 58, near: 0.1, far: 80 }}
       gl={{
         antialias: true,
         toneMapping: THREE.ACESFilmicToneMapping,

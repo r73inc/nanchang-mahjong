@@ -261,5 +261,120 @@ describe('claim-resolver · Gameplay·call-priority', () => {
       const seat1Actions = eligible.get(1) ?? [];
       expect(seat1Actions.some((a) => a.kind === 'chow')).toBe(false);
     });
+
+    // ── Win detection with open melds (MAJOR-02 regression) ─────────────────
+
+    it('offers win to a player who can complete their hand via open-meld pair claim', () => {
+      // Seat 1 has 3 open pungs (9 meld tiles) + 1 concealed tile (9s).
+      // Seat 0 discards 9s → seat 1 can win by pairing 9s.
+      // fullHand = [1m×3, 2m×3, 3m×3] + [9s] + [9s] = 14 tiles → 4-pung+pair win.
+      //
+      // Without the MAJOR-02 fix, canWin would check hand.length (1 tile) !== 13 → false.
+      // With the fix, it uses openMeldTiles and correctly returns true.
+      const state: GameState = {
+        phase: 'awaiting_claims',
+        seed: 0,
+        jingIndicator: null,
+        jingPrimary: null,
+        jingSecondary: null,
+        wall: [],
+        deadWall: [],
+        seats: [
+          // seat 0: discarder (13 tiles)
+          {
+            wind: 'east',
+            hand: [
+              '1p',
+              '2p',
+              '3p',
+              '4p',
+              '5p',
+              '6p',
+              '7p',
+              '8p',
+              '9p',
+              '1s',
+              '2s',
+              '3s',
+              '4s',
+            ] as GameState['seats'][0]['hand'],
+            openMelds: [],
+            discards: [],
+            score: 0,
+          },
+          // seat 1: 3 open pungs + 4 concealed tiles (pung(4m) + pair-waiting 9s)
+          // After 3 pungs the concealed hand is 4 tiles. '9s' is the pair wait.
+          // Claiming discard '9s' gives fullHand = [1m×3,2m×3,3m×3] + [9s,4m,4m,4m,9s] = 14
+          // Decomposition: 4 pungs + pair(9s) → win ✓
+          {
+            wind: 'south',
+            hand: ['9s', '4m', '4m', '4m'] as GameState['seats'][0]['hand'],
+            openMelds: [
+              { kind: 'pung', tiles: ['1m', '1m', '1m'], concealed: false },
+              { kind: 'pung', tiles: ['2m', '2m', '2m'], concealed: false },
+              { kind: 'pung', tiles: ['3m', '3m', '3m'], concealed: false },
+            ],
+            discards: [],
+            score: 0,
+          },
+          // seats 2 and 3: neutral hands
+          {
+            wind: 'west',
+            hand: [
+              '1p',
+              '2p',
+              '3p',
+              '4p',
+              '5p',
+              '6p',
+              '7p',
+              '8p',
+              '9p',
+              '1s',
+              '2s',
+              '3s',
+              '4s',
+            ] as GameState['seats'][0]['hand'],
+            openMelds: [],
+            discards: [],
+            score: 0,
+          },
+          {
+            wind: 'north',
+            hand: [
+              '1p',
+              '2p',
+              '3p',
+              '4p',
+              '5p',
+              '6p',
+              '7p',
+              '8p',
+              '9p',
+              '1s',
+              '2s',
+              '3s',
+              '4s',
+            ] as GameState['seats'][0]['hand'],
+            openMelds: [],
+            discards: [],
+            score: 0,
+          },
+        ] as unknown as GameState['seats'],
+        currentSeat: 0,
+        pendingDiscard: '9s' as GameState['pendingDiscard'],
+        discardedBySeat: 0,
+        kongsTotal: 0,
+        isKongDraw: false,
+        dealerSeat: 0,
+        roundWind: 'east',
+      };
+
+      const eligible = computeEligibleClaims(state);
+
+      // Seat 1 must be offered a win action
+      const seat1Actions = eligible.get(1) ?? [];
+      expect(seat1Actions.some((a) => a.kind === 'win')).toBe(true);
+    });
   });
 });

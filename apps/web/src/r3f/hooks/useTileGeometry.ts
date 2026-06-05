@@ -142,14 +142,16 @@ export function useTileGeometry(): TileGeometryResult {
     const geometry = mesh.geometry.clone();
     geometry.center(); // shifts bounding-box center to local origin
 
-    // Ceramic / melamine body material — glossy, non-metallic, ivory.
+    // Ceramic / melamine body material — matte with subtle sheen, ivory.
+    // IMP-02: reduced clearcoat (0.2 vs 0.75) and higher roughness (0.45 vs 0.18)
+    // so tiles look like matte melamine rather than polished lacquer under IBL.
     const bodyMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color('#f5efe0'),
-      roughness: 0.18,
+      roughness: 0.45,
       metalness: 0.0,
-      clearcoat: 0.75,
-      clearcoatRoughness: 0.06,
-      reflectivity: 0.5,
+      clearcoat: 0.2,
+      clearcoatRoughness: 0.3,
+      reflectivity: 0.2,
     });
 
     // Shared face stamp geometry (PlaneGeometry reused for all tiles).

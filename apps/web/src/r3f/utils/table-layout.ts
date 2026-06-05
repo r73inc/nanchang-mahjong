@@ -16,7 +16,7 @@
  *            ╲
  *             Z+ (near — viewer's hand)
  *
- *   Camera: position (0, 14, 10), lookAt (0, 0, 0), FOV 48°
+ *   Camera: position (0, 8, 13), lookAt (0, 0, 0), FOV 58°
  *   Felt surface: Y = 0 plane
  *
  * ── Tile Dimensions (world units) ────────────────────────────────────────────
