@@ -10,7 +10,8 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "setup:local": "ts-node -r tsconfig-paths/register scripts/setup-local.ts",
-    "seed:admin": "ts-node -r tsconfig-paths/register scripts/seed-admin.ts"
+    "seed:admin": "ts-node -r tsconfig-paths/register scripts/seed-admin.ts",
+    "seed:users": "ts-node -r tsconfig-paths/register scripts/seed-users.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.777.0",

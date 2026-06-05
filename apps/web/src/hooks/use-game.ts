@@ -87,6 +87,11 @@ export function useGame(gameId: string, spectate = false) {
       setRematchRoomCode(payload.roomCode);
     };
 
+    // game:error — log to console so backend rejections are visible during debugging.
+    const handleError = (payload: { code: string; message?: string }) => {
+      console.warn('[game:error]', payload.code, payload.message ?? '');
+    };
+
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
     // on the FE we just need a toast/alert if it's us.
     // We rely on game:snapshot reflecting the afk flag; no extra state needed here.
@@ -97,6 +102,7 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:contested', handleContested);
     s.on('game:ended', handleEnded);
     s.on('game:rematch-ready', handleRematchReady);
+    s.on('game:error', handleError);
 
     // ── Connection management ─────────────────────────────────────────────────
     const handleDisconnect = () => {
@@ -132,6 +138,7 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:contested', handleContested);
       s.off('game:ended', handleEnded);
       s.off('game:rematch-ready', handleRematchReady);
+      s.off('game:error', handleError);
       s.off('disconnect', handleDisconnect);
       s.off('connect', handleConnect);
       s.off('connect_error', handleConnectError);

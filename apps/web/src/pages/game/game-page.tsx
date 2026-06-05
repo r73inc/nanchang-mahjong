@@ -789,13 +789,15 @@ export function GamePage() {
   }
 
   const viewerSeat = snapshot.viewerSeat;
-  const isHost = viewerSeat === 0; // seat 0 is always the original host
+  // The dealer reveals jing — for hand 1 this is always seat 0, but using
+  // dealerSeat is more correct and survives dealer rotation in later hands.
+  const isDealer = viewerSeat !== null && viewerSeat === snapshot.dealerSeat;
 
   return (
     <>
       {/* Phase-based screen selection */}
       {snapshot.phase === 'jing_reveal' && (
-        <JingRevealScreen snapshot={snapshot} isHost={isHost} onReveal={revealJing} />
+        <JingRevealScreen snapshot={snapshot} isHost={isDealer} onReveal={revealJing} />
       )}
 
       {(snapshot.phase === 'playing' || snapshot.phase === 'awaiting_claims') && (

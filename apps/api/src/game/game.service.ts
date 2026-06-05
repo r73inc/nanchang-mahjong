@@ -235,11 +235,17 @@ export class GameService {
     const seat = session.getSeat(userId);
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
-    // Only the host (seat 0 / dealerSeat 0 for the first hand) may trigger the reveal.
-    // For subsequent hands, the host is whoever is at seatMap[0] initially; but we check
-    // the hostSeat by checking if this user's userId matches seatMap[0].
-    const hostUserId = session.seatMap[0];
-    if (userId !== hostUserId) return this.emitError(socket, 'NOT_HOST');
+    // The current dealer (engine's dealerSeat) reveals jing.
+    // Hand 1: dealer = seat 0 = room host. Later hands: dealer rotates.
+    const dealerSeat = session.engine.state.dealerSeat;
+    const dealerUserId = session.seatMap[dealerSeat];
+    if (userId !== dealerUserId) {
+      this.logger.warn(
+        `reveal-jing rejected: userId=${userId} dealerUserId=${dealerUserId} ` +
+          `seatMap=${JSON.stringify(session.seatMap)} dealerSeat=${dealerSeat}`,
+      );
+      return this.emitError(socket, 'NOT_HOST');
+    }
 
     if (session.engine.state.phase !== 'jing_reveal') {
       return this.emitError(socket, 'INVALID_PHASE');

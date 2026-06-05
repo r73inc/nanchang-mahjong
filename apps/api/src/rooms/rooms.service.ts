@@ -415,7 +415,8 @@ export class RoomsService {
     if (occupiedSeats.length < 4) {
       throw new BadRequestException('Need 4 players to start');
     }
-    if (!occupiedSeats.every((s) => s.ready)) {
+    // The host is implicitly ready — they signal readiness by clicking Start.
+    if (!occupiedSeats.every((s) => s.isHost || s.ready)) {
       throw new BadRequestException('All players must be ready');
     }
 
