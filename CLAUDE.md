@@ -20,7 +20,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 | Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                   |
 | CI       | GitHub Actions: lint + typecheck + test on every PR                                         |
 
-**Key files:** `PLAN.md` (phase roadmap), `PHASE-7-PLAN.md` (Phase 7 detailed brief), `docs/final-nanchang-mahjong-rules.md` (locked rules).
+**Key files:** `PLAN.md` (phase roadmap), `PHASE-7-PLAN.md` (Phase 7 detailed brief), `docs/final-nanchang-mahjong-rules.md` (locked rules), `BUG-LOG.md` (bug history and learnings — read before touching infra, scripts, or socket events).
 
 ---
 
@@ -116,7 +116,23 @@ gh pr view <n> --comments
 
 ---
 
-## 6. Command Self-Correction Rule
+## 6. Bug Log
+
+`BUG-LOG.md` (repo root) is the authoritative record of bugs discovered during development — including root causes, fixes, and the recurring patterns that caused them.
+
+**Read it before working on:**
+
+- PowerShell scripts or dev tooling (BUG-001, BUG-002)
+- DynamoDB seed scripts or schema keys (BUG-003)
+- NestJS config / environment loading (BUG-004)
+- Workspace package resolution (`exports` field, Jest, Vite) (BUG-006, BUG-007, BUG-011)
+- Socket event handling or game phase logic (BUG-009, BUG-010)
+
+**Append a new entry whenever a non-trivial bug is found and fixed.** Use the template at the bottom of `BUG-LOG.md`. Include: symptom, root cause, fix, and the learning/rule to prevent recurrence.
+
+---
+
+## 7. Command Self-Correction Rule
 
 When I need to run a command in a sub-directory, I must use **one of these patterns** — never `cd "absolute\path"; ...`:
 
