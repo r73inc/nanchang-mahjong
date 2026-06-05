@@ -236,6 +236,13 @@ export function GameCanvas({ onSelectTile, onDiscard }: GameCanvasProps) {
         toneMappingExposure: 1.1,
       }}
       style={{ width: '100%', height: '100%' }}
+      onCreated={({ raycaster }) => {
+        // Stop scanning once the closest mesh is found — halves raycasting
+        // cost per pointer-move event on scenes with 50+ tile meshes.
+        // Visual meshes (body, face stamp, outline) all use NOOP_RAYCAST, so
+        // only the interactive hit-boxes are ever tested.
+        raycaster.firstHitOnly = true;
+      }}
     >
       {/*
        * Suspense fallback is null — the outer DOM LoadingScreen shows while the

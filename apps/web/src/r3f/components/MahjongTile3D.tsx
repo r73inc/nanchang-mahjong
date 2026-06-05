@@ -16,10 +16,13 @@
  *   - Selected (viewer choosing a discard): tile lifts by 0.35u on Y.
  *   - Jing (spirit/wildcard): emissive gold pulse + outline shell fade-in + "节" label.
  *
- * Pointer events:
- *   - An invisible boxGeometry hit-box handles onClick / hover so clicks
- *     register on the tile sides and face equally.
- *   - Only mounted when `interactive = true`.
+ * Pointer events / raycasting:
+ *   - An invisible BoxGeometry hit-box is the ONLY mesh that participates in
+ *     raycasting. It covers the full tile footprint and handles onClick / hover.
+ *     Only mounted when `interactive = true`.
+ *   - The outline shell, body, and face stamp all use NOOP_RAYCAST — they are
+ *     invisible to the raycaster. This means non-interactive tiles (opponents,
+ *     discards, melds) add zero raycasting cost.
  */
 
 import { useRef, useMemo, useEffect, useState } from 'react';
@@ -38,6 +41,18 @@ import {
 } from '../hooks/useTileGeometry';
 import type { TileTextureMap } from '../hooks/useTileTextures';
 import type { TilePose } from '../utils/table-layout';
+
+// ── Raycasting ────────────────────────────────────────────────────────────────
+
+/**
+ * No-op raycast function — disables raycasting on a mesh entirely.
+ *
+ * The outline shell, body, and face stamp don't need to intercept pointer
+ * events; the invisible hit-box covers all interaction. Assigning this to
+ * the non-interactive meshes means they are skipped during the per-frame
+ * raycaster sweep — meaningful for scenes with 50+ tile meshes.
+ */
+const NOOP_RAYCAST = () => {};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -212,24 +227,35 @@ export function MahjongTile3D({
       {/* 1. Jing outline shell: same geometry at 1.04× scale, BackSide gold.
            Rendered first (underneath body) so front faces of the body correctly
            occlude it — only the gold rim peeks out around the edges.
-           Opacity animated in useFrame: 0 → 0.6 when Jing, 0.6 → 0 otherwise. */}
+           Opacity animated in useFrame: 0 → 0.6 when Jing, 0.6 → 0 otherwise.
+           NOOP_RAYCAST: never interactive — hit-box handles all pointer events. */}
       <mesh
         geometry={geometry}
         material={outlineMaterial}
         scale={[TILE_SCALE * 1.04, TILE_SCALE * 1.04, TILE_SCALE * 1.04]}
+        raycast={NOOP_RAYCAST}
       />
 
-      {/* 2. Body: GLB geometry at TILE_SCALE, ceramic material */}
+      {/* 2. Body: GLB geometry at TILE_SCALE, ceramic material.
+           NOOP_RAYCAST: hit-box covers all interaction; body never needs to
+           intercept rays and would double-count otherwise. */}
       <mesh
         geometry={geometry}
         material={bodyMaterial}
         scale={[TILE_SCALE, TILE_SCALE, TILE_SCALE]}
+        raycast={NOOP_RAYCAST}
         castShadow
         receiveShadow
       />
 
-      {/* 3. Face stamp: PlaneGeometry proud of the front face, SVG texture */}
-      <mesh geometry={faceStampGeometry} material={faceMaterial} position={[0, 0, FACE_STAMP_Z]} />
+      {/* 3. Face stamp: PlaneGeometry proud of the front face, SVG texture.
+           NOOP_RAYCAST: same reasoning as body — hit-box handles clicks. */}
+      <mesh
+        geometry={faceStampGeometry}
+        material={faceMaterial}
+        position={[0, 0, FACE_STAMP_Z]}
+        raycast={NOOP_RAYCAST}
+      />
 
       {/* 4. Invisible hit-box for pointer events (only when interactive) */}
       {interactive && (
