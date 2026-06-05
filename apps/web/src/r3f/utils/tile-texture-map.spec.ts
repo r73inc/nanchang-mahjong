@@ -3,6 +3,9 @@
  *
  * Unit tests for the TileType → SVG path mapping utility.
  * Pure TS — no browser, no WebGL context needed.
+ *
+ * NOTE: The Black palette SVG set has been removed from the project.
+ * Only the Regular palette is available; tests for Black paths are removed.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -46,12 +49,6 @@ describe('tileTexturePath', () => {
     expect(tileTexturePath('bai')).toBe('/textures/Tiles/Regular/Haku.svg');
   });
 
-  it('switches to Black variant when specified', () => {
-    expect(tileTexturePath('1m', 'Black')).toBe('/textures/Tiles/Black/Man1.svg');
-    expect(tileTexturePath('east', 'Black')).toBe('/textures/Tiles/Black/Ton.svg');
-    expect(tileTexturePath('zhong', 'Black')).toBe('/textures/Tiles/Black/Chun.svg');
-  });
-
   it('defaults to Regular palette when palette is omitted', () => {
     expect(tileTexturePath('5p')).toContain('/Regular/');
   });
@@ -70,8 +67,8 @@ describe('backTexturePath', () => {
     expect(backTexturePath()).toBe('/textures/Tiles/Regular/Back.svg');
   });
 
-  it('returns Black Back.svg for Black variant', () => {
-    expect(backTexturePath('Black')).toBe('/textures/Tiles/Black/Back.svg');
+  it('returns Regular Back.svg when palette is explicitly Regular', () => {
+    expect(backTexturePath('Regular')).toBe('/textures/Tiles/Regular/Back.svg');
   });
 });
 
@@ -80,26 +77,17 @@ describe('backTexturePath', () => {
 describe('allFaceTexturePaths', () => {
   it('returns exactly 34 paths', () => {
     expect(allFaceTexturePaths('Regular')).toHaveLength(34);
-    expect(allFaceTexturePaths('Black')).toHaveLength(34);
   });
 
-  it('all paths start with /textures/Tiles/', () => {
+  it('all paths start with /textures/Tiles/Regular/', () => {
     for (const p of allFaceTexturePaths('Regular')) {
       expect(p).toMatch(/^\/textures\/Tiles\/Regular\/.+\.svg$/);
     }
   });
 
-  it('all paths are unique within a palette', () => {
+  it('all paths are unique within the Regular palette', () => {
     const paths = allFaceTexturePaths('Regular');
     expect(new Set(paths).size).toBe(paths.length);
-  });
-
-  it('Regular and Black paths differ only in palette segment', () => {
-    const regular = allFaceTexturePaths('Regular');
-    const black = allFaceTexturePaths('Black');
-    regular.forEach((p, i) => {
-      expect(p.replace('/Regular/', '/Black/')).toBe(black[i]);
-    });
   });
 
   it('order matches ALL_TILE_TYPES order (stable index for useTexture preload)', () => {
@@ -156,15 +144,9 @@ describe('ALL_TILE_TYPES', () => {
 // ── themeToVariant ────────────────────────────────────────────────────────────
 
 describe('themeToVariant', () => {
-  it('maps dark theme to Black variant', () => {
-    expect(themeToVariant('dark')).toBe('Black');
-  });
-
-  it('maps classic theme to Regular variant', () => {
+  it('always returns Regular (Black assets removed from project)', () => {
+    expect(themeToVariant('dark')).toBe('Regular');
     expect(themeToVariant('classic')).toBe('Regular');
-  });
-
-  it('maps sepia theme to Regular variant', () => {
     expect(themeToVariant('sepia')).toBe('Regular');
   });
 });

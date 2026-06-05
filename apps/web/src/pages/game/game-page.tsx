@@ -20,14 +20,15 @@
  */
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
 import { useI18n } from '../../i18n';
 import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
 import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
-import type { ClaimWindowState } from '../../stores/game.store';
+import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
+import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
 
@@ -334,8 +335,8 @@ function SeatHUD({ snapshot }: { snapshot: ClientGameState }) {
       <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
         <Nameplate seat={snapshot.seats[leftSeat]} seatIdx={leftSeat} snapshot={snapshot} compact />
       </div>
-      {/* Viewer — bottom, just above the claim rail area */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+      {/* Viewer — above the hand HUD (which is ~90px tall at bottom-0) */}
+      <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
         <Nameplate
           seat={snapshot.seats[viewerSeat]}
           seatIdx={viewerSeat}
@@ -579,18 +580,393 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   );
 }
 
+// ── History types ─────────────────────────────────────────────────────────────
+
+interface HistoryEntry {
+  id: number;
+  kind: 'discard' | 'pung' | 'chow' | 'kong' | 'win' | 'concede';
+  seatWind: SeatWind;
+  /** Absolute seat index (0–3) — used to derive compass position relative to viewer. */
+  seatIdx: number;
+  tile?: TileType;
+}
+
+// ── SVG hand tile ─────────────────────────────────────────────────────────────
+
+/**
+ * Single tile rendered as an SVG image in the viewer's hand HUD.
+ * Uses the same Regular SVG textures as the 3D tile face stamps, displayed
+ * on an ivory background that matches the 3D tile body colour.
+ */
+function SvgHandTile({
+  tile,
+  isJing = false,
+  isSelected = false,
+  isDrawn = false,
+}: {
+  tile: TileType;
+  isJing?: boolean;
+  isSelected?: boolean;
+  isDrawn?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: 46,
+        height: 62,
+        borderRadius: 5,
+        background: '#f5efe0',
+        border: isJing || isSelected ? '2px solid #c9a961' : '1.5px solid rgba(201,169,97,0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        boxShadow: isJing ? '0 0 8px rgba(201,169,97,0.5)' : '0 2px 6px rgba(0,0,0,0.4)',
+      }}
+    >
+      <img
+        src={tileTexturePath(tile, 'Regular')}
+        style={{ width: '85%', height: '85%', objectFit: 'contain' }}
+        draggable={false}
+        alt=""
+      />
+      {isDrawn && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 3,
+            right: 3,
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: '#c9a961',
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Viewer hand HUD ───────────────────────────────────────────────────────────
+
+/**
+ * DOM overlay at the bottom of the screen showing the viewer's tiles at a
+ * larger scale than the 3D scene would allow. Tiles are draggable to reorder.
+ *
+ * Interaction:
+ *   - Tap once  → select (tile lifts with CSS transform)
+ *   - Tap again → discard (confirmed with the server)
+ *   - Drag      → reorder display order (local only, no server effect)
+ *
+ * The `displayOrder` array maps display-position → hand-index. It is reset
+ * to natural order whenever the hand length changes (discard+draw cycle).
+ */
+function ViewerHandHUD({
+  hand,
+  selectedTileIdx,
+  onSelect,
+  onDiscard,
+  isMyTurn,
+  jingTypes,
+  pendingMove,
+}: {
+  hand: TileType[];
+  selectedTileIdx: number | null;
+  onSelect: (idx: number) => void;
+  onDiscard: (tile: TileType) => void;
+  isMyTurn: boolean;
+  jingTypes: Set<string>;
+  pendingMove: boolean;
+}) {
+  // displayOrder[displayIdx] = handIdx
+  const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const prevLenRef = useRef(hand.length);
+
+  // Sync displayOrder when hand length changes (new draw or discard confirmation).
+  useEffect(() => {
+    const prev = prevLenRef.current;
+    prevLenRef.current = hand.length;
+
+    if (hand.length === prev) return;
+
+    if (hand.length > prev) {
+      // A tile was drawn — append its index (hand.length - 1) at the end of
+      // the display so the newly drawn tile appears on the right.
+      setDisplayOrder((order) => [...order, hand.length - 1]);
+    } else {
+      // A tile was discarded — we can't cheaply determine which index was
+      // removed, so reset to natural order for the new hand.
+      setDisplayOrder(hand.map((_, i) => i));
+    }
+  }, [hand.length]);
+
+  const handleDragStart = (displayIdx: number) => {
+    setDragFrom(displayIdx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (dragFrom === null || dragFrom === targetIdx) return;
+    // Live reorder: move the dragged tile to the hovered slot immediately.
+    setDisplayOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragFrom, 1);
+      next.splice(targetIdx, 0, moved);
+      return next;
+    });
+    setDragFrom(targetIdx);
+  };
+
+  const handleDragEnd = () => setDragFrom(null);
+
+  const handleTileClick = (displayIdx: number) => {
+    if (!isMyTurn || pendingMove) return;
+    const handIdx = displayOrder[displayIdx];
+    if (selectedTileIdx === handIdx) {
+      onDiscard(hand[handIdx]);
+    } else {
+      onSelect(handIdx);
+    }
+  };
+
+  const drawnHandIdx = hand.length > 1 ? hand.length - 1 : -1;
+
+  return (
+    <div
+      className="absolute bottom-0 left-0 right-0 flex flex-col items-center pointer-events-auto"
+      style={{ zIndex: 15 }}
+      aria-hidden="true" // accessible version is the sr-only AccessibleHand
+    >
+      {/* Gradient fade so the HUD blends into the 3D canvas above it */}
+      <div
+        className="w-full flex justify-center px-2 pt-4 pb-2"
+        style={{
+          background: 'linear-gradient(to top, rgba(0,0,0,0.88) 60%, transparent 100%)',
+        }}
+      >
+        <div
+          className="flex gap-[3px] items-end"
+          style={{ overflowX: 'auto', scrollbarWidth: 'none', maxWidth: '100%' }}
+        >
+          {displayOrder.map((handIdx, displayIdx) => {
+            const tile = hand[handIdx];
+            if (tile === undefined) return null;
+            const isSelected = !pendingMove && selectedTileIdx === handIdx;
+            const isDrawn = handIdx === drawnHandIdx;
+            const isDragging = dragFrom === displayIdx;
+
+            return (
+              <div
+                key={`hud-${handIdx}`}
+                draggable
+                onDragStart={() => handleDragStart(displayIdx)}
+                onDragOver={(e) => handleDragOver(e, displayIdx)}
+                onDragEnd={handleDragEnd}
+                onClick={() => handleTileClick(displayIdx)}
+                style={{
+                  transition: 'transform 0.12s ease, opacity 0.12s ease',
+                  transform: isSelected ? 'translateY(-10px) scale(1.08)' : 'none',
+                  opacity: isDragging ? 0.45 : 1,
+                  cursor: isMyTurn && !pendingMove ? 'pointer' : 'default',
+                  flexShrink: 0,
+                }}
+              >
+                <SvgHandTile
+                  tile={tile}
+                  isJing={jingTypes.has(tile)}
+                  isSelected={isSelected}
+                  isDrawn={isDrawn}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Game history panel ────────────────────────────────────────────────────────
+
+/**
+ * Collapsible right-side panel showing a chronological event log for the
+ * current hand: discards, pungs, chows, kongs, wins, concedes.
+ *
+ * The panel slides in from the right edge. A thin tab button toggles it.
+ * When collapsed the tab sticks out on the right, always accessible.
+ * z-index 15: above the 3D canvas (z-0) and corner nameplates (z-10),
+ * below the claim rail (z-20) and overlays (z-30+).
+ */
+function GameHistoryPanel({
+  entries,
+  isOpen,
+  onToggle,
+  snapshot,
+}: {
+  entries: HistoryEntry[];
+  isOpen: boolean;
+  onToggle: () => void;
+  snapshot: ClientGameState;
+}) {
+  const { t } = useI18n();
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to newest entry (bottom) when entries grow.
+  useEffect(() => {
+    if (isOpen && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [entries.length, isOpen]);
+
+  const PANEL_W = 210;
+
+  const ACTION_LABEL: Partial<Record<HistoryEntry['kind'], string>> = {
+    pung: t('gameActionPung'),
+    chow: t('gameActionChow'),
+    kong: t('gameActionKong'),
+    win: t('gameActionWin'),
+    concede: t('gameActionConcede'),
+  };
+
+  // Compass position label for each seat relative to the viewer.
+  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+  const POSITION_LABEL = [
+    t('gamePositionYou'),
+    t('gamePositionRight'),
+    t('gamePositionAcross'),
+    t('gamePositionLeft'),
+  ];
+
+  return (
+    <>
+      {/* Toggle tab — slides left when panel is open */}
+      <button
+        onClick={onToggle}
+        className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center"
+        style={{
+          right: isOpen ? PANEL_W : 0,
+          zIndex: 15,
+          width: 28,
+          height: 56,
+          background: 'rgba(14,14,14,0.92)',
+          border: '1px solid rgba(245,239,223,0.12)',
+          borderRight: 'none',
+          borderRadius: '6px 0 0 6px',
+          color: 'rgba(245,239,223,0.5)',
+          fontSize: 14,
+          transition: 'right 0.22s ease',
+          cursor: 'pointer',
+        }}
+        aria-label={t('gameHistoryTitle')}
+      >
+        {isOpen ? t('gameHistoryClose') : t('gameHistoryOpen')}
+      </button>
+
+      {/* Sliding panel */}
+      <div
+        className="absolute top-10 bottom-0 overflow-hidden"
+        style={{
+          right: isOpen ? 0 : -PANEL_W,
+          width: PANEL_W,
+          zIndex: 15,
+          background: 'rgba(8,8,8,0.93)',
+          borderLeft: '1px solid rgba(245,239,223,0.07)',
+          backdropFilter: 'blur(12px)',
+          transition: 'right 0.22s ease',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-3 py-2 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid rgba(245,239,223,0.07)' }}
+        >
+          <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
+            {t('gameHistoryTitle')}
+          </span>
+          <span className="text-[10px] text-mj-bone/30">{entries.length}</span>
+        </div>
+
+        {/* Scrollable event list */}
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto h-full pb-4"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {entries.length === 0 ? (
+            <p className="text-[10px] text-mj-bone/20 text-center mt-6 px-3">—</p>
+          ) : (
+            <div className="flex flex-col py-1">
+              {entries.map((entry) => {
+                // Compass offset from viewer's seat → position label.
+                const offset = (entry.seatIdx - viewerSeat + 4) % 4;
+                const posLabel = POSITION_LABEL[offset];
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-1 px-2 py-[5px]"
+                    style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
+                  >
+                    {/* Wind dot */}
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: WIND_COLOR[entry.seatWind] }}
+                    />
+                    {/* Position + wind — e.g. "You 南" or "Right 東" */}
+                    <span
+                      className="text-[10px] font-bold shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind] }}
+                    >
+                      {posLabel}
+                    </span>
+                    <span
+                      className="text-[9px] shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind], opacity: 0.7 }}
+                    >
+                      {WIND_CHAR[entry.seatWind]}
+                    </span>
+                    {/* Action label */}
+                    <span className="text-[10px] text-mj-bone/50 shrink-0">
+                      {entry.kind === 'discard'
+                        ? t('gameHistoryDiscard')
+                        : ACTION_LABEL[entry.kind]}
+                    </span>
+                    {/* Tile (if any) */}
+                    {entry.tile && (
+                      <MahjongTile
+                        tile={entry.tile}
+                        size="xs"
+                        isJing={
+                          entry.tile === snapshot.jingPrimary ||
+                          entry.tile === snapshot.jingSecondary
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Game Table ────────────────────────────────────────────────────────────────
 
 /**
  * Full game screen — 3D canvas fills the viewport; DOM overlays layer on top.
  *
  * Layer order (z-index):
- *   0  GameCanvas (fills inset-0, no z-index)
- *   10 Status bar, SeatHUD, TurnIndicator
- *   20 SideRail (claim window)
- *   30 ActionToast
- *   40 ConcedeSheet
- *   50 ReconnectingOverlay
+ *   0   GameCanvas (fills inset-0, no z-index)
+ *   10  Status bar, SeatHUD, TurnIndicator
+ *   15  ViewerHandHUD, GameHistoryPanel (above canvas, below claim rail)
+ *   20  SideRail (claim window) — slides up from bottom, covers HUD
+ *   30  ActionToast
+ *   40  ConcedeSheet
+ *   50  ReconnectingOverlay
  */
 function GameTable({
   snapshot,
@@ -607,7 +983,7 @@ function GameTable({
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
   claimWindow: ClaimWindowState | null;
-  toast: import('../../stores/game.store').GameToast | null;
+  toast: GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
@@ -617,10 +993,66 @@ function GameTable({
 }) {
   const { t } = useI18n();
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const nextHistoryId = useRef(0);
+  const prevSnapshotRef = useRef<ClientGameState | null>(null);
 
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
+
+  // Derive jing set for the viewer hand HUD tile highlighting.
+  const jingTypes = new Set<string>();
+  if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
+  if (snapshot.jingSecondary) jingTypes.add(snapshot.jingSecondary);
+
+  // ── History tracking ────────────────────────────────────────────────────────
+
+  const addHistory = useCallback((entry: Omit<HistoryEntry, 'id'>) => {
+    setHistoryEntries((prev) => [...prev, { ...entry, id: nextHistoryId.current++ }]);
+  }, []);
+
+  // Detect discards and new open melds by diffing snapshots.
+  useEffect(() => {
+    const prev = prevSnapshotRef.current;
+    prevSnapshotRef.current = snapshot;
+    if (!prev) return;
+
+    snapshot.seats.forEach((seat, i) => {
+      const prevSeat = prev.seats[i];
+      if (!prevSeat) return;
+
+      // New discard (last tile in discards array is the new one).
+      if (seat.discards.length > prevSeat.discards.length) {
+        const tile = seat.discards[seat.discards.length - 1];
+        addHistory({ kind: 'discard', seatWind: seat.wind, seatIdx: i, tile });
+      }
+
+      // New open meld (pung / chow / kong / kong_added).
+      if (seat.openMelds.length > prevSeat.openMelds.length) {
+        const newMeld = seat.openMelds[seat.openMelds.length - 1];
+        const kind: HistoryEntry['kind'] =
+          newMeld.kind === 'pung' ? 'pung' : newMeld.kind === 'chow' ? 'chow' : 'kong';
+        addHistory({ kind, seatWind: seat.wind, seatIdx: i, tile: newMeld.tiles[0] });
+      }
+    });
+  }, [snapshot, addHistory]);
+
+  // Detect wins and concedes via toast.
+  useEffect(() => {
+    if (!toast) return;
+    if (toast.kind === 'win' || toast.kind === 'concede') {
+      const wind = snapshot.seats[toast.seat]?.wind;
+      if (wind) {
+        addHistory({
+          kind: toast.kind === 'win' ? 'win' : 'concede',
+          seatWind: wind,
+          seatIdx: toast.seat,
+        });
+      }
+    }
+  }, [toast, snapshot, addHistory]);
 
   const handleConcede = () => {
     setShowConcedeSheet(false);
@@ -630,11 +1062,10 @@ function GameTable({
   return (
     <div className="relative w-full h-dvh overflow-hidden bg-black">
       {/* ── 3D canvas — fills entire screen ───────────────────────────────── */}
-      {/* snapshot + selectedTileIdx are read from the Zustand store inside    */}
-      {/* GameScene — so the canvas only re-renders on game-state changes,     */}
-      {/* not when claimWindow/toast/connection update in the parent.           */}
+      {/* GameScene reads snapshot directly from the Zustand store; the canvas */}
+      {/* re-renders only on game-state changes (not on toast / claim updates). */}
       <div className="absolute inset-0" aria-hidden="true">
-        <GameCanvas onSelectTile={onSelect} onDiscard={onDiscard} />
+        <GameCanvas />
       </div>
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
@@ -682,8 +1113,8 @@ function GameTable({
       {/* ── Seat HUD — corner nameplates ───────────────────────────────────── */}
       <SeatHUD snapshot={snapshot} />
 
-      {/* ── Turn indicator ─────────────────────────────────────────────────── */}
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none">
+      {/* ── Turn indicator (sits above the hand HUD) ──────────────────────── */}
+      <div className="absolute bottom-40 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none">
         <span
           className="text-[11px] font-bold px-3 py-1 rounded-full"
           style={{
@@ -703,6 +1134,19 @@ function GameTable({
         )}
       </div>
 
+      {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
+      {!showConcedeSheet && (
+        <ViewerHandHUD
+          hand={viewerHand}
+          selectedTileIdx={selectedTileIdx}
+          onSelect={onSelect}
+          onDiscard={onDiscard}
+          isMyTurn={isMyTurn}
+          jingTypes={jingTypes}
+          pendingMove={pendingMove}
+        />
+      )}
+
       {/* ── Accessible hand — sr-only DOM buttons for a11y + tests ─────────── */}
       <AccessibleHand
         hand={viewerHand}
@@ -711,6 +1155,16 @@ function GameTable({
         onDiscard={onDiscard}
         isMyTurn={isMyTurn && !pendingMove}
       />
+
+      {/* ── Collapsible history panel ──────────────────────────────────────── */}
+      {!showConcedeSheet && (
+        <GameHistoryPanel
+          entries={historyEntries}
+          isOpen={historyOpen}
+          onToggle={() => setHistoryOpen((o) => !o)}
+          snapshot={snapshot}
+        />
+      )}
 
       {/* ── Action toast ───────────────────────────────────────────────────── */}
       {toast && !showConcedeSheet && <ActionToast toast={toast} snapshot={snapshot} />}

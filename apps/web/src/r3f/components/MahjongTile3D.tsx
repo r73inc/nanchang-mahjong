@@ -97,24 +97,32 @@ export function MahjongTile3D({
   onClick,
 }: MahjongTile3DProps) {
   const groupRef = useRef<THREE.Group>(null!);
-  const faceMatRef = useRef<THREE.MeshPhysicalMaterial | null>(null);
+  const faceMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
 
   // ── Geometry + shared body material ────────────────────────────────────────
   const { geometry, bodyMaterial, faceStampGeometry } = useTileGeometry();
 
   // ── Per-tile face material ──────────────────────────────────────────────────
-  // Recreated only when tileType, isJing, or isDrawn changes.
+  // MeshBasicMaterial — unlit, so faces are always fully legible regardless of
+  // the tile's orientation or scene lighting. This fixes BUG-03 (flat tiles
+  // blown out by clearcoat reflections under the key light).
+  //
+  // Jing pulse: the color property is animated in useFrame (warm gold cycle).
+  // Drawn tile: faint warm tint so the player can spot their most recent draw.
   const faceMaterial = useMemo(() => {
     const texture = tileType ? (faceMap.get(tileType) ?? backTexture) : backTexture;
-    return new THREE.MeshPhysicalMaterial({
+    return new THREE.MeshBasicMaterial({
       map: texture,
-      roughness: 0.22,
-      metalness: 0.0,
-      clearcoat: 0.55,
-      clearcoatRoughness: 0.1,
-      // Jing tiles glow gold; drawn tile gets a mild tint; normal = no emissive.
-      emissive: new THREE.Color(isJing ? 0xc9a961 : isDrawn ? 0xf5e6c0 : 0x000000),
-      emissiveIntensity: isJing ? 0.3 : isDrawn ? 0.1 : 0.0,
+      // Jing: initial gold tint (animated to pulse in useFrame).
+      // Drawn: subtle warm tint so the player can identify the drawn tile.
+      // Normal: pure white (texture at full brightness).
+      color: new THREE.Color(isJing ? '#d4af37' : isDrawn ? '#fef5e0' : '#ffffff'),
+      // SVG face textures have transparent backgrounds. transparent:true lets
+      // the ivory tile body show through, giving white/cream tile appearance.
+      // depthWrite:false prevents transparent fragments from blocking tiles
+      // behind this one in the discard grid.
+      transparent: true,
+      depthWrite: false,
     });
   }, [tileType, faceMap, backTexture, isJing, isDrawn]);
 
@@ -195,9 +203,12 @@ export function MahjongTile3D({
     g.rotation.y += (t.ry - g.rotation.y) * s;
     g.rotation.z += (t.rz - g.rotation.z) * s;
 
-    // Jing emissive pulse (2 Hz sine wave, 0.07–0.43 range)
+    // Jing face color pulse (2 Hz warm gold cycle: white ↔ gold).
+    // MeshBasicMaterial doesn't support emissive — animate `color` instead.
     if (isJing && faceMatRef.current) {
-      faceMatRef.current.emissiveIntensity = 0.25 + 0.18 * Math.sin(Date.now() * 0.003);
+      const t = 0.25 + 0.18 * Math.sin(Date.now() * 0.003);
+      // Pulse between near-white (1, 1, 1) and warm gold (~1, 0.85, 0.6)
+      faceMatRef.current.color.setRGB(1.0, 0.85 + t * 0.15, 0.6 + t * 0.2);
     }
 
     // Jing outline shell — smooth fade in (0 → 0.6) / fade out (0.6 → 0)
@@ -236,16 +247,14 @@ export function MahjongTile3D({
         raycast={NOOP_RAYCAST}
       />
 
-      {/* 2. Body: GLB geometry at TILE_SCALE, ceramic material.
-           NOOP_RAYCAST: hit-box covers all interaction; body never needs to
-           intercept rays and would double-count otherwise. */}
+      {/* 2. Body: GLB geometry at TILE_SCALE, flat ivory MeshBasicMaterial.
+           castShadow/receiveShadow removed — MeshBasicMaterial is unlit so
+           shadow pass has no effect. NOOP_RAYCAST: hit-box handles clicks. */}
       <mesh
         geometry={geometry}
         material={bodyMaterial}
         scale={[TILE_SCALE, TILE_SCALE, TILE_SCALE]}
         raycast={NOOP_RAYCAST}
-        castShadow
-        receiveShadow
       />
 
       {/* 3. Face stamp: PlaneGeometry proud of the front face, SVG texture.

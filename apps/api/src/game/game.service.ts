@@ -16,7 +16,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { Server, Socket } from 'socket.io';
-import { GameEngine, nextDealer, calculateSpiritSettlement } from '@nanchang/engine';
+import { GameEngine, nextDealer, calculateSpiritSettlement, isWinningHand } from '@nanchang/engine';
 import type { TileType, SeatWind, WinType, WinPaymentResult } from '@nanchang/engine';
 import type { RoomSettings, GameEndedPayload } from '@nanchang/shared';
 import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
@@ -267,6 +267,31 @@ export class GameService {
 
   private startTurn(session: GameSession): void {
     const activeSeat = session.engine.state.currentSeat;
+    const st = session.engine.state;
+
+    // ── Auto-tsumo detection ──────────────────────────────────────────────────
+    // After any draw (or after a 4th open meld when the remaining pair is already
+    // in hand), check if the active player's full hand is already complete.
+    // fullHand = open meld tiles + concealed hand tiles. If exactly 14 tiles and
+    // isWinningHand is true, auto-declare self-draw win (tsumo).
+    //
+    // This is correct for a family game: players never decline a winning hand.
+    // The engine validates the win, so there's no way for invalid wins to sneak in.
+    if (st.jingPrimary && st.jingSecondary && st.phase === 'playing') {
+      const jingTypes: TileType[] = [st.jingPrimary, st.jingSecondary];
+      const seatState = st.seats[activeSeat];
+      const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles] as TileType[]);
+      const fullHand = [...openMeldTiles, ...seatState.hand];
+
+      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
+        this.logger.log(
+          `Auto-tsumo: seat ${activeSeat} has a complete 14-tile hand (game ${session.gameId})`,
+        );
+        this.applyWinClaim(session, activeSeat, 'tsumo', { isRobKong: false });
+        return;
+      }
+    }
+
     session.touch(activeSeat);
     session.clearAfkTimers();
 

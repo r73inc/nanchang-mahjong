@@ -71,9 +71,12 @@ export function useTileTextures(palette: TilePaletteVariant): TileTexturesResult
     const maxAnisotropy = gl.capabilities.getMaxAnisotropy();
 
     rawTextures.forEach((tex) => {
-      // SVGs are rasterised top-to-bottom by the browser Image API;
-      // WebGL addresses textures bottom-to-top — flip to correct.
-      tex.flipY = false;
+      // Three.js default (flipY = true) flips the image vertically before
+      // uploading to the GPU, compensating for WebGL's bottom-to-top texture
+      // addressing. SVGs loaded via the browser Image API are top-to-bottom,
+      // so the default flip is exactly what we need — do NOT set flipY = false
+      // or the tile characters appear upside-down (BUG-02 fix).
+      tex.flipY = true;
       // Treat SVG colours as sRGB so they match CSS colour expectations.
       tex.colorSpace = THREE.SRGBColorSpace;
       // Anisotropic filtering sharpens tiles viewed at shallow angles.

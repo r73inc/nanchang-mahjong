@@ -186,18 +186,31 @@ describe('opponentHands', () => {
     expect(layout.opponentHands.right).toHaveLength(7);
   });
 
-  it('opponent hands stand at y = STANDING_Y', () => {
+  it('across opponent tiles stand at y = STANDING_Y (upright)', () => {
+    const snap = makeSnapshot({ seats: [{}, {}, { handCount: 4 }, {}] });
+    const layout = computeTableLayout(snap);
+    for (const pose of layout.opponentHands.across) {
+      approx(pose.y, STANDING_Y);
+    }
+  });
+
+  it('right/left opponent tiles stand upright at y = STANDING_Y', () => {
     const snap = makeSnapshot({
-      seats: [{}, { handCount: 4 }, { handCount: 4 }, { handCount: 4 }],
+      seats: [{}, { handCount: 4 }, {}, { handCount: 4 }],
     });
     const layout = computeTableLayout(snap);
-    const allPoses = [
-      ...layout.opponentHands.right,
-      ...layout.opponentHands.across,
-      ...layout.opponentHands.left,
-    ];
-    for (const pose of allPoses) {
+    for (const pose of [...layout.opponentHands.right, ...layout.opponentHands.left]) {
       approx(pose.y, STANDING_Y);
+    }
+  });
+
+  it('right/left opponent tiles have rx = 0 (standing upright, face away from camera)', () => {
+    const snap = makeSnapshot({
+      seats: [{}, { handCount: 4 }, {}, { handCount: 4 }],
+    });
+    const layout = computeTableLayout(snap);
+    for (const pose of [...layout.opponentHands.right, ...layout.opponentHands.left]) {
+      approx(pose.rx, 0);
     }
   });
 });
