@@ -22,7 +22,17 @@ export interface ClaimWindowState {
 }
 
 export interface GameToast {
-  kind: 'win' | 'pung' | 'kong' | 'chow' | 'concede';
+  /** 'contested' = a lower-priority claim lost (short flash).
+   *  Everything else = a successful action broadcast to all players (longer display). */
+  kind:
+    | 'win'
+    | 'pung'
+    | 'kong_open'
+    | 'kong_concealed'
+    | 'kong_added'
+    | 'chow'
+    | 'concede'
+    | 'contested';
   seat: 0 | 1 | 2 | 3;
 }
 

@@ -241,6 +241,58 @@ To compound the confusion, `resolveClaims` had a comment claiming "the engine en
 
 ---
 
+## PR #30 cont. — gameplay UI bugs & improvements (2026-06-05)
+
+---
+
+### BUG-013 · Dealer badge shown as global label — all players appeared to be the dealer
+
+**Symptom:** The status bar top-left showed "Dealer 東" to every player, making each player think the label referred to them personally.
+
+**Root cause:** The status bar rendered `{t('gameDealer')} {WIND_CHAR[dealerSeat.wind]}` unconditionally for all players. There was no dealer indicator on the specific player's nameplate, so the label floated in a position that read ambiguously as "you are the dealer."
+
+**Fix:** Removed the "Dealer" text from the status bar (round wind indicator alone is sufficient there). Added a `"庄"` badge directly inside the `Nameplate` component, rendered only when `seatIdx === snapshot.dealerSeat`. Added the same badge to the viewer's own bottom info row. Now the dealer badge appears exclusively on the dealer's seat tile in the compass layout.
+
+**Learning:** In a compass-layout game UI, global status bar labels are easily misread as "about the viewer." Role badges (dealer, active turn, etc.) belong on the individual player's nameplate, not in a shared header.
+
+---
+
+### BUG-014 · Action toasts never shown — game:event was subscribed by backend but ignored by frontend
+
+**Symptom:** When a player punged, chowed, or declared kong/win, no notification appeared for any player. The UI was completely silent about successful game actions.
+
+**Root cause:** The backend's `broadcastEvent()` correctly emits `game:event` to the entire game room for every action (pung, chow, kong, win, concede). The frontend `useGame` hook subscribed to `game:claimed-window`, `game:contested`, `game:snapshot`, etc., but had no handler for `game:event`. The `GameToast` type and `toast` store state existed but were only set by `game:contested` (losing claims), and even then the `toast` value was never destructured in `GamePage` or passed to `GameTable` — so nothing was ever displayed.
+
+**Fix:** Three-part:
+
+1. Added `handleGameEvent` in `useGame` that listens to `game:event` and sets a 2500ms toast for pung/chow/kong/win/concede actions.
+2. Added `toast` to the `GamePage` destructuring and passed it to `GameTable` as a prop.
+3. Added `ActionToast` component — floating center-screen overlay showing "[Wind] Pung!" etc. with the acting seat's wind color, auto-dismissed after 2.5s.
+
+`game:contested` remains as a 600ms flash (its existing behavior was correct, just invisible).
+
+**Learning:** Wiring an event pipeline end-to-end means checking: backend emits → frontend subscribes → store updates → UI reads store. A break at any link silences the whole feature. Always trace the full path from socket emit to rendered pixel when a feature "exists but doesn't work."
+
+---
+
+### BUG-015 · Open melds invisible after pung/chow/kong
+
+**Symptom:** After a player punged tiles, those tiles disappeared from their hand (correct) but were not visible to anyone — neither the player who punged nor their opponents. The open melds existed in the server state but were not rendered.
+
+**Root cause:** `ClientSeatState.openMelds: Meld[]` is populated correctly by `toClientSnapshot()` and included in every `game:snapshot` payload. However, the `GameTable` component rendered only face-down hand tiles (`handCount` × `FaceDownTile`) and discard piles for each opponent position. No component rendered `openMelds` at all.
+
+**Fix:** Added `MeldGroup` (renders one meld's tiles in a row) and `OpenMeldsDisplay` (renders all melds for a seat) components. Wired them into each of the four seat areas:
+
+- **Top (across):** Horizontal row of meld groups between face-down hand and discards.
+- **Left/Right (side columns):** Vertical stack of meld groups in their 64px side columns.
+- **Viewer (bottom):** Horizontal row above the hand tiles via `OpenMeldsDisplay`.
+
+Each meld is wrapped in a subtle gold-bordered container to distinguish it from discards.
+
+**Learning:** After implementing a game mechanic (pung/chow/kong), always verify the entire data path: engine state → server snapshot → client type → rendering. A mechanic that updates state but has no visual output in the compass layout is effectively invisible. Trace `openMelds` from the engine type all the way to a rendered tile.
+
+---
+
 ## Template for future entries
 
 ```

@@ -75,8 +75,30 @@ export function useGame(gameId: string, spectate = false) {
       kind: 'win' | 'pung' | 'kong' | 'chow';
       seat: 0 | 1 | 2 | 3;
     }) => {
-      setToast(payload);
+      // Short flash (600ms) showing the losing seat — mostly a FYI indicator.
+      setToast({ kind: 'contested', seat: payload.seat });
       setTimeout(() => setToast(null), 600);
+    };
+
+    // game:event — every successful public action is broadcast here.
+    // We show a prominent toast for claims and wins so all players are notified.
+    const handleGameEvent = (payload: { event: import('@nanchang/shared').PublicGameEvent }) => {
+      const { event } = payload;
+      if (
+        event.kind === 'pung' ||
+        event.kind === 'chow' ||
+        event.kind === 'kong_open' ||
+        event.kind === 'kong_concealed' ||
+        event.kind === 'kong_added' ||
+        event.kind === 'win' ||
+        event.kind === 'concede'
+      ) {
+        const seat = 'seat' in event ? event.seat : null;
+        if (seat !== null) {
+          setToast({ kind: event.kind, seat });
+          setTimeout(() => setToast(null), 2500);
+        }
+      }
     };
 
     const handleEnded = (payload: Parameters<typeof setEnded>[0]) => {
@@ -100,6 +122,7 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:claim-window', handleClaimWindow);
     s.on('game:rob-kong-window', handleClaimWindow); // same UI
     s.on('game:contested', handleContested);
+    s.on('game:event', handleGameEvent);
     s.on('game:ended', handleEnded);
     s.on('game:rematch-ready', handleRematchReady);
     s.on('game:error', handleError);
@@ -136,6 +159,7 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:claim-window', handleClaimWindow);
       s.off('game:rob-kong-window', handleClaimWindow);
       s.off('game:contested', handleContested);
+      s.off('game:event', handleGameEvent);
       s.off('game:ended', handleEnded);
       s.off('game:rematch-ready', handleRematchReady);
       s.off('game:error', handleError);
