@@ -19,6 +19,10 @@ import type { WsRoomStartedPayload } from '@nanchang/shared';
 // Wind symbols in seat-index order (East/South/West/North)
 const WIND_SYMBOLS = ['東', '南', '西', '北'];
 
+// API values for the view-mode toggle — not i18n strings
+const VIEW_MODES = ['3D', '2D'] as const;
+type ViewMode = (typeof VIEW_MODES)[number];
+
 export function RoomPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -29,7 +33,8 @@ export function RoomPage() {
   const error = useRoomStore((s) => s.error);
   const { clearRoom } = useRoomStore();
 
-  const { getRoomByCode, leaveRoom, setReady, kickSeat, startGame } = useRoomActions();
+  const { getRoomByCode, leaveRoom, setReady, kickSeat, startGame, updateSettings } =
+    useRoomActions();
   const user = useAuthStore((s) => s.user);
 
   // Fetch room on mount (in case of hard-refresh or direct navigation).
@@ -277,7 +282,7 @@ export function RoomPage() {
           </div>
         </div>
 
-        {/* Settings (read-only in Phase 6) */}
+        {/* Settings */}
         <div>
           <p className="text-[11px] font-semibold tracking-wider text-mj-bone/65 mb-2">
             {t('roundSettings')}
@@ -317,6 +322,41 @@ export function RoomPage() {
                 <span className="text-mj-gold font-semibold">{value}</span>
               </div>
             ))}
+
+            {/* View mode row — interactive toggle for host, read-only label for others */}
+            <div className="flex justify-between items-center px-4 py-3 text-sm">
+              <span className="text-mj-bone/70">{t('settingViewModeLabel')}</span>
+              {isHost && room.status === 'waiting' ? (
+                <div className="flex gap-1.5" role="group" aria-label={t('settingViewModeLabel')}>
+                  {VIEW_MODES.map((mode: ViewMode) => {
+                    const active = room.settings.viewMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => updateSettings(room.roomId, mode)}
+                        disabled={loading}
+                        className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                        style={{
+                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          border: active
+                            ? '1px solid rgba(201,169,97,0.6)'
+                            : '1px solid rgba(245,239,223,0.12)',
+                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                        }}
+                        aria-pressed={active}
+                      >
+                        {t(mode === '3D' ? 'settingViewMode3d' : 'settingViewMode2d')}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-mj-gold font-semibold">
+                  {t(room.settings.viewMode === '3D' ? 'settingViewMode3d' : 'settingViewMode2d')}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

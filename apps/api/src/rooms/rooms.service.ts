@@ -160,6 +160,7 @@ export class RoomsService {
       startingScore: dto?.settings?.startingScore ?? 0,
       timerSecs: dto?.settings?.timerSecs ?? 30,
       minFan: dto?.settings?.minFan ?? 1,
+      viewMode: dto?.settings?.viewMode ?? '3D',
     };
 
     await this.db.transactWrite({
@@ -435,5 +436,36 @@ export class RoomsService {
 
     const updated = (await this.queryRoom(roomId))!;
     return { room: updated, gameId };
+  }
+
+  /**
+   * Update mutable pre-game settings. Only the host may call this, and only
+   * while the room is still in the 'waiting' state.
+   * Currently exposes viewMode only; extend the body when more settings become live-editable.
+   */
+  async updateSettings(
+    roomId: string,
+    requestingUserId: string,
+    viewMode: '2D' | '3D',
+  ): Promise<RoomState> {
+    const room = await this.queryRoom(roomId);
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.hostUserId !== requestingUserId)
+      throw new ForbiddenException('Only the host can update settings');
+    if (room.status !== 'waiting')
+      throw new BadRequestException('Cannot change settings after game starts');
+
+    await this.db.update({
+      Key: DK.room(roomId),
+      UpdateExpression: 'SET settings.viewMode = :viewMode, #ttl = :ttl, idleAt = :now',
+      ExpressionAttributeNames: { '#ttl': 'ttl' },
+      ExpressionAttributeValues: {
+        ':viewMode': viewMode,
+        ':ttl': this.ttlFromNow(),
+        ':now': new Date().toISOString(),
+      },
+    });
+
+    return (await this.queryRoom(roomId))!;
   }
 }

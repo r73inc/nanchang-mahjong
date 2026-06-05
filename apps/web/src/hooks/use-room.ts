@@ -121,7 +121,30 @@ export function useRoomActions() {
     [setRoom, setLoading, setError],
   );
 
-  return { createRoom, joinRoom, leaveRoom, setReady, kickSeat, startGame, getRoomByCode };
+  const updateSettings = useCallback(
+    async (roomId: string, viewMode: '2D' | '3D') => {
+      try {
+        const { data } = await api.patch<RoomState>(`/rooms/${roomId}/settings`, { viewMode });
+        setRoom(data);
+        return data;
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+        return null;
+      }
+    },
+    [setRoom, setError],
+  );
+
+  return {
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    setReady,
+    kickSeat,
+    startGame,
+    getRoomByCode,
+    updateSettings,
+  };
 }
 
 // ── Socket subscription ────────────────────────────────────────────────────────
