@@ -42,7 +42,6 @@ import { themeToVariant } from './utils/tile-texture-map';
 import { useTileTextures } from './hooks/useTileTextures';
 import { computeTableLayout } from './utils/table-layout';
 import { FeltSurface3D } from './components/FeltSurface3D';
-import { TileWall3D } from './components/TileWall3D';
 import { OpponentHand3D } from './components/OpponentHand3D';
 import { DiscardPool3D } from './components/DiscardPool3D';
 import { OpenMelds3D } from './components/OpenMelds3D';
@@ -103,10 +102,6 @@ function GameScene() {
 
       {/* ── Table surface ────────────────────────────────────────────────── */}
       <FeltSurface3D color={feltColor} />
-
-      {/* ── Draw wall ────────────────────────────────────────────────────── */}
-      {/* InstancedMesh of 136 slots; visible count = snapshot.wallCount */}
-      <TileWall3D wallCount={snapshot.wallCount} backTexture={backTexture} />
 
       {/* ── Opponent hands (face-down) ───────────────────────────────────── */}
       <OpponentHand3D

@@ -28,6 +28,7 @@ import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
 import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
+import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
 
@@ -590,6 +591,63 @@ interface HistoryEntry {
   tile?: TileType;
 }
 
+// ── SVG hand tile ─────────────────────────────────────────────────────────────
+
+/**
+ * Single tile rendered as an SVG image in the viewer's hand HUD.
+ * Uses the same Regular SVG textures as the 3D tile face stamps, displayed
+ * on an ivory background that matches the 3D tile body colour.
+ */
+function SvgHandTile({
+  tile,
+  isJing = false,
+  isSelected = false,
+  isDrawn = false,
+}: {
+  tile: TileType;
+  isJing?: boolean;
+  isSelected?: boolean;
+  isDrawn?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: 46,
+        height: 62,
+        borderRadius: 5,
+        background: '#f5efe0',
+        border: isJing || isSelected ? '2px solid #c9a961' : '1.5px solid rgba(201,169,97,0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        boxShadow: isJing ? '0 0 8px rgba(201,169,97,0.5)' : '0 2px 6px rgba(0,0,0,0.4)',
+      }}
+    >
+      <img
+        src={tileTexturePath(tile, 'Regular')}
+        style={{ width: '85%', height: '85%', objectFit: 'contain' }}
+        draggable={false}
+        alt=""
+      />
+      {isDrawn && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 3,
+            right: 3,
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: '#c9a961',
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Viewer hand HUD ───────────────────────────────────────────────────────────
 
 /**
@@ -715,11 +773,10 @@ function ViewerHandHUD({
                   flexShrink: 0,
                 }}
               >
-                <MahjongTile
+                <SvgHandTile
                   tile={tile}
-                  size="lg"
                   isJing={jingTypes.has(tile)}
-                  selected={isSelected}
+                  isSelected={isSelected}
                   isDrawn={isDrawn}
                 />
               </div>

@@ -117,6 +117,12 @@ export function MahjongTile3D({
       // Drawn: subtle warm tint so the player can identify the drawn tile.
       // Normal: pure white (texture at full brightness).
       color: new THREE.Color(isJing ? '#d4af37' : isDrawn ? '#fef5e0' : '#ffffff'),
+      // SVG face textures have transparent backgrounds. transparent:true lets
+      // the ivory tile body show through, giving white/cream tile appearance.
+      // depthWrite:false prevents transparent fragments from blocking tiles
+      // behind this one in the discard grid.
+      transparent: true,
+      depthWrite: false,
     });
   }, [tileType, faceMap, backTexture, isJing, isDrawn]);
 

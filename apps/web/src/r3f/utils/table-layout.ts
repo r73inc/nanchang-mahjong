@@ -34,12 +34,14 @@
  *   Standing tile (hand): rx=0, face (Z+) points toward its player.
  *     Viewer's tiles (Z+5.0):  ry=0         face points to +Z (toward camera)
  *     Across tiles  (Z−5.0):  ry=Math.PI   face points to −Z (away from camera)
- *     Right tiles   (X+5.0):  ry=−π/2      face points to +X (right)
- *     Left tiles    (X−5.0):  ry=+π/2      face points to −X (left)
+ *     Right tiles   (X+5.0):  ry=Math.PI   face points to −Z (same as across)
+ *     Left tiles    (X−5.0):  ry=Math.PI   face points to −Z (same as across)
  *
  *   Flat tile (discards / open melds):
  *     rx = −π/2  →  face (original +Z) maps to +Y (face visible from above)
- *     ry varies by seat — keeps text readable from each player's side.
+ *     ry = Math.PI for ALL seats — V-axis points toward camera (+Z) so tile
+ *     text is readable from the viewer's perspective regardless of which
+ *     player's discard pile it belongs to.
  */
 
 import type { ClientGameState } from '@nanchang/shared';
@@ -154,31 +156,28 @@ function handPoses(count: number, offset: 0 | 1 | 2 | 3): TilePose[] {
     ry: number;
     colAxisX: number;
     colAxisZ: number;
-    /** Side players (east/west) lie flat — back texture faces up toward camera. */
-    flat?: boolean;
   }> = [
     // 0 — viewer (south): tiles spread along X, standing at Z=+HAND_DIST
     { anchorX: 0, anchorZ: HAND_DIST, ry: 0, colAxisX: 1, colAxisZ: 0 },
-    // 1 — right (east): tiles spread along Z, FLAT at X=+HAND_DIST
-    //   rx = −π/2 rotates face (+Z local) to +Y world → back texture faces up.
-    { anchorX: HAND_DIST, anchorZ: 0, ry: -Math.PI / 2, colAxisX: 0, colAxisZ: 1, flat: true },
+    // 1 — right (east): tiles spread along Z, standing at X=+HAND_DIST
+    //   ry=Math.PI — same as across player; face points away from camera so
+    //   only the ivory body back is visible (correct for hidden opponent tiles).
+    { anchorX: HAND_DIST, anchorZ: 0, ry: Math.PI, colAxisX: 0, colAxisZ: 1 },
     // 2 — across (north): tiles spread along X, standing at Z=−HAND_DIST
     { anchorX: 0, anchorZ: -HAND_DIST, ry: Math.PI, colAxisX: 1, colAxisZ: 0 },
-    // 3 — left (west): tiles spread along Z, FLAT at X=−HAND_DIST
-    { anchorX: -HAND_DIST, anchorZ: 0, ry: Math.PI / 2, colAxisX: 0, colAxisZ: 1, flat: true },
+    // 3 — left (west): tiles spread along Z, standing at X=−HAND_DIST
+    { anchorX: -HAND_DIST, anchorZ: 0, ry: Math.PI, colAxisX: 0, colAxisZ: 1 },
   ];
 
-  const { anchorX, anchorZ, ry, colAxisX, colAxisZ, flat } = configs[offset];
+  const { anchorX, anchorZ, ry, colAxisX, colAxisZ } = configs[offset];
 
   return Array.from({ length: count }, (_, i) => {
     const col = startCol + i * TILE_STRIDE_W;
     return {
       x: anchorX + col * colAxisX,
-      // Flat tiles rest with TILE_DEPTH/2 above the felt; standing tiles with TILE_HEIGHT/2.
-      y: flat ? FLAT_Y : STANDING_Y,
+      y: STANDING_Y,
       z: anchorZ + col * colAxisZ,
-      // rx = −π/2 → tile lies flat; face stamp (+Z local) maps to +Y world (upward).
-      rx: flat ? -Math.PI / 2 : 0,
+      rx: 0,
       ry,
       rz: 0,
     };
@@ -207,11 +206,14 @@ function discardPoses(count: number, offset: 0 | 1 | 2 | 3): TilePose[] {
     // 0 — viewer (south): cols along +X, rows grow toward viewer (+Z from center)
     { baseX: 0, baseZ: DISCARD_START, ry: Math.PI, colX: 1, colZ: 0, rowX: 0, rowZ: 1 },
     // 1 — right (east): cols along +Z, rows grow toward right (+X from center)
-    { baseX: DISCARD_START, baseZ: 0, ry: -Math.PI / 2, colX: 0, colZ: 1, rowX: 1, rowZ: 0 },
+    //   ry=π (matches viewer) — tile V-axis points toward camera, text readable.
+    { baseX: DISCARD_START, baseZ: 0, ry: Math.PI, colX: 0, colZ: 1, rowX: 1, rowZ: 0 },
     // 2 — across (north): cols along +X, rows grow toward across (-Z from center)
-    { baseX: 0, baseZ: -DISCARD_START, ry: 0, colX: 1, colZ: 0, rowX: 0, rowZ: -1 },
+    //   ry=π (matches viewer) — tile V-axis points toward camera, text readable.
+    { baseX: 0, baseZ: -DISCARD_START, ry: Math.PI, colX: 1, colZ: 0, rowX: 0, rowZ: -1 },
     // 3 — left (west): cols along +Z, rows grow toward left (-X from center)
-    { baseX: -DISCARD_START, baseZ: 0, ry: Math.PI / 2, colX: 0, colZ: 1, rowX: -1, rowZ: 0 },
+    //   ry=π (matches viewer) — tile V-axis points toward camera, text readable.
+    { baseX: -DISCARD_START, baseZ: 0, ry: Math.PI, colX: 0, colZ: 1, rowX: -1, rowZ: 0 },
   ];
 
   const { baseX, baseZ, ry, colX, colZ, rowX, rowZ } = configs[offset];
@@ -261,12 +263,12 @@ function openMeldPoses(tileCount: number, meldIndex: number, offset: 0 | 1 | 2 |
   }> = [
     // 0 — viewer (south): melds spread along +X from centre, sitting at Z=MELD_DIST
     { anchorX: 0, anchorZ: MELD_DIST, ry: Math.PI, colX: 1, colZ: 0 },
-    // 1 — right (east)
-    { anchorX: MELD_DIST, anchorZ: 0, ry: -Math.PI / 2, colX: 0, colZ: 1 },
-    // 2 — across (north)
-    { anchorX: 0, anchorZ: -MELD_DIST, ry: 0, colX: 1, colZ: 0 },
-    // 3 — left (west)
-    { anchorX: -MELD_DIST, anchorZ: 0, ry: Math.PI / 2, colX: 0, colZ: 1 },
+    // 1 — right (east): ry=π so tile face points toward camera (readable from above).
+    { anchorX: MELD_DIST, anchorZ: 0, ry: Math.PI, colX: 0, colZ: 1 },
+    // 2 — across (north): ry=π so tile face points toward camera (readable from above).
+    { anchorX: 0, anchorZ: -MELD_DIST, ry: Math.PI, colX: 1, colZ: 0 },
+    // 3 — left (west): ry=π so tile face points toward camera (readable from above).
+    { anchorX: -MELD_DIST, anchorZ: 0, ry: Math.PI, colX: 0, colZ: 1 },
   ];
 
   const { anchorX, anchorZ, ry, colX, colZ } = configs[offset];

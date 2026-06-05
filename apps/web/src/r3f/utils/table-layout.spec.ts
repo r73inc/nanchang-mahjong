@@ -194,23 +194,23 @@ describe('opponentHands', () => {
     }
   });
 
-  it('right/left opponent tiles lie flat at y = FLAT_Y (back texture faces up)', () => {
+  it('right/left opponent tiles stand upright at y = STANDING_Y', () => {
     const snap = makeSnapshot({
       seats: [{}, { handCount: 4 }, {}, { handCount: 4 }],
     });
     const layout = computeTableLayout(snap);
     for (const pose of [...layout.opponentHands.right, ...layout.opponentHands.left]) {
-      approx(pose.y, FLAT_Y);
+      approx(pose.y, STANDING_Y);
     }
   });
 
-  it('right/left opponent tiles have rx = −π/2 (lying flat)', () => {
+  it('right/left opponent tiles have rx = 0 (standing upright, face away from camera)', () => {
     const snap = makeSnapshot({
       seats: [{}, { handCount: 4 }, {}, { handCount: 4 }],
     });
     const layout = computeTableLayout(snap);
     for (const pose of [...layout.opponentHands.right, ...layout.opponentHands.left]) {
-      approx(pose.rx, -Math.PI / 2);
+      approx(pose.rx, 0);
     }
   });
 });
