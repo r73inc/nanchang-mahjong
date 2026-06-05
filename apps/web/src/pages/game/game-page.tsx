@@ -585,6 +585,8 @@ interface HistoryEntry {
   id: number;
   kind: 'discard' | 'pung' | 'chow' | 'kong' | 'win' | 'concede';
   seatWind: SeatWind;
+  /** Absolute seat index (0–3) — used to derive compass position relative to viewer. */
+  seatIdx: number;
   tile?: TileType;
 }
 
@@ -761,7 +763,7 @@ function GameHistoryPanel({
     }
   }, [entries.length, isOpen]);
 
-  const PANEL_W = 188;
+  const PANEL_W = 210;
 
   const ACTION_LABEL: Partial<Record<HistoryEntry['kind'], string>> = {
     pung: t('gameActionPung'),
@@ -770,6 +772,15 @@ function GameHistoryPanel({
     win: t('gameActionWin'),
     concede: t('gameActionConcede'),
   };
+
+  // Compass position label for each seat relative to the viewer.
+  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+  const POSITION_LABEL = [
+    t('gamePositionYou'),
+    t('gamePositionRight'),
+    t('gamePositionAcross'),
+    t('gamePositionLeft'),
+  ];
 
   return (
     <>
@@ -791,7 +802,7 @@ function GameHistoryPanel({
           transition: 'right 0.22s ease',
           cursor: 'pointer',
         }}
-        aria-label={isOpen ? t('gameHistoryTitle') : t('gameHistoryTitle')}
+        aria-label={t('gameHistoryTitle')}
       >
         {isOpen ? t('gameHistoryClose') : t('gameHistoryOpen')}
       </button>
@@ -830,40 +841,54 @@ function GameHistoryPanel({
             <p className="text-[10px] text-mj-bone/20 text-center mt-6 px-3">—</p>
           ) : (
             <div className="flex flex-col py-1">
-              {entries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center gap-1.5 px-3 py-[5px]"
-                  style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
-                >
-                  {/* Wind dot */}
-                  <span
-                    className="w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ background: WIND_COLOR[entry.seatWind] }}
-                  />
-                  {/* Wind char */}
-                  <span
-                    className="text-[10px] font-bold shrink-0"
-                    style={{ color: WIND_COLOR[entry.seatWind] }}
+              {entries.map((entry) => {
+                // Compass offset from viewer's seat → position label.
+                const offset = (entry.seatIdx - viewerSeat + 4) % 4;
+                const posLabel = POSITION_LABEL[offset];
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-1 px-2 py-[5px]"
+                    style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
                   >
-                    {WIND_CHAR[entry.seatWind]}
-                  </span>
-                  {/* Action label */}
-                  <span className="text-[10px] text-mj-bone/50 shrink-0">
-                    {entry.kind === 'discard' ? t('gameHistoryDiscard') : ACTION_LABEL[entry.kind]}
-                  </span>
-                  {/* Tile (if any) */}
-                  {entry.tile && (
-                    <MahjongTile
-                      tile={entry.tile}
-                      size="xs"
-                      isJing={
-                        entry.tile === snapshot.jingPrimary || entry.tile === snapshot.jingSecondary
-                      }
+                    {/* Wind dot */}
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: WIND_COLOR[entry.seatWind] }}
                     />
-                  )}
-                </div>
-              ))}
+                    {/* Position + wind — e.g. "You 南" or "Right 東" */}
+                    <span
+                      className="text-[10px] font-bold shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind] }}
+                    >
+                      {posLabel}
+                    </span>
+                    <span
+                      className="text-[9px] shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind], opacity: 0.7 }}
+                    >
+                      {WIND_CHAR[entry.seatWind]}
+                    </span>
+                    {/* Action label */}
+                    <span className="text-[10px] text-mj-bone/50 shrink-0">
+                      {entry.kind === 'discard'
+                        ? t('gameHistoryDiscard')
+                        : ACTION_LABEL[entry.kind]}
+                    </span>
+                    {/* Tile (if any) */}
+                    {entry.tile && (
+                      <MahjongTile
+                        tile={entry.tile}
+                        size="xs"
+                        isJing={
+                          entry.tile === snapshot.jingPrimary ||
+                          entry.tile === snapshot.jingSecondary
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -944,7 +969,7 @@ function GameTable({
       // New discard (last tile in discards array is the new one).
       if (seat.discards.length > prevSeat.discards.length) {
         const tile = seat.discards[seat.discards.length - 1];
-        addHistory({ kind: 'discard', seatWind: seat.wind, tile });
+        addHistory({ kind: 'discard', seatWind: seat.wind, seatIdx: i, tile });
       }
 
       // New open meld (pung / chow / kong / kong_added).
@@ -952,7 +977,7 @@ function GameTable({
         const newMeld = seat.openMelds[seat.openMelds.length - 1];
         const kind: HistoryEntry['kind'] =
           newMeld.kind === 'pung' ? 'pung' : newMeld.kind === 'chow' ? 'chow' : 'kong';
-        addHistory({ kind, seatWind: seat.wind, tile: newMeld.tiles[0] });
+        addHistory({ kind, seatWind: seat.wind, seatIdx: i, tile: newMeld.tiles[0] });
       }
     });
   }, [snapshot, addHistory]);
@@ -966,6 +991,7 @@ function GameTable({
         addHistory({
           kind: toast.kind === 'win' ? 'win' : 'concede',
           seatWind: wind,
+          seatIdx: toast.seat,
         });
       }
     }

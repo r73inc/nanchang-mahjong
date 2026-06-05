@@ -100,12 +100,9 @@ const WALL_SLOTS: WallSlot[] = (() => {
   return result;
 })();
 
-// ── Shared geometry / material (created once, never disposed) ─────────────────
+// ── Shared geometry (created once, never disposed) ────────────────────────────
 
 const WALL_GEO = new THREE.BoxGeometry(TILE_W, TILE_H, TILE_D);
-
-/** Slightly warmer ivory than the felt — distinguishable but not distracting. */
-const WALL_MAT = new THREE.MeshBasicMaterial({ color: '#e4dbc8' });
 
 /** A zero-scale matrix to hide unused instances without incurring draw cost. */
 const ZERO_MAT4 = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -115,13 +112,23 @@ const ZERO_MAT4 = new THREE.Matrix4().makeScale(0, 0, 0);
 interface TileWall3DProps {
   /** Number of tiles remaining in the draw wall (from snapshot.wallCount). */
   wallCount: number;
+  /** Back-face SVG texture — applied to all wall tile instances. */
+  backTexture: THREE.Texture;
 }
 
-export function TileWall3D({ wallCount }: TileWall3DProps) {
+export function TileWall3D({ wallCount, backTexture }: TileWall3DProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
 
   // Reusable Object3D for matrix composition — avoids per-frame allocations.
   const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  // Per-component material so the Back.svg texture is applied to every instance.
+  // Disposed on unmount to free GPU memory.
+  const wallMaterial = useMemo(
+    () => new THREE.MeshBasicMaterial({ map: backTexture }),
+    [backTexture],
+  );
+  useEffect(() => () => wallMaterial.dispose(), [wallMaterial]);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -150,7 +157,7 @@ export function TileWall3D({ wallCount }: TileWall3DProps) {
   return (
     <instancedMesh
       ref={meshRef}
-      args={[WALL_GEO, WALL_MAT, TOTAL]}
+      args={[WALL_GEO, wallMaterial, TOTAL]}
       frustumCulled={false} // wall spans the whole table — skip frustum check
     />
   );

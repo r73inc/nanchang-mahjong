@@ -154,26 +154,31 @@ function handPoses(count: number, offset: 0 | 1 | 2 | 3): TilePose[] {
     ry: number;
     colAxisX: number;
     colAxisZ: number;
+    /** Side players (east/west) lie flat — back texture faces up toward camera. */
+    flat?: boolean;
   }> = [
     // 0 — viewer (south): tiles spread along X, standing at Z=+HAND_DIST
     { anchorX: 0, anchorZ: HAND_DIST, ry: 0, colAxisX: 1, colAxisZ: 0 },
-    // 1 — right (east): tiles spread along Z, standing at X=+HAND_DIST
-    { anchorX: HAND_DIST, anchorZ: 0, ry: -Math.PI / 2, colAxisX: 0, colAxisZ: 1 },
-    // 2 — across (north): tiles spread along X, standing at Z=-HAND_DIST
+    // 1 — right (east): tiles spread along Z, FLAT at X=+HAND_DIST
+    //   rx = −π/2 rotates face (+Z local) to +Y world → back texture faces up.
+    { anchorX: HAND_DIST, anchorZ: 0, ry: -Math.PI / 2, colAxisX: 0, colAxisZ: 1, flat: true },
+    // 2 — across (north): tiles spread along X, standing at Z=−HAND_DIST
     { anchorX: 0, anchorZ: -HAND_DIST, ry: Math.PI, colAxisX: 1, colAxisZ: 0 },
-    // 3 — left (west): tiles spread along Z, standing at X=-HAND_DIST
-    { anchorX: -HAND_DIST, anchorZ: 0, ry: Math.PI / 2, colAxisX: 0, colAxisZ: 1 },
+    // 3 — left (west): tiles spread along Z, FLAT at X=−HAND_DIST
+    { anchorX: -HAND_DIST, anchorZ: 0, ry: Math.PI / 2, colAxisX: 0, colAxisZ: 1, flat: true },
   ];
 
-  const { anchorX, anchorZ, ry, colAxisX, colAxisZ } = configs[offset];
+  const { anchorX, anchorZ, ry, colAxisX, colAxisZ, flat } = configs[offset];
 
   return Array.from({ length: count }, (_, i) => {
     const col = startCol + i * TILE_STRIDE_W;
     return {
       x: anchorX + col * colAxisX,
-      y: STANDING_Y,
+      // Flat tiles rest with TILE_DEPTH/2 above the felt; standing tiles with TILE_HEIGHT/2.
+      y: flat ? FLAT_Y : STANDING_Y,
       z: anchorZ + col * colAxisZ,
-      rx: 0,
+      // rx = −π/2 → tile lies flat; face stamp (+Z local) maps to +Y world (upward).
+      rx: flat ? -Math.PI / 2 : 0,
       ry,
       rz: 0,
     };

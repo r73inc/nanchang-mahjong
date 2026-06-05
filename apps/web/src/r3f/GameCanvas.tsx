@@ -106,7 +106,7 @@ function GameScene() {
 
       {/* ── Draw wall ────────────────────────────────────────────────────── */}
       {/* InstancedMesh of 136 slots; visible count = snapshot.wallCount */}
-      <TileWall3D wallCount={snapshot.wallCount} />
+      <TileWall3D wallCount={snapshot.wallCount} backTexture={backTexture} />
 
       {/* ── Opponent hands (face-down) ───────────────────────────────────── */}
       <OpponentHand3D
