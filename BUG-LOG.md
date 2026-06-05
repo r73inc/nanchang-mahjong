@@ -221,6 +221,26 @@ ts-jest transpiles the TypeScript source on the fly, so no pre-built `dist/` is 
 
 ---
 
+## PR #30 — `chore/bug-log` (2026-06-05)
+
+---
+
+### BUG-012 · Chow claim prompt shown to wrong players
+
+**Symptom:** During a live 4-player match, two different players were both prompted to claim a chow off the same discard. Only one player should ever be eligible.
+
+**Root cause:** `computeEligibleClaims` in `apps/api/src/game/claim-resolver.ts` looped over all 4 seats (excluding the discarder) and called `chowOptions()` on each one. If any seat held tiles that formed a valid sequence with the discard, it was offered the chow prompt — regardless of seat position relative to the discarder.
+
+`chowOptions()` in `packages/engine/src/calls.ts` has no positional guard; its docstring says "the player must be immediately after the discarder" but that is documentation of intent, not enforcement. The engine's `chow()` method does enforce `(discardedBySeat + 1) % 4`, but only at claim submission time — after the player has already been shown the (incorrect) prompt.
+
+To compound the confusion, `resolveClaims` had a comment claiming "the engine enforces this via chowOptions" — which was factually wrong.
+
+**Fix:** In `computeEligibleClaims`, pre-compute `nextSeat = ((discardedBySeat + 1) % 4) as Seat4` and gate the `chowOptions` call behind `seat === nextSeat`. Added 3 unit tests covering all discarder positions (0→1, 2→3, wrap-around 3→0) using a `makeClaimsState` fixture helper that constructs specific hands. Corrected the misleading comment in `resolveClaims`.
+
+**Learning:** Pung/Kong eligibility is position-independent (any seat can pung any player's discard). Chow eligibility is position-dependent (only the one immediate downstream seat). These two categories must be handled differently in any claim-window computation. Always test claim eligibility against all 4 possible discarder seats, including the wrap-around case (seat 3 → seat 0). Never rely on a comment saying "X enforces Y" — verify it or add a test that proves it.
+
+---
+
 ## Template for future entries
 
 ```
