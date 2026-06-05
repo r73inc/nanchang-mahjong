@@ -630,13 +630,11 @@ function GameTable({
   return (
     <div className="relative w-full h-dvh overflow-hidden bg-black">
       {/* ── 3D canvas — fills entire screen ───────────────────────────────── */}
+      {/* snapshot + selectedTileIdx are read from the Zustand store inside    */}
+      {/* GameScene — so the canvas only re-renders on game-state changes,     */}
+      {/* not when claimWindow/toast/connection update in the parent.           */}
       <div className="absolute inset-0" aria-hidden="true">
-        <GameCanvas
-          snapshot={snapshot}
-          selectedTileIdx={selectedTileIdx}
-          onSelectTile={onSelect}
-          onDiscard={onDiscard}
-        />
+        <GameCanvas onSelectTile={onSelect} onDiscard={onDiscard} />
       </div>
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
