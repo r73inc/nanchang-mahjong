@@ -255,7 +255,7 @@ function GameEndScreen({
 
 // ── Game Table ────────────────────────────────────────────────────────────────
 
-/** Nameplate for an opponent seat (top, left, right). */
+/** Nameplate for a seat (opponent or viewer). Shows wind, score, dealer badge. */
 function Nameplate({
   seat,
   seatIdx,
@@ -268,6 +268,7 @@ function Nameplate({
   compact?: boolean;
 }) {
   const isActive = snapshot.currentSeat === seatIdx;
+  const isDealer = snapshot.dealerSeat === seatIdx;
   const { t } = useI18n();
 
   return (
@@ -277,15 +278,25 @@ function Nameplate({
         compact ? 'text-[10px]' : 'text-xs',
       ].join(' ')}
       style={{
-        background: isActive ? 'rgba(201,169,97,0.15)' : 'rgba(245,239,223,0.05)',
-        border: `1px solid ${isActive ? 'rgba(201,169,97,0.4)' : 'rgba(245,239,223,0.1)'}`,
+        background: isActive ? 'rgba(201,169,97,0.18)' : 'rgba(245,239,223,0.05)',
+        border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(245,239,223,0.1)'}`,
+        boxShadow: isActive ? '0 0 8px rgba(201,169,97,0.2)' : 'none',
       }}
     >
-      {/* Wind indicator */}
+      {/* Wind indicator dot */}
       <span
         className="w-2 h-2 rounded-full shrink-0"
         style={{ background: WIND_COLOR[seat.wind] }}
       />
+      {/* Dealer badge — only on the actual dealer seat */}
+      {isDealer && (
+        <span
+          className="text-[9px] font-bold px-1 rounded shrink-0"
+          style={{ background: 'rgba(201,169,97,0.3)', color: '#c9a961' }}
+        >
+          {t('gameDealerBadge')}
+        </span>
+      )}
       <span className="text-mj-bone/60 font-mono tabular-nums">{seat.score}</span>
       {seat.afk && (
         <span className="text-mj-loss-light text-[9px] ml-1">{t('gameWaitingTurn')}</span>
@@ -300,7 +311,48 @@ function Nameplate({
   );
 }
 
-/** The viewer's own hand at the bottom. */
+/** Renders a single open meld (pung = 3 tiles, kong = 4, chow = 3). */
+function MeldGroup({
+  meld,
+  size = 'xs',
+}: {
+  meld: import('@nanchang/shared').Meld;
+  size?: 'xs' | 'sm';
+}) {
+  return (
+    <div className="flex gap-[2px] items-center">
+      {meld.tiles.map((tile, i) => (
+        <MahjongTile key={i} tile={tile} size={size} isJing={false} />
+      ))}
+    </div>
+  );
+}
+
+/** All open melds for a seat, in a horizontal wrapping row. */
+function OpenMeldsDisplay({
+  openMelds,
+  size = 'xs',
+}: {
+  openMelds: import('@nanchang/shared').Meld[];
+  size?: 'xs' | 'sm';
+}) {
+  if (openMelds.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 items-center justify-center">
+      {openMelds.map((meld, i) => (
+        <div
+          key={i}
+          className="flex gap-[2px] px-1 py-0.5 rounded"
+          style={{ background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)' }}
+        >
+          <MeldGroup meld={meld} size={size} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The viewer's own hand + open melds at the bottom. */
 function ViewerHand({
   snapshot,
   selectedTileIdx,
@@ -318,14 +370,15 @@ function ViewerHand({
   const viewerSeat = snapshot.viewerSeat;
   if (viewerSeat === null) return null;
 
-  const hand = snapshot.seats[viewerSeat].hand ?? [];
+  const mySeat = snapshot.seats[viewerSeat];
+  const hand = mySeat.hand ?? [];
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
+  const isDealer = snapshot.dealerSeat === viewerSeat;
   const drawnTile = isMyTurn && hand.length > 0 ? hand[hand.length - 1] : null;
 
   const handleTileClick = (idx: number) => {
     if (!isMyTurn || pendingMove) return;
     if (selectedTileIdx === idx) {
-      // Second tap → discard
       onDiscard(hand[idx]);
     } else {
       onSelect(idx);
@@ -333,7 +386,24 @@ function ViewerHand({
   };
 
   return (
-    <div className="flex flex-col items-center gap-2 pb-2">
+    <div className="flex flex-col items-center gap-1.5 pb-2">
+      {/* Viewer nameplate row: wind dot + dealer badge + score */}
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full" style={{ background: WIND_COLOR[mySeat.wind] }} />
+        {isDealer && (
+          <span
+            className="text-[9px] font-bold px-1 rounded"
+            style={{ background: 'rgba(201,169,97,0.3)', color: '#c9a961' }}
+          >
+            {t('gameDealerBadge')}
+          </span>
+        )}
+        <span className="text-[10px] text-mj-bone/50 font-mono">{mySeat.score}</span>
+      </div>
+
+      {/* Viewer's open melds (above hand, left-aligned) */}
+      {mySeat.openMelds.length > 0 && <OpenMeldsDisplay openMelds={mySeat.openMelds} size="xs" />}
+
       {/* Instruction */}
       <p className="text-[10px] text-mj-bone/40">
         {isMyTurn
@@ -359,6 +429,65 @@ function ViewerHand({
             onClick={isMyTurn && !pendingMove ? () => handleTileClick(idx) : undefined}
           />
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Floating action toast — announces pung, chow, kong, win, concede to all players. */
+function ActionToast({
+  toast,
+  snapshot,
+}: {
+  toast: import('../../stores/game.store').GameToast;
+  snapshot: ClientGameState;
+}) {
+  const { t } = useI18n();
+
+  const ACTION_LABEL: Record<string, string> = {
+    pung: t('gameActionPung'),
+    chow: t('gameActionChow'),
+    kong_open: t('gameActionKong'),
+    kong_concealed: t('gameActionKong'),
+    kong_added: t('gameActionKong'),
+    win: t('gameActionWin'),
+    concede: t('gameActionConcede'),
+    contested: '✗',
+  };
+
+  const seat = snapshot.seats[toast.seat];
+  const label = ACTION_LABEL[toast.kind] ?? toast.kind;
+  const isContested = toast.kind === 'contested';
+
+  return (
+    <div
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
+      aria-live="assertive"
+      aria-atomic="true"
+    >
+      <div
+        className="flex flex-col items-center gap-1 px-6 py-3 rounded-2xl animate-call-prompt-enter"
+        style={{
+          background: isContested ? 'rgba(10,10,10,0.8)' : 'rgba(10,10,10,0.88)',
+          border: `1px solid ${isContested ? 'rgba(245,239,223,0.1)' : WIND_COLOR[seat.wind] + '66'}`,
+          backdropFilter: 'blur(10px)',
+          boxShadow: isContested ? 'none' : `0 8px 24px ${WIND_COLOR[seat.wind]}33`,
+        }}
+      >
+        {!isContested && (
+          <span
+            className="text-[10px] font-bold tracking-widest uppercase"
+            style={{ color: WIND_COLOR[seat.wind] }}
+          >
+            {WIND_CHAR[seat.wind]}
+          </span>
+        )}
+        <span
+          className="font-bold text-lg"
+          style={{ color: isContested ? 'rgba(245,239,223,0.3)' : '#f5efdf' }}
+        >
+          {label}
+        </span>
       </div>
     </div>
   );
@@ -528,6 +657,7 @@ function GameTable({
   snapshot,
   selectedTileIdx,
   claimWindow,
+  toast,
   pendingMove,
   onSelect,
   onDiscard,
@@ -538,6 +668,7 @@ function GameTable({
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
   claimWindow: ClaimWindowState | null;
+  toast: import('../../stores/game.store').GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
@@ -570,16 +701,13 @@ function GameTable({
           borderBottom: '1px solid rgba(245,239,223,0.08)',
         }}
       >
-        {/* Round wind + dealer */}
+        {/* Round wind (dealer badge lives on the nameplates, not here) */}
         <div className="flex items-center gap-2">
           <span
             className="text-xs font-bold font-serif"
             style={{ color: WIND_COLOR[snapshot.roundWind] }}
           >
             {WIND_CHAR[snapshot.roundWind]} {t('gameRound')}
-          </span>
-          <span className="text-[10px] text-mj-bone/40">
-            {t('gameDealer')} {WIND_CHAR[snapshot.seats[snapshot.dealerSeat].wind]}
           </span>
         </div>
 
@@ -623,6 +751,8 @@ function GameTable({
               <FaceDownTile key={i} size="xs" />
             ))}
           </div>
+          {/* Open melds for top opponent */}
+          <OpenMeldsDisplay openMelds={seatsData[acrossSeat].openMelds} size="xs" />
           <DiscardPile
             seat={seatsData[acrossSeat].wind}
             discards={seatsData[acrossSeat].discards}
@@ -633,7 +763,7 @@ function GameTable({
         {/* ── Middle row: left | center | right ────────────────────────── */}
         <div className="flex flex-1 px-2 gap-1 min-h-0">
           {/* Left opponent */}
-          <div className="flex flex-col items-end justify-center gap-1 w-[56px] shrink-0">
+          <div className="flex flex-col items-end justify-center gap-1 w-[64px] shrink-0">
             <Nameplate seat={seatsData[leftSeat]} seatIdx={leftSeat} snapshot={snapshot} compact />
             <div
               className="flex flex-col gap-[3px]"
@@ -643,21 +773,51 @@ function GameTable({
                 <FaceDownTile key={i} size="xs" />
               ))}
             </div>
+            {/* Open melds for left opponent */}
+            {seatsData[leftSeat].openMelds.length > 0 && (
+              <div className="flex flex-col gap-0.5 items-end">
+                {seatsData[leftSeat].openMelds.map((meld, i) => (
+                  <div
+                    key={i}
+                    className="flex gap-[2px] px-0.5 py-0.5 rounded"
+                    style={{
+                      background: 'rgba(201,169,97,0.08)',
+                      border: '1px solid rgba(201,169,97,0.2)',
+                    }}
+                  >
+                    {meld.tiles.map((tile, j) => (
+                      <MahjongTile key={j} tile={tile} size="xs" isJing={false} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Center: discard pools */}
           <div className="flex-1 flex flex-col gap-1 min-w-0 overflow-hidden">
-            {/* Turn indicator */}
-            <div className="flex justify-center">
+            {/* Turn indicator — shows whose turn it is + how many turns until viewer's */}
+            <div className="flex flex-col items-center gap-0.5">
               <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                className="text-[11px] font-bold px-3 py-1 rounded-full"
                 style={{
-                  background: isMyTurn ? 'rgba(201,169,97,0.2)' : 'rgba(245,239,223,0.05)',
-                  color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.4)',
+                  background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
+                  color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
+                  border: isMyTurn
+                    ? '1px solid rgba(201,169,97,0.4)'
+                    : '1px solid rgba(245,239,223,0.1)',
                 }}
               >
-                {isMyTurn ? t('gameYourTurn') : WIND_CHAR[seatsData[snapshot.currentSeat].wind]}
+                {isMyTurn
+                  ? t('gameYourTurn')
+                  : `${WIND_CHAR[seatsData[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
               </span>
+              {/* "N turns away" helper — only shown when not your turn */}
+              {!isMyTurn && snapshot.viewerSeat !== null && (
+                <span className="text-[9px] text-mj-bone/30">
+                  {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
+                </span>
+              )}
             </div>
 
             {/* 4 discard piles in a 2×2 grid */}
@@ -697,7 +857,7 @@ function GameTable({
           </div>
 
           {/* Right opponent */}
-          <div className="flex flex-col items-start justify-center gap-1 w-[56px] shrink-0">
+          <div className="flex flex-col items-start justify-center gap-1 w-[64px] shrink-0">
             <Nameplate
               seat={seatsData[rightSeat]}
               seatIdx={rightSeat}
@@ -712,6 +872,25 @@ function GameTable({
                 <FaceDownTile key={i} size="xs" />
               ))}
             </div>
+            {/* Open melds for right opponent */}
+            {seatsData[rightSeat].openMelds.length > 0 && (
+              <div className="flex flex-col gap-0.5 items-start">
+                {seatsData[rightSeat].openMelds.map((meld, i) => (
+                  <div
+                    key={i}
+                    className="flex gap-[2px] px-0.5 py-0.5 rounded"
+                    style={{
+                      background: 'rgba(201,169,97,0.08)',
+                      border: '1px solid rgba(201,169,97,0.2)',
+                    }}
+                  >
+                    {meld.tiles.map((tile, j) => (
+                      <MahjongTile key={j} tile={tile} size="xs" isJing={false} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -726,6 +905,9 @@ function GameTable({
           />
         </div>
       </div>
+
+      {/* ── Action toast — floats center-screen, auto-dismissed ─────────── */}
+      {toast && !showConcedeSheet && <ActionToast toast={toast} snapshot={snapshot} />}
 
       {/* ── Side rail (claim window overlay) ─────────────────────────────── */}
       {hasClaimWindow && !showConcedeSheet && (
@@ -761,6 +943,7 @@ export function GamePage() {
     connection,
     selectedTileIdx,
     claimWindow,
+    toast,
     pendingMove,
     selectTile,
     discard,
@@ -805,6 +988,7 @@ export function GamePage() {
           snapshot={snapshot}
           selectedTileIdx={selectedTileIdx}
           claimWindow={claimWindow}
+          toast={toast}
           pendingMove={pendingMove}
           onSelect={selectTile}
           onDiscard={discard}
