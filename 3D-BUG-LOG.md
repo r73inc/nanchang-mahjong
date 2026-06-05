@@ -3,49 +3,53 @@
 Bugs and improvements identified during local testing of the `feat/3d-ui` branch
 before merging to `main`. All items below are on branch `fix/3d-bugs`.
 
+**Status:** Commit `505626d` fixes MAJOR-01, MAJOR-02, BUG-02, BUG-03, IMP-01, IMP-02.
+Remaining: BUG-01 (re-test after BUG-03 fix — may be resolved), BUG-04, BUG-05.
+
 ---
 
 ## Improvements
 
-### IMP-01 — Camera angle too steep
+### IMP-01 — Camera angle too steep ✅ FIXED (commit 505626d)
 
 **Description:** The default viewing angle is too high. The camera is positioned too far above the table, producing a top-down perspective. It needs to come down closer to the tiles and use a shallower, more natural angle — like sitting around a real table.
-**Location:** `apps/web/src/r3f/GameCanvas.tsx` — `<Canvas camera={{ position: [0, 14, 10], fov: 48 }}>`
-**Fix approach:** Lower Y (height) and reduce Z (pullback), increase FOV slightly. Target something like `position: [0, 8, 14]`, `fov: 55` — to be tuned visually.
+**Location:** `apps/web/src/r3f/GameCanvas.tsx`
+**Fix applied:** `position: [0, 8, 13]`, `fov: 58` — lower Y, larger Z pullback, wider FOV.
 
 ---
 
-### IMP-02 — Tiles too shiny
+### IMP-02 — Tiles too shiny ✅ FIXED (commit 505626d)
 
 **Description:** The ceramic tile body material has too much clearcoat/reflectivity. Under the studio Environment IBL the tiles look like polished lacquer rather than matte melamine.
-**Location:** `apps/web/src/r3f/hooks/useTileGeometry.ts` — `MeshPhysicalMaterial` body material (`clearcoat: 0.75`, `reflectivity: 0.5`). Also `MahjongTile3D.tsx` face stamp material (`clearcoat: 0.55`).
-**Fix approach:** Reduce `clearcoat` to ~0.2, `clearcoatRoughness` to ~0.3, `roughness` to ~0.5 on body. Reduce or remove clearcoat on face stamp entirely.
+**Location:** `apps/web/src/r3f/hooks/useTileGeometry.ts`
+**Fix applied:** Body: `clearcoat: 0.2`, `clearcoatRoughness: 0.3`, `roughness: 0.45`, `reflectivity: 0.2`. Face stamp switched to `MeshBasicMaterial` (unlit — no clearcoat at all, see BUG-03).
 
 ---
 
 ## Bugs
 
-### BUG-01 — Tile face images use the dark (Black) palette
+### BUG-01 — Tile face images use the dark (Black) palette ⚠️ RE-TEST AFTER BUG-03/02 FIX
 
-**Description:** All tile faces are rendering with the Black/dark SVG textures even though the theme is set to classic/regular. The tile images appear dark-background instead of the white-background Regular tiles.
-**Location:** `apps/web/src/r3f/GameCanvas.tsx` — `themeToVariant(tilePalette)` maps `'classic'` and `'sepia'` → `'Regular'` and `'dark'` → `'Black'`. Also `apps/web/src/r3f/hooks/useTileTextures.ts` — texture loading.
-**Fix approach:** Verify `themeToVariant` returns `'Regular'` for the default palette. Confirm the SVG paths resolve to `/textures/Tiles/Regular/` not `/textures/Tiles/Black/`. Override to force `'Regular'` palette until dark mode tile switching is properly wired.
-
----
-
-### BUG-02 — Tile face images are upside down
-
-**Description:** The SVG texture on the face stamp plane is rendered 180° rotated — tile characters and symbols appear upside down.
-**Location:** `apps/web/src/r3f/components/MahjongTile3D.tsx` — face stamp `PlaneGeometry` at `FACE_STAMP_Z`. Also `apps/web/src/r3f/hooks/useTileTextures.ts` — `tex.flipY = false`.
-**Fix approach:** The `flipY = false` setting prevents the default Three.js Y-flip, but depending on how the PlaneGeometry faces the camera relative to the GLB orientation, an additional 180° rotation on the face stamp mesh (`rz: Math.PI`) or re-enabling `flipY: true` may be needed. Investigate orientation of the GLB body to determine correct fix.
+**Description:** All tile faces were rendering with the Black/dark SVG textures even though the theme is set to classic/regular. The tile images appear dark-background instead of the white-background Regular tiles.
+**Note:** `themeToVariant('classic')` correctly returns `'Regular'`. This bug may have been an artefact of BUG-03 (face stamp blown out by clearcoat → appearing dark) combined with BUG-02 (upside-down → different tile symbol shown). Re-test after the commit-505626d fixes before investigating further.
+**Location:** `apps/web/src/r3f/GameCanvas.tsx` — `themeToVariant(tilePalette)`, `apps/web/src/r3f/hooks/useTileTextures.ts`.
+**Remaining action:** Play a game and confirm Regular (white background) tiles show. If still dark, check ThemeStore localStorage persistence and the `tilePalette` value at runtime.
 
 ---
 
-### BUG-03 — Flat tiles (discards / melds) face invisible or blown out
+### BUG-02 — Tile face images are upside down ✅ FIXED (commit 505626d)
 
-**Description:** When a tile is placed flat on the table (discarded or played as part of a meld set), the tile face SVG is not visible or appears completely washed out by the lighting. The faces must always be readable regardless of flat vs. standing orientation.
-**Location:** `apps/web/src/r3f/components/MahjongTile3D.tsx` — face stamp mesh at `FACE_STAMP_Z`. `apps/web/src/r3f/GameCanvas.tsx` — lighting setup (directional light intensity 1.4, point light 0.35, ambient 0.45).
-**Fix approach:** The face stamp uses `MeshPhysicalMaterial` which is affected by scene lighting. When the tile is flat (`rx = -π/2` rotated to face upward), the existing lights may not illuminate it correctly, or clearcoat reflections overpower the texture. Options: (a) switch face stamp to `MeshBasicMaterial` (unlit — always fully visible regardless of light direction), or (b) add a dedicated top-down fill light to ensure flat tiles are readable. `MeshBasicMaterial` is strongly preferred — tile faces should always be 100% legible.
+**Description:** The SVG texture on the face stamp plane was rendered 180° rotated — tile characters and symbols appeared upside down.
+**Root cause:** `tex.flipY = false` in `useTileTextures.ts` was wrong. Three.js `flipY = true` (default) correctly compensates for WebGL's bottom-to-top texture addressing for browser-loaded SVGs. Setting it to `false` caused the image to appear inverted.
+**Fix applied:** `tex.flipY = true` in `useTileTextures.ts`.
+
+---
+
+### BUG-03 — Flat tiles (discards / melds) face invisible or blown out ✅ FIXED (commit 505626d)
+
+**Description:** When a tile is placed flat on the table (discarded or played as part of a meld set), the tile face SVG was not visible or appeared completely washed out by the lighting.
+**Root cause:** The face stamp used `MeshPhysicalMaterial` with `clearcoat: 0.55`. Under the directional key light, the clearcoat produced specular highlights that overwhelmed the SVG texture, especially for flat tiles whose face pointed toward the light source.
+**Fix applied:** Switched face stamp from `MeshPhysicalMaterial` to `MeshBasicMaterial` (unlit — ignores all scene lighting, always renders texture at 100% brightness). Jing tile pulse now animates `color` instead of `emissiveIntensity`.
 
 ---
 
@@ -68,33 +72,34 @@ before merging to `main`. All items below are on branch `fix/3d-bugs`.
 
 ## Major Bugs (Engine / Game Logic)
 
-### MAJOR-01 — Win condition not triggering with melds on board + pair in hand
+### MAJOR-01 — Win condition not triggering with melds on board + pair in hand ✅ FIXED (commit 505626d)
 
-**Description:** A player with 4 complete meld sets already played to the board (open melds) and a matching pair of 2 tiles in hand did not trigger a win. This should be a valid winning hand (4 melds + 1 pair = 14 tiles total).
-**Hypothesis:** The win checker in the engine may not be recognising open melds on the board when evaluating whether the hand is complete. Alternatively, the pair remaining in hand may not be counted as the required pair (eye/jantai) when all 4 sets are already open.
-**Location:** `packages/engine/src/` — win detection logic, likely `game-engine.ts` or a dedicated `win-checker.ts` / `hand-evaluator.ts`. Check how `openMelds` from the game state are included in the win check.
-**Fix approach:** Read the engine win-check code carefully. Verify it sums: `openMelds.length × 3 (or 4 for kongs) + hand tiles`. The hand tiles (after all sets are open) should just be the pair. If the engine only evaluates the tiles in `hand` without adding open melds to the count, it will never find a complete hand once sets are moved off.
-**Locked rules ref:** `docs/final-nanchang-mahjong-rules.md` — confirm the 4-meld + pair structure is valid under Nanchang rules.
+**Description:** A player with complete meld sets already played to the board (open melds) and a matching pair in hand did not trigger a win. This should be a valid winning hand (4 melds + 1 pair = 14 tiles total).
+**Root cause:** There was no mechanism for self-draw (tsumo) win declarations. The gateway had no `game:tsumo` handler and the frontend had no WIN button. After drawing a tile that completes the hand, `startTurn` just showed "Your Turn" with no win option.
+**Fix applied:** `game.service.ts` `startTurn()` now checks if the active player's full hand (open meld tiles + concealed hand) = 14 tiles and `isWinningHand` = true. If so, it auto-declares the win (tsumo) immediately — appropriate for a family game where declining a win is never desired.
 
 ---
 
-### MAJOR-02 — Player cannot claim a discarded tile to win by completing a pair
+### MAJOR-02 — Player cannot claim a discarded tile to win by completing a pair ✅ FIXED (commit 505626d)
 
-**Description:** When a player was waiting for a single tile to complete a pair and win (i.e., holding one tile of a pair and the matching tile was discarded by another player), the player was unable to claim that tile for the win. The claim window either did not show a win option, or the win was rejected.
-**Hypothesis:** The engine's `getClaimActions()` or equivalent may not recognise claiming a tile to complete a pair (眼/jantai) as a valid win action. It may only allow claiming sets (pung/kong/chow) not the final pair.
-**Location:** `packages/engine/src/` — claim action generation. Also `apps/api/src/game/` — `GameGateway` / `GameService` claim handling.
-**Fix approach:** In Nanchang rules, winning by claiming a tile to complete the pair is absolutely valid. The claim-window logic must include `win` as an available action when the player's hand + claimed tile would form a complete winning hand. Check the tile-claim win evaluation path separately from the self-draw win path.
-**Related:** MAJOR-01 — if the win checker itself is broken, fixing claim-pair-win requires fixing the underlying win check first.
+**Description:** When a player had open melds and was waiting for one tile to complete their hand (e.g., a final pair), they were unable to claim a discard for a win — the claim window showed no WIN option.
+**Root cause:** `canWin(hand, tile, jingTypes)` in `calls.ts` hard-checked `hand.length !== 13`. Players with open melds have fewer than 13 concealed tiles, so the check always returned false. `computeEligibleClaims` called `canWin` with only the concealed hand, never knowing about the open melds.
+**Fix applied:**
+
+- `packages/engine/src/calls.ts`: `canWin` gains optional `openMeldTiles: TileType[] = []` parameter. Builds `fullHand = [...openMeldTiles, ...hand, tile]` and checks `fullHand.length === 14`.
+- `apps/api/src/game/claim-resolver.ts`: `computeEligibleClaims` and `computeRobKongEligible` now pass each seat's `openMelds.flatMap(m => m.tiles)` to `canWin`.
+- 3 new engine unit tests + 1 claim-resolver integration test.
 
 ---
 
-## Investigation Order (for next session)
+## Investigation Order
 
-1. **MAJOR-01 + MAJOR-02** first — engine correctness is highest priority. All visual bugs are irrelevant if the game cannot be won.
-2. **BUG-03** (face stamp material) — switch to `MeshBasicMaterial`; this is a one-line change with high impact.
-3. **BUG-01** (wrong palette) — confirm texture path resolution.
-4. **BUG-02** (upside-down faces) — fix after BUG-01 so correct textures are visible while debugging orientation.
-5. **BUG-05** (side tiles face direction) — fix layout rotations.
-6. **BUG-04** (elongation) — likely partly resolved by IMP-01 camera fix.
-7. **IMP-01** (camera angle) — tune after geometry/face bugs are resolved so the angle is judged on correct visuals.
-8. **IMP-02** (shininess) — last; purely aesthetic.
+**Completed (commit 505626d):**
+
+1. ✅ MAJOR-01 + MAJOR-02 — engine/gateway win detection
+2. ✅ BUG-03 — face stamp MeshBasicMaterial
+3. ✅ BUG-02 — flipY fix (upside-down faces)
+4. ✅ IMP-01 — camera angle
+5. ✅ IMP-02 — shininess / clearcoat
+
+**Still to verify / fix:** 6. BUG-01 — re-test after above fixes (may be resolved) 7. BUG-05 — left/right player discard/meld tiles: re-test with BUG-03 fix applied; faces should now be visible via MeshBasicMaterial 8. BUG-04 — side tile elongation: re-test after IMP-01 camera angle change
