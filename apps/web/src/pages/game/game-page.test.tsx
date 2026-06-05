@@ -19,6 +19,11 @@ import type { ClientGameState } from '@nanchang/shared';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+// Mock the 3D canvas — jsdom has no WebGL context; render a stub div instead
+vi.mock('../../r3f/GameCanvas', () => ({
+  GameCanvas: () => <div data-testid="game-canvas-3d" aria-hidden="true" />,
+}));
+
 vi.mock('../../stores/auth.store', () => ({
   useAuthStore: vi.fn((sel: (s: { user: { sub: string }; accessToken: string }) => unknown) =>
     sel({ user: { sub: 'u1' }, accessToken: 'tok' }),
@@ -179,19 +184,22 @@ describe('GamePage', () => {
     });
   });
 
-  it('Gameplay·snapshot-redaction: viewer hand is visible, opponent hands are hidden', async () => {
+  it('Gameplay·snapshot-redaction: viewer hand is accessible, opponent hands are hidden', async () => {
     renderGamePage();
-    await pushSnapshot(makeSnapshot()); // viewerSeat=0, hand has tiles
+    await pushSnapshot(makeSnapshot()); // viewerSeat=0, hand has 13 tiles
 
     await waitFor(() => {
-      // Viewer's tiles (1m, 2m, etc.) should be visible as face-up tiles with role=button
+      // Viewer's tiles are exposed via sr-only AccessibleHand buttons
       const tiles = screen.getAllByRole('button', { name: /character|bamboo|dot|wind|dragon/i });
-      expect(tiles.length).toBeGreaterThan(0);
+      // Viewer has 13 tiles in makeSnapshot — exactly 13 accessible buttons
+      expect(tiles.length).toBe(13);
     });
 
-    // FaceDownTile components are aria-hidden — no aria-label with tile name
-    const faceDownContainers = document.querySelectorAll('[aria-hidden="true"]');
-    expect(faceDownContainers.length).toBeGreaterThan(0);
+    // Opponent tiles are rendered only in the 3D canvas (aria-hidden) — no DOM buttons
+    const allTileButtons = screen.queryAllByRole('button', {
+      name: /character|bamboo|dot|wind|dragon/i,
+    });
+    expect(allTileButtons.length).toBe(13);
   });
 
   it('Gameplay·snapshot-redaction: spectator sees no player hands as buttons', async () => {
