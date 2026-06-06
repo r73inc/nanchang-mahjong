@@ -1068,7 +1068,7 @@ function GameTable({
       {/* Branched on snapshot.viewMode set by the host before game start.    */}
       {/* All overlays (z-10+) are identical in both modes.                   */}
       <div className="absolute inset-0" aria-hidden="true">
-        {snapshot.viewMode === '2D' ? <GameTable2D /> : <GameCanvas />}
+        {snapshot.viewMode === '2D' ? <GameTable2D onDiscard={onDiscard} /> : <GameCanvas />}
       </div>
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
