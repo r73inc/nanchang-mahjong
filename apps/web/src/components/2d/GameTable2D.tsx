@@ -5,6 +5,12 @@
  * to its CSS Grid area with the correct containerTransform. All four zones are
  * populated in Phase F; the bottom zone (viewer) contains PlayerHand2D.
  *
+ * Phase G additions:
+ *  - MotionConfig reducedMotion="user" — all Framer Motion animations inside
+ *    the table respect the OS prefers-reduced-motion preference.
+ *  - DiscardContext.Provider — bridges PlayerHand2D's ephemeral tile IDs to
+ *    DiscardPool2D for the shared-element discard-flight layoutId animation.
+ *
  * CSS Grid template areas:
  *
  *   "top-corner  top         top-corner"
@@ -22,8 +28,11 @@
  *   PlayerHand2D                 (outer — at screen bottom edge)
  */
 
+import { useState } from 'react';
+import { MotionConfig } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
+import { DiscardContext } from './DiscardContext';
 import { seatConfig } from './layout-2d';
 import { FeltSurface2D } from './FeltSurface2D';
 import { SeatLabel2D } from './SeatLabel2D';
@@ -31,6 +40,11 @@ import { OpponentHand2D } from './OpponentHand2D';
 import { DiscardPool2D } from './DiscardPool2D';
 import { OpenMelds2D } from './OpenMelds2D';
 import { PlayerHand2D } from './PlayerHand2D';
+
+// ── Module-level constants (avoids i18next/no-literal-string on JSX props) ───
+
+/** MotionConfig reducedMotion value — "user" honours OS prefers-reduced-motion. */
+const REDUCED_MOTION = 'user' as const;
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -49,93 +63,107 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
   const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
 
+  // ── Discard-flight context ────────────────────────────────────────────────
+  // lastDiscardId is written by PlayerHand2D just before firing onDiscard.
+  // DiscardPool2D reads it to assign the matching layoutId to the newest tile.
+  const [lastDiscardId, setLastDiscardId] = useState<string | null>(null);
+
   return (
-    <div
-      className="w-full h-full relative overflow-hidden"
-      data-testid="game-table-2d"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '22% 56% 22%',
-        gridTemplateRows: '22% 56% 22%',
-        gridTemplateAreas: `
-          "top-corner top    top-corner"
-          "left       center right"
-          "btm-corner bottom btm-corner"
-        `,
-      }}
-    >
-      {/* ── Felt background — spans entire grid ───────────────────────────── */}
-      <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', position: 'relative' }}>
-        <FeltSurface2D />
-      </div>
-
-      {/* ── Seat zones ────────────────────────────────────────────────────── */}
-      {SEAT_INDICES.map((seatIdx) => {
-        const cfg = seatConfig(seatIdx, viewerSeat);
-        const isViewer = cfg.role === 'bottom';
-
-        if (isViewer) {
-          // Viewer zone: player hand at outer edge, discards/melds toward center
-          return (
-            <div
-              key={seatIdx}
-              style={{
-                gridArea: cfg.gridArea,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '4px 2px',
-                position: 'relative',
-                zIndex: 1,
-                overflow: 'hidden',
-              }}
-            >
-              {/* Inner edge: viewer's open melds + discards */}
-              <div
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
-              >
-                <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
-                <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
-              </div>
-
-              {/* Outer edge: the viewer's interactive hand */}
-              <PlayerHand2D onDiscard={onDiscard} />
-            </div>
-          );
-        }
-
-        // Opponent zone: rotated container with label → hand → discards → melds
-        return (
-          <div
-            key={seatIdx}
-            style={{
-              gridArea: cfg.gridArea,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 2px',
-              transform: cfg.containerTransform,
-              position: 'relative',
-              zIndex: 1,
-              overflow: 'hidden',
-            }}
-          >
-            {/* Outer edge: nameplate */}
-            <SeatLabel2D seatIdx={seatIdx} />
-
-            {/* Face-down hand */}
-            <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
-
-            {/* Discard pool */}
-            <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
-
-            {/* Inner edge: open melds */}
-            <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+    <DiscardContext.Provider value={{ lastDiscardId, setLastDiscardId }}>
+      <MotionConfig reducedMotion={REDUCED_MOTION}>
+        <div
+          className="w-full h-full relative overflow-hidden"
+          data-testid="game-table-2d"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '22% 56% 22%',
+            gridTemplateRows: '22% 56% 22%',
+            gridTemplateAreas: `
+              "top-corner top    top-corner"
+              "left       center right"
+              "btm-corner bottom btm-corner"
+            `,
+          }}
+        >
+          {/* ── Felt background — spans entire grid ─────────────────────── */}
+          <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', position: 'relative' }}>
+            <FeltSurface2D />
           </div>
-        );
-      })}
-    </div>
+
+          {/* ── Seat zones ────────────────────────────────────────────────── */}
+          {SEAT_INDICES.map((seatIdx) => {
+            const cfg = seatConfig(seatIdx, viewerSeat);
+            const isViewer = cfg.role === 'bottom';
+
+            if (isViewer) {
+              // Viewer zone: player hand at outer edge, discards/melds toward center
+              return (
+                <div
+                  key={seatIdx}
+                  style={{
+                    gridArea: cfg.gridArea,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '4px 2px',
+                    position: 'relative',
+                    zIndex: 1,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Inner edge: viewer's open melds + discards */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+                    <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
+                  </div>
+
+                  {/* Outer edge: the viewer's interactive hand */}
+                  <PlayerHand2D onDiscard={onDiscard} />
+                </div>
+              );
+            }
+
+            // Opponent zone: rotated container with label → hand → discards → melds
+            return (
+              <div
+                key={seatIdx}
+                style={{
+                  gridArea: cfg.gridArea,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 2px',
+                  transform: cfg.containerTransform,
+                  position: 'relative',
+                  zIndex: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Outer edge: nameplate */}
+                <SeatLabel2D seatIdx={seatIdx} />
+
+                {/* Face-down hand */}
+                <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
+
+                {/* Discard pool */}
+                <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
+
+                {/* Inner edge: open melds */}
+                <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+              </div>
+            );
+          })}
+        </div>
+      </MotionConfig>
+    </DiscardContext.Provider>
   );
 }
