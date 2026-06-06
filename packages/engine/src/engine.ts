@@ -189,6 +189,23 @@ export class GameEngine {
   }
 
   /**
+   * Patches two seats in one operation — used when a claim (pung/chow/kong)
+   * simultaneously updates the claiming seat AND removes the last tile from the
+   * discarder's `discards` pile so it doesn't ghost in the UI.
+   */
+  private patchTwoSeats(
+    idx1: 0 | 1 | 2 | 3,
+    patch1: Partial<SeatState>,
+    idx2: 0 | 1 | 2 | 3,
+    patch2: Partial<SeatState>,
+  ): GameState['seats'] {
+    const seats = [...this.state.seats] as GameState['seats'];
+    seats[idx1] = { ...seats[idx1], ...patch1 };
+    seats[idx2] = { ...seats[idx2], ...patch2 };
+    return seats;
+  }
+
+  /**
    * The seat wind of a given seat index for the current hand.
    * Dealer is always 'east'; subsequent seats in play order are south/west/north.
    */
@@ -545,7 +562,9 @@ export class GameEngine {
     if (seatIdx === this.state.discardedBySeat) throw new Error('Cannot pung own discard');
 
     const tile = this.state.pendingDiscard!;
+    const fromSeat = this.state.discardedBySeat!;
     const seat = this.state.seats[seatIdx];
+    const discarderSeat = this.state.seats[fromSeat];
 
     if (!canPung(seat.hand, tile, this.jingTypes)) {
       throw new Error(`Cannot pung ${tile}`);
@@ -567,13 +586,20 @@ export class GameEngine {
     return this.withState(
       {
         phase: 'playing',
-        seats: this.patchSeat(seatIdx, {
-          hand,
-          openMelds: [
-            ...seat.openMelds,
-            { kind: 'pung', tiles: [tile, tile, tile], concealed: false },
-          ],
-        }),
+        // Patch both seats: add the meld to the claimer AND remove the claimed
+        // tile from the discarder's discard pile so it doesn't ghost in the UI.
+        seats: this.patchTwoSeats(
+          seatIdx,
+          {
+            hand,
+            openMelds: [
+              ...seat.openMelds,
+              { kind: 'pung', tiles: [tile, tile, tile], concealed: false },
+            ],
+          },
+          fromSeat,
+          { discards: discarderSeat.discards.slice(0, -1) },
+        ),
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
@@ -594,6 +620,7 @@ export class GameEngine {
 
     const tile = this.state.pendingDiscard!;
     const seat = this.state.seats[seatIdx];
+    const discarderSeat = this.state.seats[fromSeat];
 
     const options = chowOptions(seat.hand, tile, this.jingTypes);
     if (!options.some((opt) => opt.every((t, i) => t === sequence[i]))) {
@@ -613,10 +640,17 @@ export class GameEngine {
     return this.withState(
       {
         phase: 'playing',
-        seats: this.patchSeat(seatIdx, {
-          hand,
-          openMelds: [...seat.openMelds, { kind: 'chow', tiles: sequence, concealed: false }],
-        }),
+        // Patch both seats: add the meld to the claimer AND remove the claimed
+        // tile from the discarder's discard pile so it doesn't ghost in the UI.
+        seats: this.patchTwoSeats(
+          seatIdx,
+          {
+            hand,
+            openMelds: [...seat.openMelds, { kind: 'chow', tiles: sequence, concealed: false }],
+          },
+          fromSeat,
+          { discards: discarderSeat.discards.slice(0, -1) },
+        ),
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
@@ -654,13 +688,23 @@ export class GameEngine {
       hand = this.removeJings(hand, 3);
     }
 
-    const newSeatsAfterMeld = this.patchSeat(seatIdx, {
-      hand,
-      openMelds: [
-        ...seat.openMelds,
-        { kind: 'kong', tiles: [tile, tile, tile, tile], concealed: false },
-      ],
-    });
+    const discarder = this.state.discardedBySeat!;
+    const discarderSeat = this.state.seats[discarder];
+
+    // Patch both seats: add the meld to the claimer AND remove the claimed tile
+    // from the discarder's discard pile so it doesn't ghost in the UI.
+    const newSeatsAfterMeld = this.patchTwoSeats(
+      seatIdx,
+      {
+        hand,
+        openMelds: [
+          ...seat.openMelds,
+          { kind: 'kong', tiles: [tile, tile, tile, tile], concealed: false },
+        ],
+      },
+      discarder,
+      { discards: discarderSeat.discards.slice(0, -1) },
+    );
 
     // Apply instant open-kong payment (§6.1): 1 pt from each other player
     const seatsAfterPayment = this.applyKongPayment(seatIdx, 'open', newSeatsAfterMeld);

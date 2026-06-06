@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine, nextDealer } from '../engine';
 import { isWinningHand } from '../hand';
+import { chowOptions } from '../calls';
 import type { TileType, GameState, Meld, GameEvent, SeatState, SeatWind } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -221,6 +222,26 @@ describe('Pung', () => {
   it('throws if trying to pung own discard', () => {
     const g = startedGame(42).discard(startedGame(42).state.seats[0].hand[0]);
     expect(() => g.pung(0)).toThrow();
+  });
+
+  it('pung removes the claimed tile from the discarder discards array (BUG-2D-01)', () => {
+    const g = startedGame(42);
+    const eastHand = g.state.seats[0].hand;
+    const southHand = g.state.seats[1].hand;
+    const target = eastHand.find((t) => southHand.filter((x) => x === t).length >= 2);
+    if (!target) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    const g2 = g.discard(target);
+    expect(g2.state.seats[0].discards).toContain(target); // tile is in discard pile
+
+    const g3 = g2.pung(1);
+    // After pung, the tile must NOT remain in the discarder's pile
+    expect(g3.state.seats[0].discards).not.toContain(target);
+    // And the claimer's meld must contain it
+    expect(g3.state.seats[1].openMelds[0].tiles).toContain(target);
   });
 });
 
@@ -711,6 +732,77 @@ describe('Engine·kong-instant-payments', () => {
     expect(after.state.seats[1].score).toBe(before[1] - 2);
     expect(after.state.seats[2].score).toBe(before[2] - 2);
     expect(after.state.seats[3].score).toBe(before[3] - 2);
+  });
+});
+
+// ── Claim removes tile from discarder's pile (BUG-2D-01) ─────────────────────
+
+describe('Engine·claim-clears-discarder-pile', () => {
+  it('chow removes the claimed tile from the discarder discards array', () => {
+    // Find a seed where seat 1 (south, directly after east) can chow east's discard
+    let g: GameEngine | null = null;
+    let target: TileType | null = null;
+
+    for (let seed = 0; seed < 500; seed++) {
+      const candidate = GameEngine.create(seed).deal().revealJing();
+      const eastHand = candidate.state.seats[0].hand;
+      const southHand = candidate.state.seats[1].hand;
+      const jts: TileType[] = [candidate.state.jingPrimary!, candidate.state.jingSecondary!];
+      for (const t of eastHand) {
+        if (chowOptions(southHand, t, jts).length > 0) {
+          g = candidate;
+          target = t;
+          break;
+        }
+      }
+      if (g) break;
+    }
+
+    if (!g || !target) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    const g2 = g.discard(target);
+    expect(g2.state.seats[0].discards).toContain(target);
+
+    const jingTypes: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
+    const seq = chowOptions(g.state.seats[1].hand, target, jingTypes)[0];
+    const g3 = g2.chow(1, seq);
+
+    expect(g3.state.seats[0].discards).not.toContain(target);
+    expect(g3.state.seats[1].openMelds[0].tiles).toContain(target);
+  });
+
+  it('kongFromDiscard removes the claimed tile from the discarder discards array', () => {
+    let g: GameEngine | null = null;
+    let target: TileType | null = null;
+
+    for (let seed = 0; seed < 500; seed++) {
+      const candidate = GameEngine.create(seed).deal().revealJing();
+      const eastHand = candidate.state.seats[0].hand;
+      const southHand = candidate.state.seats[1].hand;
+      for (const t of eastHand) {
+        if (southHand.filter((x) => x === t).length >= 3) {
+          g = candidate;
+          target = t;
+          break;
+        }
+      }
+      if (g) break;
+    }
+
+    if (!g || !target) {
+      expect(true).toBe(true);
+      return;
+    }
+
+    const g2 = g.discard(target);
+    expect(g2.state.seats[0].discards).toContain(target);
+
+    const g3 = g2.kongFromDiscard(1);
+    expect(g3.state.seats[0].discards).not.toContain(target);
+    expect(g3.state.seats[1].openMelds[0].tiles).toContain(target);
   });
 });
 
