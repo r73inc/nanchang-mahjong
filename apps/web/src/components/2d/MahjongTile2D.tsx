@@ -19,6 +19,7 @@ import { tileAriaLabel } from '@nanchang/shared';
 import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
 import { tileTexturePath, backTexturePath } from '../../r3f/utils/tile-texture-map';
+import { useTable2DScale } from './Table2DContext';
 import type { SeatRole } from './layout-2d';
 
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
@@ -100,19 +101,38 @@ export function MahjongTile2D({
   onSelect,
 }: MahjongTile2DProps) {
   const { lang } = useI18n();
+  const { tileScale } = useTable2DScale();
 
-  const dims = TILE_DIMS[size];
-  const [sx, sy] = SHADOW_OFFSETS[role];
+  // Scale all pixel dimensions by tileScale so tiles shrink proportionally
+  // on narrow or short viewports. Math.round prevents sub-pixel blurriness;
+  // Math.max guards against dimensions collapsing to 0.
+  const ref = TILE_DIMS[size];
+  const dims = {
+    w: Math.max(8, Math.round(ref.w * tileScale)),
+    h: Math.max(11, Math.round(ref.h * tileScale)),
+    shadow: Math.max(1, Math.round(ref.shadow * tileScale)),
+    radius: Math.max(2, Math.round(4 * tileScale)),
+  };
+
+  const [sxRef, syRef] = SHADOW_OFFSETS[role];
+  const sx = Math.round(sxRef * tileScale);
+  const sy = Math.round(syRef * tileScale);
   const thickness = dims.shadow;
+  // Tile lift when selected — scale proportionally so it doesn't look exaggerated
+  // at small tile sizes.
+  const liftY = Math.round(-6 * tileScale);
 
   const isBack = tile === 'back';
   const imgSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
   const ariaLabel = isBack ? ARIA_HIDDEN_TILE : tileAriaLabel(tile as TileType, lang);
 
-  // Build box-shadow: directional thickness + optional selected ring + optional jing glow
+  // Build box-shadow: directional thickness + optional selected ring + optional jing glow.
+  // Ring width and glow radius also scale so they remain proportional to tile size.
+  const ringPx = Math.max(1, Math.round(2 * tileScale));
+  const glowPx = Math.max(4, Math.round(12 * tileScale));
   const shadowParts: string[] = [`${sx}px ${sy}px ${thickness}px rgba(0,0,0,0.6)`];
-  if (selected) shadowParts.push('0 0 0 2px #c9a961');
-  if (isJing) shadowParts.push('0 0 12px rgba(201,169,97,0.7)');
+  if (selected) shadowParts.push(`0 0 0 ${ringPx}px #c9a961`);
+  if (isJing) shadowParts.push(`0 0 ${glowPx}px rgba(201,169,97,0.7)`);
   const boxShadow = shadowParts.join(', ');
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -130,7 +150,7 @@ export function MahjongTile2D({
       <motion.div
         layout
         layoutId={layoutId}
-        animate={{ y: selected ? -6 : 0 }}
+        animate={{ y: selected ? liftY : 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         role={interactive ? 'button' : 'img'}
         aria-label={ariaLabel}
@@ -143,7 +163,7 @@ export function MahjongTile2D({
         style={{
           width: dims.w,
           height: dims.h,
-          borderRadius: 4,
+          borderRadius: dims.radius,
           background: isBack
             ? 'linear-gradient(165deg, #1c1c1c 0%, #141414 100%)'
             : 'linear-gradient(to bottom, var(--tile-face-top, #fffbeb) 0%, var(--tile-face-bottom, #e8dfc5) 100%)',
@@ -180,9 +200,9 @@ export function MahjongTile2D({
           aria-hidden="true"
           style={{
             color: '#c9a961',
-            fontSize: 10,
+            fontSize: Math.max(8, Math.round(10 * tileScale)),
             lineHeight: 1,
-            marginTop: 2,
+            marginTop: Math.max(1, Math.round(2 * tileScale)),
             fontFamily: 'serif',
           }}
         >

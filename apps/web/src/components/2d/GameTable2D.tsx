@@ -2,8 +2,7 @@
  * GameTable2D — 2.5D DOM game table compositor.
  *
  * Reads viewerSeat from Zustand and uses seatConfig() to assign each seat
- * to its CSS Grid area with the correct containerTransform. All four zones are
- * populated in Phase F; the bottom zone (viewer) contains PlayerHand2D.
+ * to its CSS Grid area with the correct containerTransform.
  *
  * Phase G additions:
  *  - MotionConfig reducedMotion="user" — all Framer Motion animations inside
@@ -11,28 +10,41 @@
  *  - DiscardContext.Provider — bridges PlayerHand2D's ephemeral tile IDs to
  *    DiscardPool2D for the shared-element discard-flight layoutId animation.
  *
+ * BUG-2D-02 fix — responsive scaling:
+ *  - ResizeObserver tracks the table's actual pixel dimensions.
+ *  - computeTileScale() derives a tileScale in [0.25, 1.0] so tiles shrink
+ *    proportionally on narrow/short viewports.
+ *  - Table2DScaleContext.Provider broadcasts tileScale to all MahjongTile2D
+ *    instances inside the table.
+ *  - Grid rows changed from fixed `22% / 56% / 22%` to
+ *    `minmax(0,1fr) / minmax(0,2fr) / auto` so the viewer zone grows with
+ *    its content (melds + discards + hand) instead of overflowing.
+ *  - The viewer zone (role="bottom") spans all three columns so the hand
+ *    uses the full table width, not just the 56% center column.
+ *
  * CSS Grid template areas:
  *
- *   "top-corner  top         top-corner"
- *   "left        center      right"
- *   "btm-corner  bottom      btm-corner"
+ *   ".      top      ."
+ *   "left   center   right"
+ *   "bottom bottom   bottom"   ← viewer spans full width
  *
- * Each non-bottom seat zone is a rotated flex column:
- *   SeatLabel2D  (outer edge — farthest from table center in local coords)
+ * Each opponent seat zone is a rotated flex column:
+ *   SeatLabel2D  (outer edge)
  *   OpponentHand2D
  *   DiscardPool2D
- *   OpenMelds2D  (inner edge — closest to table center)
+ *   OpenMelds2D  (inner edge)
  *
- * The viewer's bottom zone is a reversed column:
- *   OpenMelds2D + DiscardPool2D  (inner — toward table center)
+ * The viewer's bottom zone (full-width) is a reversed column:
+ *   OpenMelds2D + DiscardPool2D  (inner)
  *   PlayerHand2D                 (outer — at screen bottom edge)
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MotionConfig } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { DiscardContext } from './DiscardContext';
+import { Table2DScaleContext, computeTileScale } from './Table2DContext';
 import { seatConfig } from './layout-2d';
 import { FeltSurface2D } from './FeltSurface2D';
 import { SeatLabel2D } from './SeatLabel2D';
@@ -64,45 +76,110 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
   const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
 
   // ── Discard-flight context ────────────────────────────────────────────────
-  // lastDiscardId is written by PlayerHand2D just before firing onDiscard.
-  // DiscardPool2D reads it to assign the matching layoutId to the newest tile.
   const [lastDiscardId, setLastDiscardId] = useState<string | null>(null);
 
+  // ── Responsive tile scaling (BUG-2D-02) ──────────────────────────────────
+  // ResizeObserver tracks the container's actual pixel dimensions and recomputes
+  // tileScale whenever the window resizes (or when the layout changes due to
+  // melds being added/removed).
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState({ w: 800, h: 600 });
+
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      // Guard against zero-size during initial mount
+      if (width > 0 && height > 0) {
+        setDims({ w: width, h: height });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const tileScale = computeTileScale(dims.w, dims.h);
+
   return (
-    <DiscardContext.Provider value={{ lastDiscardId, setLastDiscardId }}>
-      <MotionConfig reducedMotion={REDUCED_MOTION}>
-        <div
-          className="w-full h-full relative overflow-hidden"
-          data-testid="game-table-2d"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '22% 56% 22%',
-            gridTemplateRows: '22% 56% 22%',
-            // Corner cells are unused — use '.' (null cell) to avoid repeating
-            // the same area name in non-adjacent cells, which would make the
-            // entire grid-template-areas declaration invalid (CSS requires each
-            // named area to be a single rectangular region). An invalid
-            // grid-template-areas causes all gridArea placements to fail and
-            // every seat zone falls back to auto-placement at the top-left.
-            gridTemplateAreas: `
-              ". top    ."
-              "left       center right"
-              ".          bottom ."
-            `,
-          }}
-        >
-          {/* ── Felt background — spans entire grid ─────────────────────── */}
-          <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', position: 'relative' }}>
-            <FeltSurface2D />
-          </div>
+    <Table2DScaleContext.Provider value={{ tileScale }}>
+      <DiscardContext.Provider value={{ lastDiscardId, setLastDiscardId }}>
+        <MotionConfig reducedMotion={REDUCED_MOTION}>
+          <div
+            ref={tableRef}
+            className="w-full h-full relative overflow-hidden"
+            data-testid="game-table-2d"
+            style={{
+              display: 'grid',
+              // Side columns fixed at 22% each; center column fills the rest.
+              gridTemplateColumns: '22% 1fr 22%',
+              // Top row and center row share remaining height (1:2 ratio).
+              // Bottom row is auto-sized to its content — grows when melds are
+              // added so the viewer's hand is never pushed off-screen.
+              gridTemplateRows: 'minmax(0, 1fr) minmax(0, 2fr) auto',
+              // The viewer's bottom zone spans all three columns so PlayerHand2D
+              // gets the full table width (critical on narrow/mobile viewports).
+              // Corner cells in the top row use '.' (null) to avoid the
+              // invalid-area bug where repeating a name in non-adjacent cells
+              // silently discards the entire gridTemplateAreas declaration.
+              gridTemplateAreas: `
+                ".      top      ."
+                "left   center   right"
+                "bottom bottom   bottom"
+              `,
+            }}
+          >
+            {/* ── Felt background — spans entire grid ─────────────────── */}
+            <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', position: 'relative' }}>
+              <FeltSurface2D />
+            </div>
 
-          {/* ── Seat zones ────────────────────────────────────────────────── */}
-          {SEAT_INDICES.map((seatIdx) => {
-            const cfg = seatConfig(seatIdx, viewerSeat);
-            const isViewer = cfg.role === 'bottom';
+            {/* ── Seat zones ────────────────────────────────────────────── */}
+            {SEAT_INDICES.map((seatIdx) => {
+              const cfg = seatConfig(seatIdx, viewerSeat);
+              const isViewer = cfg.role === 'bottom';
 
-            if (isViewer) {
-              // Viewer zone: player hand at outer edge, discards/melds toward center
+              if (isViewer) {
+                // Viewer zone spans full width (all three columns via "bottom bottom bottom").
+                // Content stacks vertically: inner melds/discards at top, interactive hand at bottom.
+                return (
+                  <div
+                    key={seatIdx}
+                    style={{
+                      gridArea: cfg.gridArea,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      padding: '4px 8px',
+                      position: 'relative',
+                      zIndex: 1,
+                      // No overflow:hidden — selected tiles raise upward and
+                      // must remain visible above the zone boundary.
+                    }}
+                  >
+                    {/* Inner edge: viewer's open melds + discards */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+                      <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
+                    </div>
+
+                    {/* Outer edge: the viewer's interactive hand */}
+                    <PlayerHand2D onDiscard={onDiscard} />
+                  </div>
+                );
+              }
+
+              // Opponent zone: rotated container — label → hand → discards → melds.
+              // The CSS rotation swaps visual width/height so a 13-tile xs row
+              // fits within the center row's height (not the column's width).
               return (
                 <div
                   key={seatIdx}
@@ -113,68 +190,31 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '4px 2px',
+                    transform: cfg.containerTransform,
                     position: 'relative',
                     zIndex: 1,
-                    // No overflow:hidden — PlayerHand2D tiles raise upward on
-                    // selection and would be clipped. The outer wrapper handles
-                    // viewport clipping.
+                    // No overflow:hidden — for right/left seats the container is
+                    // 22% wide in local space. overflow:hidden would clip the
+                    // rotated tile row to zero visible area before rotation applies.
                   }}
                 >
-                  {/* Inner edge: viewer's open melds + discards */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
-                    <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
-                  </div>
+                  {/* Outer edge: nameplate */}
+                  <SeatLabel2D seatIdx={seatIdx} />
 
-                  {/* Outer edge: the viewer's interactive hand */}
-                  <PlayerHand2D onDiscard={onDiscard} />
+                  {/* Face-down hand */}
+                  <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
+
+                  {/* Discard pool */}
+                  <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
+
+                  {/* Inner edge: open melds */}
+                  <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
                 </div>
               );
-            }
-
-            // Opponent zone: rotated container with label → hand → discards → melds
-            return (
-              <div
-                key={seatIdx}
-                style={{
-                  gridArea: cfg.gridArea,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '4px 2px',
-                  transform: cfg.containerTransform,
-                  position: 'relative',
-                  zIndex: 1,
-                  // No overflow:hidden — for right/left seats the container is
-                  // 22% wide in local space but the tile row is ~390px. Setting
-                  // overflow:hidden clips the row to zero visible area after the
-                  // rotateZ transform. The outer wrapper handles viewport clipping.
-                }}
-              >
-                {/* Outer edge: nameplate */}
-                <SeatLabel2D seatIdx={seatIdx} />
-
-                {/* Face-down hand */}
-                <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
-
-                {/* Discard pool */}
-                <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
-
-                {/* Inner edge: open melds */}
-                <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
-              </div>
-            );
-          })}
-        </div>
-      </MotionConfig>
-    </DiscardContext.Provider>
+            })}
+          </div>
+        </MotionConfig>
+      </DiscardContext.Provider>
+    </Table2DScaleContext.Provider>
   );
 }
