@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true, // bind to 0.0.0.0 so LAN devices can reach the dev server
     proxy: {
       // Strip the /api prefix before forwarding to the NestJS server.
       // FE calls /api/auth/signin  →  API receives /auth/signin
