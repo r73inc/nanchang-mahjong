@@ -34,10 +34,26 @@ const HORIZONTAL_AXIS = 'x' as const;
 
 // ── Draw-tile animation variants (module-level for i18next/no-literal-string) ─
 
-/** Entering tile: fade + scale up from 80% opacity-0 over 200 ms. */
-const TILE_INITIAL = { opacity: 0, scale: 0.8 } as const;
-const TILE_ANIMATE = { opacity: 1, scale: 1 } as const;
-const TILE_TRANSITION = { duration: 0.2 } as const;
+/**
+ * Draw animation — new tile slides in from the right (simulates drawing from
+ * the wall) and scales up from 80%. Spring physics gives it a physical feel.
+ */
+const TILE_INITIAL = { opacity: 0, scale: 0.8, x: 24 } as const;
+const TILE_ANIMATE = { opacity: 1, scale: 1, x: 0 } as const;
+const TILE_TRANSITION = { type: 'spring', stiffness: 320, damping: 24 } as const;
+
+/**
+ * Discard exit animation — tile flies upward toward the board centre and fades
+ * out. Gives the visual impression of the tile leaving the hand and landing on
+ * the table. The transition is embedded so it overrides only the exit keyframe.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TILE_EXIT: any = {
+  opacity: 0,
+  y: -60,
+  scale: 0.75,
+  transition: { duration: 0.22, ease: 'easeIn' },
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -222,6 +238,7 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
               drag={draggable ? HORIZONTAL_AXIS : false}
               initial={TILE_INITIAL}
               animate={TILE_ANIMATE}
+              exit={TILE_EXIT}
               transition={TILE_TRANSITION}
               whileDragging={{ y: -12, zIndex: 10, scale: 1.05 }}
               style={{ listStyle: 'none', touchAction: 'none' }}

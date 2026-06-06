@@ -109,7 +109,9 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                     padding: '4px 2px',
                     position: 'relative',
                     zIndex: 1,
-                    overflow: 'hidden',
+                    // No overflow:hidden — PlayerHand2D tiles raise upward on
+                    // selection and would be clipped. The outer wrapper handles
+                    // viewport clipping.
                   }}
                 >
                   {/* Inner edge: viewer's open melds + discards */}
@@ -145,7 +147,10 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                   transform: cfg.containerTransform,
                   position: 'relative',
                   zIndex: 1,
-                  overflow: 'hidden',
+                  // No overflow:hidden — for right/left seats the container is
+                  // 22% wide in local space but the tile row is ~390px. Setting
+                  // overflow:hidden clips the row to zero visible area after the
+                  // rotateZ transform. The outer wrapper handles viewport clipping.
                 }}
               >
                 {/* Outer edge: nameplate */}
