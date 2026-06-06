@@ -2,16 +2,18 @@
  * GameTable2D.test.tsx
  *
  * Feature coverage:
- *  - 2DBoard·smoke:   full board renders without crashing
- *  - 2DBoard·zones:   all four seat zones are present
+ *  - 2DBoard·smoke:    full board renders without crashing
+ *  - 2DBoard·zones:    all four seat zones are present
  *  - 2DBoard·discards: discard pool shows correct tile count
- *  - 2DBoard·melds:   open melds section present when melds exist
+ *  - 2DBoard·melds:    open melds section present when melds exist
+ *  - 2DBoard·scale:    computeTileScale returns sensible values (BUG-2D-02)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { I18nProvider } from '../../i18n';
 import { GameTable2D } from './GameTable2D';
+import { computeTileScale, TILE_SCALE_MIN } from './Table2DContext';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState, ClientSeatState, Meld, TileType } from '@nanchang/shared';
 
@@ -209,5 +211,45 @@ describe('GameTable2D · 2DBoard·melds', () => {
     renderTable();
     // Default snapshot has no melds
     expect(screen.queryByTestId('open-melds-0')).not.toBeInTheDocument();
+  });
+});
+
+// ── BUG-2D-02: computeTileScale ───────────────────────────────────────────────
+
+describe('GameTable2D · 2DBoard·scale', () => {
+  it('returns 1.0 at the 800 × 600 reference canvas', () => {
+    // At reference size both constraints resolve above 1.0 and the result is
+    // capped at 1.0.
+    const s = computeTileScale(800, 600);
+    expect(s).toBeGreaterThanOrEqual(0.5); // comfortable margin for reference
+    expect(s).toBeLessThanOrEqual(1.0);
+  });
+
+  it('returns 1.0 on a large desktop viewport (1920 × 1080)', () => {
+    expect(computeTileScale(1920, 1080)).toBe(1.0);
+  });
+
+  it('returns a reduced scale on a narrow viewport (600 × 400)', () => {
+    const s = computeTileScale(600, 400);
+    expect(s).toBeLessThan(1.0);
+    expect(s).toBeGreaterThanOrEqual(TILE_SCALE_MIN);
+  });
+
+  it('is always ≥ TILE_SCALE_MIN regardless of viewport size', () => {
+    // Tiny viewport (e.g. very small embedded webview)
+    const s = computeTileScale(200, 150);
+    expect(s).toBeGreaterThanOrEqual(TILE_SCALE_MIN);
+  });
+
+  it('returns smaller scale on a narrow viewport than on a wide one', () => {
+    const narrow = computeTileScale(400, 800);
+    const wide = computeTileScale(1200, 800);
+    expect(narrow).toBeLessThanOrEqual(wide);
+  });
+
+  it('returns smaller scale on a short viewport than on a tall one', () => {
+    const short = computeTileScale(1200, 400);
+    const tall = computeTileScale(1200, 900);
+    expect(short).toBeLessThanOrEqual(tall);
   });
 });
