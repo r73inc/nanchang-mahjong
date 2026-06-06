@@ -49,12 +49,20 @@ const TILE_TRANSITION = { duration: 0.2 };
 
 export interface DiscardPool2DProps {
   seatIdx: 0 | 1 | 2 | 3;
+  /** Layout role — determines grid column count (via discardGrid). */
   role: SeatRole;
+  /**
+   * Shadow direction passed to MahjongTile2D. Defaults to `role`.
+   * Pass 'bottom' when rendering inside the centre area so the simulated
+   * overhead light source points the same direction for every tile regardless
+   * of which seat owns the discard (no container rotation in the centre).
+   */
+  tileRole?: SeatRole;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function DiscardPool2D({ seatIdx, role }: DiscardPool2DProps) {
+export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
   const claimWindow = useGameStore((s) => s.claimWindow);
   const { lastDiscardId } = useDiscardContext();
@@ -64,6 +72,9 @@ export function DiscardPool2D({ seatIdx, role }: DiscardPool2DProps) {
   const seat = snapshot.seats[seatIdx];
   const discards: TileType[] = seat.discards;
   const spec = discardGrid(role);
+  // Use tileRole for shadow direction when set (centre-area pools have no
+  // rotation context; shadow should always face screen-down-right = 'bottom').
+  const shadowRole = tileRole ?? role;
 
   if (discards.length === 0) return null;
 
@@ -105,7 +116,7 @@ export function DiscardPool2D({ seatIdx, role }: DiscardPool2DProps) {
               <MahjongTile2D
                 tile={tile}
                 size={spec.tileSize}
-                role={role}
+                role={shadowRole}
                 interactive={false}
                 layoutId={tileLayoutId}
               />

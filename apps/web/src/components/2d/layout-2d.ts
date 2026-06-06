@@ -83,7 +83,22 @@ const CONTAINER_TRANSFORMS: Record<SeatRole, string> = {
   left: 'rotateZ(90deg)',
 };
 
-const DISCARD_SPEC: DiscardGridSpec = { cols: 6, tileSize: 'sm', gap: 2 };
+/**
+ * Discard pool column counts for centre-area placement (BUG-2D-03).
+ *
+ * top/bottom pools sit horizontally — 6 columns fit the centre width.
+ * left/right pools sit vertically along the side edges — 3 columns keep them
+ * narrow enough not to overlap the compass rose.  (Previously both used 6
+ * columns because the seat zone container carried the 90° rotation; now that
+ * the pools are rendered inside the un-rotated centre cell the column count
+ * must encode the compactness directly.)
+ */
+const DISCARD_SPECS: Record<SeatRole, DiscardGridSpec> = {
+  bottom: { cols: 6, tileSize: 'sm', gap: 2 },
+  top: { cols: 6, tileSize: 'sm', gap: 2 },
+  left: { cols: 3, tileSize: 'sm', gap: 2 },
+  right: { cols: 3, tileSize: 'sm', gap: 2 },
+};
 
 const HAND_SPECS: Record<SeatRole, HandLayoutSpec> = {
   bottom: { tileSize: 'lg', gap: 4 },
@@ -118,11 +133,13 @@ export function seatConfig(seatIdx: 0 | 1 | 2 | 3, viewerSeat: 0 | 1 | 2 | 3): S
 }
 
 /**
- * Discard pool grid spec. All four seats share the same spec because the
- * zone container carries the rotation — the grid itself is always horizontal.
+ * Discard pool grid spec for centre-area placement (BUG-2D-03).
+ *
+ * top/bottom seats use 6 columns (wide horizontal strip).
+ * left/right seats use 3 columns (narrow vertical strip along the side edge).
  */
-export function discardGrid(_role: SeatRole): DiscardGridSpec {
-  return DISCARD_SPEC;
+export function discardGrid(role: SeatRole): DiscardGridSpec {
+  return DISCARD_SPECS[role];
 }
 
 /**
