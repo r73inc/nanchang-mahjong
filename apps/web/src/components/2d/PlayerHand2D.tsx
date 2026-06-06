@@ -189,13 +189,14 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
         gap: 4,
         padding: '8px 4px',
       }}
-      aria-label={HAND_ARIA_LABEL}
     >
       <Reorder.Group
         as="div"
         axis={HORIZONTAL_AXIS}
         values={localOrder}
         onReorder={draggable ? setLocalOrder : () => undefined}
+        aria-label={HAND_ARIA_LABEL}
+        aria-describedby="hand-drag-hint"
         style={{
           display: 'flex',
           flexWrap: 'nowrap',
@@ -250,12 +251,15 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
         </span>
       )}
 
-      {/* sr-only drag hint wired to the Reorder.Group via aria-describedby */}
-      {draggable && (
-        <span id="hand-drag-hint" className="sr-only">
-          {DRAG_HINT}
-        </span>
-      )}
+      {/*
+       * sr-only drag hint — always rendered so that the Reorder.Group's
+       * aria-describedby="hand-drag-hint" always resolves to a valid element.
+       * The text is only meaningful when the hand is draggable but the span
+       * must exist unconditionally to satisfy the aria-describedby contract.
+       */}
+      <span id="hand-drag-hint" className="sr-only">
+        {DRAG_HINT}
+      </span>
     </div>
   );
 }
