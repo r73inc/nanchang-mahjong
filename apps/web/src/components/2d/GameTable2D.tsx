@@ -2,7 +2,8 @@
  * GameTable2D — 2.5D DOM game table compositor.
  *
  * Phase C: FeltSurface2D background + 3×3 CSS Grid skeleton.
- * Phase D–G: tile components and Framer Motion animations fill each zone.
+ * Phase E: PlayerHand2D mounted in the 'bottom' grid area.
+ * Phase F: Opponent hands, discard pools, open melds, seat labels fill remaining zones.
  *
  * CSS Grid template areas (matches SeatRole values from layout-2d.ts):
  *
@@ -11,9 +12,16 @@
  *   "btm-corner  bottom      btm-corner"
  */
 
+import type { TileType } from '@nanchang/shared';
 import { FeltSurface2D } from './FeltSurface2D';
+import { PlayerHand2D } from './PlayerHand2D';
 
-export function GameTable2D() {
+export interface GameTable2DProps {
+  /** Wired from game-page.tsx's useGame().discard — called when the viewer discards. */
+  onDiscard: (tile: TileType) => void;
+}
+
+export function GameTable2D({ onDiscard }: GameTable2DProps) {
   return (
     <div
       className="w-full h-full relative overflow-hidden"
@@ -34,7 +42,22 @@ export function GameTable2D() {
         <FeltSurface2D />
       </div>
 
-      {/* Seat zones — populated in Phase F */}
+      {/* ── Bottom zone — viewer's own hand ─────────────────────────────────── */}
+      <div
+        style={{
+          gridArea: 'bottom',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          paddingBottom: 4,
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        <PlayerHand2D onDiscard={onDiscard} />
+      </div>
+
+      {/* Remaining seat zones — populated in Phase F */}
     </div>
   );
 }
