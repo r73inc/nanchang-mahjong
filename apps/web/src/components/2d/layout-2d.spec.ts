@@ -130,12 +130,18 @@ describe('discardGrid · 2DLayout·seat-geometry', () => {
     }
   });
 
-  it('all roles share the same spec (container carries rotation)', () => {
-    const specs = VALID_ROLES.map((r) => discardGrid(r));
-    const first = specs[0];
-    for (const s of specs.slice(1)) {
-      expect(s).toEqual(first);
-    }
+  it('top/bottom pools use 6 columns (wide horizontal strip)', () => {
+    // BUG-2D-03: pools rendered in the un-rotated centre area — top/bottom
+    // get 6 columns to span the centre width.
+    expect(discardGrid('bottom').cols).toBe(6);
+    expect(discardGrid('top').cols).toBe(6);
+  });
+
+  it('left/right pools use 3 columns (narrow vertical strip along side edge)', () => {
+    // BUG-2D-03: left/right pools are no longer inside a rotated container,
+    // so 3 columns keeps them compact enough not to overlap the compass rose.
+    expect(discardGrid('left').cols).toBe(3);
+    expect(discardGrid('right').cols).toBe(3);
   });
 });
 

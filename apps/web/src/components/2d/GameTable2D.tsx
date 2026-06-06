@@ -29,14 +29,19 @@
  *   "bottom bottom   bottom"   ← viewer spans full width
  *
  * Each opponent seat zone is a rotated flex column:
- *   SeatLabel2D  (outer edge)
+ *   SeatLabel2D   (outer edge)
  *   OpponentHand2D
- *   DiscardPool2D
- *   OpenMelds2D  (inner edge)
+ *   OpenMelds2D   (inner edge — discards removed, now in CenterDiscards2D)
  *
  * The viewer's bottom zone (full-width) is a reversed column:
- *   OpenMelds2D + DiscardPool2D  (inner)
- *   PlayerHand2D                 (outer — at screen bottom edge)
+ *   OpenMelds2D  (inner — discards removed, now in CenterDiscards2D)
+ *   PlayerHand2D (outer — at screen bottom edge)
+ *
+ * BUG-2D-03 fix — centre discard pools:
+ *  All four DiscardPool2D instances are now rendered inside the `center`
+ *  grid cell by CenterDiscards2D rather than inside each seat zone.
+ *  This places discarded tiles on the felt surface, matching real-world
+ *  Mahjong table layout.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -49,7 +54,7 @@ import { seatConfig } from './layout-2d';
 import { FeltSurface2D } from './FeltSurface2D';
 import { SeatLabel2D } from './SeatLabel2D';
 import { OpponentHand2D } from './OpponentHand2D';
-import { DiscardPool2D } from './DiscardPool2D';
+import { CenterDiscards2D } from './CenterDiscards2D';
 import { OpenMelds2D } from './OpenMelds2D';
 import { PlayerHand2D } from './PlayerHand2D';
 
@@ -134,6 +139,11 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
               <FeltSurface2D />
             </div>
 
+            {/* ── Centre discard pools (BUG-2D-03) ─────────────────────── */}
+            {/* All four DiscardPool2D instances live here so tiles land on  */}
+            {/* the felt surface, not inside the rotated seat zone strips.   */}
+            <CenterDiscards2D viewerSeat={viewerSeat} />
+
             {/* ── Seat zones ────────────────────────────────────────────── */}
             {SEAT_INDICES.map((seatIdx) => {
               const cfg = seatConfig(seatIdx, viewerSeat);
@@ -158,7 +168,7 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                       // must remain visible above the zone boundary.
                     }}
                   >
-                    {/* Inner edge: viewer's open melds + discards */}
+                    {/* Inner edge: viewer's open melds (discards moved to CenterDiscards2D) */}
                     <div
                       style={{
                         display: 'flex',
@@ -168,7 +178,6 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                       }}
                     >
                       <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
-                      <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
                     </div>
 
                     {/* Outer edge: the viewer's interactive hand */}
@@ -204,10 +213,7 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                   {/* Face-down hand */}
                   <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
 
-                  {/* Discard pool */}
-                  <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
-
-                  {/* Inner edge: open melds */}
+                  {/* Inner edge: open melds (discards moved to CenterDiscards2D) */}
                   <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
                 </div>
               );
