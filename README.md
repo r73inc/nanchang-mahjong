@@ -238,9 +238,9 @@ nanchang-mahjong/
 pnpm test
 
 # Individual packages
-pnpm --filter @nanchang/engine run test    # 241 Vitest tests
-pnpm --filter @nanchang/api    run test    # 216 Jest tests
-pnpm --filter @nanchang/web    run test    # 106 Vitest + RTL tests
+pnpm --filter @nanchang/engine run test    # 248 Vitest tests
+pnpm --filter @nanchang/api    run test    # 220 Jest tests
+pnpm --filter @nanchang/web    run test    # 286 Vitest + RTL tests
 
 # Watch mode (engine example)
 pnpm --filter @nanchang/engine run test -- --watch
@@ -403,9 +403,9 @@ Never run `cd apps/api && tsc` — use the pnpm filter form above.
 | Layer    | Stack                                                                                       |
 | -------- | ------------------------------------------------------------------------------------------- |
 | Monorepo | pnpm workspaces, TypeScript throughout                                                      |
-| Engine   | `packages/engine` — pure TS, no deps, Vitest (241 tests)                                    |
+| Engine   | `packages/engine` — pure TS, no deps, Vitest (248 tests)                                    |
 | Shared   | `packages/shared` — Zod schemas, socket event types, tile map                               |
-| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB, Jest (216 tests)                        |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (106 tests) |
+| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB, Jest (220 tests)                        |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (286 tests) |
 | Infra    | AWS App Runner, DynamoDB, S3, CloudFront, CDK in `infra/`                                   |
 | CI/CD    | GitHub Actions: lint + typecheck + test on every PR; deploy on merge to `main`              |
