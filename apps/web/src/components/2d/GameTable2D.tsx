@@ -78,10 +78,16 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
             display: 'grid',
             gridTemplateColumns: '22% 56% 22%',
             gridTemplateRows: '22% 56% 22%',
+            // Corner cells are unused — use '.' (null cell) to avoid repeating
+            // the same area name in non-adjacent cells, which would make the
+            // entire grid-template-areas declaration invalid (CSS requires each
+            // named area to be a single rectangular region). An invalid
+            // grid-template-areas causes all gridArea placements to fail and
+            // every seat zone falls back to auto-placement at the top-left.
             gridTemplateAreas: `
-              "top-corner top    top-corner"
+              ". top    ."
               "left       center right"
-              "btm-corner bottom btm-corner"
+              ".          bottom ."
             `,
           }}
         >
@@ -109,7 +115,9 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                     padding: '4px 2px',
                     position: 'relative',
                     zIndex: 1,
-                    overflow: 'hidden',
+                    // No overflow:hidden — PlayerHand2D tiles raise upward on
+                    // selection and would be clipped. The outer wrapper handles
+                    // viewport clipping.
                   }}
                 >
                   {/* Inner edge: viewer's open melds + discards */}
@@ -145,7 +153,10 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                   transform: cfg.containerTransform,
                   position: 'relative',
                   zIndex: 1,
-                  overflow: 'hidden',
+                  // No overflow:hidden — for right/left seats the container is
+                  // 22% wide in local space but the tile row is ~390px. Setting
+                  // overflow:hidden clips the row to zero visible area after the
+                  // rotateZ transform. The outer wrapper handles viewport clipping.
                 }}
               >
                 {/* Outer edge: nameplate */}

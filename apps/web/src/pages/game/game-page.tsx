@@ -28,7 +28,7 @@ import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
 import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
-import { GameTable2D } from '../../components/2d';
+import { GameTable2D, MahjongTile2D } from '../../components/2d';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
@@ -955,6 +955,46 @@ function GameHistoryPanel({
   );
 }
 
+// ── Jing tile chip (status bar) ───────────────────────────────────────────────
+
+// Module-level strings to satisfy i18next/no-literal-string.
+const JING_CHIP_ARIA = 'Spirit tile – tap to enlarge' as const;
+
+/**
+ * Spirit tile chip shown in the top status bar.
+ *
+ * Uses MahjongTile2D (SVG textures) instead of the old text-glyph MahjongTile.
+ * Tapping the chip opens a centred overlay with the tile scaled up 3× for easy
+ * reference. Tapping anywhere on the overlay closes it.
+ */
+function JingTileChip({ tile }: { tile: TileType }) {
+  const [enlarged, setEnlarged] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setEnlarged(true)}
+        aria-label={JING_CHIP_ARIA}
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 0 }}
+      >
+        <MahjongTile2D tile={tile} size="xs" role="bottom" isJing interactive={false} />
+      </button>
+
+      {enlarged && (
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 70, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setEnlarged(false)}
+        >
+          <div style={{ transform: 'scale(3)', transformOrigin: 'center' }}>
+            <MahjongTile2D tile={tile} size="lg" role="bottom" isJing interactive={false} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Game Table ────────────────────────────────────────────────────────────────
 
 /**
@@ -1090,10 +1130,8 @@ function GameTable({
           {snapshot.jingPrimary && (
             <div className="flex items-center gap-1">
               <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
-              <MahjongTile tile={snapshot.jingPrimary} size="xs" isJing />
-              {snapshot.jingSecondary && (
-                <MahjongTile tile={snapshot.jingSecondary} size="xs" isJing />
-              )}
+              <JingTileChip tile={snapshot.jingPrimary} />
+              {snapshot.jingSecondary && <JingTileChip tile={snapshot.jingSecondary} />}
             </div>
           )}
         </div>
@@ -1116,8 +1154,12 @@ function GameTable({
       {/* ── Seat HUD — corner nameplates ───────────────────────────────────── */}
       <SeatHUD snapshot={snapshot} />
 
-      {/* ── Turn indicator (sits above the hand HUD) ──────────────────────── */}
-      <div className="absolute bottom-40 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none">
+      {/* ── Turn indicator ────────────────────────────────────────────────── */}
+      {/* 3D: bottom-40 sits above the ViewerHandHUD (~80 px gradient).      */}
+      {/* 2D: bottom-2 sits inside the board's own bottom zone.              */}
+      <div
+        className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
+      >
         <span
           className="text-[11px] font-bold px-3 py-1 rounded-full"
           style={{
@@ -1138,7 +1180,9 @@ function GameTable({
       </div>
 
       {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
-      {!showConcedeSheet && (
+      {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
+      {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
+      {!showConcedeSheet && snapshot.viewMode !== '2D' && (
         <ViewerHandHUD
           hand={viewerHand}
           selectedTileIdx={selectedTileIdx}
