@@ -1,27 +1,54 @@
 /**
  * GameTable2D — 2.5D DOM game table compositor.
  *
- * Phase C: FeltSurface2D background + 3×3 CSS Grid skeleton.
- * Phase E: PlayerHand2D mounted in the 'bottom' grid area.
- * Phase F: Opponent hands, discard pools, open melds, seat labels fill remaining zones.
+ * Reads viewerSeat from Zustand and uses seatConfig() to assign each seat
+ * to its CSS Grid area with the correct containerTransform. All four zones are
+ * populated in Phase F; the bottom zone (viewer) contains PlayerHand2D.
  *
- * CSS Grid template areas (matches SeatRole values from layout-2d.ts):
+ * CSS Grid template areas:
  *
  *   "top-corner  top         top-corner"
  *   "left        center      right"
  *   "btm-corner  bottom      btm-corner"
+ *
+ * Each non-bottom seat zone is a rotated flex column:
+ *   SeatLabel2D  (outer edge — farthest from table center in local coords)
+ *   OpponentHand2D
+ *   DiscardPool2D
+ *   OpenMelds2D  (inner edge — closest to table center)
+ *
+ * The viewer's bottom zone is a reversed column:
+ *   OpenMelds2D + DiscardPool2D  (inner — toward table center)
+ *   PlayerHand2D                 (outer — at screen bottom edge)
  */
 
 import type { TileType } from '@nanchang/shared';
+import { useGameStore } from '../../stores/game.store';
+import { seatConfig } from './layout-2d';
 import { FeltSurface2D } from './FeltSurface2D';
+import { SeatLabel2D } from './SeatLabel2D';
+import { OpponentHand2D } from './OpponentHand2D';
+import { DiscardPool2D } from './DiscardPool2D';
+import { OpenMelds2D } from './OpenMelds2D';
 import { PlayerHand2D } from './PlayerHand2D';
 
+// ── Props ─────────────────────────────────────────────────────────────────────
+
 export interface GameTable2DProps {
-  /** Wired from game-page.tsx's useGame().discard — called when the viewer discards. */
+  /** Wired from game-page.tsx's useGame().discard */
   onDiscard: (tile: TileType) => void;
 }
 
+// ── Seat indices ──────────────────────────────────────────────────────────────
+
+const SEAT_INDICES = [0, 1, 2, 3] as const;
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function GameTable2D({ onDiscard }: GameTable2DProps) {
+  const snapshot = useGameStore((s) => s.snapshot);
+  const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+
   return (
     <div
       className="w-full h-full relative overflow-hidden"
@@ -37,27 +64,78 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
         `,
       }}
     >
-      {/* Felt background spans the entire grid */}
+      {/* ── Felt background — spans entire grid ───────────────────────────── */}
       <div style={{ gridColumn: '1 / -1', gridRow: '1 / -1', position: 'relative' }}>
         <FeltSurface2D />
       </div>
 
-      {/* ── Bottom zone — viewer's own hand ─────────────────────────────────── */}
-      <div
-        style={{
-          gridArea: 'bottom',
-          display: 'flex',
-          alignItems: 'flex-end',
-          justifyContent: 'center',
-          paddingBottom: 4,
-          position: 'relative',
-          zIndex: 1,
-        }}
-      >
-        <PlayerHand2D onDiscard={onDiscard} />
-      </div>
+      {/* ── Seat zones ────────────────────────────────────────────────────── */}
+      {SEAT_INDICES.map((seatIdx) => {
+        const cfg = seatConfig(seatIdx, viewerSeat);
+        const isViewer = cfg.role === 'bottom';
 
-      {/* Remaining seat zones — populated in Phase F */}
+        if (isViewer) {
+          // Viewer zone: player hand at outer edge, discards/melds toward center
+          return (
+            <div
+              key={seatIdx}
+              style={{
+                gridArea: cfg.gridArea,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '4px 2px',
+                position: 'relative',
+                zIndex: 1,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Inner edge: viewer's open melds + discards */}
+              <div
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+              >
+                <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+                <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
+              </div>
+
+              {/* Outer edge: the viewer's interactive hand */}
+              <PlayerHand2D onDiscard={onDiscard} />
+            </div>
+          );
+        }
+
+        // Opponent zone: rotated container with label → hand → discards → melds
+        return (
+          <div
+            key={seatIdx}
+            style={{
+              gridArea: cfg.gridArea,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px 2px',
+              transform: cfg.containerTransform,
+              position: 'relative',
+              zIndex: 1,
+              overflow: 'hidden',
+            }}
+          >
+            {/* Outer edge: nameplate */}
+            <SeatLabel2D seatIdx={seatIdx} />
+
+            {/* Face-down hand */}
+            <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
+
+            {/* Discard pool */}
+            <DiscardPool2D seatIdx={seatIdx} role={cfg.role} />
+
+            {/* Inner edge: open melds */}
+            <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+          </div>
+        );
+      })}
     </div>
   );
 }
