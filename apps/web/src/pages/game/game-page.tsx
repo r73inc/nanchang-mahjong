@@ -1154,8 +1154,12 @@ function GameTable({
       {/* ── Seat HUD — corner nameplates ───────────────────────────────────── */}
       <SeatHUD snapshot={snapshot} />
 
-      {/* ── Turn indicator (sits above the hand HUD) ──────────────────────── */}
-      <div className="absolute bottom-40 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none">
+      {/* ── Turn indicator ────────────────────────────────────────────────── */}
+      {/* 3D: bottom-40 sits above the ViewerHandHUD (~80 px gradient).      */}
+      {/* 2D: bottom-2 sits inside the board's own bottom zone.              */}
+      <div
+        className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
+      >
         <span
           className="text-[11px] font-bold px-3 py-1 rounded-full"
           style={{
@@ -1176,7 +1180,9 @@ function GameTable({
       </div>
 
       {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
-      {!showConcedeSheet && (
+      {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
+      {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
+      {!showConcedeSheet && snapshot.viewMode !== '2D' && (
         <ViewerHandHUD
           hand={viewerHand}
           selectedTileIdx={selectedTileIdx}

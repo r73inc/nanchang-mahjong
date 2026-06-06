@@ -78,10 +78,16 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
             display: 'grid',
             gridTemplateColumns: '22% 56% 22%',
             gridTemplateRows: '22% 56% 22%',
+            // Corner cells are unused — use '.' (null cell) to avoid repeating
+            // the same area name in non-adjacent cells, which would make the
+            // entire grid-template-areas declaration invalid (CSS requires each
+            // named area to be a single rectangular region). An invalid
+            // grid-template-areas causes all gridArea placements to fail and
+            // every seat zone falls back to auto-placement at the top-left.
             gridTemplateAreas: `
-              "top-corner top    top-corner"
+              ". top    ."
               "left       center right"
-              "btm-corner bottom btm-corner"
+              ".          bottom ."
             `,
           }}
         >
