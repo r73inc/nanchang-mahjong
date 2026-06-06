@@ -8,15 +8,20 @@
  *    touching the server. On server snapshots the list is merged: existing entries
  *    stay in user-sorted order; new tiles (drawn) are appended at the end.
  *  - Framer Motion Reorder.Group for drag-to-sort (axis="x").
+ *  - AnimatePresence for draw animations — new tiles fade/scale in (Phase G).
  *  - Tap-to-select → tap-again → onDiscard(tile) two-step flow.
- *  - layoutId="hand-{id}" hooks into Phase G shared-element discard animation.
- *  - Respects prefers-reduced-motion via MotionConfig reducedMotion="user".
+ *  - Before firing onDiscard, stores the tile's local ID in DiscardContext so
+ *    DiscardPool2D can assign the matching layoutId for the discard-flight
+ *    shared-element animation (Phase G).
+ *  - layoutId="hand-{id}" hooks into the shared-element discard animation.
+ *  - MotionConfig reducedMotion="user" lives at GameTable2D root (Phase G).
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Reorder, MotionConfig } from 'framer-motion';
+import { Reorder, AnimatePresence } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
+import { useDiscardContext } from './DiscardContext';
 import { MahjongTile2D } from './MahjongTile2D';
 
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
@@ -26,6 +31,13 @@ const DRAG_HINT = 'Drag to reorder tiles' as const;
 const DISCARD_HINT = 'Tap to discard' as const;
 // 'x' as a JSX prop value triggers i18next/no-literal-string — use a constant.
 const HORIZONTAL_AXIS = 'x' as const;
+
+// ── Draw-tile animation variants (module-level for i18next/no-literal-string) ─
+
+/** Entering tile: fade + scale up from 80% opacity-0 over 200 ms. */
+const TILE_INITIAL = { opacity: 0, scale: 0.8 } as const;
+const TILE_ANIMATE = { opacity: 1, scale: 1 } as const;
+const TILE_TRANSITION = { duration: 0.2 } as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,6 +120,9 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
 
+  // ── Discard-flight context (Phase G) ──────────────────────────────────────
+  const { setLastDiscardId } = useDiscardContext();
+
   // Derive viewer's hand from snapshot
   const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const viewerHand: TileType[] =
@@ -146,6 +161,9 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
     (entry: LocalEntry) => {
       if (selectedId === entry.id) {
         // Second tap on the already-selected tile → discard
+        // Store the tile's local ID in context before removing it from localOrder,
+        // so DiscardPool2D can use the matching layoutId for the discard flight.
+        setLastDiscardId(entry.id);
         setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
         setSelectedId(null);
         onDiscard(entry.tile);
@@ -154,7 +172,7 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
         setSelectedId(entry.id);
       }
     },
-    [selectedId, onDiscard],
+    [selectedId, onDiscard, setLastDiscardId],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -162,39 +180,48 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
   if (!snapshot || viewerHand.length === 0) return null;
 
   return (
-    <MotionConfig reducedMotion="user">
-      <div
-        data-testid="player-hand-2d"
+    <div
+      data-testid="player-hand-2d"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 4,
+        padding: '8px 4px',
+      }}
+      aria-label={HAND_ARIA_LABEL}
+    >
+      <Reorder.Group
+        as="div"
+        axis={HORIZONTAL_AXIS}
+        values={localOrder}
+        onReorder={draggable ? setLocalOrder : () => undefined}
         style={{
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          flexWrap: 'nowrap',
           gap: 4,
-          padding: '8px 4px',
+          listStyle: 'none',
+          padding: 0,
+          margin: 0,
         }}
-        aria-label={HAND_ARIA_LABEL}
       >
-        <Reorder.Group
-          as="div"
-          axis={HORIZONTAL_AXIS}
-          values={localOrder}
-          onReorder={draggable ? setLocalOrder : () => undefined}
-          style={{
-            display: 'flex',
-            flexWrap: 'nowrap',
-            gap: 4,
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-          }}
-        >
-          {/* AnimatePresence (draw/discard animations) added in Phase G */}
+        {/*
+         * AnimatePresence enables draw animations:
+         * - New tiles (drawn from wall) enter with TILE_INITIAL → TILE_ANIMATE.
+         * - Discarded tiles have no exit variant; they're removed from localOrder
+         *   immediately. The layoutId on MahjongTile2D's motion.div carries the
+         *   cross-component flight to DiscardPool2D.
+         */}
+        <AnimatePresence>
           {localOrder.map((entry) => (
             <Reorder.Item
               as="div"
               key={entry.id}
               value={entry}
               drag={draggable ? HORIZONTAL_AXIS : false}
+              initial={TILE_INITIAL}
+              animate={TILE_ANIMATE}
+              transition={TILE_TRANSITION}
               whileDragging={{ y: -12, zIndex: 10, scale: 1.05 }}
               style={{ listStyle: 'none', touchAction: 'none' }}
             >
@@ -210,25 +237,25 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
               />
             </Reorder.Item>
           ))}
-        </Reorder.Group>
+        </AnimatePresence>
+      </Reorder.Group>
 
-        {/* Discard nudge — shown when the viewer drew and must discard */}
-        {needsDiscard && isMyTurn && (
-          <span
-            aria-live="polite"
-            style={{ color: '#c9a961', fontSize: 11, letterSpacing: '0.03em' }}
-          >
-            {DISCARD_HINT}
-          </span>
-        )}
+      {/* Discard nudge — shown when the viewer drew and must discard */}
+      {needsDiscard && isMyTurn && (
+        <span
+          aria-live="polite"
+          style={{ color: '#c9a961', fontSize: 11, letterSpacing: '0.03em' }}
+        >
+          {DISCARD_HINT}
+        </span>
+      )}
 
-        {/* sr-only drag hint wired to the Reorder.Group via aria-describedby */}
-        {draggable && (
-          <span id="hand-drag-hint" className="sr-only">
-            {DRAG_HINT}
-          </span>
-        )}
-      </div>
-    </MotionConfig>
+      {/* sr-only drag hint wired to the Reorder.Group via aria-describedby */}
+      {draggable && (
+        <span id="hand-drag-hint" className="sr-only">
+          {DRAG_HINT}
+        </span>
+      )}
+    </div>
   );
 }

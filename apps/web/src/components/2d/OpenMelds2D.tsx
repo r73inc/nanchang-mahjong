@@ -8,13 +8,24 @@
  * Groups are spaced by `groupGap` (from meldLayout); tiles within a group
  * by `gap`. The seat zone container carries the CSS rotation so tiles need
  * no per-tile transform.
+ *
+ * Phase G: newly formed meld groups animate in from opacity-0 with a subtle
+ * upward slide via AnimatePresence + motion.div wrappers.
  */
 
+import { AnimatePresence, motion } from 'framer-motion';
 import type { Meld, TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { MahjongTile2D } from './MahjongTile2D';
 import { meldLayout } from './layout-2d';
 import type { SeatRole } from './layout-2d';
+
+// ── Animation constants ───────────────────────────────────────────────────────
+
+/** New meld group enters: fade in from above. */
+const MELD_INITIAL = { opacity: 0, y: -8 } as const;
+const MELD_ANIMATE = { opacity: 1, y: 0 } as const;
+const MELD_TRANSITION = { duration: 0.25 } as const;
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -47,9 +58,18 @@ export function OpenMelds2D({ seatIdx, role }: OpenMelds2DProps) {
         justifyContent: 'center',
       }}
     >
-      {melds.map((meld, meldIdx) => (
-        <MeldGroup key={meldIdx} meld={meld} role={role} spec={spec} />
-      ))}
+      <AnimatePresence>
+        {melds.map((meld, meldIdx) => (
+          <motion.div
+            key={meldIdx}
+            initial={MELD_INITIAL}
+            animate={MELD_ANIMATE}
+            transition={MELD_TRANSITION}
+          >
+            <MeldGroup meld={meld} role={role} spec={spec} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

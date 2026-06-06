@@ -17,11 +17,22 @@ import type { LocalEntry } from './PlayerHand2D';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState } from '@nanchang/shared';
 
-// ── Store mock ────────────────────────────────────────────────────────────────
+// ── Module mocks ──────────────────────────────────────────────────────────────
 
 vi.mock('../../stores/game.store', () => ({
   useGameStore: vi.fn(),
 }));
+
+// AnimatePresence holds exited elements in jsdom (exit animations never complete
+// without a real browser RAF loop). Make it a transparent pass-through so DOM
+// assertions about tile count remain reliable.
+vi.mock('framer-motion', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('framer-motion')>();
+  return {
+    ...mod,
+    AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  };
+});
 
 const mockUseGameStore = vi.mocked(useGameStore);
 

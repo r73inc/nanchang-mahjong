@@ -1,5 +1,7 @@
 export { GameTable2D } from './GameTable2D';
 export type { GameTable2DProps } from './GameTable2D';
+export { DiscardContext, useDiscardContext } from './DiscardContext';
+export type { DiscardContextValue } from './DiscardContext';
 export { SeatLabel2D } from './SeatLabel2D';
 export type { SeatLabel2DProps } from './SeatLabel2D';
 export { OpponentHand2D } from './OpponentHand2D';
