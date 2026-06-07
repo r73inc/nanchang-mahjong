@@ -293,6 +293,41 @@ Each meld is wrapped in a subtle gold-bordered container to distinguish it from 
 
 ---
 
+### BUG-016 · DynamoDB Local `-inMemory` flag wipes all data on container restart
+
+**Symptom:** Every time Docker is stopped (or the PC is shut down), all user accounts,
+game history, and invite codes are deleted. After restarting Docker the app throws
+`ResourceNotFoundException: Cannot do operations on a non-existent table` on the first
+sign-in because the table no longer exists and must be recreated from scratch via
+`setup:local` + `seed:admin` + `seed:users`.
+
+**Root cause:** `docker-compose.yml` started `amazon/dynamodb-local` with the `-inMemory`
+flag: `command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-inMemory']`.
+The `-inMemory` flag tells DynamoDB Local to store everything in RAM only — nothing is
+written to disk. When the container stops (whether from `docker compose down`, a PC
+shutdown, or a Docker Desktop restart) all data is permanently lost. The `-sharedDb`
+flag (single shared database file) has no effect when `-inMemory` is also present.
+
+**Fix (PR #54):** Removed `-inMemory`; replaced with `-dbPath /home/dynamodblocal/data`.
+Added a `dynamodb-data` named volume mounted at that path. Added a comment block warning
+never to re-add `-inMemory`.
+
+```yaml
+command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-dbPath', '/home/dynamodblocal/data']
+volumes:
+  - dynamodb-data:/home/dynamodblocal/data
+```
+
+After the fix `setup:local` + `seed:admin` + `seed:users` only need to be run once.
+All subsequent Docker restarts and PC shutdowns leave data intact.
+
+**Learning:** `-inMemory` is convenient for CI (fast, clean slate every run) but
+catastrophic for a local dev database you want to survive restarts. Always use
+`-dbPath` with a mounted volume for local dev environments where persistent state
+matters. Keep `-inMemory` only for CI/test pipeline runs.
+
+---
+
 ## Template for future entries
 
 ```

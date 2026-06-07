@@ -1,12 +1,25 @@
 services:
   # ── DynamoDB Local ───────────────────────────────────────────
   # Prod equivalent: AWS DynamoDB (on-demand, ap-east-1)
+  #
+  # -dbPath writes data to a file on disk (mounted volume) so it
+  # survives container restarts and PC shutdowns.
+  # -sharedDb uses a single shared database file (nanchang_main.db)
+  # regardless of the AWS region/credentials in the request.
+  # NOTE: do NOT add -inMemory here — that flag stores everything in
+  # RAM only and causes all data to be lost on every restart.
   dynamodb:
     image: amazon/dynamodb-local:latest
     container_name: mj-dynamodb
+    # Run as root so the process can write to the Docker-managed volume.
+    # The default image user (dynamodblocal) lacks write permission on a
+    # freshly created named volume whose directory is owned by root.
+    user: root
     ports:
       - '8000:8000'
-    command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-inMemory']
+    command: ['-jar', 'DynamoDBLocal.jar', '-sharedDb', '-dbPath', '/home/dynamodblocal/data']
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
     healthcheck:
       test: ['CMD-SHELL', 'curl -sf http://localhost:8000/ || exit 1']
       interval: 10s
@@ -86,5 +99,6 @@ services:
       retries: 5
 
 volumes:
+  dynamodb-data: # persists DynamoDB table data across container/PC restarts
   minio-data:
   cognito-data:
