@@ -70,6 +70,7 @@ function renderLobby() {
 describe('LobbyPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     vi.spyOn(socket, 'connectSocket').mockReturnValue(
       {} as ReturnType<typeof socket.connectSocket>,
     );
@@ -110,6 +111,35 @@ describe('LobbyPage', () => {
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/room/AB-1234');
     });
+  });
+
+  // ── BUG-2D-06: rejoin card ────────────────────────────────────────────────
+
+  it('Lobby·rejoin-card: shows rejoin card when an active game is stored in localStorage', () => {
+    localStorage.setItem('mj:active-game', 'game-abc123');
+    renderLobby();
+    expect(screen.getByTestId('rejoin-card')).toBeInTheDocument();
+    expect(screen.getByText(/game in progress/i)).toBeInTheDocument();
+  });
+
+  it('Lobby·rejoin-navigate: clicking Rejoin navigates to /game/:id', () => {
+    localStorage.setItem('mj:active-game', 'game-abc123');
+    renderLobby();
+    fireEvent.click(screen.getByRole('button', { name: /rejoin game/i }));
+    expect(mockNavigate).toHaveBeenCalledWith('/game/game-abc123');
+  });
+
+  it('Lobby·rejoin-dismiss: clicking Dismiss hides the card and clears localStorage', () => {
+    localStorage.setItem('mj:active-game', 'game-abc123');
+    renderLobby();
+    fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
+    expect(screen.queryByTestId('rejoin-card')).not.toBeInTheDocument();
+    expect(localStorage.getItem('mj:active-game')).toBeNull();
+  });
+
+  it('Lobby·rejoin-absent: no rejoin card when no game is stored', () => {
+    renderLobby();
+    expect(screen.queryByTestId('rejoin-card')).not.toBeInTheDocument();
   });
 
   it('shows error message on API failure', async () => {
