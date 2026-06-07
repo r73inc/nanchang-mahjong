@@ -23,3 +23,7 @@ export type {
   HandLayoutSpec,
   MeldLayoutSpec,
 } from './layout-2d';
+export { ForcedLandscapeWrapper } from './ForcedLandscapeWrapper';
+export type { ForcedLandscapeWrapperProps } from './ForcedLandscapeWrapper';
+export { MobileLandscapeGate } from './MobileLandscapeGate';
+export type { MobileLandscapeGateProps } from './MobileLandscapeGate';

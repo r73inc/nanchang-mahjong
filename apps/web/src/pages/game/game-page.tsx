@@ -29,7 +29,9 @@ import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nan
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D } from '../../components/2d';
+import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
+import { useOrientation } from '../../hooks/use-orientation';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
 
@@ -1085,6 +1087,31 @@ function GameTable({
   const nextHistoryId = useRef(0);
   const prevSnapshotRef = useRef<ClientGameState | null>(null);
 
+  // ── Mobile landscape mode ───────────────────────────────────────────────────
+  const { mode: landscapeMode, isMobileLandscapeForced, requestNativeLandscape } = useOrientation();
+
+  // Suppress pull-to-refresh on the document body while the game is mounted.
+  useEffect(() => {
+    const prev = document.body.style.overscrollBehavior;
+    if (landscapeMode !== 'desktop') {
+      document.body.style.overscrollBehavior = 'none';
+    }
+    return () => {
+      document.body.style.overscrollBehavior = prev;
+    };
+  }, [landscapeMode]);
+
+  // Exit fullscreen cleanly when the component unmounts (e.g. game ends).
+  useEffect(() => {
+    return () => {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {
+          // Ignore — browser may already be exiting fullscreen.
+        });
+      }
+    };
+  }, []);
+
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
@@ -1147,12 +1174,18 @@ function GameTable({
   };
 
   return (
-    <div className="relative w-full h-dvh overflow-hidden bg-black">
+    <div className="mj-game-surface relative w-full h-dvh overflow-hidden bg-black">
       {/* ── Table renderer — fills entire screen ──────────────────────────── */}
       {/* Branched on snapshot.viewMode set by the host before game start.    */}
       {/* All overlays (z-10+) are identical in both modes.                   */}
       <div className="absolute inset-0" aria-hidden="true">
-        {snapshot.viewMode === '2D' ? <GameTable2D onDiscard={onDiscard} /> : <GameCanvas />}
+        {snapshot.viewMode === '2D' ? (
+          <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
+            <GameTable2D onDiscard={onDiscard} isMobile={isMobileLandscapeForced} />
+          </MobileLandscapeGate>
+        ) : (
+          <GameCanvas />
+        )}
       </div>
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}

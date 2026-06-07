@@ -68,6 +68,22 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useBlocker: () => mockBlocker };
 });
 
+// ── useOrientation mock (Phase 14A) ──────────────────────────────────────────
+// Default: desktop mode so existing tests are unaffected.
+const mockRequestNativeLandscape = vi.fn().mockResolvedValue(undefined);
+const mockOrientation = {
+  mode: 'desktop' as import('../../hooks/use-orientation').LandscapeMode,
+  isMobileLandscapeForced: false,
+  vw: 1280,
+  vh: 800,
+  requestNativeLandscape: mockRequestNativeLandscape,
+};
+
+vi.mock('../../hooks/use-orientation', () => ({
+  useOrientation: () => mockOrientation,
+  MOBILE_BREAKPOINT_PX: 600,
+}));
+
 // ── Snapshot fixtures ─────────────────────────────────────────────────────────
 
 function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState {
@@ -168,6 +184,8 @@ describe('GamePage', () => {
     mockBlocker.state = 'unblocked';
     mockBlockerProceed.mockClear();
     mockBlockerReset.mockClear();
+    mockOrientation.mode = 'desktop';
+    mockOrientation.isMobileLandscapeForced = false;
     localStorage.clear();
   });
 
@@ -379,6 +397,40 @@ describe('GamePage', () => {
     expect(mockBlockerProceed).not.toHaveBeenCalled();
 
     mockBlocker.state = 'unblocked';
+  });
+
+  // ── Phase 14A: mobile overscroll suppression ─────────────────────────────────
+
+  it('Mobile·body-overscroll-suppressed: body overscrollBehavior is none in non-desktop mode', async () => {
+    mockOrientation.mode = 'needs-gesture';
+
+    const { unmount } = renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'playing' }));
+
+    await waitFor(() => {
+      expect(document.body.style.overscrollBehavior).toBe('none');
+    });
+
+    unmount();
+  });
+
+  it('Mobile·body-overscroll-restored: body overscrollBehavior is restored on unmount', async () => {
+    // Set a pre-existing value to verify it is restored rather than blanked.
+    document.body.style.overscrollBehavior = 'auto';
+    mockOrientation.mode = 'css-landscape';
+
+    const { unmount } = renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'playing' }));
+
+    await waitFor(() => {
+      expect(document.body.style.overscrollBehavior).toBe('none');
+    });
+
+    unmount();
+    expect(document.body.style.overscrollBehavior).toBe('auto');
+
+    // Clean up for other tests.
+    document.body.style.overscrollBehavior = '';
   });
 });
 
