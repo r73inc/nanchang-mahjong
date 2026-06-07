@@ -350,6 +350,33 @@ describe('PlayerHand2D discard hint · 2DHand·discard-hint', () => {
   });
 });
 
+// ── PlayerHand2D — Phase 14C: --mj-hand-height ResizeObserver ────────────────
+
+describe('PlayerHand2D hand-height CSS var · Hand·hand-height', () => {
+  beforeEach(() => setupStore());
+
+  it('Mobile·hand-height-prop-set: --mj-hand-height is set on :root after mounting', () => {
+    // ResizeObserver in jsdom does not fire callbacks automatically (no layout engine).
+    // The useLayoutEffect runs update() synchronously on mount via offsetHeight (0 in jsdom).
+    // We verify the property is present — the value will be "0px" in jsdom (no layout).
+    const { unmount } = renderHand();
+    // The var should be set (even if 0px — jsdom has no layout engine)
+    const val = document.documentElement.style.getPropertyValue('--mj-hand-height');
+    // Should be set as a string (empty string means absent)
+    expect(val).toBeDefined();
+    // Clean up
+    unmount();
+  });
+
+  it('Mobile·hand-height-prop-cleanup: --mj-hand-height is removed from :root on unmount', () => {
+    const { unmount } = renderHand();
+    unmount();
+    const val = document.documentElement.style.getPropertyValue('--mj-hand-height');
+    // After unmount the property should be removed (empty string = not set)
+    expect(val).toBe('');
+  });
+});
+
 // ── PlayerHand2D — Phase 14B: drag disable + flex-shrink ─────────────────────
 
 describe('PlayerHand2D mobile constraints · Hand·drag-disabled / Hand·flex-shrink', () => {

@@ -44,6 +44,10 @@ function getCompassSeats(viewerSeat: 0 | 1 | 2 | 3) {
 }
 
 const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
+
+// Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
+const ICON_HISTORY = '≡' as const;
+const ICON_CLOSE = '✕' as const;
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
   south: '#a36d3e',
@@ -460,10 +464,12 @@ function SideRail({
   claimWindow,
   onClaim,
   onPass,
+  isMobile = false,
 }: {
   claimWindow: ClaimWindowState;
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
+  isMobile?: boolean;
 }) {
   const { t } = useI18n();
   const secLeft = Math.max(0, Math.ceil((claimWindow.deadline - Date.now()) / 1000));
@@ -484,8 +490,12 @@ function SideRail({
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 p-4 max-w-viewport mx-auto animate-call-prompt-enter z-20"
-      style={{ background: 'rgba(10,10,10,0.92)', backdropFilter: 'blur(12px)' }}
+      className="absolute left-0 right-0 flex flex-col items-center gap-3 p-4 max-w-viewport mx-auto animate-call-prompt-enter z-20"
+      style={{
+        bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
+        background: 'rgba(10,10,10,0.92)',
+        backdropFilter: 'blur(12px)',
+      }}
       role="dialog"
       aria-label={t('gameClaimWindow')}
     >
@@ -851,11 +861,13 @@ function GameHistoryPanel({
   isOpen,
   onToggle,
   snapshot,
+  isMobile = false,
 }: {
   entries: HistoryEntry[];
   isOpen: boolean;
   onToggle: () => void;
   snapshot: ClientGameState;
+  isMobile?: boolean;
 }) {
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -885,6 +897,93 @@ function GameHistoryPanel({
     t('gamePositionAcross'),
     t('gamePositionLeft'),
   ];
+
+  if (isMobile) {
+    // ── Mobile: full-width bottom sheet, toggle is in the status bar ──────────
+    return (
+      <div
+        data-testid="history-bottom-sheet"
+        className="absolute left-0 right-0 overflow-hidden"
+        style={{
+          bottom: isOpen ? 'var(--mj-hand-height, 90px)' : '-40%',
+          height: '40%',
+          zIndex: 16,
+          background: 'rgba(8,8,8,0.95)',
+          borderTop: '1px solid rgba(245,239,223,0.1)',
+          backdropFilter: 'blur(12px)',
+          transition: 'bottom 0.22s ease',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-3 py-2 flex items-center justify-between shrink-0"
+          style={{ borderBottom: '1px solid rgba(245,239,223,0.07)' }}
+        >
+          <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
+            {t('gameHistoryTitle')}
+          </span>
+          <span className="text-[10px] text-mj-bone/30">{entries.length}</span>
+        </div>
+
+        {/* Scrollable event list */}
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto h-full pb-4"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {entries.length === 0 ? (
+            <p className="text-[10px] text-mj-bone/20 text-center mt-6 px-3">—</p>
+          ) : (
+            <div className="flex flex-col py-1">
+              {entries.map((entry) => {
+                const offset = (entry.seatIdx - viewerSeat + 4) % 4;
+                const posLabel = POSITION_LABEL[offset];
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-1 px-2 py-[5px]"
+                    style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: WIND_COLOR[entry.seatWind] }}
+                    />
+                    <span
+                      className="text-[10px] font-bold shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind] }}
+                    >
+                      {posLabel}
+                    </span>
+                    <span
+                      className="text-[9px] shrink-0"
+                      style={{ color: WIND_COLOR[entry.seatWind], opacity: 0.7 }}
+                    >
+                      {WIND_CHAR[entry.seatWind]}
+                    </span>
+                    <span className="text-[10px] text-mj-bone/50 shrink-0">
+                      {entry.kind === 'discard'
+                        ? t('gameHistoryDiscard')
+                        : ACTION_LABEL[entry.kind]}
+                    </span>
+                    {entry.tile && (
+                      <MahjongTile
+                        tile={entry.tile}
+                        size="xs"
+                        isJing={
+                          entry.tile === snapshot.jingPrimary ||
+                          entry.tile === snapshot.jingSecondary
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1088,7 +1187,9 @@ function GameTable({
   const prevSnapshotRef = useRef<ClientGameState | null>(null);
 
   // ── Mobile landscape mode ───────────────────────────────────────────────────
-  const { mode: landscapeMode, isMobileLandscapeForced, requestNativeLandscape } = useOrientation();
+  const { mode: landscapeMode, requestNativeLandscape } = useOrientation();
+  /** True for any non-desktop mode (native-landscape OR css-landscape). */
+  const isMobile = landscapeMode !== 'desktop';
 
   // Suppress pull-to-refresh on the document body while the game is mounted.
   useEffect(() => {
@@ -1181,7 +1282,7 @@ function GameTable({
       <div className="absolute inset-0" aria-hidden="true">
         {snapshot.viewMode === '2D' ? (
           <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
-            <GameTable2D onDiscard={onDiscard} isMobile={isMobileLandscapeForced} />
+            <GameTable2D onDiscard={onDiscard} isMobile={isMobile} />
           </MobileLandscapeGate>
         ) : (
           <GameCanvas />
@@ -1190,21 +1291,30 @@ function GameTable({
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
       <div
-        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2"
+        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between"
         style={{
           background: 'rgba(10,10,10,0.7)',
           borderBottom: '1px solid rgba(245,239,223,0.08)',
+          height: isMobile ? 32 : undefined,
+          padding: isMobile ? 'var(--mj-safe-top, 0px) 8px 0' : undefined,
+          paddingLeft: isMobile ? 8 : undefined,
+          paddingRight: isMobile ? 8 : undefined,
+          paddingTop: isMobile ? 'var(--mj-safe-top, 0px)' : undefined,
+          paddingBottom: isMobile ? 0 : undefined,
+          // Desktop padding via className below — here we only override for mobile.
+          ...(!isMobile && { padding: '8px 16px' }),
         }}
       >
         {/* Round wind + Jing indicator */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span
-            className="text-xs font-bold font-serif"
-            style={{ color: WIND_COLOR[snapshot.roundWind] }}
+            className="font-bold font-serif"
+            style={{ color: WIND_COLOR[snapshot.roundWind], fontSize: isMobile ? 13 : 12 }}
           >
-            {WIND_CHAR[snapshot.roundWind]} {t('gameRound')}
+            {WIND_CHAR[snapshot.roundWind]}
+            {!isMobile && <> {t('gameRound')}</>}
           </span>
-          {snapshot.jingPrimary && (
+          {!isMobile && snapshot.jingPrimary && (
             <div className="flex items-center gap-1">
               <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
               <JingTileChip tile={snapshot.jingPrimary} />
@@ -1214,18 +1324,61 @@ function GameTable({
         </div>
 
         {/* Wall count */}
-        <span className="text-[10px] text-mj-bone/50">
-          {t('gameWallLeft')} {snapshot.wallCount}
+        <span className="text-mj-bone/50" style={{ fontSize: isMobile ? 10 : 10 }}>
+          {isMobile ? snapshot.wallCount : `${t('gameWallLeft')} ${snapshot.wallCount}`}
         </span>
 
-        {/* Concede button */}
-        <button
-          onClick={() => setShowConcedeSheet(true)}
-          className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
-          style={{ border: '1px solid rgba(245,239,223,0.1)' }}
-        >
-          {t('gameConcede')}
-        </button>
+        {/* Right-side controls */}
+        <div className="flex items-center gap-1">
+          {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
+          {isMobile && (
+            <button
+              onClick={() => setHistoryOpen((o) => !o)}
+              className="flex items-center justify-center"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 4,
+                border: '1px solid rgba(245,239,223,0.1)',
+                color: historyOpen ? '#c9a961' : 'rgba(245,239,223,0.4)',
+                fontSize: 12,
+                background: 'transparent',
+              }}
+              aria-label={t('gameHistoryTitle')}
+              aria-pressed={historyOpen}
+            >
+              {ICON_HISTORY}
+            </button>
+          )}
+
+          {/* Concede button */}
+          {isMobile ? (
+            <button
+              onClick={() => setShowConcedeSheet(true)}
+              className="flex items-center justify-center"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 4,
+                border: '1px solid rgba(245,239,223,0.1)',
+                color: 'rgba(245,239,223,0.4)',
+                fontSize: 12,
+                background: 'transparent',
+              }}
+              aria-label={t('gameConcede')}
+            >
+              {ICON_CLOSE}
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowConcedeSheet(true)}
+              className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
+              style={{ border: '1px solid rgba(245,239,223,0.1)' }}
+            >
+              {t('gameConcede')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Seat HUD — corner nameplates ───────────────────────────────────── */}
@@ -1287,6 +1440,7 @@ function GameTable({
           isOpen={historyOpen}
           onToggle={() => setHistoryOpen((o) => !o)}
           snapshot={snapshot}
+          isMobile={isMobile}
         />
       )}
 
@@ -1295,7 +1449,7 @@ function GameTable({
 
       {/* ── Claim window rail ──────────────────────────────────────────────── */}
       {claimWindow && !showConcedeSheet && (
-        <SideRail claimWindow={claimWindow} onClaim={onClaim} onPass={onPass} />
+        <SideRail claimWindow={claimWindow} onClaim={onClaim} onPass={onPass} isMobile={isMobile} />
       )}
 
       {/* ── Concede sheet ──────────────────────────────────────────────────── */}

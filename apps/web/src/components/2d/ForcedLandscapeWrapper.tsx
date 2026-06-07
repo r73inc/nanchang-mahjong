@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import { useI18n } from '../../i18n';
 
 export interface ForcedLandscapeWrapperProps {
   active: boolean;
@@ -22,6 +23,8 @@ export interface ForcedLandscapeWrapperProps {
 }
 
 export function ForcedLandscapeWrapper({ active, children }: ForcedLandscapeWrapperProps) {
+  const { t } = useI18n();
+
   if (!active) {
     return <div className="w-full h-full">{children}</div>;
   }
@@ -29,6 +32,7 @@ export function ForcedLandscapeWrapper({ active, children }: ForcedLandscapeWrap
   return (
     <div
       className="mj-landscape-wrapper"
+      aria-label={t('gameLandscapeMode')}
       style={
         {
           position: 'fixed',

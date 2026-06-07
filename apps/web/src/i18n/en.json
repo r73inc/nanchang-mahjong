@@ -262,6 +262,7 @@
   "gameMobileEnterTitle": "Rotate to Play",
   "gameMobileEnterDesc": "We'll switch to landscape mode for the best experience.",
   "gameMobileEnterCta": "Enter Game",
+  "gameLandscapeMode": "Game table rotated to landscape",
 
   "endGamePlacement1": "1st Place",
   "endGamePlacement2": "2nd Place",

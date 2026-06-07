@@ -17,7 +17,7 @@
  *  - MotionConfig reducedMotion="user" lives at GameTable2D root (Phase G).
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { Reorder, AnimatePresence } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
@@ -144,6 +144,30 @@ export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DPro
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
 
+  // ── Hand-height CSS variable ──────────────────────────────────────────────
+  // Observes the container height and sets --mj-hand-height on :root so that
+  // overlays (SideRail) can position themselves above the hand on mobile.
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      document.documentElement.style.setProperty('--mj-hand-height', `${el.offsetHeight}px`);
+    };
+
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+
+    return () => {
+      ro.disconnect();
+      document.documentElement.style.removeProperty('--mj-hand-height');
+    };
+  }, []);
+
   // ── Discard-flight context (Phase G) ──────────────────────────────────────
   const { setLastDiscardId } = useDiscardContext();
 
@@ -206,6 +230,7 @@ export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DPro
 
   return (
     <div
+      ref={containerRef}
       data-testid="player-hand-2d"
       style={{
         display: 'flex',
