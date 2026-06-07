@@ -32,6 +32,7 @@ export function useGame(gameId: string, spectate = false) {
     connection,
     pendingMove,
     toast,
+    gameError,
     setSnapshot,
     setEnded,
     setRematchRoomCode,
@@ -40,6 +41,7 @@ export function useGame(gameId: string, spectate = false) {
     selectTile,
     setPendingMove,
     setToast,
+    setGameError,
     reset,
   } = useGameStore();
 
@@ -110,8 +112,14 @@ export function useGame(gameId: string, spectate = false) {
     };
 
     // game:error — log to console so backend rejections are visible during debugging.
+    // For unrecoverable errors (game not found, player not in game) surface the
+    // error in the store so GamePage can render an error screen instead of the
+    // perpetual LoadingScreen.
     const handleError = (payload: { code: string; message?: string }) => {
       console.warn('[game:error]', payload.code, payload.message ?? '');
+      if (payload.code === 'GAME_NOT_FOUND' || payload.code === 'NOT_IN_GAME') {
+        setGameError(payload.code);
+      }
     };
 
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
@@ -258,6 +266,7 @@ export function useGame(gameId: string, spectate = false) {
     connection,
     pendingMove,
     toast,
+    gameError,
     // Actions
     selectTile,
     discard,

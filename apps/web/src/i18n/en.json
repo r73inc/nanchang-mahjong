@@ -264,6 +264,11 @@
   "gameMobileEnterCta": "Enter Game",
   "gameLandscapeMode": "Game table rotated to landscape",
 
+  "gameErrorTitle": "Game Unavailable",
+  "gameErrorNotFound": "This game session no longer exists. The server may have restarted. Please return to the lobby.",
+  "gameErrorNotInGame": "You are not a player in this game.",
+  "gameErrorBackToLobby": "Back to Lobby",
+
   "endGamePlacement1": "1st Place",
   "endGamePlacement2": "2nd Place",
   "endGamePlacement3": "3rd Place",

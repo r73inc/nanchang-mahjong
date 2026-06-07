@@ -264,6 +264,11 @@
   "gameMobileEnterCta": "进入游戏",
   "gameLandscapeMode": "游戏界面已旋转为横屏",
 
+  "gameErrorTitle": "游戏不可用",
+  "gameErrorNotFound": "该游戏会话已不存在，服务器可能已重启，请返回大厅。",
+  "gameErrorNotInGame": "您不是该游戏的玩家。",
+  "gameErrorBackToLobby": "返回大厅",
+
   "endGamePlacement1": "第一名",
   "endGamePlacement2": "第二名",
   "endGamePlacement3": "第三名",

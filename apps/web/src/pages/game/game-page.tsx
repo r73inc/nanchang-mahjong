@@ -66,6 +66,33 @@ function LoadingScreen() {
   );
 }
 
+/**
+ * Shown when the server emits an unrecoverable game:error (e.g. the game
+ * session no longer exists after a server restart). Gives the user a clear
+ * message and a route back to the lobby.
+ */
+function GameErrorScreen({ errorCode, onHome }: { errorCode: string; onHome: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">
+      <h1 className="text-2xl font-bold text-mj-bone">{t('gameErrorTitle')}</h1>
+      <p className="text-sm text-mj-bone/60 max-w-[280px]">
+        {errorCode === 'GAME_NOT_FOUND' ? t('gameErrorNotFound') : t('gameErrorNotInGame')}
+      </p>
+      <button
+        onClick={onHome}
+        className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+        style={{
+          background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+          boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
+        }}
+      >
+        {t('gameErrorBackToLobby')}
+      </button>
+    </div>
+  );
+}
+
 function JingRevealScreen({
   snapshot,
   isHost,
@@ -1486,6 +1513,7 @@ export function GamePage() {
     claimWindow,
     toast,
     pendingMove,
+    gameError,
     selectTile,
     discard,
     claim,
@@ -1527,7 +1555,16 @@ export function GamePage() {
       isActiveGame && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  if (!gameId || !snapshot) {
+  if (!gameId) {
+    return <LoadingScreen />;
+  }
+
+  // Server emitted an unrecoverable error (e.g. game session lost after restart).
+  if (gameError) {
+    return <GameErrorScreen errorCode={gameError} onHome={handleHome} />;
+  }
+
+  if (!snapshot) {
     return <LoadingScreen />;
   }
 
