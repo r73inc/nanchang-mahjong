@@ -267,6 +267,8 @@
   "gameErrorTitle": "Game Unavailable",
   "gameErrorNotFound": "This game session no longer exists. The server may have restarted. Please return to the lobby.",
   "gameErrorNotInGame": "You are not a player in this game.",
+  "gameErrorTimeout": "Unable to connect to the game. The server is not responding. Please return to the lobby and try again.",
+  "gameErrorGeneric": "An unexpected error occurred. Please return to the lobby and try again.",
   "gameErrorBackToLobby": "Back to Lobby",
 
   "endGamePlacement1": "1st Place",

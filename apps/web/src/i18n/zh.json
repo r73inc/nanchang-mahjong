@@ -267,6 +267,8 @@
   "gameErrorTitle": "游戏不可用",
   "gameErrorNotFound": "该游戏会话已不存在，服务器可能已重启，请返回大厅。",
   "gameErrorNotInGame": "您不是该游戏的玩家。",
+  "gameErrorTimeout": "无法连接游戏，服务器未响应，请返回大厅后重试。",
+  "gameErrorGeneric": "发生意外错误，请返回大厅后重试。",
   "gameErrorBackToLobby": "返回大厅",
 
   "endGamePlacement1": "第一名",

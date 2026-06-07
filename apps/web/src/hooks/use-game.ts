@@ -58,10 +58,11 @@ export function useGame(gameId: string, spectate = false) {
 
     const s = socket;
 
-    // ── Join ──────────────────────────────────────────────────────────────────
-    s.emit('game:join', { gameId, spectate });
-
     // ── Game state events ─────────────────────────────────────────────────────
+    // IMPORTANT: Register ALL listeners BEFORE emitting game:join.
+    // Although network latency makes the race essentially impossible in practice,
+    // registering first is the correct pattern and eliminates any theoretical risk
+    // of missing the game:snapshot response in low-latency (localhost) environments.
     const handleSnapshot = (payload: { state: Parameters<typeof setSnapshot>[0] }) => {
       setSnapshot(payload.state);
     };
@@ -112,14 +113,13 @@ export function useGame(gameId: string, spectate = false) {
     };
 
     // game:error — log to console so backend rejections are visible during debugging.
-    // For unrecoverable errors (game not found, player not in game) surface the
-    // error in the store so GamePage can render an error screen instead of the
-    // perpetual LoadingScreen.
+    // Surface ALL error codes in the store so GamePage renders an error screen
+    // instead of leaving the user stuck on a perpetual LoadingScreen.
+    // Previously only GAME_NOT_FOUND and NOT_IN_GAME were handled; TOO_FAST,
+    // INVALID_PAYLOAD, NOT_HOST, ENGINE_ERROR, etc. were silently dropped.
     const handleError = (payload: { code: string; message?: string }) => {
       console.warn('[game:error]', payload.code, payload.message ?? '');
-      if (payload.code === 'GAME_NOT_FOUND' || payload.code === 'NOT_IN_GAME') {
-        setGameError(payload.code);
-      }
+      setGameError(payload.code);
     };
 
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
@@ -136,6 +136,8 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:error', handleError);
 
     // ── Connection management ─────────────────────────────────────────────────
+    // Registered before game:join so reconnect logic is wired before the
+    // server can respond with connect/disconnect events.
     const handleDisconnect = () => {
       // Start the 1.5s timer before showing the overlay (PLAN §7.5)
       reconnectTimerRef.current = setTimeout(() => {
@@ -160,6 +162,11 @@ export function useGame(gameId: string, spectate = false) {
     s.on('disconnect', handleDisconnect);
     s.on('connect', handleConnect);
     s.on('connect_error', handleConnectError);
+
+    // ── Join ──────────────────────────────────────────────────────────────────
+    // Emit AFTER all listeners are registered so we cannot miss game:snapshot
+    // even if the server responds before this effect resumes execution.
+    s.emit('game:join', { gameId, spectate });
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {

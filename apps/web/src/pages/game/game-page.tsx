@@ -60,8 +60,17 @@ const WIND_COLOR: Record<SeatWind, string> = {
 function LoadingScreen() {
   const { t } = useI18n();
   return (
-    <div className="flex items-center justify-center h-dvh bg-mj-bg-page">
-      <p className="text-mj-bone/50 text-sm">{t('loading')}</p>
+    <div className="flex flex-col items-center justify-center gap-3 h-dvh bg-mj-bg-page">
+      <div className="flex gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-2 h-2 rounded-full bg-mj-gold/60 animate-pulse"
+            style={{ animationDelay: `${i * 200}ms` }}
+          />
+        ))}
+      </div>
+      <p className="text-mj-bone/80 text-sm">{t('loading')}</p>
     </div>
   );
 }
@@ -73,12 +82,21 @@ function LoadingScreen() {
  */
 function GameErrorScreen({ errorCode, onHome }: { errorCode: string; onHome: () => void }) {
   const { t } = useI18n();
+
+  const errorMessage =
+    errorCode === 'GAME_NOT_FOUND'
+      ? t('gameErrorNotFound')
+      : errorCode === 'NOT_IN_GAME'
+        ? t('gameErrorNotInGame')
+        : errorCode === 'TIMEOUT'
+          ? t('gameErrorTimeout')
+          : t('gameErrorGeneric');
+
   return (
     <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">
       <h1 className="text-2xl font-bold text-mj-bone">{t('gameErrorTitle')}</h1>
-      <p className="text-sm text-mj-bone/60 max-w-[280px]">
-        {errorCode === 'GAME_NOT_FOUND' ? t('gameErrorNotFound') : t('gameErrorNotInGame')}
-      </p>
+      <p className="text-sm text-mj-bone/60 max-w-[280px]">{errorMessage}</p>
+      <p className="text-[10px] text-mj-bone/30 font-mono">{errorCode}</p>
       <button
         onClick={onHome}
         className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
@@ -1497,6 +1515,9 @@ function GameTable({
 /** localStorage key that persists the active gameId across page navigations. */
 const ACTIVE_GAME_KEY = 'mj:active-game';
 
+/** How long to wait for game:snapshot before giving up and showing an error. */
+const GAME_JOIN_TIMEOUT_MS = 12_000;
+
 export function GamePage() {
   const { id: gameId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -1522,6 +1543,19 @@ export function GamePage() {
     revealJing,
     requestRematch,
   } = useGame(gameId ?? '', spectate);
+
+  // ── Loading timeout ───────────────────────────────────────────────────────────
+  // If we haven't received a game:snapshot within GAME_JOIN_TIMEOUT_MS, the
+  // connection is broken or the server rejected us silently. Surface a TIMEOUT
+  // error so the user gets a clear message and a Back to Lobby button rather than
+  // staring at an infinite loading screen.
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (snapshot || gameError || timedOut) return; // already have state — no timer needed
+    const id = setTimeout(() => setTimedOut(true), GAME_JOIN_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, [snapshot, gameError, timedOut]);
 
   const handleHome = useCallback(() => navigate('/lobby'), [navigate]);
 
@@ -1562,6 +1596,12 @@ export function GamePage() {
   // Server emitted an unrecoverable error (e.g. game session lost after restart).
   if (gameError) {
     return <GameErrorScreen errorCode={gameError} onHome={handleHome} />;
+  }
+
+  // Client-side timeout: if game:snapshot hasn't arrived after GAME_JOIN_TIMEOUT_MS,
+  // show an error rather than leaving the user on an infinite loading screen.
+  if (timedOut) {
+    return <GameErrorScreen errorCode="TIMEOUT" onHome={handleHome} />;
   }
 
   if (!snapshot) {
