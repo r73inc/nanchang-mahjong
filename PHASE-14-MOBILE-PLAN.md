@@ -148,14 +148,15 @@ that drives the state machine on user interaction.
 
 ### 2.6 Mobile Touch Constraint Summary (NEW)
 
-Two browser-native behaviours must be surgically suppressed on the game surface:
+Three browser-native behaviours must be surgically suppressed on the game surface:
 
-| Behaviour                         | Trigger                                     | Suppression                                                                   |
-| --------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
-| Pull-to-refresh (iOS/Android)     | Downward swipe on overscrolled page         | `overscroll-behavior: none` on `body`; `touch-action: none` on game wrapper   |
-| Drag coordinate misinterpretation | CSS `rotate(90deg)` swaps physical X/Y axes | Disable `Reorder.Group` drag entirely when `isMobileLandscapeForced === true` |
+| Behaviour                                | Trigger                                                       | Suppression                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Pull-to-refresh (iOS/Android)            | Downward swipe on overscrolled page                           | `overscroll-behavior: none` on `body`; `touch-action: none` on game wrapper                                          |
+| Drag coordinate misinterpretation        | CSS `rotate(90deg)` swaps physical X/Y axes                   | Disable `Reorder.Group` drag entirely when `isMobileLandscapeForced === true`                                        |
+| Long-press context menu / text selection | Resting finger on a tile or button for ~500 ms on iOS/Android | `-webkit-touch-callout: none`; `-webkit-user-select: none`; `user-select: none` on wrapper + global `index.css` rule |
 
-Both are applied at the `ForcedLandscapeWrapper` / `GameTable` mount lifecycle and
+All three are applied at the `ForcedLandscapeWrapper` / `GameTable` mount lifecycle and
 cleaned up on unmount to avoid polluting non-game pages.
 
 ---
@@ -261,6 +262,16 @@ When `active === true`:
     // game surface. Prevents iOS momentum scroll, Android pull-to-refresh,
     // and swipe-back navigation from firing during gameplay.
     touchAction: 'none',
+    // ── Long-press trap prevention ──────────────────────────────────────────
+    // iOS Safari shows a magnifying glass / "Save Image" / "Copy" context
+    // menu if a finger rests on any element for ~500 ms. This is catastrophic
+    // during gameplay (interrupts the tap-to-select flow). The three properties
+    // below collectively defeat this on all mobile WebKit and Blink engines.
+    // -webkit-touch-callout targets the iOS callout popup specifically.
+    // user-select (standard + prefixed) prevents text/image selection highlight.
+    WebkitTouchCallout: 'none',
+    WebkitUserSelect: 'none',
+    userSelect: 'none',
   }}
   className="mj-landscape-wrapper"
 >
@@ -297,7 +308,24 @@ Add to `apps/web/src/index.css`:
     box-shadow: 0 0 0 2px #c9a961 !important;
   }
 }
+
+/*
+ * Long-press trap: defeat iOS Safari's callout menu and all mobile browsers'
+ * text/image selection highlight across the entire game surface.
+ * Applied as a class rule so it targets both the CSS-rotation wrapper and the
+ * native-fullscreen path (where ForcedLandscapeWrapper is inactive but the
+ * game table still fills the screen).
+ */
+.mj-game-surface {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 ```
+
+Add `className="mj-game-surface"` to the outermost game table `div` in `GameTable`
+(`game-page.tsx`) so the rule applies in both `'css-landscape'` and `'native-landscape'`
+modes, not just on `ForcedLandscapeWrapper`.
 
 #### 3.1.3 New file: `apps/web/src/components/2d/MobileLandscapeGate.tsx`
 
@@ -1111,20 +1139,21 @@ on a desktop browser window ≥ 600 px wide:
 
 ## 7. Key Risks & Mitigations
 
-| Risk                                                                                  | Mitigation                                                                                                                                                                                                                                                                           |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `100dvh` / `100vw` units differ in older WebKits                                      | Use `100vh` fallback first, then `100dvh` via `@supports (height: 100dvh)`                                                                                                                                                                                                           |
-| `env(safe-area-inset-*)` not available in jsdom test environment                      | Guard with `?? '0px'` fallback; test safe-area paths via CSS custom property presence, not computed pixel values                                                                                                                                                                     |
-| Framer Motion `layoutId` shared-element animation re-anchors inside rotated container | `layoutId` animates within the nearest `LayoutGroup`. Add `<LayoutGroup id="game-table">` at the `MobileLandscapeGate` level if the discard flight animation misfires after rotation; validate manually on device                                                                    |
-| `ResizeObserver` for `--mj-hand-height` fires after first paint                       | Debounce 16 ms (one frame); the CSS variable fallback `var(--mj-hand-height, 90px)` ensures `SideRail` is not mispositioned on first render                                                                                                                                          |
-| `screen.orientation.lock()` rejects silently on iOS Safari                            | Entire `requestNativeLandscape` is wrapped in try/catch; any rejection (including `NotSupportedError`) routes to `'css-landscape'` mode                                                                                                                                              |
-| Native fullscreen exits unexpectedly (e.g., incoming phone call)                      | `fullscreenchange` listener transitions back to `'needs-gesture'`; overlay reappears. Player sees "Tap to Enter Game" and can re-enter with one tap                                                                                                                                  |
-| **[NEW] Drag coordinate inversion under CSS rotation**                                | `disableDrag={true}` passed to `PlayerHand2D` from `MobileGameTable2D`; `Reorder.Item drag={false}` removes all pointer event capture from Framer Motion's drag system. Two-tap flow is the sole mobile interaction path — no drag tracking occurs                                   |
-| **[NEW] Pull-to-refresh fires during rapid tile tapping**                             | Two-layer suppression: `touch-action: none` on the rotated wrapper and the game table root div; `overscrollBehavior: none` on `body` via `useEffect` (with cleanup on unmount). `overscrollBehavior: contain` on the discard pool allows internal scroll without propagating to body |
-| **[NEW] Native fullscreen blocked by browser policy**                                 | Fullscreen requires a user gesture; the `MobileTapToPlayOverlay` CTA button is the gesture. If `requestFullscreen()` is blocked (e.g., some Android WebViews), catch routes to CSS fallback. The game is always playable via CSS rotation                                            |
-| **[NEW] 14 tiles overflow on iPhone SE (320/375 px)**                                 | `flex-shrink: 1; min-width: 0` on both `Reorder.Group` and each `Reorder.Item`; tiles squeeze proportionally rather than overflowing. Minimum tile tap target is the tile height (62 px), not width, so usability is preserved even at maximum shrink                                |
-| TypeScript: `React.CSSProperties` does not accept CSS custom properties               | Cast the style object `as React.CSSProperties` — standard pattern throughout the codebase for `--felt-*` and `--tile-*` vars                                                                                                                                                         |
-| History bottom sheet z-index conflict with `PlayerHand2D`                             | Bottom sheet at z-16 uses a click-away backdrop at z-15; tapping outside the sheet closes it. `PlayerHand2D` at z-3 is below both layers                                                                                                                                             |
+| Risk                                                                                  | Mitigation                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `100dvh` / `100vw` units differ in older WebKits                                      | Use `100vh` fallback first, then `100dvh` via `@supports (height: 100dvh)`                                                                                                                                                                                                                                                                                                         |
+| `env(safe-area-inset-*)` not available in jsdom test environment                      | Guard with `?? '0px'` fallback; test safe-area paths via CSS custom property presence, not computed pixel values                                                                                                                                                                                                                                                                   |
+| Framer Motion `layoutId` shared-element animation re-anchors inside rotated container | `layoutId` animates within the nearest `LayoutGroup`. Add `<LayoutGroup id="game-table">` at the `MobileLandscapeGate` level if the discard flight animation misfires after rotation; validate manually on device                                                                                                                                                                  |
+| `ResizeObserver` for `--mj-hand-height` fires after first paint                       | Debounce 16 ms (one frame); the CSS variable fallback `var(--mj-hand-height, 90px)` ensures `SideRail` is not mispositioned on first render                                                                                                                                                                                                                                        |
+| `screen.orientation.lock()` rejects silently on iOS Safari                            | Entire `requestNativeLandscape` is wrapped in try/catch; any rejection (including `NotSupportedError`) routes to `'css-landscape'` mode                                                                                                                                                                                                                                            |
+| Native fullscreen exits unexpectedly (e.g., incoming phone call)                      | `fullscreenchange` listener transitions back to `'needs-gesture'`; overlay reappears. Player sees "Tap to Enter Game" and can re-enter with one tap                                                                                                                                                                                                                                |
+| **[NEW] Drag coordinate inversion under CSS rotation**                                | `disableDrag={true}` passed to `PlayerHand2D` from `MobileGameTable2D`; `Reorder.Item drag={false}` removes all pointer event capture from Framer Motion's drag system. Two-tap flow is the sole mobile interaction path — no drag tracking occurs                                                                                                                                 |
+| **[NEW] Pull-to-refresh fires during rapid tile tapping**                             | Two-layer suppression: `touch-action: none` on the rotated wrapper and the game table root div; `overscrollBehavior: none` on `body` via `useEffect` (with cleanup on unmount). `overscrollBehavior: contain` on the discard pool allows internal scroll without propagating to body                                                                                               |
+| **[NEW] Long-press shows iOS callout / text selection highlight on tiles**            | `WebkitTouchCallout: 'none'`; `WebkitUserSelect: 'none'`; `userSelect: 'none'` on `ForcedLandscapeWrapper` inline style. `.mj-game-surface` CSS class on the `GameTable` root div covers the native-fullscreen path where the wrapper is inactive. All three properties required: `touch-callout` handles the iOS popover; `user-select` handles highlight on both iOS and Android |
+| **[NEW] Native fullscreen blocked by browser policy**                                 | Fullscreen requires a user gesture; the `MobileTapToPlayOverlay` CTA button is the gesture. If `requestFullscreen()` is blocked (e.g., some Android WebViews), catch routes to CSS fallback. The game is always playable via CSS rotation                                                                                                                                          |
+| **[NEW] 14 tiles overflow on iPhone SE (320/375 px)**                                 | `flex-shrink: 1; min-width: 0` on both `Reorder.Group` and each `Reorder.Item`; tiles squeeze proportionally rather than overflowing. Minimum tile tap target is the tile height (62 px), not width, so usability is preserved even at maximum shrink                                                                                                                              |
+| TypeScript: `React.CSSProperties` does not accept CSS custom properties               | Cast the style object `as React.CSSProperties` — standard pattern throughout the codebase for `--felt-*` and `--tile-*` vars                                                                                                                                                                                                                                                       |
+| History bottom sheet z-index conflict with `PlayerHand2D`                             | Bottom sheet at z-16 uses a click-away backdrop at z-15; tapping outside the sheet closes it. `PlayerHand2D` at z-3 is below both layers                                                                                                                                                                                                                                           |
 
 ---
 
