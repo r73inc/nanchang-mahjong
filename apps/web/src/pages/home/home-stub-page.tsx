@@ -142,6 +142,7 @@ export function HomeStubPage() {
                   onClick={() => void (isSubscribed ? unsubscribe() : subscribe())}
                   disabled={isLoading}
                   aria-pressed={isSubscribed}
+                  data-testid="push-toggle"
                   className="relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50"
                   style={{
                     background: isSubscribed ? '#c9a961' : 'rgba(245,239,223,0.15)',
