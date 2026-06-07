@@ -19,7 +19,7 @@
  * accessible interface).
  */
 
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useBlocker } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
@@ -574,6 +574,50 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
             style={{ background: '#c0392b', color: '#f5efdf' }}
           >
             {t('gameConcedeConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Leave-game confirmation sheet — slides up from the bottom when the player
+ * attempts to navigate away (back button / link) during an active hand.
+ *
+ * Uses `position:fixed` so it overlays the entire viewport regardless of
+ * where in the component tree it is mounted (z-60, above ReconnectingOverlay).
+ */
+function LeaveGameSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)' }}
+    >
+      <div
+        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
+        role="dialog"
+        aria-label={t('gameLeaveTitle')}
+        aria-modal="true"
+      >
+        <h2 className="font-bold text-lg text-mj-bone">{t('gameLeaveTitle')}</h2>
+        <p className="text-sm text-mj-bone/60">{t('gameLeaveDesc')}</p>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+          >
+            {t('gameLeaveCancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl font-bold text-sm"
+            style={{ background: '#c0392b', color: '#f5efdf' }}
+          >
+            {t('gameLeaveConfirm')}
           </button>
         </div>
       </div>
@@ -1236,6 +1280,9 @@ function GameTable({
 
 // ── Main page component ───────────────────────────────────────────────────────
 
+/** localStorage key that persists the active gameId across page navigations. */
+const ACTIVE_GAME_KEY = 'mj:active-game';
+
 export function GamePage() {
   const { id: gameId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -1268,6 +1315,30 @@ export function GamePage() {
       navigate(`/room/${rematchRoomCode}`);
     }
   }, [rematchRoomCode, navigate]);
+
+  // ── Active-game localStorage tracking ──────────────────────────────────────
+  // Store the gameId so LobbyPage can show a "Rejoin" card if the player
+  // navigates away mid-game. Clear it once the session ends normally.
+
+  useEffect(() => {
+    if (gameId) localStorage.setItem(ACTIVE_GAME_KEY, gameId);
+  }, [gameId]);
+
+  useEffect(() => {
+    if (snapshot?.phase === 'finished') localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [snapshot?.phase]);
+
+  // ── Back-button / navigation intercept ─────────────────────────────────────
+  // Block any navigation attempt while the game is actively in progress.
+  // On mobile the OS back gesture fires the same popstate event that
+  // useBlocker intercepts via React Router's history listener.
+
+  const isActiveGame = snapshot?.phase === 'playing' || snapshot?.phase === 'awaiting_claims';
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isActiveGame && currentLocation.pathname !== nextLocation.pathname,
+  );
 
   if (!gameId || !snapshot) {
     return <LoadingScreen />;
@@ -1313,6 +1384,17 @@ export function GamePage() {
       )}
 
       {connection === 'reconnecting' && <ReconnectingOverlay />}
+
+      {/* ── Leave-game confirmation (back-button intercept) ─────────────── */}
+      {blocker.state === 'blocked' && (
+        <LeaveGameSheet
+          onConfirm={() => {
+            localStorage.removeItem(ACTIVE_GAME_KEY);
+            blocker.proceed();
+          }}
+          onCancel={() => blocker.reset()}
+        />
+      )}
     </>
   );
 }

@@ -7,6 +7,7 @@
  *  - Gameplay·discard-flow: tile selection and discard emit the right socket event
  *  - MahjongTile aria-label from tile-map
  *  - GamePage renders jing_reveal screen for phase=jing_reveal
+ *  - Gameplay·back-intercept: leave-game sheet, confirm, cancel (BUG-2D-06)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -50,6 +51,22 @@ vi.mock('../../lib/socket', () => ({
   getSocket: vi.fn(() => mockSocket),
   disconnectSocket: vi.fn(),
 }));
+
+// ── useBlocker mock (BUG-2D-06) ───────────────────────────────────────────────
+// Controls the blocker state so tests can simulate a blocked navigation
+// without actually triggering router history changes.
+const mockBlockerProceed = vi.fn();
+const mockBlockerReset = vi.fn();
+const mockBlocker = {
+  state: 'unblocked' as 'unblocked' | 'blocked' | 'proceeding',
+  proceed: mockBlockerProceed,
+  reset: mockBlockerReset,
+};
+
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return { ...actual, useBlocker: () => mockBlocker };
+});
 
 // ── Snapshot fixtures ─────────────────────────────────────────────────────────
 
@@ -148,6 +165,10 @@ describe('GamePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registeredHandlers = new Map();
+    mockBlocker.state = 'unblocked';
+    mockBlockerProceed.mockClear();
+    mockBlockerReset.mockClear();
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -304,6 +325,60 @@ describe('GamePage', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /pass|过/i }));
     expect(mockEmit).toHaveBeenCalledWith('game:pass', {});
+  });
+
+  // ── BUG-2D-06: back-button intercept ───────────────────────────────────────
+
+  it('Gameplay·back-intercept: leave sheet appears when blocker is blocked', async () => {
+    // Simulate the blocker firing (navigation was attempted and intercepted).
+    mockBlocker.state = 'blocked';
+
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'playing' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /leave game/i })).toBeInTheDocument();
+    });
+
+    // Reset blocker state for subsequent tests
+    mockBlocker.state = 'unblocked';
+  });
+
+  it('Gameplay·back-intercept: confirming leave calls proceed() and clears localStorage', async () => {
+    localStorage.setItem('mj:active-game', 'game-test');
+    mockBlocker.state = 'blocked';
+
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'playing' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: /leave game/i })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^leave$/i }));
+
+    expect(mockBlockerProceed).toHaveBeenCalledOnce();
+    expect(localStorage.getItem('mj:active-game')).toBeNull();
+
+    mockBlocker.state = 'unblocked';
+  });
+
+  it('Gameplay·back-intercept: cancelling leave calls reset() and keeps the player in-game', async () => {
+    mockBlocker.state = 'blocked';
+
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'playing' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: /leave game/i })).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /stay in game/i }));
+
+    expect(mockBlockerReset).toHaveBeenCalledOnce();
+    expect(mockBlockerProceed).not.toHaveBeenCalled();
+
+    mockBlocker.state = 'unblocked';
   });
 });
 

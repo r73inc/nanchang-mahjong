@@ -8,6 +8,9 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+/** localStorage key shared with game-page.tsx */
+const ACTIVE_GAME_KEY = 'mj:active-game';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
 import { useRoomActions } from '../../hooks/use-room';
@@ -24,6 +27,16 @@ export function LobbyPage() {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [code, setCode] = useState('');
+
+  // Rejoin card — shown when a gameId was stored by game-page before navigating away.
+  const [activeGameId, setActiveGameId] = useState<string | null>(() =>
+    localStorage.getItem(ACTIVE_GAME_KEY),
+  );
+
+  function handleDismissRejoin() {
+    localStorage.removeItem(ACTIVE_GAME_KEY);
+    setActiveGameId(null);
+  }
 
   const accessToken = useAuthStore((s) => s.accessToken);
 
@@ -54,6 +67,52 @@ export function LobbyPage() {
   return (
     <ScreenShell title={t('joinRoom')} onBack={() => navigate('/home')}>
       <div className="px-4 py-6 flex flex-col gap-6">
+        {/* ── Rejoin in-progress game ─────────────────────────────────── */}
+        {activeGameId && (
+          <div
+            className="rounded-2xl p-5 relative"
+            data-testid="rejoin-card"
+            style={{
+              background: 'rgba(90,125,140,0.12)',
+              border: '1px solid rgba(90,125,140,0.5)',
+            }}
+          >
+            {/* Dismiss button */}
+            <button
+              onClick={handleDismissRejoin}
+              aria-label={t('lobbyRejoinDismiss')}
+              className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full text-mj-bone/40 hover:text-mj-bone/70"
+              style={{ background: 'rgba(245,239,223,0.07)' }}
+            >
+              <svg
+                aria-hidden="true"
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <line x1="1" y1="1" x2="11" y2="11" />
+                <line x1="11" y1="1" x2="1" y2="11" />
+              </svg>
+            </button>
+            <h2 className="text-base font-bold text-mj-bone mb-1 pr-8">{t('lobbyRejoinBanner')}</h2>
+            <p className="text-xs text-mj-bone/60 mb-4">{t('lobbyRejoinSub')}</p>
+            <button
+              onClick={() => navigate(`/game/${activeGameId}`)}
+              className="w-full py-3.5 rounded-[14px] font-bold text-sm"
+              style={{
+                background: 'rgba(90,125,140,0.35)',
+                border: '1px solid rgba(90,125,140,0.6)',
+                color: '#d4eaf5',
+              }}
+            >
+              {t('lobbyRejoin')}
+            </button>
+          </div>
+        )}
+
         {error && (
           <div
             className="px-4 py-3 rounded-xl text-sm font-semibold text-mj-loss-light"
