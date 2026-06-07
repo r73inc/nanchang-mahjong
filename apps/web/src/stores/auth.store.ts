@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { decodeJwtPayload } from '../lib/decode-jwt';
+import { disconnectSocket } from '../lib/socket';
 
 export type UserRole = 'user' | 'admin';
 
@@ -76,12 +77,29 @@ export const useAuthStore = create<AuthState>()(
           user: parseUser(accessToken) ?? s.user,
         })),
 
-      clearAuth: () => set({ user: null, accessToken: null, refreshToken: null }),
+      clearAuth: () => {
+        // Disconnect the socket so it cannot re-authenticate with the stale token.
+        disconnectSocket();
+        set({ user: null, accessToken: null, refreshToken: null });
+      },
     }),
     {
       name: 'nanchang-auth',
-      // Only persist tokens; user is re-derived from the access token on load.
-      partialize: (s) => ({ accessToken: s.accessToken, refreshToken: s.refreshToken }),
+      // Persist tokens AND the parsed user object so that displayName / sub are
+      // available immediately on page reload (before any token refresh occurs).
+      partialize: (s) => ({
+        accessToken: s.accessToken,
+        refreshToken: s.refreshToken,
+        user: s.user,
+      }),
+      // After rehydration: if we got an access token but no user (e.g. old
+      // localStorage without the user field), re-derive the user from the token.
+      onRehydrateStorage: () => (state) => {
+        if (state?.accessToken && !state.user) {
+          const derived = parseUser(state.accessToken);
+          if (derived) state.user = derived;
+        }
+      },
     },
   ),
 );

@@ -65,6 +65,12 @@ interface GameStore {
   /** Socket connection health. Drives the reconnecting overlay. */
   connection: ConnectionStatus;
 
+  /**
+   * Set when the server emits an unrecoverable game:error (e.g. GAME_NOT_FOUND,
+   * NOT_IN_GAME). Drives the error screen instead of the LoadingScreen.
+   */
+  gameError: string | null;
+
   // ── Actions ────────────────────────────────────────────────────────────────
   setSnapshot: (s: ClientGameState) => void;
   setEnded: (e: GameEndedPayload) => void;
@@ -74,6 +80,7 @@ interface GameStore {
   selectTile: (idx: number | null) => void;
   setPendingMove: (v: boolean) => void;
   setToast: (t: GameToast | null) => void;
+  setGameError: (err: string | null) => void;
   reset: () => void;
 }
 
@@ -86,6 +93,7 @@ const initialState = {
   claimWindow: null,
   toast: null,
   connection: 'live' as ConnectionStatus,
+  gameError: null,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -114,6 +122,8 @@ export const useGameStore = create<GameStore>()(
     setPendingMove: (pendingMove) => set({ pendingMove }),
 
     setToast: (toast) => set({ toast }),
+
+    setGameError: (gameError) => set({ gameError }),
 
     reset: () => set(initialState),
   })),
