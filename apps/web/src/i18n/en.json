@@ -259,6 +259,9 @@
   "gameConfirmDiscard": "Tap again to discard",
   "gameDrawRound": "Draw — No Winner",
   "gameConceded": "Player Conceded",
+  "gameMobileEnterTitle": "Rotate to Play",
+  "gameMobileEnterDesc": "We'll switch to landscape mode for the best experience.",
+  "gameMobileEnterCta": "Enter Game",
 
   "endGamePlacement1": "1st Place",
   "endGamePlacement2": "2nd Place",

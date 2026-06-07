@@ -40,6 +40,27 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* Kill the CSS-rotate transition on the landscape wrapper for vestibular safety. */
+  .mj-landscape-wrapper {
+    transition: none !important;
+  }
+
+  /* Kill the opponent badge active-turn animation, fall back to a static gold outline. */
+  .mj-opponent-badge-active {
+    animation: none !important;
+    box-shadow: 0 0 0 2px #c9a961 !important;
+  }
+}
+
+/* ── Mobile game surface — long-press context menu suppression ───────────────── */
+/* Applied to the GameTable root div. Covers both the css-landscape path           */
+/* (where ForcedLandscapeWrapper inline styles also apply) and the native-         */
+/* landscape path (where the wrapper is a passthrough div with no inline styles).  */
+.mj-game-surface {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 @layer utilities {

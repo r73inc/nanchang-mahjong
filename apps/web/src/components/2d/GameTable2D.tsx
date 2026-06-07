@@ -79,6 +79,11 @@ const REDUCED_MOTION = 'user' as const;
 export interface GameTable2DProps {
   /** Wired from game-page.tsx's useGame().discard */
   onDiscard: (tile: TileType) => void;
+  /**
+   * True when the CSS forced-landscape wrapper is active (mode === 'css-landscape').
+   * Accepted now, consumed in PR 14B for drag-coordinate trap mitigation.
+   */
+  isMobile?: boolean;
 }
 
 // ── Seat indices ──────────────────────────────────────────────────────────────
@@ -87,7 +92,7 @@ const SEAT_INDICES = [0, 1, 2, 3] as const;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function GameTable2D({ onDiscard }: GameTable2DProps) {
+export function GameTable2D({ onDiscard, isMobile: _isMobile }: GameTable2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
   const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
 

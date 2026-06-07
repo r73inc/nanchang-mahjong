@@ -259,6 +259,9 @@
   "gameConfirmDiscard": "再次点击确认出牌",
   "gameDrawRound": "荒牌 — 无人胡牌",
   "gameConceded": "玩家认输",
+  "gameMobileEnterTitle": "横屏游戏",
+  "gameMobileEnterDesc": "我们将切换到横屏模式以获得最佳体验。",
+  "gameMobileEnterCta": "进入游戏",
 
   "endGamePlacement1": "第一名",
   "endGamePlacement2": "第二名",
