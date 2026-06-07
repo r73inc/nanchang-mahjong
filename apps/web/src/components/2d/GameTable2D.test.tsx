@@ -132,8 +132,9 @@ describe('GameTable2D · 2DBoard·zones', () => {
   });
 });
 
+// BUG-2D-05: all discards are merged into a single combined-discard-pool.
 describe('GameTable2D · 2DBoard·discards', () => {
-  it('shows discard pool when a seat has discards', () => {
+  it('renders the combined discard pool when any seat has discards', () => {
     setupStore(
       makeSnapshot({
         seats: [
@@ -150,14 +151,18 @@ describe('GameTable2D · 2DBoard·discards', () => {
       }),
     );
     renderTable();
-    // Seat 0 and seat 1 discard pools are present
-    expect(screen.getByTestId('discard-pool-0')).toBeInTheDocument();
-    expect(screen.getByTestId('discard-pool-1')).toBeInTheDocument();
-    // Seat 2 has no discards
-    expect(screen.queryByTestId('discard-pool-2')).not.toBeInTheDocument();
+    // A single combined pool is present (seats 0 and 1 have discards).
+    expect(screen.getByTestId('combined-discard-pool')).toBeInTheDocument();
   });
 
-  it('discard pool renders one tile per discard', () => {
+  it('does not render the combined pool when no seat has discards', () => {
+    setupStore(); // default snapshot — all seats have empty discard arrays
+    renderTable();
+    expect(screen.queryByTestId('combined-discard-pool')).not.toBeInTheDocument();
+  });
+
+  it('combined pool renders the total tile count across all discarding seats', () => {
+    // Seat 0: 3 discards, seat 1: 2 discards → 5 tiles total in combined pool.
     setupStore(
       makeSnapshot({
         seats: [
@@ -167,16 +172,16 @@ describe('GameTable2D · 2DBoard·discards', () => {
             handCount: 1,
             discards: ['4m', '5m', '6m'] as TileType[],
           }),
-          makeSeat({ wind: 'south' }),
+          makeSeat({ wind: 'south', discards: ['1p', '2p'] as TileType[] }),
           makeSeat({ wind: 'west' }),
           makeSeat({ wind: 'north' }),
         ],
       }),
     );
     renderTable();
-    const pool = screen.getByTestId('discard-pool-0');
-    // Each MahjongTile2D wrapper has data-testid="mahjong-tile-2d"
-    expect(pool.querySelectorAll('[data-testid="mahjong-tile-2d"]')).toHaveLength(3);
+    const pool = screen.getByTestId('combined-discard-pool');
+    // Round-robin: s0[0], s1[0], s0[1], s1[1], s0[2] → 5 tiles
+    expect(pool.querySelectorAll('[data-testid="mahjong-tile-2d"]')).toHaveLength(5);
   });
 });
 

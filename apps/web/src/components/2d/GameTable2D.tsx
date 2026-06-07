@@ -28,20 +28,31 @@
  *   "left   center   right"
  *   "bottom bottom   bottom"   ← viewer spans full width
  *
- * Each opponent seat zone is a rotated flex column:
- *   SeatLabel2D   (outer edge)
- *   OpponentHand2D
- *   OpenMelds2D   (inner edge — discards removed, now in CenterDiscards2D)
+ * Each opponent seat zone is a rotated flex column.
+ *
+ * BUG-2D-04 fix — correct visual order after CSS rotation:
+ *  CSS rotateZ (180°, ±90°) inverts the flex visual order: the DOM-FIRST
+ *  child ends up at the visual INNER edge (closest to the centre felt) and
+ *  the DOM-LAST child ends up at the visual OUTER edge (screen perimeter).
+ *  This is true for ALL three opponent rotations.
+ *
+ *  Correct layout (DOM order → visual order after rotation):
+ *    1. Sub-group [OpenMelds2D, OpponentHand2D]  → INNER edge (near centre)
+ *    2. SeatLabel2D                              → OUTER edge (screen edge)
+ *
+ *  OpenMelds is placed first within the sub-group so it appears closest to
+ *  the compass rose (matching real table layout where melds face the centre).
  *
  * The viewer's bottom zone (full-width) is a reversed column:
- *   OpenMelds2D  (inner — discards removed, now in CenterDiscards2D)
+ *   OpenMelds2D  (inner — discards now in CombinedDiscardPool2D)
  *   PlayerHand2D (outer — at screen bottom edge)
  *
  * BUG-2D-03 fix — centre discard pools:
- *  All four DiscardPool2D instances are now rendered inside the `center`
- *  grid cell by CenterDiscards2D rather than inside each seat zone.
- *  This places discarded tiles on the felt surface, matching real-world
- *  Mahjong table layout.
+ *  Discards are rendered inside the `center` grid cell by CenterDiscards2D.
+ *
+ * BUG-2D-05 fix — combined discard pile:
+ *  CenterDiscards2D now renders a single CombinedDiscardPool2D in the true
+ *  centre of the felt rather than four per-seat pools near seat edges.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -142,7 +153,7 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
             {/* ── Centre discard pools (BUG-2D-03) ─────────────────────── */}
             {/* All four DiscardPool2D instances live here so tiles land on  */}
             {/* the felt surface, not inside the rotated seat zone strips.   */}
-            <CenterDiscards2D viewerSeat={viewerSeat} />
+            <CenterDiscards2D />
 
             {/* ── Seat zones ────────────────────────────────────────────── */}
             {SEAT_INDICES.map((seatIdx) => {
@@ -186,9 +197,11 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                 );
               }
 
-              // Opponent zone: rotated container — label → hand → discards → melds.
-              // The CSS rotation swaps visual width/height so a 13-tile xs row
-              // fits within the center row's height (not the column's width).
+              // Opponent zone: rotated flex container.
+              // DOM child order is REVERSED from intended visual order because
+              // CSS rotateZ flips which end of the flex axis is "outer" vs "inner".
+              // For all three rotations (180°, ±90°): DOM-first → visual inner edge,
+              // DOM-last → visual outer edge.
               return (
                 <div
                   key={seatIdx}
@@ -207,14 +220,27 @@ export function GameTable2D({ onDiscard }: GameTable2DProps) {
                     // rotated tile row to zero visible area before rotation applies.
                   }}
                 >
-                  {/* Outer edge: nameplate */}
+                  {/*
+                   * DOM-FIRST → visual INNER edge (closest to centre felt).
+                   * OpenMelds is innermost (faces compass rose, like real table).
+                   * OpponentHand is just outward of melds, grouped together.
+                   * When no melds exist OpenMelds2D returns null and the hand
+                   * alone is still anchored at the inner edge — never off-screen.
+                   */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+                    <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
+                  </div>
+
+                  {/* DOM-LAST → visual OUTER edge (screen perimeter nameplate). */}
                   <SeatLabel2D seatIdx={seatIdx} />
-
-                  {/* Face-down hand */}
-                  <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
-
-                  {/* Inner edge: open melds (discards moved to CenterDiscards2D) */}
-                  <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
                 </div>
               );
             })}
