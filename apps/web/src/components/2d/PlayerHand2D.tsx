@@ -129,9 +129,17 @@ export function mergeLocalOrder(prev: LocalEntry[], serverHand: TileType[]): Loc
 export interface PlayerHand2DProps {
   /** Wired to useGame().discard in GameTable2D → game-page.tsx */
   onDiscard: (tile: TileType) => void;
+  /**
+   * Disable Framer Motion drag entirely.
+   *
+   * CSS rotate(90deg) swaps the physical X/Y axes, making Framer Motion's
+   * Reorder drag tracking produce inverted/incorrect tile movements.
+   * Set true in MobileGameTable2D; players use tap-to-select → tap-to-discard.
+   */
+  disableDrag?: boolean;
 }
 
-export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
+export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
@@ -171,7 +179,8 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
   // ── Interaction ───────────────────────────────────────────────────────────
 
   const interactive = isMyTurn && !claimWindow && !pendingMove;
-  const draggable = interactive;
+  // Drag disabled on mobile: CSS rotation makes Framer Motion coordinates incorrect.
+  const draggable = interactive && !disableDrag;
 
   const handleTileSelect = useCallback(
     (entry: LocalEntry) => {
@@ -220,6 +229,12 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
           listStyle: 'none',
           padding: 0,
           margin: 0,
+          // Flex-shrink safety (PR 14B): allows the tile row to shrink below
+          // its intrinsic width on small devices (e.g. iPhone SE 375 px).
+          // min-width: 0 is mandatory — without it flex items cannot shrink
+          // below their content size, causing overflow on narrow viewports.
+          flexShrink: 1,
+          minWidth: 0,
         }}
       >
         {/*
@@ -241,7 +256,14 @@ export function PlayerHand2D({ onDiscard }: PlayerHand2DProps) {
               exit={TILE_EXIT}
               transition={TILE_TRANSITION}
               whileDragging={{ y: -12, zIndex: 10, scale: 1.05 }}
-              style={{ listStyle: 'none', touchAction: 'none' }}
+              style={{
+                listStyle: 'none',
+                touchAction: 'none',
+                // Allow each tile to shrink proportionally below its natural size.
+                // Pairs with the Reorder.Group flexShrink/minWidth above.
+                flexShrink: 1,
+                minWidth: 0,
+              }}
             >
               <MahjongTile2D
                 tile={entry.tile}
