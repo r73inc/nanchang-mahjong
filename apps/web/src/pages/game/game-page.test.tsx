@@ -414,6 +414,72 @@ describe('GamePage', () => {
     unmount();
   });
 
+  it('Mobile·status-bar-compact: wall count shows only number (no label) in mobile mode', async () => {
+    mockOrientation.mode = 'css-landscape';
+    mockOrientation.isMobileLandscapeForced = true;
+
+    renderGamePage();
+    const snap = makeSnapshot({ wallCount: 42, viewMode: '2D' });
+    await pushSnapshot(snap);
+
+    await waitFor(() => {
+      // On mobile, the wall count renders as just the number — no "Wall:" label
+      expect(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    // The full label text should NOT appear on mobile
+    expect(screen.queryByText(/wall left/i)).not.toBeInTheDocument();
+  });
+
+  it('Mobile·history-toggle-hidden: right-edge history toggle is absent in mobile mode', async () => {
+    mockOrientation.mode = 'native-landscape';
+    mockOrientation.isMobileLandscapeForced = false;
+
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ viewMode: '2D' }));
+
+    // Wait for the mobile game table to appear
+    await waitFor(() => {
+      expect(screen.getByTestId('mobile-game-table-2d')).toBeInTheDocument();
+    });
+
+    // The right-edge tab toggle has no aria-pressed (it uses text arrows ◀/▶).
+    // On mobile, the toggle is an icon button in the status bar with aria-pressed.
+    // We verify: the gameHistoryTitle button (if present) has aria-pressed (= mobile icon).
+    const historyButtons = screen.queryAllByRole('button', { name: /game log|历史/i });
+    historyButtons.forEach((btn) => {
+      // Mobile icon button has aria-pressed; desktop edge tab does not
+      expect(btn).toHaveAttribute('aria-pressed');
+    });
+  });
+
+  it('Mobile·siderail-above-hand: SideRail bottom is var(--mj-hand-height,90px) in mobile mode', async () => {
+    mockOrientation.mode = 'css-landscape';
+    mockOrientation.isMobileLandscapeForced = true;
+
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'awaiting_claims', viewMode: '2D' }));
+
+    // Wait for the mobile game table to render
+    await waitFor(() => {
+      expect(screen.getByTestId('mobile-game-table-2d')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      registeredHandlers.get('game:claim-window')?.({
+        actions: [{ kind: 'pung' }],
+        deadline: Date.now() + 8000,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /claim|碰|抢/i })).toBeInTheDocument();
+    });
+
+    const rail = screen.getByRole('dialog', { name: /claim|碰|抢/i });
+    expect(rail.style.bottom).toBe('var(--mj-hand-height, 90px)');
+  });
+
   it('Mobile·body-overscroll-restored: body overscrollBehavior is restored on unmount', async () => {
     // Set a pre-existing value to verify it is restored rather than blanked.
     document.body.style.overscrollBehavior = 'auto';
