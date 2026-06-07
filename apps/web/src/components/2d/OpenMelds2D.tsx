@@ -18,7 +18,17 @@ import type { Meld, TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { MahjongTile2D } from './MahjongTile2D';
 import { meldLayout } from './layout-2d';
-import type { SeatRole } from './layout-2d';
+import type { SeatRole, MeldLayoutSpec } from './layout-2d';
+
+// ── Compact spec (mobile — xs tiles, tighter spacing) ────────────────────────
+
+type CompactMeldSpec = Omit<MeldLayoutSpec, 'tileSize'> & { tileSize: 'xs' };
+const COMPACT_MELD_SPEC: CompactMeldSpec = {
+  tileSize: 'xs',
+  gap: 1,
+  groupGap: 3,
+  kongOffset: -6,
+};
 
 // ── Animation constants ───────────────────────────────────────────────────────
 
@@ -32,18 +42,25 @@ const MELD_TRANSITION = { duration: 0.25 } as const;
 export interface OpenMelds2DProps {
   seatIdx: 0 | 1 | 2 | 3;
   role: SeatRole;
+  /**
+   * Compact mode — forces xs tile size and tighter groupGap.
+   * Used in MobileGameTable2D where space is constrained.
+   * Ignores the tileScale from Table2DScaleContext.
+   */
+  compact?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function OpenMelds2D({ seatIdx, role }: OpenMelds2DProps) {
+export function OpenMelds2D({ seatIdx, role, compact = false }: OpenMelds2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
 
   if (!snapshot) return null;
 
   const seat = snapshot.seats[seatIdx];
   const melds: Meld[] = seat.openMelds;
-  const spec = meldLayout(role);
+  // In compact mode override tile size and spacing regardless of tileScale.
+  const spec = compact ? COMPACT_MELD_SPEC : meldLayout(role);
 
   if (melds.length === 0) return null;
 
@@ -79,7 +96,7 @@ export function OpenMelds2D({ seatIdx, role }: OpenMelds2DProps) {
 interface MeldGroupProps {
   meld: Meld;
   role: SeatRole;
-  spec: ReturnType<typeof meldLayout>;
+  spec: ReturnType<typeof meldLayout> | CompactMeldSpec;
 }
 
 function MeldGroup({ meld, role, spec }: MeldGroupProps) {
