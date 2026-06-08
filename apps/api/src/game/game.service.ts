@@ -16,9 +16,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { Server, Socket } from 'socket.io';
-import { GameEngine, nextDealer, calculateSpiritSettlement, isWinningHand } from '@nanchang/engine';
-import type { TileType, SeatWind, WinType, WinPaymentResult } from '@nanchang/engine';
-import type { RoomSettings, GameEndedPayload } from '@nanchang/shared';
+import {
+  GameEngine,
+  nextDealer,
+  calculateSpiritSettlement,
+  calculateOpeningJingSettlement,
+  isWinningHand,
+  typeOf,
+} from '@nanchang/engine';
+import type {
+  TileType,
+  SeatWind,
+  WinType,
+  WinPaymentResult,
+  HandType,
+  SeatState,
+} from '@nanchang/engine';
+import type {
+  RoomSettings,
+  GameEndedPayload,
+  HandRevealPayload,
+  SettlementPreviewPayload,
+  SpiritCount,
+} from '@nanchang/shared';
 import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { GameSession } from './game-session';
@@ -200,8 +220,13 @@ export class GameService {
     // Send current snapshot only to this socket
     this.emitSnapshotToSocket(socket.id, session, userId);
 
-    // If all 4 players are now connected and game is in jing_reveal, we stay there
-    // waiting for the host to emit game:reveal-jing (D6).
+    // Re-send pending events to reconnecting players so they don't miss a screen.
+    if (session.preGamePhase === 'settlement' && session.lastSettlementPreview) {
+      this.server?.to(socket.id).emit('game:settlement-preview', session.lastSettlementPreview);
+    }
+    if (session.lastHandReveal) {
+      this.server?.to(socket.id).emit('game:hand-reveal', session.lastHandReveal);
+    }
   }
 
   /**
@@ -223,31 +248,97 @@ export class GameService {
     }
   }
 
-  // ── Jing reveal ──────────────────────────────────────────────────────────────
+  // ── Pre-game reveal flow ──────────────────────────────────────────────────────
 
   /**
-   * Handle game:reveal-jing (host explicit tap, D6).
-   * Transitions engine from jing_reveal → playing and starts the first turn.
+   * Handle game:advance-pre-game — host taps through the pre-game reveal steps.
+   *
+   * Flow without ruleTopBottomJing (2 clicks to start):
+   *   'hands' → (click) → 'jing'  → (click) → null (game starts)
+   *
+   * Flow with ruleTopBottomJing (3 clicks to start):
+   *   'hands' → (click) → 'settlement' → (click) → 'jing' → (click) → null
+   *
+   * Backward-compat: game:reveal-jing delegates here so old clients still work.
    */
-  handleRevealJing(socket: Socket, userId: string, gameId: string): void {
+  handleAdvancePreGame(socket: Socket, userId: string, gameId: string): void {
     const session = this.sessions.get(gameId);
     if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
 
     const seat = session.getSeat(userId);
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
-    // The current dealer (engine's dealerSeat) reveals jing.
-    // Hand 1: dealer = seat 0 = room host. Later hands: dealer rotates.
+    // Only the current dealer (host of this hand) may advance.
     const dealerSeat = session.engine.state.dealerSeat;
     const dealerUserId = session.seatMap[dealerSeat];
     if (userId !== dealerUserId) {
       this.logger.warn(
-        `reveal-jing rejected: userId=${userId} dealerUserId=${dealerUserId} ` +
-          `seatMap=${JSON.stringify(session.seatMap)} dealerSeat=${dealerSeat}`,
+        `advance-pre-game rejected: userId=${userId} is not dealer (${dealerUserId})`,
       );
       return this.emitError(socket, 'NOT_HOST');
     }
 
+    const { ruleTopBottomJing } = session.settings;
+
+    if (session.preGamePhase === 'hands') {
+      if (ruleTopBottomJing) {
+        // Step 1 (ruleTopBottomJing): compute and broadcast settlement preview.
+        // Scores are NOT updated yet — that happens when revealJing() is called.
+        const state = session.engine.state;
+        if (state.wall.length < 2) return this.emitError(socket, 'ENGINE_ERROR');
+        const settlementTile = typeOf(state.wall[0]);
+        // wall[1] is the indicator tile (上精) that will become jingIndicator
+        const nextTile = typeOf(state.wall[1]);
+        const seatCounts = state.seats.map(
+          (s) => s.hand.filter((t) => t === settlementTile).length,
+        ) as [number, number, number, number];
+        const delta = calculateOpeningJingSettlement(settlementTile, state.seats, 2);
+        // Indicator tile (wall[1]) also pays 1 pt per copy held
+        const nextTileSeatCounts = state.seats.map(
+          (s) => s.hand.filter((t) => t === nextTile).length,
+        ) as [number, number, number, number];
+        const nextTileDelta = calculateOpeningJingSettlement(nextTile, state.seats, 1);
+
+        const preview: SettlementPreviewPayload = {
+          settlementTile,
+          nextTile,
+          seatCounts,
+          delta,
+          nextTileSeatCounts,
+          nextTileDelta,
+        };
+        session.preGamePhase = 'settlement';
+        session.lastSettlementPreview = preview;
+
+        this.broadcastSnapshots(session); // broadcasts updated preGamePhase
+        if (this.server) {
+          this.server.to(`game:${gameId}`).emit('game:settlement-preview', preview);
+        }
+      } else {
+        // Standard rule: skip straight to jing reveal.
+        this.doRevealJing(socket, session);
+      }
+    } else if (session.preGamePhase === 'settlement') {
+      // Step 2 (ruleTopBottomJing): call revealJing() — applies settlement + reveals jing.
+      this.doRevealJing(socket, session);
+    } else if (session.preGamePhase === 'jing') {
+      // Final step: start the game turn.
+      session.preGamePhase = null;
+      session.lastSettlementPreview = null;
+      this.broadcastSnapshots(session);
+      this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.currentSeat });
+      this.startTurn(session);
+    } else {
+      // preGamePhase === null means game is already live — ignore stray clicks.
+      this.logger.warn(`advance-pre-game ignored: preGamePhase=null for game ${gameId}`);
+    }
+  }
+
+  /**
+   * Apply revealJing() and advance preGamePhase to 'jing'.
+   * Shared by both the standard and ruleTopBottomJing paths.
+   */
+  private doRevealJing(socket: Socket, session: GameSession): void {
     if (session.engine.state.phase !== 'jing_reveal') {
       return this.emitError(socket, 'INVALID_PHASE');
     }
@@ -259,22 +350,19 @@ export class GameService {
       return this.emitError(socket, 'ENGINE_ERROR', String(err));
     }
 
-    // Push the snapshot FIRST so every client's score counters reflect the
-    // settlement payouts before the toast event arrives.  Socket.IO delivers
-    // messages in emission order on the same connection, so by the time
-    // opening_jing_settlement reaches the client the snapshot is already applied.
+    session.preGamePhase = 'jing';
+
+    // Snapshot first so scores reflect the settlement payout before the event toast.
     this.broadcastSnapshots(session);
 
-    // Broadcast the opening settlement event when top-bottom rule is enabled.
-    // The snapshot above has already updated the score display; the event fires
-    // immediately after so the toast appears against the correct numbers.
+    // Broadcast the opening settlement event so the score-toast can fire.
     if (session.settings.ruleTopBottomJing) {
       const settlementEvent = session.engine.events.find(
         (e) => e.kind === 'opening_jing_settlement',
       ) as
         | {
             kind: 'opening_jing_settlement';
-            settlementTile: import('@nanchang/engine').TileType;
+            settlementTile: TileType;
             scoreDelta: [number, number, number, number];
           }
         | undefined;
@@ -286,9 +374,52 @@ export class GameService {
         });
       }
     }
+    // Note: startTurn() is NOT called here — the host must click one more time.
+  }
 
-    this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.dealerSeat });
-    this.startTurn(session);
+  /**
+   * Backward-compat alias: game:reveal-jing → handleAdvancePreGame.
+   * Old clients that still emit game:reveal-jing continue to work.
+   */
+  handleRevealJing(socket: Socket, userId: string, gameId: string): void {
+    this.handleAdvancePreGame(socket, userId, gameId);
+  }
+
+  // ── Hand-reveal advance ───────────────────────────────────────────────────────
+
+  /**
+   * Handle game:advance-hand — host clicks "Continue" on the hand-reveal screen
+   * to start the next hand or end the session.
+   */
+  handleAdvanceHand(socket: Socket, userId: string, gameId: string): void {
+    const session = this.sessions.get(gameId);
+    if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
+
+    const seat = session.getSeat(userId);
+    if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
+
+    // Only the dealer (host of the just-finished hand) may advance.
+    const dealerSeat = session.engine.state.dealerSeat;
+    const dealerUserId = session.seatMap[dealerSeat];
+    if (userId !== dealerUserId) return this.emitError(socket, 'NOT_HOST');
+
+    const pending = session.pendingHandEnd;
+    if (!pending) return this.emitError(socket, 'INVALID_PHASE');
+
+    session.pendingHandEnd = null;
+    session.lastHandReveal = null;
+
+    if (pending.isLastHand) {
+      void this.endSession(
+        session,
+        pending.winnerSeat,
+        pending.result,
+        pending.payment,
+        pending.spiritDeltas,
+      );
+    } else {
+      this.startNextHand(session, pending.nextDealerInfo);
+    }
   }
 
   // ── Turn loop ────────────────────────────────────────────────────────────────
@@ -591,16 +722,18 @@ export class GameService {
     const lastEvent = session.engine.events.at(-1);
     const payment = lastEvent?.kind === 'win' ? lastEvent.paymentResult : undefined;
 
+    const handType: HandType = lastEvent?.kind === 'win' ? lastEvent.handType : 'standard';
+
     this.broadcastEvent(session, {
       kind: 'win',
       seat: winnerSeat,
       winType,
-      handType: lastEvent?.kind === 'win' ? lastEvent.handType : 'standard',
+      handType,
       payment: payment!,
     });
     this.broadcastSnapshots(session);
 
-    this.handleHandEnd(session, winnerSeat, 'win', payment);
+    this.handleHandEnd(session, winnerSeat, 'win', payment, winType, handType);
   }
 
   private applyRobKongResolution(
@@ -732,7 +865,7 @@ export class GameService {
 
     this.broadcastEvent(session, { kind: 'concede', seat });
     this.broadcastSnapshots(session);
-    this.handleHandEnd(session, null, 'concede');
+    this.handleHandEnd(session, null, 'concede', undefined, undefined, undefined, seat);
   }
 
   // ── Hand end & session management ────────────────────────────────────────────
@@ -742,15 +875,18 @@ export class GameService {
     winnerSeat: Seat4 | null,
     result: 'win' | 'draw' | 'concede',
     payment?: WinPaymentResult,
+    winType?: WinType,
+    handType?: HandType,
+    concedeSeat?: Seat4,
   ): void {
     session.clearAfkTimers();
     session.closeClaimWindow();
     session.handsPlayed++;
 
-    // ── Spirit settlement ──────────────────────────────────────────────────────
     const state = session.engine.state;
-    let spiritDeltas: [number, number, number, number] = [0, 0, 0, 0];
 
+    // ── Spirit settlement ──────────────────────────────────────────────────────
+    let spiritDeltas: [number, number, number, number] = [0, 0, 0, 0];
     if (state.jingPrimary !== null && state.jingSecondary !== null) {
       spiritDeltas = calculateSpiritSettlement(state.seats, state.jingPrimary, state.jingSecondary);
     }
@@ -760,20 +896,96 @@ export class GameService {
       session.cumulativeScores[i as Seat4] = state.seats[i].score + spiritDeltas[i];
     }
 
-    // ── Compute next dealer (needed for both termination check and next hand) ────
+    // ── Compute next dealer ────────────────────────────────────────────────────
     const nextDealerInfo = nextDealer(
       { dealerSeat: state.dealerSeat, roundWind: state.roundWind },
       winnerSeat,
     );
 
-    // ── Check session termination ──────────────────────────────────────────────
-    if (result === 'concede' || this.isSessionOver(session, nextDealerInfo)) {
-      this.endSession(session, winnerSeat, result, payment, spiritDeltas);
-      return;
+    const isLastHand = result === 'concede' || this.isSessionOver(session, nextDealerInfo);
+
+    // ── Per-player spirit counts for the reveal screen ─────────────────────────
+    const spiritCounts = this.computeSpiritCounts(
+      state.seats,
+      state.jingPrimary,
+      state.jingSecondary,
+    );
+
+    // ── Net hand delta per seat (win + kong payouts + spirit vs. starting score) ─
+    const handMeta = session.handLog[session.handLog.length - 1];
+    const handStarting =
+      handMeta?.startingScores ?? ([0, 0, 0, 0] as [number, number, number, number]);
+    const handNetDeltas = session.cumulativeScores.map((s, i) => s - handStarting[i]) as [
+      number,
+      number,
+      number,
+      number,
+    ];
+
+    // ── Build hand-reveal payload ──────────────────────────────────────────────
+    const handReveal: HandRevealPayload = {
+      hands: state.seats.map((s) => [...s.hand]) as [
+        TileType[],
+        TileType[],
+        TileType[],
+        TileType[],
+      ],
+      jingPrimary: state.jingPrimary,
+      jingSecondary: state.jingSecondary,
+      spiritCounts,
+      spiritDeltas,
+      result,
+      winnerSeat: winnerSeat ?? undefined,
+      winType,
+      handType,
+      winPayment: payment,
+      concedeSeat,
+      isLastHand,
+      nextDealerSeat: isLastHand ? undefined : nextDealerInfo.dealerSeat,
+      handNetDeltas,
+    };
+
+    // ── Store pending state, emit hand-reveal, and pause ──────────────────────
+    session.pendingHandEnd = {
+      winnerSeat,
+      result,
+      payment,
+      winType,
+      handType,
+      spiritDeltas,
+      nextDealerInfo,
+      isLastHand,
+    };
+    session.lastHandReveal = handReveal;
+
+    if (this.server) {
+      this.server.to(`game:${session.gameId}`).emit('game:hand-reveal', handReveal);
     }
 
-    // ── Start next hand ────────────────────────────────────────────────────────
-    this.startNextHand(session, nextDealerInfo);
+    // The host must emit game:advance-hand to proceed.
+  }
+
+  /**
+   * Compute per-seat spirit tile counts for the hand-reveal breakdown.
+   */
+  private computeSpiritCounts(
+    seats: readonly SeatState[],
+    jingPrimary: TileType | null,
+    jingSecondary: TileType | null,
+  ): [SpiritCount, SpiritCount, SpiritCount, SpiritCount] {
+    return seats.map((seat): SpiritCount => {
+      if (!jingPrimary || !jingSecondary) return { primary: 0, secondary: 0, spiritKongs: 0 };
+      const allTiles: TileType[] = [
+        ...seat.hand,
+        ...(seat.openMelds.flatMap((m) => [...m.tiles]) as TileType[]),
+      ];
+      const primary = allTiles.filter((t) => t === jingPrimary).length;
+      const secondary = allTiles.filter((t) => t === jingSecondary).length;
+      const spiritKongs = seat.openMelds.filter(
+        (m) => m.kind === 'kong' && (m.tiles[0] === jingPrimary || m.tiles[0] === jingSecondary),
+      ).length;
+      return { primary, secondary, spiritKongs };
+    }) as [SpiritCount, SpiritCount, SpiritCount, SpiritCount];
   }
 
   private isSessionOver(
@@ -827,17 +1039,9 @@ export class GameService {
     });
 
     session.engine = newEngine;
+    // Reset to pre-game hand-viewing phase for the next hand
+    session.preGamePhase = 'hands';
     this.broadcastSnapshots(session);
-
-    // Host still needs to tap to start Jing reveal for the next hand (D6)
-    const hostSocketId = session.socketIdForSeat(0);
-    if (hostSocketId && this.server) {
-      this.server.to(hostSocketId).emit('game:jing-reveal-ready', {
-        handNumber: session.handsPlayed,
-        dealerSeat,
-        roundWind,
-      });
-    }
   }
 
   private async endSession(
@@ -985,6 +1189,7 @@ export class GameService {
       session.connState,
       session.settings.viewMode,
       session.settings.ruleTopBottomJing,
+      session.preGamePhase,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

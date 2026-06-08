@@ -25,7 +25,14 @@ import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
 import { useI18n } from '../../i18n';
 import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
-import type { ClientGameState, TileType, SeatWind, GameEndedPayload } from '@nanchang/shared';
+import type {
+  ClientGameState,
+  TileType,
+  SeatWind,
+  GameEndedPayload,
+  SettlementPreviewPayload,
+  HandRevealPayload,
+} from '@nanchang/shared';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D } from '../../components/2d';
@@ -50,6 +57,7 @@ const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
 const JING_CHAR = '节' as const;
 const JING_ARROW = '→' as const;
+const MULT_CHAR = '×' as const;
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
   south: '#a36d3e',
@@ -113,63 +121,534 @@ function GameErrorScreen({ errorCode, onHome }: { errorCode: string; onHome: () 
   );
 }
 
-function JingRevealScreen({
+// ── Shared UI helpers ─────────────────────────────────────────────────────────
+
+function GoldButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+      style={{
+        background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+        boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function WaitingDots() {
+  return (
+    <div className="flex gap-1.5" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="w-1.5 h-1.5 rounded-full bg-mj-gold/40 animate-pulse"
+          style={{ animationDelay: `${i * 200}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── PreGameFlow ───────────────────────────────────────────────────────────────
+// Multi-step host-driven reveal sequence before each hand.
+//   Step 'hands'      — each player sees their dealt hand
+//   Step 'settlement' — bonus settlement tile shown (ruleTopBottomJing only)
+//   Step 'jing'       — spirit wildcard tiles revealed; host starts game
+
+function PreGameFlow({
   snapshot,
+  settlementPreview,
   isHost,
-  onReveal,
+  onAdvance,
 }: {
   snapshot: ClientGameState;
+  settlementPreview: SettlementPreviewPayload | null;
   isHost: boolean;
-  onReveal: () => void;
+  onAdvance: () => void;
 }) {
   const { t } = useI18n();
-  const indicatorTile = snapshot.jingIndicator;
+  const phase = snapshot.preGamePhase;
+  const viewerSeat = snapshot.viewerSeat;
+  const myHand: TileType[] = viewerSeat !== null ? (snapshot.seats[viewerSeat].hand ?? []) : [];
+
+  // ── Step 1: Hands ─────────────────────────────────────────────────────────
+  if (phase === 'hands') {
+    const buttonLabel = snapshot.ruleTopBottomJing
+      ? t('preGameRevealSettlement')
+      : t('preGameRevealSpirit');
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-8 min-h-dvh px-6 text-center bg-mj-bg-page"
+        aria-label={t('preGameYourHand')}
+      >
+        <div>
+          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+            {t('preGameHandTitle')}
+          </p>
+          <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('preGameYourHand')}</h1>
+          <p className="text-sm text-mj-bone/50 mt-1">{t('preGameHandDesc')}</p>
+        </div>
+
+        {myHand.length > 0 && (
+          <div
+            className="flex flex-wrap justify-center gap-1 max-w-sm"
+            aria-label={t('preGameYourHand')}
+          >
+            {myHand.map((tile, i) => (
+              <MahjongTile2D
+                key={`${tile}-${i}`}
+                tile={tile}
+                size="sm"
+                interactive={false}
+                isJing={tile === snapshot.jingPrimary || tile === snapshot.jingSecondary}
+              />
+            ))}
+          </div>
+        )}
+
+        {viewerSeat === null && <p className="text-sm text-mj-bone/50">{t('preGameSpectating')}</p>}
+
+        {isHost ? (
+          <GoldButton onClick={onAdvance}>{buttonLabel} →</GoldButton>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <WaitingDots />
+            <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Step 2: Settlement preview (ruleTopBottomJing only) ────────────────────
+  if (phase === 'settlement' && settlementPreview) {
+    return (
+      <div
+        className="flex flex-col items-center gap-6 min-h-dvh px-6 py-8 text-center bg-mj-bg-page overflow-y-auto"
+        aria-label={t('preGameSettlementTitle')}
+      >
+        {/* Header */}
+        <div>
+          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+            {t('preGameBonusTile')}
+          </p>
+          <h1 className="text-2xl font-serif font-bold text-mj-bone">
+            {t('preGameSettlementTitle')}
+          </h1>
+          <p className="text-sm text-mj-bone/50 mt-1">{t('preGameSettlementDesc')}</p>
+        </div>
+
+        {/* Settlement tile (large) + indicator tile (small) */}
+        <div className="flex items-end justify-center gap-4">
+          <div className="flex flex-col items-center gap-2">
+            <MahjongTile2D
+              tile={settlementPreview.settlementTile}
+              size="lg"
+              isJing
+              interactive={false}
+            />
+            <p className="text-[10px] text-mj-gold/70 font-bold uppercase tracking-wider">
+              {t('preGameBonusTile2pt')}
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-2 pb-1">
+            <MahjongTile2D tile={settlementPreview.nextTile} size="sm" interactive={false} />
+            <p className="text-[10px] text-mj-gold/50 font-bold uppercase tracking-wider">
+              {t('preGameBonusTile1pt')}
+            </p>
+          </div>
+        </div>
+
+        {/* Per-player score preview — 2pt settlement tile */}
+        <div className="flex flex-col gap-1.5 w-full max-w-xs">
+          {settlementPreview.delta.map((delta, i) => {
+            const wind = snapshot.seats[i].wind;
+            const count = settlementPreview.seatCounts[i];
+            const isViewer = i === viewerSeat;
+            return (
+              <div
+                key={i}
+                className={`flex items-center justify-between px-4 py-2 rounded-xl ${
+                  isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
+                }`}
+              >
+                <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                  {WIND_CHAR[wind]}
+                  {isViewer && (
+                    <span className="text-mj-bone/50 font-normal ml-1 text-xs">
+                      {t('preGameYou')}
+                    </span>
+                  )}
+                </span>
+                <span className="text-xs text-mj-bone/60">
+                  {MULT_CHAR}
+                  {count}
+                </span>
+                <span
+                  className={`text-sm font-bold tabular-nums ${
+                    delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-mj-bone/40'
+                  }`}
+                >
+                  {delta > 0 ? '+' : ''}
+                  {delta}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Per-player score preview — 1pt indicator tile */}
+        {settlementPreview.nextTileDelta.some((d) => d !== 0) && (
+          <div className="flex flex-col gap-1.5 w-full max-w-xs">
+            <p className="text-[9px] text-mj-gold/40 uppercase tracking-widest text-center">
+              {t('preGameBonusTile1pt')}
+            </p>
+            {settlementPreview.nextTileDelta.map((delta, i) => {
+              const wind = snapshot.seats[i].wind;
+              const count = settlementPreview.nextTileSeatCounts[i];
+              const isViewer = i === viewerSeat;
+              if (count === 0 && delta === 0) {
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between px-4 py-1.5 rounded-lg ${
+                      isViewer ? 'bg-mj-gold/8 border border-mj-gold/20' : 'bg-white/3'
+                    }`}
+                  >
+                    <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                      {WIND_CHAR[wind]}
+                    </span>
+                    <span className="text-xs text-mj-bone/30">{MULT_CHAR}0</span>
+                    <span className="text-sm font-bold tabular-nums text-mj-bone/30">0</span>
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between px-4 py-1.5 rounded-lg ${
+                    isViewer ? 'bg-mj-gold/8 border border-mj-gold/20' : 'bg-white/3'
+                  }`}
+                >
+                  <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                    {WIND_CHAR[wind]}
+                    {isViewer && (
+                      <span className="text-mj-bone/50 font-normal ml-1 text-xs">
+                        {t('preGameYou')}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-mj-bone/60">
+                    {MULT_CHAR}
+                    {count}
+                  </span>
+                  <span
+                    className={`text-sm font-bold tabular-nums ${
+                      delta > 0
+                        ? 'text-emerald-400'
+                        : delta < 0
+                          ? 'text-red-400'
+                          : 'text-mj-bone/40'
+                    }`}
+                  >
+                    {delta > 0 ? '+' : ''}
+                    {delta}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Viewer's own hand — always visible so they can count their bonus tiles */}
+        {myHand.length > 0 && (
+          <div className="w-full max-w-sm">
+            <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider mb-2">
+              {t('preGameYourHand')}
+            </p>
+            <div className="flex flex-wrap justify-center gap-1">
+              {myHand.map((tile, i) => (
+                <MahjongTile2D
+                  key={`${tile}-${i}`}
+                  tile={tile}
+                  size="xs"
+                  interactive={false}
+                  isJing={
+                    tile === settlementPreview.settlementTile || tile === settlementPreview.nextTile
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isHost ? (
+          <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <WaitingDots />
+            <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Step 3: Jing wildcards revealed ────────────────────────────────────────
+  if (phase === 'jing') {
+    const indicator = snapshot.jingIndicator;
+    const primary = snapshot.jingPrimary;
+    const secondary = snapshot.jingSecondary;
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-8 min-h-dvh px-6 text-center bg-mj-bg-page"
+        aria-label={t('gameSpiritTiles')}
+      >
+        <div>
+          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+            {t('gameSpirit')}
+          </p>
+          <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('gameSpiritTiles')}</h1>
+        </div>
+
+        <div className="flex items-center justify-center gap-6 flex-wrap">
+          {indicator && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider">
+                {t('preGameIndicator')}
+              </p>
+              <MahjongTile2D tile={indicator} size="lg" interactive={false} />
+            </div>
+          )}
+          <div className="text-mj-gold/60 text-2xl self-center">{JING_ARROW}</div>
+          {primary && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-[10px] text-mj-gold/60 uppercase tracking-wider">
+                {t('preGamePrimary')}
+              </p>
+              <MahjongTile2D tile={primary} size="lg" isJing interactive={false} />
+            </div>
+          )}
+          {secondary && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-[10px] text-mj-gold/40 uppercase tracking-wider">
+                {t('preGameSecondary')}
+              </p>
+              <MahjongTile2D tile={secondary} size="lg" isJing interactive={false} />
+            </div>
+          )}
+        </div>
+
+        <p className="text-sm text-mj-bone/50 max-w-[260px]">
+          {t('gameSpiritDesc', primary ?? '', secondary ?? '')}
+        </p>
+
+        {isHost ? (
+          <GoldButton onClick={onAdvance}>{t('preGameStartGame')} →</GoldButton>
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <WaitingDots />
+            <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fallback while snapshot hasn't arrived yet
+  return <LoadingScreen />;
+}
+
+// ── HandRevealScreen ──────────────────────────────────────────────────────────
+// Full-screen post-hand reveal. Shows all hands, spirit settlement, and
+// payment breakdown. Host clicks "Continue" to start the next hand.
+
+function HandRevealScreen({
+  handReveal,
+  snapshot,
+  isHost,
+  onAdvance,
+}: {
+  handReveal: HandRevealPayload;
+  snapshot: ClientGameState;
+  isHost: boolean;
+  onAdvance: () => void;
+}) {
+  const { t } = useI18n();
+  const viewerSeat = snapshot.viewerSeat;
+
+  const resultLabel =
+    handReveal.result === 'win'
+      ? t('handRevealResultWin')
+      : handReveal.result === 'concede'
+        ? t('handRevealResultConcede')
+        : t('handRevealResultDraw');
 
   return (
-    <div
-      className="flex flex-col items-center justify-center gap-8 min-h-dvh px-8 text-center bg-mj-bg-page"
-      aria-label={t('gameSpiritTiles')}
-    >
-      <div>
-        <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
-          {t('gameSpirit')}
-        </p>
-        <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('gameSpiritTiles')}</h1>
+    <div className="min-h-dvh bg-mj-bg-page overflow-y-auto">
+      <div className="flex flex-col items-center gap-6 px-4 py-8 max-w-lg mx-auto">
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="text-center">
+          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+            {t('handRevealTitle')}
+          </p>
+          <h1 className="text-2xl font-serif font-bold text-mj-bone">{resultLabel}</h1>
+          {handReveal.winnerSeat !== undefined && (
+            <p className="text-sm text-mj-bone/60 mt-1">
+              {t('handRevealWinner', WIND_CHAR[snapshot.seats[handReveal.winnerSeat].wind])}
+            </p>
+          )}
+          {handReveal.concedeSeat !== undefined && (
+            <p className="text-sm text-mj-bone/60 mt-1">
+              {t('handRevealConcedeBy', WIND_CHAR[snapshot.seats[handReveal.concedeSeat].wind])}
+            </p>
+          )}
+        </div>
+
+        {/* ── Score summary ────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-2 w-full">
+          {handReveal.handNetDeltas.map((delta, i) => {
+            const wind = snapshot.seats[i].wind;
+            const isViewer = i === viewerSeat;
+            const isWinner = i === handReveal.winnerSeat;
+            return (
+              <div
+                key={i}
+                className={`flex items-center justify-between px-4 py-2.5 rounded-xl ${
+                  isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-bold" style={{ color: WIND_COLOR[wind] }}>
+                    {WIND_CHAR[wind]}
+                  </span>
+                  {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
+                  {isWinner && (
+                    <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                      {t('handRevealWinnerBadge')}
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={`text-base font-bold tabular-nums ${
+                    delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-mj-bone/40'
+                  }`}
+                >
+                  {delta > 0 ? '+' : ''}
+                  {delta}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Spirit settlement breakdown ──────────────────────────────────── */}
+        {(handReveal.jingPrimary || handReveal.jingSecondary) && (
+          <div className="w-full">
+            <p className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase mb-2 text-center">
+              {t('handRevealSpiritSection')}
+            </p>
+            <div className="flex flex-col gap-1.5 w-full">
+              {handReveal.spiritDeltas.map((delta, i) => {
+                const wind = snapshot.seats[i].wind;
+                const counts = handReveal.spiritCounts[i];
+                const isViewer = i === viewerSeat;
+                if (delta === 0 && counts.primary === 0 && counts.secondary === 0) return null;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${
+                      isViewer ? 'bg-mj-gold/10' : 'bg-white/4'
+                    }`}
+                  >
+                    <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                      {WIND_CHAR[wind]}
+                    </span>
+                    <span className="text-xs text-mj-bone/50">
+                      {counts.primary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.primary} `}
+                      {counts.secondary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.secondary}`}
+                    </span>
+                    <span
+                      className={`text-sm font-bold tabular-nums ${
+                        delta > 0
+                          ? 'text-emerald-400'
+                          : delta < 0
+                            ? 'text-red-400'
+                            : 'text-mj-bone/30'
+                      }`}
+                    >
+                      {delta > 0 ? '+' : ''}
+                      {delta}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── All four hands ───────────────────────────────────────────────── */}
+        <div className="w-full">
+          <p className="text-[10px] font-bold tracking-widest text-mj-bone/40 uppercase mb-3 text-center">
+            {t('handRevealAllHands')}
+          </p>
+          <div className="flex flex-col gap-4 w-full">
+            {handReveal.hands.map((hand, i) => {
+              const wind = snapshot.seats[i].wind;
+              const isViewer = i === viewerSeat;
+              const isWinner = i === handReveal.winnerSeat;
+              return (
+                <div
+                  key={i}
+                  className={`rounded-xl p-3 ${isViewer ? 'bg-mj-gold/10 border border-mj-gold/20' : 'bg-white/4'}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                      {WIND_CHAR[wind]}
+                    </span>
+                    {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
+                    {isWinner && (
+                      <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                        {t('handRevealWinnerBadge')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-0.5">
+                    {hand.map((tile, j) => (
+                      <MahjongTile2D
+                        key={`${i}-${tile}-${j}`}
+                        tile={tile}
+                        size="xs"
+                        interactive={false}
+                        isJing={
+                          tile === handReveal.jingPrimary || tile === handReveal.jingSecondary
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Continue / waiting ───────────────────────────────────────────── */}
+        <div className="pt-2 pb-4 flex flex-col items-center gap-3">
+          {isHost ? (
+            <GoldButton onClick={onAdvance}>
+              {handReveal.isLastHand ? t('handRevealEndSession') : t('handRevealContinue')} →
+            </GoldButton>
+          ) : (
+            <>
+              <WaitingDots />
+              <p className="text-xs text-mj-bone/40">{t('handRevealWaitingHost')}</p>
+            </>
+          )}
+        </div>
       </div>
-
-      {indicatorTile && (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-xs text-mj-bone/50">{t('gameSpirit')}</p>
-          <MahjongTile tile={indicatorTile} size="lg" isJing />
-        </div>
-      )}
-
-      <p className="text-sm text-mj-bone/60 max-w-[260px]">
-        {isHost ? t('gameRevealSpirit') : t('gameWaitingReveal')}
-      </p>
-
-      {isHost ? (
-        <button
-          onClick={onReveal}
-          className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
-          style={{
-            background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
-            boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
-          }}
-        >
-          {t('gameRevealSpirit')} →
-        </button>
-      ) : (
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-mj-gold/40 animate-pulse"
-              style={{ animationDelay: `${i * 200}ms` }}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -1643,6 +2122,8 @@ export function GamePage() {
   const {
     snapshot,
     ended,
+    settlementPreview,
+    handReveal,
     rematchRoomCode,
     connection,
     selectedTileIdx,
@@ -1655,7 +2136,8 @@ export function GamePage() {
     claim,
     pass,
     concede,
-    revealJing,
+    advancePreGame,
+    advanceHand,
     requestRematch,
   } = useGame(gameId ?? '', spectate);
 
@@ -1738,26 +2220,50 @@ export function GamePage() {
 
   return (
     <>
-      {snapshot.phase === 'jing_reveal' && (
-        <JingRevealScreen snapshot={snapshot} isHost={isDealer} onReveal={revealJing} />
-      )}
-
-      {(snapshot.phase === 'playing' || snapshot.phase === 'awaiting_claims') && (
-        <GameTable
+      {/* ── Post-hand reveal (paused between hands) ──────────────────────── */}
+      {handReveal && (
+        <HandRevealScreen
+          handReveal={handReveal}
           snapshot={snapshot}
-          selectedTileIdx={selectedTileIdx}
-          claimWindow={claimWindow}
-          toast={toast}
-          pendingMove={pendingMove}
-          onSelect={selectTile}
-          onDiscard={discard}
-          onClaim={claim}
-          onPass={pass}
-          onConcede={concede}
+          isHost={isDealer}
+          onAdvance={advanceHand}
         />
       )}
 
-      {snapshot.phase === 'finished' && (
+      {/* ── Pre-game reveal flow ──────────────────────────────────────────── */}
+      {/* Shown whenever preGamePhase is not null — this covers both the         */}
+      {/* jing_reveal engine phase (hands/settlement steps) AND the playing      */}
+      {/* engine phase with preGamePhase='jing' (jing step after revealJing).   */}
+      {!handReveal && snapshot.preGamePhase !== null && (
+        <PreGameFlow
+          snapshot={snapshot}
+          settlementPreview={settlementPreview}
+          isHost={isDealer}
+          onAdvance={advancePreGame}
+        />
+      )}
+
+      {/* ── Active game table ─────────────────────────────────────────────── */}
+      {/* Only rendered when the pre-game sequence is complete (preGamePhase=null). */}
+      {!handReveal &&
+        snapshot.preGamePhase === null &&
+        (snapshot.phase === 'playing' || snapshot.phase === 'awaiting_claims') && (
+          <GameTable
+            snapshot={snapshot}
+            selectedTileIdx={selectedTileIdx}
+            claimWindow={claimWindow}
+            toast={toast}
+            pendingMove={pendingMove}
+            onSelect={selectTile}
+            onDiscard={discard}
+            onClaim={claim}
+            onPass={pass}
+            onConcede={concede}
+          />
+        )}
+
+      {/* ── Session end screen ────────────────────────────────────────────── */}
+      {!handReveal && snapshot.preGamePhase === null && snapshot.phase === 'finished' && (
         <GameEndScreen
           snapshot={snapshot}
           ended={ended}
@@ -1767,10 +2273,12 @@ export function GamePage() {
         />
       )}
 
-      {(snapshot.phase === 'dealing' ||
-        !['jing_reveal', 'playing', 'awaiting_claims', 'finished'].includes(snapshot.phase)) && (
-        <LoadingScreen />
-      )}
+      {/* ── Loading / dealing ─────────────────────────────────────────────── */}
+      {!handReveal &&
+        snapshot.preGamePhase === null &&
+        snapshot.phase !== 'playing' &&
+        snapshot.phase !== 'awaiting_claims' &&
+        snapshot.phase !== 'finished' && <LoadingScreen />}
 
       {connection === 'reconnecting' && <ReconnectingOverlay />}
     </>

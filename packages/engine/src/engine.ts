@@ -370,8 +370,17 @@ export class GameEngine {
       const indicator = typeOf(indicatorTileId);
       const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);
 
-      // Compute instant payout for players holding the settlement tile
-      const scoreDelta = calculateOpeningJingSettlement(settlementTile, this.state.seats);
+      // Compute instant payout for players holding the settlement tile (wall[0], 2 pts/copy)
+      const scoreDelta0 = calculateOpeningJingSettlement(settlementTile, this.state.seats, 2);
+      // Compute 1 pt/copy payout for players holding the indicator tile (wall[1], 1 pt/copy)
+      const scoreDelta1 = calculateOpeningJingSettlement(indicator, this.state.seats, 1);
+      // Combined zero-sum delta (both settlements applied together)
+      const scoreDelta = scoreDelta0.map((d, i) => d + scoreDelta1[i]) as [
+        number,
+        number,
+        number,
+        number,
+      ];
 
       // Apply score deltas
       const seatsAfterSettlement = [...this.state.seats] as GameState['seats'];

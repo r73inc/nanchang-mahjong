@@ -87,6 +87,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     viewerSeat: 0,
     viewMode: '3D',
     ruleTopBottomJing: false,
+    preGamePhase: null,
     seats: [
       {
         wind: 'east',
@@ -188,12 +189,17 @@ describe('GamePage', () => {
   it('shows jing_reveal screen when phase=jing_reveal', async () => {
     renderGamePage();
     await pushSnapshot(
-      makeSnapshot({ phase: 'jing_reveal', jingPrimary: null, jingSecondary: null }),
+      makeSnapshot({
+        phase: 'jing_reveal',
+        jingPrimary: null,
+        jingSecondary: null,
+        preGamePhase: 'jing',
+      }),
     );
 
     await waitFor(() => {
-      // The spirit-reveal text appears either in the button or the paragraph
-      expect(screen.getAllByText(/reveal spirit|精牌|spirit tile/i).length).toBeGreaterThan(0);
+      // The spirit-reveal text appears in the "Spirit Tiles" heading
+      expect(screen.getAllByText(/spirit tile/i).length).toBeGreaterThan(0);
     });
   });
 

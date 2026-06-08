@@ -11,7 +11,14 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { ClientGameState, ClaimAction, GameEndedPayload, TileType } from '@nanchang/shared';
+import type {
+  ClientGameState,
+  ClaimAction,
+  GameEndedPayload,
+  TileType,
+  SettlementPreviewPayload,
+  HandRevealPayload,
+} from '@nanchang/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -52,6 +59,12 @@ interface GameStore {
   // ── Derived from game:ended (available for end-screen) ────────────────────
   ended: GameEndedPayload | null;
 
+  // ── Pre-game settlement preview (ruleTopBottomJing only) ─────────────────
+  settlementPreview: SettlementPreviewPayload | null;
+
+  // ── Post-hand reveal (server pauses until host advances) ─────────────────
+  handReveal: HandRevealPayload | null;
+
   // ── Rematch: roomCode delivered by game:rematch-ready ─────────────────────
   rematchRoomCode: string | null;
 
@@ -80,6 +93,8 @@ interface GameStore {
   // ── Actions ────────────────────────────────────────────────────────────────
   setSnapshot: (s: ClientGameState) => void;
   setEnded: (e: GameEndedPayload) => void;
+  setSettlementPreview: (p: SettlementPreviewPayload | null) => void;
+  setHandReveal: (r: HandRevealPayload | null) => void;
   setRematchRoomCode: (code: string) => void;
   setConnection: (s: ConnectionStatus) => void;
   setClaimWindow: (w: ClaimWindowState | null) => void;
@@ -93,6 +108,8 @@ interface GameStore {
 const initialState = {
   snapshot: null,
   ended: null,
+  settlementPreview: null,
+  handReveal: null,
   rematchRoomCode: null,
   selectedTileIdx: null,
   pendingMove: false,
@@ -116,6 +133,10 @@ export const useGameStore = create<GameStore>()(
       }),
 
     setEnded: (ended) => set({ ended }),
+
+    setSettlementPreview: (settlementPreview) => set({ settlementPreview }),
+
+    setHandReveal: (handReveal) => set({ handReveal }),
 
     setRematchRoomCode: (rematchRoomCode) => set({ rematchRoomCode }),
 

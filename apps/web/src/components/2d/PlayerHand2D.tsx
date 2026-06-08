@@ -187,7 +187,8 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const viewerHand: TileType[] =
     (snapshot?.seats[viewerSeat]?.hand as TileType[] | null | undefined) ?? [];
-  const jingIndicator = snapshot?.jingIndicator ?? null;
+  const jingPrimary = snapshot?.jingPrimary ?? null;
+  const jingSecondary = snapshot?.jingSecondary ?? null;
   const isMyTurn =
     snapshot !== null && snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const needsDiscard = snapshot?.pendingDiscard !== null && snapshot?.pendingDiscard !== undefined;
@@ -370,7 +371,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
                 size="lg"
                 role="bottom"
                 selected={selectedId === entry.id}
-                isJing={entry.tile === jingIndicator}
+                isJing={entry.tile === jingPrimary || entry.tile === jingSecondary}
                 interactive={interactive}
                 layoutId={`hand-${entry.id}`}
                 onSelect={() => handleTileSelect(entry)}

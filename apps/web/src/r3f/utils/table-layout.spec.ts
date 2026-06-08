@@ -74,6 +74,7 @@ function makeSnapshot(overrides: {
     seats,
     viewMode: '3D' as const,
     ruleTopBottomJing: false,
+    preGamePhase: null,
   };
 }
 
