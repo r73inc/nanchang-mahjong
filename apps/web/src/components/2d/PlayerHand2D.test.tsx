@@ -378,9 +378,9 @@ describe('PlayerHand2D hand-height CSS var · Hand·hand-height', () => {
   });
 });
 
-// ── PlayerHand2D — Phase 14B: drag disable + flex-shrink ─────────────────────
+// ── PlayerHand2D — Phase 14B: flex-shrink ────────────────────────────────────
 
-describe('PlayerHand2D mobile constraints · Hand·drag-disabled / Hand·flex-shrink', () => {
+describe('PlayerHand2D mobile constraints · Hand·flex-shrink', () => {
   beforeEach(() => setupStore());
 
   it('Hand·flex-shrink-group: Reorder.Group container has flexShrink and minWidth styles', () => {
@@ -414,22 +414,80 @@ describe('PlayerHand2D mobile constraints · Hand·drag-disabled / Hand·flex-sh
     // verifies structural correctness of the rendered DOM.
     expect(tiles.length).toBeGreaterThan(0);
   });
+});
 
-  it('Hand·drag-disabled-prop: tiles remain non-draggable when disableDrag=true even on viewer turn', () => {
-    // When disableDrag=true, Reorder.Item drag={false} — Framer Motion does NOT
-    // attach pointer event capture. The tiles still render as interactive buttons
-    // (tap-to-select still works) but no drag attribute is present.
-    const onDiscard = vi.fn();
-    render(
+// ── PlayerHand2D — Phase 14D: confirmMode (mobile floating button) ─────────
+
+describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
+  beforeEach(() => setupStore()); // currentSeat=0, viewerSeat=0, phase='playing' → isMyTurn=true
+
+  function renderConfirmHand(onDiscard = vi.fn()) {
+    return render(
       <I18nProvider>
-        <PlayerHand2D onDiscard={onDiscard} disableDrag />
+        <PlayerHand2D onDiscard={onDiscard} confirmMode />
       </I18nProvider>,
     );
-    // Tiles should still be interactive buttons (tap flow works)
+  }
+
+  it('Hand·confirm-mode-no-btn-idle: discard button hidden when no tile is selected', () => {
+    renderConfirmHand();
+    expect(screen.queryByTestId('mobile-discard-confirm-btn')).toBeNull();
+  });
+
+  it('Hand·confirm-mode-btn-appears: discard button appears after selecting a tile on player turn', () => {
+    renderConfirmHand();
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBeGreaterThan(0);
-    // Click to select still works with drag disabled
-    fireEvent.click(buttons[0]);
-    expect(buttons[0]).toHaveAttribute('aria-pressed', 'true');
+    // First button is the tile, not the discard btn (discard btn not yet visible)
+    fireEvent.click(buttons[0]); // select first tile
+    expect(screen.getByTestId('mobile-discard-confirm-btn')).toBeInTheDocument();
+  });
+
+  it('Hand·confirm-mode-tap-deselects: tapping selected tile again deselects (no discard)', () => {
+    const onDiscard = vi.fn();
+    renderConfirmHand(onDiscard);
+    const tileButtons = screen.getAllByRole('button');
+    fireEvent.click(tileButtons[0]); // select
+    fireEvent.click(tileButtons[0]); // deselect
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('mobile-discard-confirm-btn')).toBeNull();
+  });
+
+  it('Hand·confirm-mode-btn-discards: clicking the confirm button triggers onDiscard', () => {
+    const onDiscard = vi.fn();
+    renderConfirmHand(onDiscard);
+    const tileButtons = screen.getAllByRole('button');
+    fireEvent.click(tileButtons[0]); // select tile
+    const discardBtn = screen.getByTestId('mobile-discard-confirm-btn');
+    fireEvent.click(discardBtn);
+    expect(onDiscard).toHaveBeenCalledOnce();
+    expect(onDiscard).toHaveBeenCalledWith('1m'); // first tile in makeSnapshot
+  });
+
+  it('Hand·confirm-mode-btn-removes-tile: tile is removed from hand after confirm discard', () => {
+    renderConfirmHand();
+    const tileButtons = screen.getAllByRole('button');
+    fireEvent.click(tileButtons[0]); // select
+    fireEvent.click(screen.getByTestId('mobile-discard-confirm-btn'));
+    expect(screen.getAllByTestId('mahjong-tile-2d')).toHaveLength(2);
+  });
+
+  it('Hand·confirm-mode-double-tap-no-discard: second tap on same tile does NOT discard (deselects only)', () => {
+    const onDiscard = vi.fn();
+    renderConfirmHand(onDiscard);
+    const tileButtons = screen.getAllByRole('button');
+    fireEvent.click(tileButtons[0]); // select
+    fireEvent.click(tileButtons[0]); // deselect (not discard)
+    expect(onDiscard).not.toHaveBeenCalled();
+    expect(screen.getAllByTestId('mahjong-tile-2d')).toHaveLength(3); // still 3 tiles
+  });
+
+  it('Hand·confirm-mode-btn-hidden-outside-turn: confirm button hidden when not player turn', () => {
+    // currentSeat=1, viewerSeat=0 → isMyTurn=false → interactive=false
+    // Tiles render as role="img" (not clickable buttons); the confirm button never appears.
+    setupStore({ snapshot: makeSnapshot({ currentSeat: 1 }) });
+    renderConfirmHand();
+    // No interactive buttons present at all (tiles are role="img")
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByTestId('mobile-discard-confirm-btn')).toBeNull();
   });
 });

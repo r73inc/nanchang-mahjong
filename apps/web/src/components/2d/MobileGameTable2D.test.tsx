@@ -109,6 +109,12 @@ describe('MobileGameTable2D', () => {
     expect(screen.getByTestId('player-hand-2d')).toBeInTheDocument();
   });
 
+  it('MobileTable·player-badge-present: viewer self-badge is rendered in top-left', () => {
+    setupStore(makeSnapshot());
+    renderMobileTable();
+    expect(screen.getByTestId('mobile-player-badge')).toBeInTheDocument();
+  });
+
   it('MobileTable·no-css-grid: container does not use display:grid', () => {
     setupStore(makeSnapshot());
     renderMobileTable();

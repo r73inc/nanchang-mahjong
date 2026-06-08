@@ -270,6 +270,7 @@
   "gameMobileEnterDesc": "We'll switch to landscape mode for the best experience.",
   "gameMobileEnterCta": "Enter Game",
   "gameLandscapeMode": "Game table rotated to landscape",
+  "mobileDiscardConfirm": "Discard",
 
   "gameErrorTitle": "Game Unavailable",
   "gameErrorNotFound": "This game session no longer exists. The server may have restarted. Please return to the lobby.",

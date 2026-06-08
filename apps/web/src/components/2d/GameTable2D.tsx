@@ -70,13 +70,19 @@ export interface GameTable2DProps {
    * Routes to MobileGameTable2D when true, DesktopGameTable2D when false/undefined.
    */
   isMobile?: boolean;
+  /**
+   * True when mode === 'css-landscape' specifically (ForcedLandscapeWrapper active).
+   * Passed to MobileGameTable2D so it can inject a touch coordinate transform
+   * into MotionConfig, correcting Framer Motion drag tracking for the 90° rotation.
+   */
+  isCssLandscape?: boolean;
 }
 
 // ── Component — layout dispatcher ────────────────────────────────────────────
 
-export function GameTable2D({ onDiscard, isMobile }: GameTable2DProps) {
+export function GameTable2D({ onDiscard, isMobile, isCssLandscape }: GameTable2DProps) {
   return isMobile ? (
-    <MobileGameTable2D onDiscard={onDiscard} />
+    <MobileGameTable2D onDiscard={onDiscard} isCssLandscape={isCssLandscape} />
   ) : (
     <DesktopGameTable2D onDiscard={onDiscard} />
   );

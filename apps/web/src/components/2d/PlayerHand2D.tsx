@@ -17,11 +17,12 @@
  *  - MotionConfig reducedMotion="user" lives at GameTable2D root (Phase G).
  */
 
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { Reorder, AnimatePresence } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { useDiscardContext } from './DiscardContext';
+import { useI18n } from '../../i18n';
 import { MahjongTile2D } from './MahjongTile2D';
 
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
@@ -31,6 +32,9 @@ const DRAG_HINT = 'Drag to reorder tiles' as const;
 const DISCARD_HINT = 'Tap to discard' as const;
 // 'x' as a JSX prop value triggers i18next/no-literal-string — use a constant.
 const HORIZONTAL_AXIS = 'x' as const;
+
+// i18n key for the floating discard confirmation button (mobile confirmMode).
+const I18N_MOBILE_DISCARD_CONFIRM = 'mobileDiscardConfirm' as const;
 
 // ── Draw-tile animation variants (module-level for i18next/no-literal-string) ─
 
@@ -130,16 +134,24 @@ export interface PlayerHand2DProps {
   /** Wired to useGame().discard in GameTable2D → game-page.tsx */
   onDiscard: (tile: TileType) => void;
   /**
-   * Disable Framer Motion drag entirely.
+   * Mobile confirm-button mode.
    *
-   * CSS rotate(90deg) swaps the physical X/Y axes, making Framer Motion's
-   * Reorder drag tracking produce inverted/incorrect tile movements.
-   * Set true in MobileGameTable2D; players use tap-to-select → tap-to-discard.
+   * When true (MobileGameTable2D):
+   *  - Drag reorders tiles freely even during opponent turns.
+   *  - A single tap selects/deselects a tile (no double-tap discard).
+   *  - A floating gold "Discard" button appears above the selected tile and
+   *    is the only way to trigger onDiscard — preventing accidental discards
+   *    while sorting.
+   *
+   * When false (DesktopGameTable2D, default):
+   *  - Drag reorders on the player's turn.
+   *  - First tap selects; second tap on the same tile discards.
    */
-  disableDrag?: boolean;
+  confirmMode?: boolean;
 }
 
-export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DProps) {
+export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DProps) {
+  const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
@@ -203,25 +215,50 @@ export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DPro
   // ── Interaction ───────────────────────────────────────────────────────────
 
   const interactive = isMyTurn && !claimWindow && !pendingMove;
-  // Drag disabled on mobile: CSS rotation makes Framer Motion coordinates incorrect.
-  const draggable = interactive && !disableDrag;
+
+  /**
+   * Drag-reorder eligibility.
+   *
+   * confirmMode (mobile): allow reordering at any time — even during opponent
+   * turns — except during an active claim window or a pending server move.
+   *
+   * Standard mode (desktop): reorder only when interactive (player's own turn).
+   */
+  const draggable = confirmMode ? !claimWindow && !pendingMove : interactive;
+
+  // ── Floating discard confirmation (confirmMode only) ─────────────────────
+  const handleConfirmDiscard = useCallback(() => {
+    if (selectedId === null) return;
+    const entry = localOrder.find((e) => e.id === selectedId);
+    if (!entry) return;
+    setLastDiscardId(entry.id);
+    setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
+    setSelectedId(null);
+    onDiscard(entry.tile);
+  }, [selectedId, localOrder, onDiscard, setLastDiscardId]);
 
   const handleTileSelect = useCallback(
     (entry: LocalEntry) => {
-      if (selectedId === entry.id) {
-        // Second tap on the already-selected tile → discard
+      if (confirmMode) {
+        // Mobile: single tap toggles selection; the floating button discards.
+        // Dragging a tile changes order — it does not trigger selection.
+        setSelectedId((prev) => (prev === entry.id ? null : entry.id));
+      } else {
+        // Desktop: second tap on the already-selected tile → discard.
         // Store the tile's local ID in context before removing it from localOrder,
         // so DiscardPool2D can use the matching layoutId for the discard flight.
-        setLastDiscardId(entry.id);
-        setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
-        setSelectedId(null);
-        onDiscard(entry.tile);
-      } else {
-        // First tap → select
-        setSelectedId(entry.id);
+        if (selectedId === entry.id) {
+          setLastDiscardId(entry.id);
+          setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
+          setSelectedId(null);
+          onDiscard(entry.tile);
+        } else {
+          // First tap → select
+          setSelectedId(entry.id);
+        }
       }
     },
-    [selectedId, onDiscard, setLastDiscardId],
+    [confirmMode, selectedId, onDiscard, setLastDiscardId],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -233,6 +270,7 @@ export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DPro
       ref={containerRef}
       data-testid="player-hand-2d"
       style={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -240,6 +278,43 @@ export function PlayerHand2D({ onDiscard, disableDrag = false }: PlayerHand2DPro
         padding: '8px 4px',
       }}
     >
+      {/* ── Floating discard confirmation button (confirmMode / mobile only) ─ */}
+      {/* Appears above the tile row when a tile is selected on the player's    */}
+      {/* turn. Drag-to-sort never triggers a discard — only this button does.  */}
+      {confirmMode && selectedId !== null && interactive && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -46,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+            zIndex: 20,
+          }}
+        >
+          <button
+            data-testid="mobile-discard-confirm-btn"
+            onClick={handleConfirmDiscard}
+            style={{
+              padding: '8px 28px',
+              borderRadius: 14,
+              background: 'linear-gradient(180deg, #c9a961 0%, #a88a45 100%)',
+              boxShadow: '0 4px 14px rgba(201,169,97,0.45)',
+              border: 'none',
+              color: '#1a1108',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              WebkitTouchCallout: 'none' as React.CSSProperties['WebkitTouchCallout'],
+              userSelect: 'none',
+            }}
+          >
+            {t(I18N_MOBILE_DISCARD_CONFIRM)}
+          </button>
+        </div>
+      )}
       <Reorder.Group
         as="div"
         axis={HORIZONTAL_AXIS}

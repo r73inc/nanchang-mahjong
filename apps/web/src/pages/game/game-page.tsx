@@ -1323,7 +1323,11 @@ function GameTable({
           // 2D mode or any mobile device (phones always use the touch-optimised 2D layout
           // regardless of the host's viewMode setting — the 3D canvas has no mobile handling).
           <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
-            <GameTable2D onDiscard={onDiscard} isMobile={isMobile} />
+            <GameTable2D
+              onDiscard={onDiscard}
+              isMobile={isMobile}
+              isCssLandscape={landscapeMode === 'css-landscape'}
+            />
           </MobileLandscapeGate>
         ) : (
           <GameCanvas />
