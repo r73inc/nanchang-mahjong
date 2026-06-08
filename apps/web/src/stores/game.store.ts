@@ -11,7 +11,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { ClientGameState, ClaimAction, GameEndedPayload } from '@nanchang/shared';
+import type { ClientGameState, ClaimAction, GameEndedPayload, TileType } from '@nanchang/shared';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,7 @@ export interface ClaimWindowState {
 
 export interface GameToast {
   /** 'contested' = a lower-priority claim lost (short flash).
+   *  'opening_settlement' = Opening Spirit Flip instant payout at round start.
    *  Everything else = a successful action broadcast to all players (longer display). */
   kind:
     | 'win'
@@ -33,8 +34,13 @@ export interface GameToast {
     | 'kong_added'
     | 'chow'
     | 'concede'
-    | 'contested';
+    | 'contested'
+    | 'opening_settlement';
   seat: 0 | 1 | 2 | 3;
+  /** Present for opening_settlement toasts: the flipped tile type. */
+  settlementTile?: TileType;
+  /** Present for opening_settlement toasts: viewer's score delta. */
+  settlementDelta?: number;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────

@@ -6,7 +6,12 @@
  * functions against the locked Nanchang Mahjong rules document.
  */
 import { describe, it, expect } from 'vitest';
-import { calculateWinPayout, instantKongPayment, calculateSpiritSettlement } from '../scoring';
+import {
+  calculateWinPayout,
+  instantKongPayment,
+  calculateSpiritSettlement,
+  calculateOpeningJingSettlement,
+} from '../scoring';
 import type { ScoringContext, SeatState, TileType } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -432,6 +437,106 @@ describe('Engine·scoring-spirit-settlement', () => {
       { ...blankSeat(), hand: ['east'] as TileType[] },
     ];
     const delta = calculateSpiritSettlement(seats, 'east', 'south');
+    expect(delta.reduce((s, v) => s + v, 0)).toBe(0);
+  });
+});
+
+// ── Opening Top & Bottom Spirit Flip settlement (开局上下翻精) ───────────────────
+
+describe('Scoring·opening-jing-settlement', () => {
+  it('nobody holds the settlement tile → [0, 0, 0, 0]', () => {
+    const seats: [SeatState, SeatState, SeatState, SeatState] = [
+      blankSeat(),
+      blankSeat(),
+      blankSeat(),
+      blankSeat(),
+    ];
+    expect(calculateOpeningJingSettlement('1m', seats)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('one player holds 1 copy: they receive 2 from each other (net +6, others −2 each)', () => {
+    // RATE=2, copies=[1,0,0,0], total=1
+    // delta[0] = 2×(4×1−1) = 2×3 = 6
+    // delta[1] = 2×(4×0−1) = −2
+    const seats: [SeatState, SeatState, SeatState, SeatState] = [
+      { ...blankSeat(), hand: ['1m'] as TileType[] },
+      blankSeat(),
+      blankSeat(),
+      blankSeat(),
+    ];
+    const delta = calculateOpeningJingSettlement('1m', seats);
+    expect(delta[0]).toBe(6);
+    expect(delta[1]).toBe(-2);
+    expect(delta[2]).toBe(-2);
+    expect(delta[3]).toBe(-2);
+    expect(delta.reduce((s, v) => s + v, 0)).toBe(0);
+  });
+
+  it('two players each hold 1 copy: they net 0 from each other, others pay −2 each', () => {
+    // copies=[1,1,0,0], total=2
+    // delta[0] = 2×(4×1−2) = 2×2 = 4
+    // delta[1] = 4
+    // delta[2] = 2×(4×0−2) = −4
+    const seats: [SeatState, SeatState, SeatState, SeatState] = [
+      { ...blankSeat(), hand: ['2p'] as TileType[] },
+      { ...blankSeat(), hand: ['2p'] as TileType[] },
+      blankSeat(),
+      blankSeat(),
+    ];
+    const delta = calculateOpeningJingSettlement('2p', seats);
+    expect(delta[0]).toBe(4);
+    expect(delta[1]).toBe(4);
+    expect(delta[2]).toBe(-4);
+    expect(delta[3]).toBe(-4);
+    expect(delta.reduce((s, v) => s + v, 0)).toBe(0);
+  });
+
+  it('one player holds 2 copies: delta scales with count', () => {
+    // copies=[2,0,0,0], total=2
+    // delta[0] = 2×(4×2−2) = 2×6 = 12
+    // delta[others] = 2×(4×0−2) = −4
+    const seats: [SeatState, SeatState, SeatState, SeatState] = [
+      { ...blankSeat(), hand: ['3s', '3s'] as TileType[] },
+      blankSeat(),
+      blankSeat(),
+      blankSeat(),
+    ];
+    const delta = calculateOpeningJingSettlement('3s', seats);
+    expect(delta[0]).toBe(12);
+    expect(delta[1]).toBe(-4);
+    expect(delta[2]).toBe(-4);
+    expect(delta[3]).toBe(-4);
+    expect(delta.reduce((s, v) => s + v, 0)).toBe(0);
+  });
+
+  it('all four copies spread across different players: mixed positive/negative, zero-sum', () => {
+    // copies=[2,1,1,0], total=4
+    // delta[0] = 2×(8−4) = 8
+    // delta[1] = 2×(4−4) = 0
+    // delta[2] = 2×(4−4) = 0
+    // delta[3] = 2×(0−4) = −8
+    const seats: [SeatState, SeatState, SeatState, SeatState] = [
+      { ...blankSeat(), hand: ['east', 'east'] as TileType[] },
+      { ...blankSeat(), hand: ['east'] as TileType[] },
+      { ...blankSeat(), hand: ['east'] as TileType[] },
+      blankSeat(),
+    ];
+    const delta = calculateOpeningJingSettlement('east', seats);
+    expect(delta[0]).toBe(8);
+    expect(delta[1]).toBe(0);
+    expect(delta[2]).toBe(0);
+    expect(delta[3]).toBe(-8);
+    expect(delta.reduce((s, v) => s + v, 0)).toBe(0);
+  });
+
+  it('is always zero-sum regardless of distribution', () => {
+    const seats: [SeatState, SeatState, SeatState, SeatState] = [
+      { ...blankSeat(), hand: ['zhong', 'zhong', 'zhong'] as TileType[] },
+      { ...blankSeat(), hand: ['zhong'] as TileType[] },
+      blankSeat(),
+      blankSeat(),
+    ];
+    const delta = calculateOpeningJingSettlement('zhong', seats);
     expect(delta.reduce((s, v) => s + v, 0)).toBe(0);
   });
 });

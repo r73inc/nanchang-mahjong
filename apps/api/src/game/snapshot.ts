@@ -23,6 +23,7 @@ export function toClientSnapshot(
   viewerSeat: ViewerSeat,
   connState: readonly [ConnState, ConnState, ConnState, ConnState],
   viewMode: '2D' | '3D' = '3D',
+  ruleTopBottomJing = false,
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
@@ -54,5 +55,6 @@ export function toClientSnapshot(
     viewerSeat,
     seats,
     viewMode,
+    ruleTopBottomJing,
   };
 }

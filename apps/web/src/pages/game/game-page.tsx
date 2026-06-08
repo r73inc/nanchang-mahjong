@@ -455,6 +455,44 @@ function ActionToast({
 }) {
   const { t } = useI18n();
 
+  // ── Opening Spirit Flip settlement toast (special layout) ─────────────────
+  if (toast.kind === 'opening_settlement') {
+    const tile = toast.settlementTile;
+    const delta = toast.settlementDelta ?? 0;
+    const deltaLabel =
+      delta > 0
+        ? t('toastOpeningSettlementYouWin', String(delta))
+        : delta < 0
+          ? t('toastOpeningSettlementYouPay', String(Math.abs(delta)))
+          : t('toastOpeningSettlementPush');
+    const deltaColor = delta > 0 ? '#7fc299' : delta < 0 ? '#e07070' : 'rgba(245,239,223,0.5)';
+    return (
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
+        <div
+          className="flex flex-col items-center gap-1 px-6 py-3 rounded-2xl animate-call-prompt-enter"
+          style={{
+            background: 'rgba(10,10,10,0.90)',
+            border: '1px solid rgba(201,169,97,0.5)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 8px 24px rgba(201,169,97,0.2)',
+          }}
+        >
+          <span className="text-[10px] font-bold tracking-widest uppercase text-mj-gold">
+            {t('toastOpeningSettlement', tile ?? '')}
+          </span>
+          <span className="font-bold text-lg" style={{ color: deltaColor }}>
+            {deltaLabel}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Standard action toast ──────────────────────────────────────────────────
   const ACTION_LABEL: Record<string, string> = {
     pung: t('gameActionPung'),
     chow: t('gameActionChow'),

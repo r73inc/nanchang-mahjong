@@ -23,10 +23,16 @@ import {
   addToKongOptions,
   chowOptions,
 } from './calls';
-import { calculateWinPayout, instantKongPayment, calculateSpiritSettlement } from './scoring';
+import {
+  calculateWinPayout,
+  instantKongPayment,
+  calculateSpiritSettlement,
+  calculateOpeningJingSettlement,
+} from './scoring';
 import type {
   GameState,
   GameEvent,
+  GameConfig,
   SeatState,
   SeatWind,
   TileType,
@@ -126,9 +132,21 @@ export class GameEngine {
       dealerSeat?: 0 | 1 | 2 | 3;
       roundWind?: SeatWind;
       startingScores?: [number, number, number, number];
+      /** Optional rule-variant configuration. Unset flags default to false. */
+      config?: Partial<GameConfig>;
     } = {},
   ): GameEngine {
-    const { dealerSeat = 0, roundWind = 'east', startingScores = [0, 0, 0, 0] } = options;
+    const {
+      dealerSeat = 0,
+      roundWind = 'east',
+      startingScores = [0, 0, 0, 0],
+      config = {},
+    } = options;
+
+    const fullConfig: GameConfig = {
+      ruleTopBottomJing: false,
+      ...config,
+    };
 
     // Seat winds are relative to the dealer (dealer = east, next in play order = south, …)
     const seats = [0, 1, 2, 3].map((i) =>
@@ -138,6 +156,7 @@ export class GameEngine {
     const state: GameState = {
       phase: 'dealing',
       seed,
+      config: fullConfig,
       jingIndicator: null,
       jingPrimary: null,
       jingSecondary: null,
@@ -318,13 +337,76 @@ export class GameEngine {
 
   /**
    * Reveal the Jing indicator and determine both wildcard tile types.
-   * Primary Spirit (正精): the indicator tile itself.
-   * Secondary Spirit (副精): the tile one rank above the indicator.
-   * Transitions to 'playing', with the dealer to act first (they have 14 tiles).
+   *
+   * Standard rule:
+   *   Primary Spirit (正精): deadWall[0] (the indicator tile).
+   *   Secondary Spirit (副精): one rank above the indicator.
+   *   Transitions to 'playing', dealer acts first (14 tiles).
+   *
+   * With ruleTopBottomJing:
+   *   1. wall[0] = settlement tile (下精): instant payout — every player holding
+   *      this tile in their dealt hand receives 2 pts per copy from each other player.
+   *   2. The settlement tile is tucked to the bottom of the live wall.
+   *   3. wall[1] (now wall[0] after tuck) = true indicator for jing determination.
+   *   4. Indicator is consumed from the live wall (not the dead wall).
+   *   5. deadWall is left intact (4 tiles → all 4 available for kong replacements).
+   *   6. Two engine events are appended: opening_jing_settlement, then jing_indicator.
    */
   revealJing(): GameEngine {
     if (this.state.phase !== 'jing_reveal') throw new Error('Not in jing_reveal phase');
 
+    // ── Opening Top & Bottom Spirit Flip variant ─────────────────────────────
+    if (this.state.config.ruleTopBottomJing) {
+      if (this.state.wall.length < 2) {
+        throw new Error('ruleTopBottomJing: not enough wall tiles for settlement + indicator');
+      }
+
+      const wall = this.state.wall;
+
+      // wall[0] = settlement tile (下精); wall[1] = indicator (上精 / true Jing indicator)
+      const settlementTileId = wall[0];
+      const indicatorTileId = wall[1];
+      const settlementTile = typeOf(settlementTileId);
+      const indicator = typeOf(indicatorTileId);
+      const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);
+
+      // Compute instant payout for players holding the settlement tile
+      const scoreDelta = calculateOpeningJingSettlement(settlementTile, this.state.seats);
+
+      // Apply score deltas
+      const seatsAfterSettlement = [...this.state.seats] as GameState['seats'];
+      for (let i = 0; i < 4; i++) {
+        seatsAfterSettlement[i] = {
+          ...seatsAfterSettlement[i],
+          score: seatsAfterSettlement[i].score + scoreDelta[i],
+        };
+      }
+
+      // Settlement tile tucked to bottom; indicator consumed (removed from live wall).
+      // Final wall: [wall[2], wall[3], ..., wall[n-1], wall[0]]
+      //   - wall[1] (indicator) is consumed (not available to draw)
+      //   - wall[0] (settlement tile) moves to the bottom (last-draw position)
+      const newWall = [...wall.slice(2), settlementTileId];
+
+      return this.withState(
+        {
+          phase: 'playing',
+          jingIndicator: indicator,
+          jingPrimary,
+          jingSecondary,
+          wall: newWall,
+          // deadWall remains untouched (all 4 tiles available for kong replacements)
+          seats: seatsAfterSettlement,
+          currentSeat: this.state.dealerSeat,
+        },
+        [
+          { kind: 'opening_jing_settlement', settlementTile, scoreDelta },
+          { kind: 'jing_indicator', indicator, jingPrimary, jingSecondary },
+        ],
+      );
+    }
+
+    // ── Standard rule ────────────────────────────────────────────────────────
     const indicatorId = this.state.deadWall[0];
     const indicator = typeOf(indicatorId);
     const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);

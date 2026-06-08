@@ -92,6 +92,7 @@ export class GameService {
       startingScores,
       dealerSeat: 0,
       roundWind: 'east',
+      config: { ruleTopBottomJing: settings.ruleTopBottomJing },
     }).deal();
 
     const session = new GameSession({
@@ -256,6 +257,26 @@ export class GameService {
       session.moveLog.push(...session.engine.events);
     } catch (err) {
       return this.emitError(socket, 'ENGINE_ERROR', String(err));
+    }
+
+    // Broadcast the opening settlement event when top-bottom rule is enabled
+    if (session.settings.ruleTopBottomJing) {
+      const settlementEvent = session.engine.events.find(
+        (e) => e.kind === 'opening_jing_settlement',
+      ) as
+        | {
+            kind: 'opening_jing_settlement';
+            settlementTile: import('@nanchang/engine').TileType;
+            scoreDelta: [number, number, number, number];
+          }
+        | undefined;
+      if (settlementEvent) {
+        this.broadcastEvent(session, {
+          kind: 'opening_jing_settlement',
+          settlementTile: settlementEvent.settlementTile,
+          scoreDelta: settlementEvent.scoreDelta,
+        });
+      }
     }
 
     this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.dealerSeat });
@@ -786,6 +807,7 @@ export class GameService {
       startingScores,
       dealerSeat,
       roundWind,
+      config: { ruleTopBottomJing: session.settings.ruleTopBottomJing },
     }).deal();
 
     // Record hand metadata for replay
@@ -955,6 +977,7 @@ export class GameService {
       viewerSeat,
       session.connState,
       session.settings.viewMode,
+      session.settings.ruleTopBottomJing,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

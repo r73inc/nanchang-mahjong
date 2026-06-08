@@ -73,6 +73,7 @@ function makeSnapshot(overrides: {
     viewerSeat,
     seats,
     viewMode: '3D' as const,
+    ruleTopBottomJing: false,
   };
 }
 

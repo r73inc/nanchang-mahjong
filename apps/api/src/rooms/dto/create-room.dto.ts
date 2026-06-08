@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RoomSettingsDto {
@@ -31,6 +31,10 @@ export class RoomSettingsDto {
   @IsOptional()
   @IsIn(['2D', '3D'])
   viewMode?: '2D' | '3D';
+
+  @IsOptional()
+  @IsBoolean()
+  ruleTopBottomJing?: boolean;
 }
 
 export class CreateRoomDto {

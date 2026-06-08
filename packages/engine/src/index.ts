@@ -21,6 +21,7 @@ export type {
   MultiplierItem,
   WinPaymentResult,
   Payment,
+  GameConfig,
   SeatWind,
   GamePhase,
   SeatState,
@@ -82,7 +83,12 @@ export {
 
 // ── Scoring (locked rules §6) ─────────────────────────────────────────────────
 
-export { calculateWinPayout, instantKongPayment, calculateSpiritSettlement } from './scoring';
+export {
+  calculateWinPayout,
+  instantKongPayment,
+  calculateSpiritSettlement,
+  calculateOpeningJingSettlement,
+} from './scoring';
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 

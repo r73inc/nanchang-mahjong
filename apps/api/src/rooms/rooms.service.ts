@@ -161,6 +161,7 @@ export class RoomsService {
       timerSecs: dto?.settings?.timerSecs ?? 30,
       minFan: dto?.settings?.minFan ?? 1,
       viewMode: dto?.settings?.viewMode ?? '3D',
+      ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? false,
     };
 
     await this.db.transactWrite({
@@ -441,12 +442,12 @@ export class RoomsService {
   /**
    * Update mutable pre-game settings. Only the host may call this, and only
    * while the room is still in the 'waiting' state.
-   * Currently exposes viewMode only; extend the body when more settings become live-editable.
+   * Supports: viewMode, ruleTopBottomJing.
    */
   async updateSettings(
     roomId: string,
     requestingUserId: string,
-    viewMode: '2D' | '3D',
+    updates: { viewMode?: '2D' | '3D'; ruleTopBottomJing?: boolean },
   ): Promise<RoomState> {
     const room = await this.queryRoom(roomId);
     if (!room) throw new NotFoundException('Room not found');
@@ -455,15 +456,27 @@ export class RoomsService {
     if (room.status !== 'waiting')
       throw new BadRequestException('Cannot change settings after game starts');
 
+    const setParts: string[] = ['#ttl = :ttl', 'idleAt = :now'];
+    const names: Record<string, string> = { '#ttl': 'ttl' };
+    const values: Record<string, unknown> = {
+      ':ttl': this.ttlFromNow(),
+      ':now': new Date().toISOString(),
+    };
+
+    if (updates.viewMode !== undefined) {
+      setParts.push('settings.viewMode = :viewMode');
+      values[':viewMode'] = updates.viewMode;
+    }
+    if (updates.ruleTopBottomJing !== undefined) {
+      setParts.push('settings.ruleTopBottomJing = :ruleTopBottomJing');
+      values[':ruleTopBottomJing'] = updates.ruleTopBottomJing;
+    }
+
     await this.db.update({
       Key: DK.room(roomId),
-      UpdateExpression: 'SET settings.viewMode = :viewMode, #ttl = :ttl, idleAt = :now',
-      ExpressionAttributeNames: { '#ttl': 'ttl' },
-      ExpressionAttributeValues: {
-        ':viewMode': viewMode,
-        ':ttl': this.ttlFromNow(),
-        ':now': new Date().toISOString(),
-      },
+      UpdateExpression: `SET ${setParts.join(', ')}`,
+      ExpressionAttributeNames: names,
+      ExpressionAttributeValues: values,
     });
 
     return (await this.queryRoom(roomId))!;
