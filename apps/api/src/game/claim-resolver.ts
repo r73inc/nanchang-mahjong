@@ -8,7 +8,7 @@
  * independently of the gateway and engine state machine.
  */
 
-import { canWin, canPung, canKongFromDiscard, chowOptions } from '@nanchang/engine';
+import { canWin, canKongFromDiscard, chowOptions, separateJing } from '@nanchang/engine';
 import type { GameState, TileType } from '@nanchang/engine';
 import type { ClaimAction } from '@nanchang/shared';
 
@@ -68,14 +68,34 @@ export function computeEligibleClaims(state: GameState): Map<Seat4, ClaimAction[
     const actions: ClaimAction[] = [];
 
     if (canWin(hand, pendingDiscard, jingTypes, openMeldTiles)) actions.push({ kind: 'win' });
-    if (canPung(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'pung' });
+
+    // Family rule: wildcards (jing tiles) may NOT be used to form open melds (pung/chow).
+    // Only offer pung/chow when the player has enough NATURAL copies (no jing substitution).
+    const { naturals } = separateJing(hand, jingTypes);
+    const naturalCount = naturals.filter((t) => t === pendingDiscard).length;
+
+    if (naturalCount >= 2) actions.push({ kind: 'pung' });
     if (canKongFromDiscard(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'kong' });
 
     // Chow is restricted to the single seat immediately after the discarder.
+    // Only offer sequences achievable without any jing substitution.
     if (seat === nextSeat) {
-      const seqs = chowOptions(hand, pendingDiscard, jingTypes);
-      if (seqs.length > 0) {
-        actions.push({ kind: 'chow', sequences: seqs });
+      const allSeqs = chowOptions(hand, pendingDiscard, jingTypes);
+      const naturalSeqs = allSeqs.filter((seq) => {
+        let tempNaturals = [...naturals];
+        for (const t of seq) {
+          if (t === pendingDiscard) continue; // discard fills this position
+          const idx = tempNaturals.indexOf(t);
+          if (idx !== -1) {
+            tempNaturals = [...tempNaturals.slice(0, idx), ...tempNaturals.slice(idx + 1)];
+          } else {
+            return false; // would need a jing — exclude
+          }
+        }
+        return true;
+      });
+      if (naturalSeqs.length > 0) {
+        actions.push({ kind: 'chow', sequences: naturalSeqs });
       }
     }
 

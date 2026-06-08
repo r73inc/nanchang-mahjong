@@ -12,7 +12,7 @@
  *   - Instant Kong payouts and Spirit settlements are applied inside the engine
  *     so the score on SeatState always reflects the full game ledger.
  */
-import { buildWall, typeOf, sortTypes } from './tiles';
+import { buildWall, typeOf, sortTypes, stepAbove } from './tiles';
 import { seededShuffle } from './prng';
 import { jingTypesFromIndicator, separateJing } from './jing';
 import { isWinningHand, decomposeHand } from './hand';
@@ -372,8 +372,11 @@ export class GameEngine {
 
       // Compute instant payout for players holding the settlement tile (wall[0], 2 pts/copy)
       const scoreDelta0 = calculateOpeningJingSettlement(settlementTile, this.state.seats, 2);
-      // Compute 1 pt/copy payout for players holding the indicator tile (wall[1], 1 pt/copy)
-      const scoreDelta1 = calculateOpeningJingSettlement(indicator, this.state.seats, 1);
+      // Compute 1 pt/copy payout for the "next in sequence" tile (stepAbove wall[0], 1 pt/copy).
+      // This tile is NEVER physically removed from the wall — it is only derived from the
+      // settlement tile's position and counted in each player's dealt hand.
+      const nextInSeq = stepAbove(settlementTile);
+      const scoreDelta1 = calculateOpeningJingSettlement(nextInSeq, this.state.seats, 1);
       // Combined zero-sum delta (both settlements applied together)
       const scoreDelta = scoreDelta0.map((d, i) => d + scoreDelta1[i]) as [
         number,
