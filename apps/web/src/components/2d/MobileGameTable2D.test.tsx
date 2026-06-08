@@ -9,10 +9,18 @@ import { MobileGameTable2D } from './MobileGameTable2D';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState, ClientSeatState } from '@nanchang/shared';
 
-// ── Store mock ────────────────────────────────────────────────────────────────
+// ── Store mocks ───────────────────────────────────────────────────────────────
 
 vi.mock('../../stores/game.store', () => ({ useGameStore: vi.fn() }));
 const mockUseGameStore = vi.mocked(useGameStore);
+
+vi.mock('../../stores/auth.store', () => ({
+  useAuthStore: vi
+    .fn()
+    .mockImplementation((sel: (s: { user: { displayName: string } | null }) => unknown) =>
+      sel({ user: { displayName: 'TestPlayer' } }),
+    ),
+}));
 
 // ── Framer Motion passthrough ─────────────────────────────────────────────────
 // AnimatePresence holds exited elements without real browser RAF.
@@ -109,10 +117,20 @@ describe('MobileGameTable2D', () => {
     expect(screen.getByTestId('player-hand-2d')).toBeInTheDocument();
   });
 
-  it('MobileTable·player-badge-present: viewer self-badge is rendered in top-left', () => {
+  it('MobileTable·score-strip-present: score strip is rendered above the hand', () => {
     setupStore(makeSnapshot());
     renderMobileTable();
-    expect(screen.getByTestId('mobile-player-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-score-strip')).toBeInTheDocument();
+  });
+
+  it('MobileTable·no-legacy-pills: SeatLabel2D pill elements are absent from the mobile layout', () => {
+    setupStore(makeSnapshot());
+    renderMobileTable();
+    // SeatLabel2D renders data-testid="seat-label-*" — must never appear in mobile.
+    expect(screen.queryByTestId('seat-label-0')).toBeNull();
+    expect(screen.queryByTestId('seat-label-1')).toBeNull();
+    expect(screen.queryByTestId('seat-label-2')).toBeNull();
+    expect(screen.queryByTestId('seat-label-3')).toBeNull();
   });
 
   it('MobileTable·no-css-grid: container does not use display:grid', () => {

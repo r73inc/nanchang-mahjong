@@ -271,6 +271,8 @@
   "gameMobileEnterCta": "进入游戏",
   "gameLandscapeMode": "游戏界面已旋转为横屏",
   "mobileDiscardConfirm": "打出",
+  "mobileTurnIndicator": "你的回合",
+  "mobileScoreStrip": "{{0}}：{{1}} 分",
 
   "gameErrorTitle": "游戏不可用",
   "gameErrorNotFound": "该游戏会话已不存在，服务器可能已重启，请返回大厅。",
