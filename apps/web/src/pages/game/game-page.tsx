@@ -1319,7 +1319,9 @@ function GameTable({
       {/* Branched on snapshot.viewMode set by the host before game start.    */}
       {/* All overlays (z-10+) are identical in both modes.                   */}
       <div className="absolute inset-0" aria-hidden="true">
-        {snapshot.viewMode === '2D' ? (
+        {snapshot.viewMode === '2D' || isMobile ? (
+          // 2D mode or any mobile device (phones always use the touch-optimised 2D layout
+          // regardless of the host's viewMode setting — the 3D canvas has no mobile handling).
           <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
             <GameTable2D onDiscard={onDiscard} isMobile={isMobile} />
           </MobileLandscapeGate>

@@ -2,12 +2,16 @@
  * useOrientation — mobile landscape mode state machine.
  *
  * Four modes:
- *   'desktop'           — viewport ≥ 600px wide, or already landscape: normal rendering
- *   'needs-gesture'     — portrait mobile, waiting for user tap to request fullscreen
+ *   'desktop'           — non-touch device OR touch tablet (both dims ≥ 600px): normal rendering
+ *   'needs-gesture'     — touch phone (portrait OR landscape): waiting for user tap to enter fullscreen
  *   'native-landscape'  — fullscreen + screen.orientation.lock('landscape') granted
  *   'css-landscape'     — fullscreen API rejected (iOS Safari); CSS rotate fallback active
  *
- * On mobile portrait the caller should show a "Tap to Play" overlay that invokes
+ * Detection uses navigator.maxTouchPoints > 1 to distinguish phones from desktop
+ * browsers. This prevents phones already in landscape (innerWidth ≥ 600) from being
+ * misclassified as desktop.
+ *
+ * On mobile the caller should show a "Tap to Play" overlay that invokes
  * requestNativeLandscape(). If that Promise rejects the hook self-transitions to
  * 'css-landscape' automatically.
  */
@@ -28,7 +32,18 @@ export interface OrientationState {
 }
 
 function getInitialMode(vw: number, vh: number): LandscapeMode {
-  if (vw >= MOBILE_BREAKPOINT_PX || vw > vh) return 'desktop';
+  // Non-touch environments (desktops, laptops) always use the desktop layout.
+  // navigator.maxTouchPoints is 0 on true desktop browsers and > 1 on phones/tablets.
+  const isTouchDevice = typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1;
+  if (!isTouchDevice) return 'desktop';
+
+  // Touch device: distinguish tablets (both dims ≥ breakpoint, e.g. iPad in any
+  // orientation) from phones (one dim is always < breakpoint).
+  if (vw >= MOBILE_BREAKPOINT_PX && vh >= MOBILE_BREAKPOINT_PX) return 'desktop';
+
+  // Phone in portrait or landscape — require a user gesture to enter fullscreen
+  // before the game table renders. This covers the case where the phone is already
+  // physically rotated to landscape (innerWidth ≥ 600) on page load.
   return 'needs-gesture';
 }
 
