@@ -51,6 +51,34 @@
     animation: none !important;
     box-shadow: 0 0 0 2px #c9a961 !important;
   }
+
+  /* Kill the viewport turn-glow animation, fall back to a static inset border. */
+  .mj-turn-border-glow {
+    animation: none !important;
+    box-shadow: inset 0 0 0 2px rgba(201, 169, 97, 0.7) !important;
+  }
+}
+
+/* ── Active turn border glow ────────────────────────────────────────────────── */
+/* Applied to .mj-game-surface when it is the viewer's turn. Pulsing inset      */
+/* box-shadow creates an unmistakable golden border around the entire viewport.  */
+/* The prefers-reduced-motion block above overrides to a static border.          */
+@keyframes mj-turn-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 2px rgba(201, 169, 97, 0.45),
+      inset 0 0 20px rgba(201, 169, 97, 0.12);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 3px rgba(201, 169, 97, 0.9),
+      inset 0 0 32px rgba(201, 169, 97, 0.3);
+  }
+}
+
+.mj-turn-border-glow {
+  animation: mj-turn-pulse 1.6s ease-in-out infinite;
 }
 
 /* ── Mobile game surface — long-press context menu suppression ───────────────── */

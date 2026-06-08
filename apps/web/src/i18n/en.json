@@ -271,6 +271,8 @@
   "gameMobileEnterCta": "Enter Game",
   "gameLandscapeMode": "Game table rotated to landscape",
   "mobileDiscardConfirm": "Discard",
+  "mobileTurnIndicator": "Your Turn",
+  "mobileScoreStrip": "{{0}}: {{1}} pts",
 
   "gameErrorTitle": "Game Unavailable",
   "gameErrorNotFound": "This game session no longer exists. The server may have restarted. Please return to the lobby.",

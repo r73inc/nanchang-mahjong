@@ -1314,7 +1314,9 @@ function GameTable({
   };
 
   return (
-    <div className="mj-game-surface relative w-full h-dvh overflow-hidden bg-black">
+    <div
+      className={`mj-game-surface relative w-full h-dvh overflow-hidden bg-black${isMyTurn ? ' mj-turn-border-glow' : ''}`}
+    >
       {/* ── Table renderer — fills entire screen ──────────────────────────── */}
       {/* Branched on snapshot.viewMode set by the host before game start.    */}
       {/* All overlays (z-10+) are identical in both modes.                   */}

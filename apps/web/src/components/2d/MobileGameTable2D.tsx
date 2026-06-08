@@ -38,10 +38,11 @@ import { MotionConfig } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
 import type { SeatWind } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
+import { useAuthStore } from '../../stores/auth.store';
+import { useI18n } from '../../i18n';
 import { DiscardContext } from './DiscardContext';
 import { useState } from 'react';
 import { FeltSurface2D } from './FeltSurface2D';
-import { MobilePlayerBadge2D } from './MobilePlayerBadge2D';
 import { OpponentBadge2D } from './OpponentBadge2D';
 import { MobileDiscardPool2D } from './MobileDiscardPool2D';
 import { OpenMelds2D } from './OpenMelds2D';
@@ -66,6 +67,11 @@ const CSS_LANDSCAPE_POINT_TRANSFORM = (point: { x: number; y: number }) => ({
   x: point.y,
   y: -point.x,
 });
+
+// ── i18n key constants (avoids i18next/no-literal-string on JSX text nodes) ──
+
+const I18N_TURN_INDICATOR = 'mobileTurnIndicator' as const;
+const I18N_SCORE_STRIP = 'mobileScoreStrip' as const;
 
 /** Width reserved on each side for left/right opponent badges. */
 const BADGE_W = 52;
@@ -121,6 +127,38 @@ function RoundWatermark() {
   );
 }
 
+// ── MobileScoreStrip2D ───────────────────────────────────────────────────────
+// Compact one-liner showing the viewer's display name and current score.
+// Floats just above the PlayerHand2D tile row, pointer-events: none so it
+// never blocks tile taps. Reads displayName from auth store (not in snapshot)
+// and score from the game snapshot.
+
+function MobileScoreStrip2D() {
+  const { t } = useI18n();
+  const snapshot = useGameStore((s) => s.snapshot);
+  const displayName = useAuthStore((s) => s.user?.displayName ?? '');
+  if (!snapshot) return null;
+
+  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+  const seat = snapshot.seats[viewerSeat];
+
+  return (
+    <span
+      data-testid="mobile-score-strip"
+      style={{
+        color: 'rgba(245,239,223,0.6)',
+        fontSize: 10,
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: '0.02em',
+        textShadow: '0 1px 2px rgba(0,0,0,0.9)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {t(I18N_SCORE_STRIP, displayName, seat.score.toLocaleString())}
+    </span>
+  );
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface MobileGameTable2DProps {
@@ -137,6 +175,7 @@ export interface MobileGameTable2DProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileGameTable2DProps) {
+  const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
 
   // ── Discard-flight context ────────────────────────────────────────────────
@@ -145,6 +184,7 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
   if (!snapshot) return null;
 
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+  const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const { right: rightSeat, across: acrossSeat, left: leftSeat } = getCompassSeats(viewerSeat);
 
   return (
@@ -168,19 +208,35 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
           {/* ── Round watermark — decorative centred behind discard pool ── */}
           <RoundWatermark />
 
-          {/* ── Viewer self-badge — top-left, below status bar ───────────── */}
-          {/* Moves the player's own wind/score out of the hand strip so the  */}
-          {/* bottom edge stays fully clear for the interactive tile row.      */}
-          <div
-            style={{
-              position: 'absolute',
-              top: STATUS_H + 8,
-              left: `calc(4px + var(--mj-safe-left, 0px))`,
-              zIndex: 2,
-            }}
-          >
-            <MobilePlayerBadge2D />
-          </div>
+          {/* ── Turn indicator — top-left, below status bar ─────────────── */}
+          {/* Shown only when it is the viewer's active turn. "[ Your Turn ]" */}
+          {/* / "[ 你的回合 ]". Replaces the old MobilePlayerBadge2D that was  */}
+          {/* previously pinned here. Score/name move to the score strip above */}
+          {/* the hand tiles (see below).                                       */}
+          {isMyTurn && (
+            <div
+              data-testid="mobile-turn-indicator"
+              style={{
+                position: 'absolute',
+                top: STATUS_H + 8,
+                left: `calc(4px + var(--mj-safe-left, 0px))`,
+                zIndex: 2,
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '3px 8px',
+                borderRadius: 6,
+                background: 'rgba(201,169,97,0.18)',
+                border: '1px solid rgba(201,169,97,0.55)',
+                color: '#c9a961',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                pointerEvents: 'none',
+              }}
+            >
+              {t(I18N_TURN_INDICATOR)}
+            </div>
+          )}
 
           {/* ── Top opponent badge ───────────────────────────────────────── */}
           <div
@@ -252,6 +308,24 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
             }}
           >
             <OpenMelds2D seatIdx={viewerSeat} role="bottom" compact />
+          </div>
+
+          {/* ── Viewer score strip — floats just above the hand tiles ────── */}
+          {/* Compact "Name: Score pts" text. pointer-events:none so it never  */}
+          {/* blocks tile selection. Sits at the top of the hand strip area.   */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: `calc(var(--mj-hand-height, ${HAND_H_FALLBACK}px) + var(--mj-safe-bottom, 0px) + 2px)`,
+              left: 0,
+              right: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              zIndex: 4,
+              pointerEvents: 'none',
+            }}
+          >
+            <MobileScoreStrip2D />
           </div>
 
           {/* ── Viewer hand — full width, pins to bottom ─────────────────── */}
