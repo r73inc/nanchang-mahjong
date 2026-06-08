@@ -20,6 +20,10 @@ import { LearnPage } from './pages/learn/learn-page';
 import { CustomizePage } from './pages/customize/customize-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
+import { AppErrorBoundary } from './components/error-boundary';
+
+// Module-level constant avoids i18next/no-literal-string on the context prop.
+const GAME_PAGE_CONTEXT = 'GamePage' as const;
 
 /**
  * Route tree for the app.
@@ -49,7 +53,14 @@ export default function App() {
         <Route path="/home" element={<HomeStubPage />} />
         <Route path="/lobby" element={<LobbyPage />} />
         <Route path="/room/:code" element={<RoomPage />} />
-        <Route path="/game/:id" element={<GamePage />} />
+        <Route
+          path="/game/:id"
+          element={
+            <AppErrorBoundary context={GAME_PAGE_CONTEXT}>
+              <GamePage />
+            </AppErrorBoundary>
+          }
+        />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/replay/:id" element={<ReplayPage />} />
         <Route path="/learn" element={<LearnPage />} />
