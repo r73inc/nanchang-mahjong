@@ -1185,6 +1185,56 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   );
 }
 
+/** Spirit-tile discard confirmation sheet. */
+function JingDiscardConfirmSheet({
+  tile,
+  onConfirm,
+  onCancel,
+}: {
+  tile: TileType;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-end justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)' }}
+    >
+      <div
+        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
+        role="dialog"
+        aria-label={t('jingDiscardTitle')}
+      >
+        <div className="flex items-center gap-4">
+          <MahjongTile2D tile={tile} size="lg" isJing interactive={false} />
+          <div>
+            <h2 className="font-bold text-lg text-mj-bone">{t('jingDiscardTitle')}</h2>
+            <p className="text-sm text-mj-bone/60 mt-1">{t('jingDiscardDesc')}</p>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+          >
+            {t('jingDiscardCancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl font-bold text-sm"
+            style={{ background: '#c9a961', color: '#1a1a1a' }}
+          >
+            {t('jingDiscardConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── History types ─────────────────────────────────────────────────────────────
 
 interface HistoryEntry {
@@ -1805,7 +1855,7 @@ function GameTable({
   claimWindow: ClaimWindowState | null;
   toast: GameToast | null;
   pendingMove: boolean;
-  onSelect: (idx: number) => void;
+  onSelect: (idx: number | null) => void;
   onDiscard: (tile: TileType) => void;
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
@@ -1813,6 +1863,7 @@ function GameTable({
 }) {
   const { t } = useI18n();
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
+  const [jingDiscardPending, setJingDiscardPending] = useState<TileType | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const nextHistoryId = useRef(0);
@@ -1853,6 +1904,31 @@ function GameTable({
   const jingTypes = new Set<string>();
   if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
   if (snapshot.jingSecondary) jingTypes.add(snapshot.jingSecondary);
+
+  // ── Jing discard confirmation ────────────────────────────────────────────────
+  // Intercept discard attempts on spirit tiles — show a confirmation sheet so
+  // the player doesn't accidentally throw away a wildcard.
+  const handleDiscardWithConfirm = useCallback(
+    (tile: TileType) => {
+      const isJing = tile === snapshot.jingPrimary || tile === snapshot.jingSecondary;
+      if (isJing) {
+        setJingDiscardPending(tile);
+      } else {
+        onDiscard(tile);
+      }
+    },
+    [snapshot.jingPrimary, snapshot.jingSecondary, onDiscard],
+  );
+
+  const handleJingDiscardConfirm = () => {
+    if (jingDiscardPending) onDiscard(jingDiscardPending);
+    setJingDiscardPending(null);
+  };
+
+  const handleJingDiscardCancel = () => {
+    setJingDiscardPending(null);
+    onSelect(null); // deselect the tile
+  };
 
   // ── History tracking ────────────────────────────────────────────────────────
 
@@ -1917,7 +1993,7 @@ function GameTable({
           // regardless of the host's viewMode setting — the 3D canvas has no mobile handling).
           <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
             <GameTable2D
-              onDiscard={onDiscard}
+              onDiscard={handleDiscardWithConfirm}
               isMobile={isMobile}
               isCssLandscape={landscapeMode === 'css-landscape'}
             />
@@ -2084,7 +2160,7 @@ function GameTable({
           hand={viewerHand}
           selectedTileIdx={selectedTileIdx}
           onSelect={onSelect}
-          onDiscard={onDiscard}
+          onDiscard={handleDiscardWithConfirm}
           isMyTurn={isMyTurn}
           jingTypes={jingTypes}
           pendingMove={pendingMove}
@@ -2096,12 +2172,12 @@ function GameTable({
         hand={viewerHand}
         selectedTileIdx={pendingMove ? null : selectedTileIdx}
         onSelect={onSelect}
-        onDiscard={onDiscard}
+        onDiscard={handleDiscardWithConfirm}
         isMyTurn={isMyTurn && !pendingMove}
       />
 
       {/* ── Collapsible history panel ──────────────────────────────────────── */}
-      {!showConcedeSheet && (
+      {!showConcedeSheet && !jingDiscardPending && (
         <GameHistoryPanel
           entries={historyEntries}
           isOpen={historyOpen}
@@ -2112,16 +2188,27 @@ function GameTable({
       )}
 
       {/* ── Action toast ───────────────────────────────────────────────────── */}
-      {toast && !showConcedeSheet && <ActionToast toast={toast} snapshot={snapshot} />}
+      {toast && !showConcedeSheet && !jingDiscardPending && (
+        <ActionToast toast={toast} snapshot={snapshot} />
+      )}
 
       {/* ── Claim window rail ──────────────────────────────────────────────── */}
-      {claimWindow && !showConcedeSheet && (
+      {claimWindow && !showConcedeSheet && !jingDiscardPending && (
         <SideRail claimWindow={claimWindow} onClaim={onClaim} onPass={onPass} isMobile={isMobile} />
       )}
 
       {/* ── Concede sheet ──────────────────────────────────────────────────── */}
-      {showConcedeSheet && (
+      {showConcedeSheet && !jingDiscardPending && (
         <ConcedeSheet onConfirm={handleConcede} onCancel={() => setShowConcedeSheet(false)} />
+      )}
+
+      {/* ── Jing discard confirmation sheet ────────────────────────────────── */}
+      {jingDiscardPending && (
+        <JingDiscardConfirmSheet
+          tile={jingDiscardPending}
+          onConfirm={handleJingDiscardConfirm}
+          onCancel={handleJingDiscardCancel}
+        />
       )}
 
       {/* ── A11y live region ───────────────────────────────────────────────── */}
