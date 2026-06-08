@@ -259,7 +259,15 @@ export class GameService {
       return this.emitError(socket, 'ENGINE_ERROR', String(err));
     }
 
-    // Broadcast the opening settlement event when top-bottom rule is enabled
+    // Push the snapshot FIRST so every client's score counters reflect the
+    // settlement payouts before the toast event arrives.  Socket.IO delivers
+    // messages in emission order on the same connection, so by the time
+    // opening_jing_settlement reaches the client the snapshot is already applied.
+    this.broadcastSnapshots(session);
+
+    // Broadcast the opening settlement event when top-bottom rule is enabled.
+    // The snapshot above has already updated the score display; the event fires
+    // immediately after so the toast appears against the correct numbers.
     if (session.settings.ruleTopBottomJing) {
       const settlementEvent = session.engine.events.find(
         (e) => e.kind === 'opening_jing_settlement',
@@ -280,7 +288,6 @@ export class GameService {
     }
 
     this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.dealerSeat });
-    this.broadcastSnapshots(session);
     this.startTurn(session);
   }
 
