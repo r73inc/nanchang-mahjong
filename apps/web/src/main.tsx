@@ -16,17 +16,23 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/query-client';
 import { I18nProvider } from './i18n';
+import { AppErrorBoundary } from './components/error-boundary';
+
+// Module-level constant avoids i18next/no-literal-string on the context prop.
+const APP_CONTEXT = 'App' as const;
 import './index.css';
 import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </I18nProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary context={APP_CONTEXT}>
+      <QueryClientProvider client={queryClient}>
+        <I18nProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </I18nProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 );
