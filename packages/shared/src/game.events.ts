@@ -92,6 +92,17 @@ export type ConcedePayload = z.infer<typeof ConcedePayloadSchema>;
 export const RevealJingPayloadSchema = z.object({});
 export type RevealJingPayload = z.infer<typeof RevealJingPayloadSchema>;
 
+/**
+ * Host advances the pre-game reveal by one step.
+ * Each click progresses: hands → settlement (if ruleTopBottomJing) → jing → start.
+ */
+export const AdvancePreGamePayloadSchema = z.object({});
+export type AdvancePreGamePayload = z.infer<typeof AdvancePreGamePayloadSchema>;
+
+/** Host advances past the hand-reveal screen to start the next hand (or end session). */
+export const AdvanceHandPayloadSchema = z.object({});
+export type AdvanceHandPayload = z.infer<typeof AdvanceHandPayloadSchema>;
+
 // ── Server → Client data shapes ───────────────────────────────────────────────
 
 /** Per-seat view within a ClientGameState. */
@@ -136,6 +147,75 @@ export interface ClientGameState {
   viewMode: '2D' | '3D';
   /** Whether the Opening Top & Bottom Spirit Flip rule is active for this game. */
   ruleTopBottomJing: boolean;
+  /**
+   * Pre-game reveal sub-phase (null once the game is actually in play).
+   *   'hands'      — hands dealt, waiting for host to advance
+   *   'settlement' — settlement tile preview shown (ruleTopBottomJing only)
+   *   'jing'       — jing indicator/primary/secondary revealed; waiting for host to start
+   */
+  preGamePhase: 'hands' | 'settlement' | 'jing' | null;
+}
+
+// ── Pre-game & hand-reveal payloads ──────────────────────────────────────────
+
+/** Per-player spirit tile count for the hand-reveal breakdown. */
+export interface SpiritCount {
+  /** Copies of jingPrimary held (hand + open melds). */
+  primary: number;
+  /** Copies of jingSecondary held (hand + open melds). */
+  secondary: number;
+  /** Number of spirit kongs held (quadruplets of a single spirit type). */
+  spiritKongs: number;
+}
+
+/**
+ * Settlement preview emitted as `game:settlement-preview` before `revealJing()`
+ * is called (ruleTopBottomJing mode only). The score deltas in this payload are
+ * PREVIEW only — they are applied to official scores when the host clicks "Reveal
+ * Spirit" and the engine's `revealJing()` runs.
+ */
+export interface SettlementPreviewPayload {
+  /** The flipped settlement tile (下精). */
+  settlementTile: TileType;
+  /** How many copies of the settlement tile each seat holds in their initial hand. */
+  seatCounts: [number, number, number, number];
+  /** Preview score delta (zero-sum) if settlement were applied now. */
+  delta: [number, number, number, number];
+}
+
+/**
+ * Hand-reveal payload emitted as `game:hand-reveal` after every hand ends.
+ * The server pauses and waits for the host to emit `game:advance-hand` before
+ * starting the next hand or ending the session.
+ */
+export interface HandRevealPayload {
+  /** All four hands fully revealed (including the winner's and opponents'). */
+  hands: [TileType[], TileType[], TileType[], TileType[]];
+  jingPrimary: TileType | null;
+  jingSecondary: TileType | null;
+  /** Per-player spirit tile counts (for the settlement breakdown display). */
+  spiritCounts: [SpiritCount, SpiritCount, SpiritCount, SpiritCount];
+  /** Zero-sum spirit settlement delta [seat0, seat1, seat2, seat3]. */
+  spiritDeltas: [number, number, number, number];
+  /** How the hand ended. */
+  result: 'win' | 'draw' | 'concede';
+  /** Seat that won (present when result === 'win'). */
+  winnerSeat?: 0 | 1 | 2 | 3;
+  winType?: WinType;
+  handType?: HandType;
+  /** Winning hand payment breakdown (null for draw/concede). */
+  winPayment?: WinPaymentResult;
+  /** Seat that conceded (present when result === 'concede'). */
+  concedeSeat?: 0 | 1 | 2 | 3;
+  /** True when this is the last hand of the session. */
+  isLastHand: boolean;
+  /** Dealer seat for the next hand (undefined when isLastHand). */
+  nextDealerSeat?: 0 | 1 | 2 | 3;
+  /**
+   * Net score change per seat this hand: includes win payment, kong payouts, and
+   * spirit settlement. Zero-sum; useful for "you gained/lost N this hand" display.
+   */
+  handNetDeltas: [number, number, number, number];
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */

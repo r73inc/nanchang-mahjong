@@ -60,6 +60,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     viewerSeat: 0,
     viewMode: '2D',
     ruleTopBottomJing: false,
+    preGamePhase: null,
     seats: [
       makeSeat({ wind: 'east', hand: ['1m', '2m', '3m'] as TileType[], handCount: 3 }),
       makeSeat({ wind: 'south' }),

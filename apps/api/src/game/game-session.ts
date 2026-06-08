@@ -18,12 +18,32 @@
  */
 
 import { GameEngine } from '@nanchang/engine';
-import type { GameEvent, SeatWind } from '@nanchang/engine';
-import type { RoomSettings } from '@nanchang/shared';
+import type { GameEvent, SeatWind, WinPaymentResult, WinType, HandType } from '@nanchang/engine';
+import type { RoomSettings, HandRevealPayload, SettlementPreviewPayload } from '@nanchang/shared';
 import type { ClaimAction } from '@nanchang/shared';
 import type { IncomingClaim, Seat4 } from './claim-resolver';
 
 export type { Seat4 };
+
+/**
+ * Data captured when a hand ends, held until the host clicks "Continue" on the
+ * hand-reveal screen. Cleared by handleAdvanceHand().
+ */
+export interface PendingHandEnd {
+  winnerSeat: Seat4 | null;
+  result: 'win' | 'draw' | 'concede';
+  payment?: WinPaymentResult;
+  winType?: WinType;
+  handType?: HandType;
+  spiritDeltas: [number, number, number, number];
+  nextDealerInfo: {
+    dealerSeat: 0 | 1 | 2 | 3;
+    roundWind: SeatWind;
+    dealerChanged: boolean;
+    roundComplete: boolean;
+  };
+  isLastHand: boolean;
+}
 
 /** Metadata for one hand within a session — needed to reconstruct replay. */
 export interface HandMeta {
@@ -119,6 +139,34 @@ export class GameSession {
   teardownTimer?: ReturnType<typeof setTimeout>;
 
   readonly startedAt: string;
+
+  /**
+   * Pre-game reveal sub-phase for the current hand.
+   * Advances via game:advance-pre-game (host-only).
+   *   'hands'      — initial: hands dealt, awaiting host to start reveals
+   *   'settlement' — settlement tile preview shown (ruleTopBottomJing only)
+   *   'jing'       — revealJing() called; wildcards visible; awaiting host to start game
+   *   null         — game is in play (startTurn() has been called)
+   */
+  preGamePhase: 'hands' | 'settlement' | 'jing' | null = 'hands';
+
+  /**
+   * Pending hand-end state: set when a hand finishes, cleared when the host
+   * clicks "Continue" on the hand-reveal screen.
+   */
+  pendingHandEnd: PendingHandEnd | null = null;
+
+  /**
+   * The most recent hand-reveal payload — re-sent to reconnecting players while
+   * the session is paused at the hand-reveal screen.
+   */
+  lastHandReveal: HandRevealPayload | null = null;
+
+  /**
+   * The most recent settlement-preview payload — re-sent to reconnecting players
+   * while the session is in the 'settlement' pre-game phase.
+   */
+  lastSettlementPreview: SettlementPreviewPayload | null = null;
 
   constructor(params: {
     engine: GameEngine;

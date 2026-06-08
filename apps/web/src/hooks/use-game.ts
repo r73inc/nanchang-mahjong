@@ -26,6 +26,8 @@ export function useGame(gameId: string, spectate = false) {
   const {
     snapshot,
     ended,
+    settlementPreview,
+    handReveal,
     rematchRoomCode,
     selectedTileIdx,
     claimWindow,
@@ -35,6 +37,8 @@ export function useGame(gameId: string, spectate = false) {
     gameError,
     setSnapshot,
     setEnded,
+    setSettlementPreview,
+    setHandReveal,
     setRematchRoomCode,
     setConnection,
     setClaimWindow,
@@ -120,6 +124,16 @@ export function useGame(gameId: string, spectate = false) {
       setEnded(payload);
     };
 
+    const handleSettlementPreview = (
+      payload: import('@nanchang/shared').SettlementPreviewPayload,
+    ) => {
+      setSettlementPreview(payload);
+    };
+
+    const handleHandReveal = (payload: import('@nanchang/shared').HandRevealPayload) => {
+      setHandReveal(payload);
+    };
+
     const handleRematchReady = (payload: { roomId: string; roomCode: string }) => {
       setRematchRoomCode(payload.roomCode);
     };
@@ -144,6 +158,8 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:contested', handleContested);
     s.on('game:event', handleGameEvent);
     s.on('game:ended', handleEnded);
+    s.on('game:settlement-preview', handleSettlementPreview);
+    s.on('game:hand-reveal', handleHandReveal);
     s.on('game:rematch-ready', handleRematchReady);
     s.on('game:error', handleError);
 
@@ -188,6 +204,8 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:contested', handleContested);
       s.off('game:event', handleGameEvent);
       s.off('game:ended', handleEnded);
+      s.off('game:settlement-preview', handleSettlementPreview);
+      s.off('game:hand-reveal', handleHandReveal);
       s.off('game:rematch-ready', handleRematchReady);
       s.off('game:error', handleError);
       s.off('disconnect', handleDisconnect);
@@ -252,6 +270,24 @@ export function useGame(gameId: string, spectate = false) {
     }
   }, [gameId]);
 
+  /** Host advances the pre-game reveal by one step (hands → settlement → jing → start). */
+  const advancePreGame = useCallback(() => {
+    try {
+      getSocket().emit('game:advance-pre-game', { gameId });
+    } catch {
+      /* ignore */
+    }
+  }, [gameId]);
+
+  /** Host advances past the hand-reveal screen to the next hand (or session end). */
+  const advanceHand = useCallback(() => {
+    try {
+      getSocket().emit('game:advance-hand', { gameId });
+    } catch {
+      /* ignore */
+    }
+  }, [gameId]);
+
   const requestRematch = useCallback(() => {
     try {
       getSocket().emit('game:rematch', {});
@@ -279,6 +315,8 @@ export function useGame(gameId: string, spectate = false) {
   return {
     snapshot,
     ended,
+    settlementPreview,
+    handReveal,
     rematchRoomCode,
     selectedTileIdx,
     claimWindow,
@@ -293,6 +331,8 @@ export function useGame(gameId: string, spectate = false) {
     pass,
     concede,
     revealJing,
+    advancePreGame,
+    advanceHand,
     kongConcealed,
     kongAdd,
     requestRematch,

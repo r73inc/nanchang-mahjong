@@ -54,6 +54,8 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     'game:kong-add': { limit: 2, windowMs: 1_000 },
     'game:concede': { limit: 2, windowMs: 1_000 },
     'game:reveal-jing': { limit: 2, windowMs: 1_000 },
+    'game:advance-pre-game': { limit: 3, windowMs: 2_000 },
+    'game:advance-hand': { limit: 2, windowMs: 2_000 },
     'game:rematch': { limit: 1, windowMs: 10_000 },
   });
 
@@ -191,6 +193,30 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
 
     this.gameService.handleConcede(socket, user.sub, gameId);
+  }
+
+  @SubscribeMessage('game:advance-pre-game')
+  handleAdvancePreGame(socket: Socket, raw: unknown): void {
+    if (!this.checkRate(socket, 'game:advance-pre-game')) return;
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = (raw as Record<string, unknown>)?.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'INVALID_PAYLOAD');
+
+    this.gameService.handleAdvancePreGame(socket, user.sub, gameId);
+  }
+
+  @SubscribeMessage('game:advance-hand')
+  handleAdvanceHand(socket: Socket, raw: unknown): void {
+    if (!this.checkRate(socket, 'game:advance-hand')) return;
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = (raw as Record<string, unknown>)?.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'INVALID_PAYLOAD');
+
+    this.gameService.handleAdvanceHand(socket, user.sub, gameId);
   }
 
   @SubscribeMessage('game:rematch')
