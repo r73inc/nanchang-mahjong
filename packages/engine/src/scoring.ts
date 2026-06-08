@@ -193,6 +193,42 @@ export function calculateWinPayout(ctx: ScoringContext): WinPaymentResult {
   };
 }
 
+// ── Opening Top & Bottom Spirit Flip settlement (开局上下翻精) ────────────────
+
+/**
+ * Instant payout for the Opening Top & Bottom Spirit Flip rule (开局上下翻精).
+ *
+ * Each player who holds one or more copies of the settlement tile in their
+ * INITIAL DEALT HAND receives 2 points from every other player per copy held.
+ *
+ * Formula (identical structure to spirit settlement):
+ *   scoreDelta[i] = RATE × (4 × copies_i − total_copies)
+ *
+ * This guarantees zero-sum: Σ scoreDelta[i] = 0.
+ *
+ * When nobody holds the tile (all copies are in the wall), the delta is [0,0,0,0].
+ *
+ * @param settlementTile  The flipped tile (wall[0] after dealing).
+ * @param seats           The four seat states immediately after dealing.
+ * @returns               Zero-sum score delta [seat0, seat1, seat2, seat3].
+ */
+export function calculateOpeningJingSettlement(
+  settlementTile: TileType,
+  seats: readonly [SeatState, SeatState, SeatState, SeatState],
+): [number, number, number, number] {
+  /** Points per copy held, paid by each other player. */
+  const RATE = 2;
+
+  const counts = seats.map((seat) => seat.hand.filter((t) => t === settlementTile).length);
+  const total = counts.reduce((sum, c) => sum + c, 0);
+
+  if (total === 0) return [0, 0, 0, 0];
+
+  // scoreDelta[i] = RATE × (4 × copies_i − total)
+  // Proof of zero-sum: Σ(4×c_i − total) = 4×total − 4×total = 0
+  return counts.map((c) => RATE * (4 * c - total)) as [number, number, number, number];
+}
+
 // ── Instant Kong payout (§6.1) ────────────────────────────────────────────────
 
 /**

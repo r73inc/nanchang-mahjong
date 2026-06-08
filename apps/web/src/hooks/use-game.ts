@@ -87,7 +87,19 @@ export function useGame(gameId: string, spectate = false) {
     // We show a prominent toast for claims and wins so all players are notified.
     const handleGameEvent = (payload: { event: import('@nanchang/shared').PublicGameEvent }) => {
       const { event } = payload;
-      if (
+      if (event.kind === 'opening_jing_settlement') {
+        // Compute the viewer's own score delta (null for spectators)
+        const currentSnapshot = useGameStore.getState().snapshot;
+        const viewerSeat = currentSnapshot?.viewerSeat ?? null;
+        const settlementDelta = viewerSeat !== null ? event.scoreDelta[viewerSeat] : 0;
+        setToast({
+          kind: 'opening_settlement',
+          seat: 0, // seat is required by type; not meaningful for this toast
+          settlementTile: event.settlementTile,
+          settlementDelta,
+        });
+        setTimeout(() => setToast(null), 4000);
+      } else if (
         event.kind === 'pung' ||
         event.kind === 'chow' ||
         event.kind === 'kong_open' ||

@@ -27,6 +27,7 @@ function makeClaimsState(
   return {
     phase: 'awaiting_claims',
     seed: 0,
+    config: { ruleTopBottomJing: false },
     jingIndicator: null,
     jingPrimary: null,
     jingSecondary: null,
@@ -274,6 +275,7 @@ describe('claim-resolver · Gameplay·call-priority', () => {
       const state: GameState = {
         phase: 'awaiting_claims',
         seed: 0,
+        config: { ruleTopBottomJing: false },
         jingIndicator: null,
         jingPrimary: null,
         jingSecondary: null,

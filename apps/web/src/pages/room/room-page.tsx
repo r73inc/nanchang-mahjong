@@ -333,7 +333,7 @@ export function RoomPage() {
                     return (
                       <button
                         key={mode}
-                        onClick={() => updateSettings(room.roomId, mode)}
+                        onClick={() => updateSettings(room.roomId, { viewMode: mode })}
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{
@@ -354,6 +354,50 @@ export function RoomPage() {
               ) : (
                 <span className="text-mj-gold font-semibold">
                   {t(room.settings.viewMode === '3D' ? 'settingViewMode3d' : 'settingViewMode2d')}
+                </span>
+              )}
+            </div>
+
+            {/* Opening Spirit Flip toggle */}
+            <div
+              className="flex justify-between items-center px-4 py-3 text-sm"
+              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+            >
+              <span className="text-mj-bone/70">{t('settingTopBottomJingLabel')}</span>
+              {isHost && room.status === 'waiting' ? (
+                <button
+                  onClick={() =>
+                    updateSettings(room.roomId, {
+                      ruleTopBottomJing: !room.settings.ruleTopBottomJing,
+                    })
+                  }
+                  disabled={loading}
+                  aria-pressed={room.settings.ruleTopBottomJing}
+                  className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                  style={{
+                    background: room.settings.ruleTopBottomJing
+                      ? 'rgba(201,169,97,0.25)'
+                      : 'rgba(245,239,223,0.06)',
+                    border: room.settings.ruleTopBottomJing
+                      ? '1px solid rgba(201,169,97,0.6)'
+                      : '1px solid rgba(245,239,223,0.12)',
+                    color: room.settings.ruleTopBottomJing ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {t(
+                    room.settings.ruleTopBottomJing
+                      ? 'settingTopBottomJingOn'
+                      : 'settingTopBottomJingOff',
+                  )}
+                </button>
+              ) : (
+                <span className="text-mj-gold font-semibold">
+                  {t(
+                    room.settings.ruleTopBottomJing
+                      ? 'settingTopBottomJingOn'
+                      : 'settingTopBottomJingOff',
+                  )}
                 </span>
               )}
             </div>

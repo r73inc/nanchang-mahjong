@@ -3,6 +3,7 @@ import { GameEngine, nextDealer } from '../engine';
 import { isWinningHand } from '../hand';
 import { chowOptions } from '../calls';
 import type { TileType, GameState, Meld, GameEvent, SeatState, SeatWind } from '../types';
+import { typeOf } from '../tiles';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -842,5 +843,147 @@ describe('Immutability', () => {
     expect(g.state.phase).toBe('playing');
     expect(g.state.seats[0].hand).toContain(tile);
     expect(after.state.phase).toBe('awaiting_claims');
+  });
+});
+
+// ── Opening Top & Bottom Spirit Flip (开局上下翻精) ────────────────────────────
+
+describe('Engine·ruleTopBottomJing', () => {
+  /** Create a game with the top-bottom rule enabled, through revealJing. */
+  function topBottomGame(seed = 42) {
+    return GameEngine.create(seed, { config: { ruleTopBottomJing: true } })
+      .deal()
+      .revealJing();
+  }
+
+  it('GameConfig is stored on state with ruleTopBottomJing: false by default', () => {
+    const g = GameEngine.create(1);
+    expect(g.state.config.ruleTopBottomJing).toBe(false);
+  });
+
+  it('GameConfig ruleTopBottomJing: true is persisted through deal', () => {
+    const g = GameEngine.create(1, { config: { ruleTopBottomJing: true } }).deal();
+    expect(g.state.config.ruleTopBottomJing).toBe(true);
+  });
+
+  it('transitions to playing phase after revealJing with top-bottom rule', () => {
+    const g = topBottomGame(7);
+    expect(g.state.phase).toBe('playing');
+  });
+
+  it('jingPrimary and jingSecondary are set after revealJing with top-bottom rule', () => {
+    const g = topBottomGame(7);
+    expect(g.state.jingPrimary).not.toBeNull();
+    expect(g.state.jingSecondary).not.toBeNull();
+  });
+
+  it('dead wall remains 4 tiles intact (not consumed for indicator)', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    expect(afterDeal.state.deadWall).toHaveLength(4);
+    const afterReveal = afterDeal.revealJing();
+    // Standard path removes deadWall[0]; top-bottom path leaves deadWall intact
+    expect(afterReveal.state.deadWall).toHaveLength(4);
+    expect(afterReveal.state.deadWall[0]).toBe(afterDeal.state.deadWall[0]);
+  });
+
+  it('live wall loses 2 tiles (indicator consumed, settlement tile moved to bottom)', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    const wallBefore = afterDeal.state.wall.length;
+    const afterReveal = afterDeal.revealJing();
+    // wall[1] consumed (indicator), wall[0] moved to bottom — net length unchanged
+    // Actually: wall.slice(2) + [wall[0]] = length - 1
+    expect(afterReveal.state.wall.length).toBe(wallBefore - 1);
+  });
+
+  it('settlement tile (wall[0]) is tucked to the bottom of the live wall', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    const settlementTileId = afterDeal.state.wall[0];
+    const afterReveal = afterDeal.revealJing();
+    const bottom = afterReveal.state.wall[afterReveal.state.wall.length - 1];
+    expect(bottom).toBe(settlementTileId);
+  });
+
+  it('indicator (wall[1]) is not in the new wall', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    const indicatorId = afterDeal.state.wall[1];
+    const afterReveal = afterDeal.revealJing();
+    expect(afterReveal.state.wall).not.toContain(indicatorId);
+  });
+
+  it('emits opening_jing_settlement event before jing_indicator event', () => {
+    const g = topBottomGame(7);
+    const kinds = g.events.map((e) => e.kind);
+    const settleIdx = kinds.indexOf('opening_jing_settlement');
+    const jingIdx = kinds.indexOf('jing_indicator');
+    expect(settleIdx).toBeGreaterThanOrEqual(0);
+    expect(jingIdx).toBeGreaterThan(settleIdx);
+  });
+
+  it('opening_jing_settlement event scoreDelta is zero-sum', () => {
+    const g = topBottomGame(7);
+    const ev = g.events.find((e) => e.kind === 'opening_jing_settlement') as
+      | { kind: 'opening_jing_settlement'; scoreDelta: [number, number, number, number] }
+      | undefined;
+    expect(ev).toBeDefined();
+    const sum = ev!.scoreDelta.reduce((s, v) => s + v, 0);
+    expect(sum).toBe(0);
+  });
+
+  it('seat scores after revealJing reflect the opening settlement delta', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    const scoresBefore = afterDeal.state.seats.map((s) => s.score);
+    const afterReveal = afterDeal.revealJing();
+    const ev = afterReveal.events.find((e) => e.kind === 'opening_jing_settlement') as
+      | { kind: 'opening_jing_settlement'; scoreDelta: [number, number, number, number] }
+      | undefined;
+    expect(ev).toBeDefined();
+    for (let i = 0; i < 4; i++) {
+      expect(afterReveal.state.seats[i].score).toBe(scoresBefore[i] + ev!.scoreDelta[i]);
+    }
+  });
+
+  it('jingIndicator is derived from wall[1] (not deadWall[0])', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    const indicatorTileId = afterDeal.state.wall[1];
+    const expectedIndicator = typeOf(indicatorTileId);
+    const afterReveal = afterDeal.revealJing();
+    expect(afterReveal.state.jingIndicator).toBe(expectedIndicator);
+  });
+
+  it('standard path is unaffected (revealJing consumes deadWall[0] as before)', () => {
+    const afterDeal = GameEngine.create(7).deal();
+    expect(afterDeal.state.config.ruleTopBottomJing).toBe(false);
+    const afterReveal = afterDeal.revealJing();
+    // Standard: deadWall shrinks by 1; live wall is untouched
+    expect(afterReveal.state.deadWall).toHaveLength(3);
+  });
+
+  it('throws if wall has fewer than 2 tiles when top-bottom rule is active', () => {
+    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      { ...afterDeal.state, phase: 'jing_reveal', wall: [afterDeal.state.wall[0]] },
+      afterDeal.events,
+    );
+    expect(() => engine.revealJing()).toThrow(/not enough/i);
+  });
+
+  it('deterministic: same seed always produces same settlement tile and delta', () => {
+    const g1 = GameEngine.create(42, { config: { ruleTopBottomJing: true } })
+      .deal()
+      .revealJing();
+    const g2 = GameEngine.create(42, { config: { ruleTopBottomJing: true } })
+      .deal()
+      .revealJing();
+    const ev1 = g1.events.find((e) => e.kind === 'opening_jing_settlement') as {
+      settlementTile: TileType;
+      scoreDelta: number[];
+    };
+    const ev2 = g2.events.find((e) => e.kind === 'opening_jing_settlement') as {
+      settlementTile: TileType;
+      scoreDelta: number[];
+    };
+    expect(ev1.settlementTile).toBe(ev2.settlementTile);
+    expect(ev1.scoreDelta).toEqual(ev2.scoreDelta);
   });
 });

@@ -122,9 +122,9 @@ export function useRoomActions() {
   );
 
   const updateSettings = useCallback(
-    async (roomId: string, viewMode: '2D' | '3D') => {
+    async (roomId: string, updates: { viewMode?: '2D' | '3D'; ruleTopBottomJing?: boolean }) => {
       try {
-        const { data } = await api.patch<RoomState>(`/rooms/${roomId}/settings`, { viewMode });
+        const { data } = await api.patch<RoomState>(`/rooms/${roomId}/settings`, updates);
         setRoom(data);
         return data;
       } catch (err) {

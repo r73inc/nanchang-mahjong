@@ -92,6 +92,7 @@ export class GameService {
       startingScores,
       dealerSeat: 0,
       roundWind: 'east',
+      config: { ruleTopBottomJing: settings.ruleTopBottomJing },
     }).deal();
 
     const session = new GameSession({
@@ -258,8 +259,35 @@ export class GameService {
       return this.emitError(socket, 'ENGINE_ERROR', String(err));
     }
 
-    this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.dealerSeat });
+    // Push the snapshot FIRST so every client's score counters reflect the
+    // settlement payouts before the toast event arrives.  Socket.IO delivers
+    // messages in emission order on the same connection, so by the time
+    // opening_jing_settlement reaches the client the snapshot is already applied.
     this.broadcastSnapshots(session);
+
+    // Broadcast the opening settlement event when top-bottom rule is enabled.
+    // The snapshot above has already updated the score display; the event fires
+    // immediately after so the toast appears against the correct numbers.
+    if (session.settings.ruleTopBottomJing) {
+      const settlementEvent = session.engine.events.find(
+        (e) => e.kind === 'opening_jing_settlement',
+      ) as
+        | {
+            kind: 'opening_jing_settlement';
+            settlementTile: import('@nanchang/engine').TileType;
+            scoreDelta: [number, number, number, number];
+          }
+        | undefined;
+      if (settlementEvent) {
+        this.broadcastEvent(session, {
+          kind: 'opening_jing_settlement',
+          settlementTile: settlementEvent.settlementTile,
+          scoreDelta: settlementEvent.scoreDelta,
+        });
+      }
+    }
+
+    this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.dealerSeat });
     this.startTurn(session);
   }
 
@@ -786,6 +814,7 @@ export class GameService {
       startingScores,
       dealerSeat,
       roundWind,
+      config: { ruleTopBottomJing: session.settings.ruleTopBottomJing },
     }).deal();
 
     // Record hand metadata for replay
@@ -955,6 +984,7 @@ export class GameService {
       viewerSeat,
       session.connState,
       session.settings.viewMode,
+      session.settings.ruleTopBottomJing,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

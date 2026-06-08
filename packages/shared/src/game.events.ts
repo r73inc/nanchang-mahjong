@@ -21,6 +21,7 @@ import type {
   WinType,
   GameEvent,
   GameState,
+  GameConfig,
   ReplayHandConfig,
 } from '@nanchang/engine';
 
@@ -35,6 +36,7 @@ export type {
   WinType,
   GameEvent,
   GameState,
+  GameConfig,
   ReplayHandConfig,
 };
 // Re-export replay utility so web only needs @nanchang/shared.
@@ -132,6 +134,8 @@ export interface ClientGameState {
   seats: [ClientSeatState, ClientSeatState, ClientSeatState, ClientSeatState];
   /** Which table renderer the host selected for this game. */
   viewMode: '2D' | '3D';
+  /** Whether the Opening Top & Bottom Spirit Flip rule is active for this game. */
+  ruleTopBottomJing: boolean;
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */
@@ -161,7 +165,14 @@ export type PublicGameEvent =
       payment: WinPaymentResult;
     }
   | { kind: 'draw_game' }
-  | { kind: 'concede'; seat: 0 | 1 | 2 | 3 };
+  | { kind: 'concede'; seat: 0 | 1 | 2 | 3 }
+  | {
+      kind: 'opening_jing_settlement';
+      /** The flipped settlement tile (下精). */
+      settlementTile: TileType;
+      /** Zero-sum score delta for each seat [seat0, seat1, seat2, seat3]. */
+      scoreDelta: [number, number, number, number];
+    };
 
 /**
  * Final session result emitted as `game:ended`.

@@ -40,6 +40,14 @@ export const RoomSettingsSchema = z.object({
 
   /** Which game table renderer to use. Defaults to 3D; host can switch to 2D. */
   viewMode: z.enum(['2D', '3D']).default('3D'),
+
+  /**
+   * Opening Top & Bottom Spirit Flip (开局上下翻精).
+   * When true, the first two wall tiles are used as the settlement tile and
+   * Jing indicator after dealing, triggering an instant payout for players
+   * holding the settlement tile. See engine/src/types.ts GameConfig for details.
+   */
+  ruleTopBottomJing: z.boolean().default(false),
 });
 export type RoomSettings = z.infer<typeof RoomSettingsSchema>;
 

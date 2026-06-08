@@ -173,6 +173,30 @@ export interface Payment {
   totalReceived: number;
 }
 
+// ── Game configuration ────────────────────────────────────────────────────────
+
+/**
+ * Rule flags that control optional gameplay variants.
+ * Stored inside GameState so every engine method has access without additional parameters.
+ * All flags default to false (standard Nanchang rules).
+ */
+export interface GameConfig {
+  /**
+   * Opening Top & Bottom Spirit Flip (开局上下翻精).
+   *
+   * When true, the standard dead-wall indicator draw is replaced by a live-wall
+   * two-tile sequence immediately after dealing:
+   *   1. wall[0] (the settlement tile / 下精) is flipped; any player holding
+   *      it in their initial hand receives 2 pts from every other player per copy.
+   *   2. The settlement tile is tucked to the bottom of the live wall.
+   *   3. wall[1] (now wall[0] after the tuck) becomes the Jing indicator.
+   *   4. jingPrimary = indicator, jingSecondary = stepAbove(indicator).
+   *
+   * Default: false (standard single-indicator rule).
+   */
+  ruleTopBottomJing: boolean;
+}
+
 // ── Game state ────────────────────────────────────────────────────────────────
 
 export type SeatWind = 'east' | 'south' | 'west' | 'north';
@@ -191,6 +215,8 @@ export interface GameState {
   phase: GamePhase;
   /** RNG seed for this game (for replay). */
   seed: number;
+  /** Rule-variant configuration for this game instance. */
+  config: GameConfig;
   /** The indicator tile drawn for Jing determination. */
   jingIndicator: TileType | null;
   /** Primary Spirit (正精): the indicator tile itself — all 4 copies are wildcards. */
@@ -229,6 +255,13 @@ export interface GameState {
 
 export type GameEvent =
   | { kind: 'deal'; seed: number; hands: [TileType[], TileType[], TileType[], TileType[]] }
+  | {
+      kind: 'opening_jing_settlement';
+      /** The flipped settlement tile (下精) that triggered instant payouts. */
+      settlementTile: TileType;
+      /** Zero-sum score delta for each seat [seat0, seat1, seat2, seat3]. */
+      scoreDelta: [number, number, number, number];
+    }
   | { kind: 'jing_indicator'; indicator: TileType; jingPrimary: TileType; jingSecondary: TileType }
   | { kind: 'draw'; seat: 0 | 1 | 2 | 3; tile: TileType; fromDeadWall: boolean }
   | { kind: 'discard'; seat: 0 | 1 | 2 | 3; tile: TileType }
