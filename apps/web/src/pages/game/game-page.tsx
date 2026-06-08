@@ -1531,8 +1531,11 @@ function GameTable({
         </div>
       </div>
 
-      {/* ── Seat HUD — corner nameplates ───────────────────────────────────── */}
-      <SeatHUD snapshot={snapshot} />
+      {/* ── Seat HUD — corner nameplates (desktop/3D only) ─────────────────── */}
+      {/* Hidden on mobile: the 2D game table renders OpponentBadge2D and      */}
+      {/* MobilePlayerBadge2D for player info. SeatHUD would also escape the   */}
+      {/* MobileJingButton overlay's stacking context and paint on top of it.  */}
+      {!isMobile && <SeatHUD snapshot={snapshot} />}
 
       {/* ── Turn indicator ────────────────────────────────────────────────── */}
       {/* Hidden on mobile: the viewport-wide glow (mj-turn-border-glow) is   */}
