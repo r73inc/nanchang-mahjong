@@ -215,18 +215,16 @@ export function calculateWinPayout(ctx: ScoringContext): WinPaymentResult {
 export function calculateOpeningJingSettlement(
   settlementTile: TileType,
   seats: readonly [SeatState, SeatState, SeatState, SeatState],
+  rate = 2,
 ): [number, number, number, number] {
-  /** Points per copy held, paid by each other player. */
-  const RATE = 2;
-
   const counts = seats.map((seat) => seat.hand.filter((t) => t === settlementTile).length);
   const total = counts.reduce((sum, c) => sum + c, 0);
 
   if (total === 0) return [0, 0, 0, 0];
 
-  // scoreDelta[i] = RATE × (4 × copies_i − total)
+  // scoreDelta[i] = rate × (4 × copies_i − total)
   // Proof of zero-sum: Σ(4×c_i − total) = 4×total − 4×total = 0
-  return counts.map((c) => RATE * (4 * c - total)) as [number, number, number, number];
+  return counts.map((c) => rate * (4 * c - total)) as [number, number, number, number];
 }
 
 // ── Instant Kong payout (§6.1) ────────────────────────────────────────────────

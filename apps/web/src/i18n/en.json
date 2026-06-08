@@ -261,6 +261,7 @@
   "preGameWaitingHost": "Waiting for host…",
   "preGameBonusTile": "Bonus Tile",
   "preGameBonusTile2pt": "2 pts each",
+  "preGameBonusTile1pt": "1 pt each",
   "preGameSettlementTitle": "Settlement Tile",
   "preGameSettlementDesc": "Players earn points for each copy of this tile",
   "preGameIndicatorHint": "Spirit indicator →",

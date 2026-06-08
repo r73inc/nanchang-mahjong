@@ -261,6 +261,7 @@
   "preGameWaitingHost": "等待房主…",
   "preGameBonusTile": "奖励牌",
   "preGameBonusTile2pt": "每张 2 分",
+  "preGameBonusTile1pt": "每张 1 分",
   "preGameSettlementTitle": "结算牌",
   "preGameSettlementDesc": "每名玩家每持有一张该牌可获得积分",
   "preGameIndicatorHint": "精牌指示 →",

@@ -181,12 +181,17 @@ export interface SettlementPreviewPayload {
    * The indicator tile (上精 / wall[1]). Shown as the smaller "next in sequence"
    * tile beside the settlement tile. This tile is consumed when revealJing() runs
    * and becomes jingIndicator, from which jingPrimary / jingSecondary are derived.
+   * Pays 1 pt per copy held.
    */
   nextTile: TileType;
-  /** How many copies of the settlement tile each seat holds in their initial hand. */
+  /** How many copies of the settlement tile (wall[0]) each seat holds. */
   seatCounts: [number, number, number, number];
-  /** Preview score delta (zero-sum) if settlement were applied now. */
+  /** Preview score delta (zero-sum) for the 2pt settlement tile. */
   delta: [number, number, number, number];
+  /** How many copies of the indicator tile (wall[1]) each seat holds. */
+  nextTileSeatCounts: [number, number, number, number];
+  /** Preview score delta (zero-sum) for the 1pt indicator tile. */
+  nextTileDelta: [number, number, number, number];
 }
 
 /**

@@ -198,10 +198,11 @@ function PreGameFlow({
             aria-label={t('preGameYourHand')}
           >
             {myHand.map((tile, i) => (
-              <MahjongTile
+              <MahjongTile2D
                 key={`${tile}-${i}`}
                 tile={tile}
                 size="sm"
+                interactive={false}
                 isJing={tile === snapshot.jingPrimary || tile === snapshot.jingSecondary}
               />
             ))}
@@ -243,21 +244,26 @@ function PreGameFlow({
         {/* Settlement tile (large) + indicator tile (small) */}
         <div className="flex items-end justify-center gap-4">
           <div className="flex flex-col items-center gap-2">
-            <MahjongTile tile={settlementPreview.settlementTile} size="lg" isJing />
+            <MahjongTile2D
+              tile={settlementPreview.settlementTile}
+              size="lg"
+              isJing
+              interactive={false}
+            />
             <p className="text-[10px] text-mj-gold/70 font-bold uppercase tracking-wider">
               {t('preGameBonusTile2pt')}
             </p>
           </div>
           <div className="flex flex-col items-center gap-2 pb-1">
-            <MahjongTile tile={settlementPreview.nextTile} size="sm" />
-            <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider">
-              {t('preGameIndicatorHint')}
+            <MahjongTile2D tile={settlementPreview.nextTile} size="sm" interactive={false} />
+            <p className="text-[10px] text-mj-gold/50 font-bold uppercase tracking-wider">
+              {t('preGameBonusTile1pt')}
             </p>
           </div>
         </div>
 
-        {/* Per-player score preview */}
-        <div className="flex flex-col gap-2 w-full max-w-xs">
+        {/* Per-player score preview — 2pt settlement tile */}
+        <div className="flex flex-col gap-1.5 w-full max-w-xs">
           {settlementPreview.delta.map((delta, i) => {
             const wind = snapshot.seats[i].wind;
             const count = settlementPreview.seatCounts[i];
@@ -294,6 +300,69 @@ function PreGameFlow({
           })}
         </div>
 
+        {/* Per-player score preview — 1pt indicator tile */}
+        {settlementPreview.nextTileDelta.some((d) => d !== 0) && (
+          <div className="flex flex-col gap-1.5 w-full max-w-xs">
+            <p className="text-[9px] text-mj-gold/40 uppercase tracking-widest text-center">
+              {t('preGameBonusTile1pt')}
+            </p>
+            {settlementPreview.nextTileDelta.map((delta, i) => {
+              const wind = snapshot.seats[i].wind;
+              const count = settlementPreview.nextTileSeatCounts[i];
+              const isViewer = i === viewerSeat;
+              if (count === 0 && delta === 0) {
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between px-4 py-1.5 rounded-lg ${
+                      isViewer ? 'bg-mj-gold/8 border border-mj-gold/20' : 'bg-white/3'
+                    }`}
+                  >
+                    <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                      {WIND_CHAR[wind]}
+                    </span>
+                    <span className="text-xs text-mj-bone/30">{MULT_CHAR}0</span>
+                    <span className="text-sm font-bold tabular-nums text-mj-bone/30">0</span>
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between px-4 py-1.5 rounded-lg ${
+                    isViewer ? 'bg-mj-gold/8 border border-mj-gold/20' : 'bg-white/3'
+                  }`}
+                >
+                  <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                    {WIND_CHAR[wind]}
+                    {isViewer && (
+                      <span className="text-mj-bone/50 font-normal ml-1 text-xs">
+                        {t('preGameYou')}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-mj-bone/60">
+                    {MULT_CHAR}
+                    {count}
+                  </span>
+                  <span
+                    className={`text-sm font-bold tabular-nums ${
+                      delta > 0
+                        ? 'text-emerald-400'
+                        : delta < 0
+                          ? 'text-red-400'
+                          : 'text-mj-bone/40'
+                    }`}
+                  >
+                    {delta > 0 ? '+' : ''}
+                    {delta}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Viewer's own hand — always visible so they can count their bonus tiles */}
         {myHand.length > 0 && (
           <div className="w-full max-w-sm">
@@ -302,11 +371,14 @@ function PreGameFlow({
             </p>
             <div className="flex flex-wrap justify-center gap-1">
               {myHand.map((tile, i) => (
-                <MahjongTile
+                <MahjongTile2D
                   key={`${tile}-${i}`}
                   tile={tile}
                   size="xs"
-                  isJing={tile === settlementPreview.settlementTile}
+                  interactive={false}
+                  isJing={
+                    tile === settlementPreview.settlementTile || tile === settlementPreview.nextTile
+                  }
                 />
               ))}
             </div>
@@ -348,7 +420,7 @@ function PreGameFlow({
               <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider">
                 {t('preGameIndicator')}
               </p>
-              <MahjongTile tile={indicator} size="lg" />
+              <MahjongTile2D tile={indicator} size="lg" interactive={false} />
             </div>
           )}
           <div className="text-mj-gold/60 text-2xl self-center">{JING_ARROW}</div>
@@ -357,7 +429,7 @@ function PreGameFlow({
               <p className="text-[10px] text-mj-gold/60 uppercase tracking-wider">
                 {t('preGamePrimary')}
               </p>
-              <MahjongTile tile={primary} size="lg" isJing />
+              <MahjongTile2D tile={primary} size="lg" isJing interactive={false} />
             </div>
           )}
           {secondary && (
@@ -365,7 +437,7 @@ function PreGameFlow({
               <p className="text-[10px] text-mj-gold/40 uppercase tracking-wider">
                 {t('preGameSecondary')}
               </p>
-              <MahjongTile tile={secondary} size="lg" isJing />
+              <MahjongTile2D tile={secondary} size="lg" isJing interactive={false} />
             </div>
           )}
         </div>
@@ -546,10 +618,11 @@ function HandRevealScreen({
                   </div>
                   <div className="flex flex-wrap gap-0.5">
                     {hand.map((tile, j) => (
-                      <MahjongTile
+                      <MahjongTile2D
                         key={`${i}-${tile}-${j}`}
                         tile={tile}
                         size="xs"
+                        interactive={false}
                         isJing={
                           tile === handReveal.jingPrimary || tile === handReveal.jingSecondary
                         }

@@ -292,9 +292,21 @@ export class GameService {
         const seatCounts = state.seats.map(
           (s) => s.hand.filter((t) => t === settlementTile).length,
         ) as [number, number, number, number];
-        const delta = calculateOpeningJingSettlement(settlementTile, state.seats);
+        const delta = calculateOpeningJingSettlement(settlementTile, state.seats, 2);
+        // Indicator tile (wall[1]) also pays 1 pt per copy held
+        const nextTileSeatCounts = state.seats.map(
+          (s) => s.hand.filter((t) => t === nextTile).length,
+        ) as [number, number, number, number];
+        const nextTileDelta = calculateOpeningJingSettlement(nextTile, state.seats, 1);
 
-        const preview: SettlementPreviewPayload = { settlementTile, nextTile, seatCounts, delta };
+        const preview: SettlementPreviewPayload = {
+          settlementTile,
+          nextTile,
+          seatCounts,
+          delta,
+          nextTileSeatCounts,
+          nextTileDelta,
+        };
         session.preGamePhase = 'settlement';
         session.lastSettlementPreview = preview;
 
