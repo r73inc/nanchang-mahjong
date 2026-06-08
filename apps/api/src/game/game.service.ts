@@ -23,6 +23,7 @@ import {
   calculateOpeningJingSettlement,
   isWinningHand,
   typeOf,
+  stepAbove,
 } from '@nanchang/engine';
 import type {
   TileType,
@@ -31,6 +32,7 @@ import type {
   WinPaymentResult,
   HandType,
   SeatState,
+  Meld,
 } from '@nanchang/engine';
 import type {
   RoomSettings,
@@ -287,13 +289,15 @@ export class GameService {
         const state = session.engine.state;
         if (state.wall.length < 2) return this.emitError(socket, 'ENGINE_ERROR');
         const settlementTile = typeOf(state.wall[0]);
-        // wall[1] is the indicator tile (上精) that will become jingIndicator
-        const nextTile = typeOf(state.wall[1]);
+        // "Next in sequence" tile = stepAbove(wall[0]). It is NEVER physically removed from
+        // the wall — wall[1] stays as-is (jing indicator only). The 1pt bonus is purely
+        // derived from each player's initial hand count of this tile type.
+        const nextTile = stepAbove(settlementTile);
         const seatCounts = state.seats.map(
           (s) => s.hand.filter((t) => t === settlementTile).length,
         ) as [number, number, number, number];
         const delta = calculateOpeningJingSettlement(settlementTile, state.seats, 2);
-        // Indicator tile (wall[1]) also pays 1 pt per copy held
+        // Next-in-sequence tile pays 1 pt per copy held
         const nextTileSeatCounts = state.seats.map(
           (s) => s.hand.filter((t) => t === nextTile).length,
         ) as [number, number, number, number];
@@ -930,6 +934,7 @@ export class GameService {
         TileType[],
         TileType[],
       ],
+      openMelds: state.seats.map((s) => [...s.openMelds]) as [Meld[], Meld[], Meld[], Meld[]],
       jingPrimary: state.jingPrimary,
       jingSecondary: state.jingSecondary,
       spiritCounts,

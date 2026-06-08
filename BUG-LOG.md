@@ -328,6 +328,64 @@ matters. Keep `-inMemory` only for CI/test pipeline runs.
 
 ---
 
+## Branch `feat/hand-reveal-flow` — live family testing (2026-06-08)
+
+Bugs and improvements discovered during family testing of the hand-reveal-flow feature.
+
+---
+
+### BUG-017 · Settlement 1pt tile used `wall[1]` instead of next-in-sequence from `wall[0]`
+
+**Symptom:** The smaller "1 pt each" indicator tile shown beside the settlement tile on the pre-game settlement screen was whatever happened to be at `wall[1]` (the jing indicator tile), not the tile one step above the settlement tile in sequence. E.g., if settlement = 8-dot, the 1pt tile was some random wall tile instead of 9-dot.
+
+**Root cause:** The engine's `revealJing()` called `calculateOpeningJingSettlement(indicator, seats, 1)` where `indicator = typeOf(wall[1])`. The service's `handleAdvancePreGame()` also set `nextTile = typeOf(state.wall[1])`. Both treated the jing indicator tile as the 1pt bonus tile. In reality, the 1pt bonus tile is always the tile ONE STEP ABOVE the settlement tile in its suit/category (identical logic to how the jing secondary spirit is derived from the indicator). `wall[1]` is only consumed to determine jing wildcards — it is never scored at 1pt.
+
+**Fix:** In `engine.ts`, replaced `calculateOpeningJingSettlement(indicator, seats, 1)` with `calculateOpeningJingSettlement(stepAbove(settlementTile), seats, 1)`. In `game.service.ts`, replaced `nextTile = typeOf(state.wall[1])` with `nextTile = stepAbove(typeOf(state.wall[0]))` (importing `stepAbove` from `@nanchang/engine`). The `wall[1]` tile remains in the wall unchanged — only `wall[0]` is tucked to the bottom and only `wall[1]` is consumed as the jing indicator.
+
+**Learning:** In the ruleTopBottomJing flow there are three distinct tiles: `wall[0]` (settlement, 2pt), the derived "next-in-sequence" (1pt — never physically removed), and `wall[1]` (consumed as jing indicator only, zero scoring). Don't conflate the jing indicator (`wall[1]`) with the 1pt bonus tile (always `stepAbove(wall[0])`).
+
+---
+
+### BUG-018 · Wildcards (jing tiles) offered freely in pung/chow claim windows
+
+**Symptom:** During gameplay, players were offered pung and chow calls that used jing (wildcard) tiles to fill meld positions. Players accepted these calls. Per Nanchang Mahjong rules, wildcards may ONLY be used in an open meld (pung/chow) if doing so would allow the player to win the game; otherwise wildcards must stay concealed in the hand.
+
+**Root cause:** `computeEligibleClaims()` in `claim-resolver.ts` called `canPung(hand, pendingDiscard, jingTypes)` and `chowOptions(hand, pendingDiscard, jingTypes)` without filtering out jing-dependent melds. Both engine functions correctly report eligibility (including jing assistance) for the general Mahjong case, but the family rules prohibit jing in open melds except to win.
+
+**Fix:** In `computeEligibleClaims()`, added `separateJing` to determine how many natural copies of the discarded tile each seat holds. Pung is only offered when ≥2 naturals exist (no jing needed). Chow sequences are filtered to remove any that require a jing tile to fill a position. The `canWin` path is unchanged — jing tiles continue to work freely for win declarations.
+
+**Learning:** Engine-level eligibility functions are general-purpose and rule-agnostic. Family-specific rule restrictions (like "no jing in open melds") must be applied as a post-filter in the claim resolver, not inside the engine functions. Always check family rules at the claim-resolver boundary.
+
+---
+
+### BUG-019 · Open meld tiles stored as substituted type instead of actual wildcard type
+
+**Symptom:** When a player formed a pung or chow using a jing (wildcard) tile to substitute, the meld was stored and displayed as all copies of the discarded tile (e.g., `[3p, 3p, 3p]` even when one was actually `3m` acting as a jing). The wildcard tile's identity was "transformed" to look like the substituted tile.
+
+**Root cause:** `engine.ts pung()` always stored `{ kind: 'pung', tiles: [tile, tile, tile] }` using the discarded tile type for all three positions, discarding any jing tile's actual identity. `chow()` stored `sequence` verbatim, which contains the "logical" tile types (e.g., `3m` for the position a jing was filling) — which happened to be coincidentally correct for chow, but the jing substitution was invisible in the meld record.
+
+**Fix (deferred — superseded by BUG-018 fix):** After BUG-018 is fixed, jing-assisted pung/chow are no longer offered in regular play. No meld storage fix required for pung/chow. Documented for future reference if kong or other meld types exhibit the same pattern.
+
+**Learning:** Meld tiles arrays must store the PHYSICAL tile type actually in the player's hand, not the logical tile type the wildcard is standing in for. Wildcards should remain identifiable as wildcards in all downstream data structures (display, spirit settlement, replay).
+
+---
+
+### IMPROVEMENT-001 · Spirit tile screen showed redundant indicator tile
+
+**Observation:** The "Spirit Tiles" pre-game step displayed three tiles: Indicator → Primary Spirit → Secondary Spirit. The indicator is already visible on the previous Settlement step and is just scaffolding — players only care about the primary and secondary spirit wildcards.
+
+**Fix:** Removed the indicator tile and arrow from the jing step in `PreGameFlow`. Now shows only Primary Spirit and Secondary Spirit tiles (mirroring the clean two-tile layout of the Settlement step).
+
+---
+
+### IMPROVEMENT-002 · Hand reveal screen did not show open melds
+
+**Observation:** The post-hand reveal screen showed each player's concealed hand but not their open melds (pungs, chows, kongs). This made it impossible to see the full hand picture (especially for the winner).
+
+**Fix:** Added `openMelds: [Meld[], Meld[], Meld[], Meld[]]` to `HandRevealPayload`. Service populates it from `state.seats[i].openMelds` in `handleHandEnd()`. `HandRevealScreen` now renders open melds as labeled tile groups above each player's concealed hand tiles.
+
+---
+
 ## Template for future entries
 
 ```

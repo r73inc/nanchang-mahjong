@@ -32,6 +32,7 @@ import type {
   GameEndedPayload,
   SettlementPreviewPayload,
   HandRevealPayload,
+  Meld,
 } from '@nanchang/shared';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
@@ -58,6 +59,13 @@ const ICON_CLOSE = '✕' as const;
 const JING_CHAR = '节' as const;
 const JING_ARROW = '→' as const;
 const MULT_CHAR = '×' as const;
+// Module-level meld kind label (no-literal-string safe).
+const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
+  pung: 'PUNG',
+  chow: 'CHOW',
+  kong: 'KONG',
+} as const;
+
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
   south: '#a36d3e',
@@ -399,7 +407,6 @@ function PreGameFlow({
 
   // ── Step 3: Jing wildcards revealed ────────────────────────────────────────
   if (phase === 'jing') {
-    const indicator = snapshot.jingIndicator;
     const primary = snapshot.jingPrimary;
     const secondary = snapshot.jingSecondary;
     return (
@@ -412,39 +419,30 @@ function PreGameFlow({
             {t('gameSpirit')}
           </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('gameSpiritTiles')}</h1>
+          <p className="text-sm text-mj-bone/50 mt-1">
+            {t('gameSpiritDesc', primary ?? '', secondary ?? '')}
+          </p>
         </div>
 
-        <div className="flex items-center justify-center gap-6 flex-wrap">
-          {indicator && (
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider">
-                {t('preGameIndicator')}
-              </p>
-              <MahjongTile2D tile={indicator} size="lg" interactive={false} />
-            </div>
-          )}
-          <div className="text-mj-gold/60 text-2xl self-center">{JING_ARROW}</div>
+        {/* Just show primary and secondary spirit tiles — no indicator needed */}
+        <div className="flex items-end justify-center gap-6 flex-wrap">
           {primary && (
             <div className="flex flex-col items-center gap-2">
-              <p className="text-[10px] text-mj-gold/60 uppercase tracking-wider">
+              <MahjongTile2D tile={primary} size="lg" isJing interactive={false} />
+              <p className="text-[10px] text-mj-gold/70 font-bold uppercase tracking-wider">
                 {t('preGamePrimary')}
               </p>
-              <MahjongTile2D tile={primary} size="lg" isJing interactive={false} />
             </div>
           )}
           {secondary && (
             <div className="flex flex-col items-center gap-2">
-              <p className="text-[10px] text-mj-gold/40 uppercase tracking-wider">
+              <MahjongTile2D tile={secondary} size="lg" isJing interactive={false} />
+              <p className="text-[10px] text-mj-gold/50 font-bold uppercase tracking-wider">
                 {t('preGameSecondary')}
               </p>
-              <MahjongTile2D tile={secondary} size="lg" isJing interactive={false} />
             </div>
           )}
         </div>
-
-        <p className="text-sm text-mj-bone/50 max-w-[260px]">
-          {t('gameSpiritDesc', primary ?? '', secondary ?? '')}
-        </p>
 
         {isHost ? (
           <GoldButton onClick={onAdvance}>{t('preGameStartGame')} →</GoldButton>
@@ -600,6 +598,7 @@ function HandRevealScreen({
               const wind = snapshot.seats[i].wind;
               const isViewer = i === viewerSeat;
               const isWinner = i === handReveal.winnerSeat;
+              const melds = handReveal.openMelds[i] ?? [];
               return (
                 <div
                   key={i}
@@ -616,6 +615,35 @@ function HandRevealScreen({
                       </span>
                     )}
                   </div>
+
+                  {/* Open melds (pung / chow / kong) */}
+                  {melds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {melds.map((meld, mi) => (
+                        <div key={mi} className="flex flex-col items-center gap-0.5">
+                          <div className="flex gap-0.5">
+                            {meld.tiles.map((tile, ti) => (
+                              <MahjongTile2D
+                                key={`m${i}-${mi}-${ti}`}
+                                tile={tile}
+                                size="xs"
+                                interactive={false}
+                                isJing={
+                                  tile === handReveal.jingPrimary ||
+                                  tile === handReveal.jingSecondary
+                                }
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[8px] text-mj-bone/30 uppercase tracking-wider">
+                            {MELD_KIND_LABEL[meld.kind]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Concealed hand */}
                   <div className="flex flex-wrap gap-0.5">
                     {hand.map((tile, j) => (
                       <MahjongTile2D

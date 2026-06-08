@@ -202,6 +202,8 @@ export interface SettlementPreviewPayload {
 export interface HandRevealPayload {
   /** All four hands fully revealed (including the winner's and opponents'). */
   hands: [TileType[], TileType[], TileType[], TileType[]];
+  /** All four players' open melds (pungs, chows, kongs) for the full hand picture. */
+  openMelds: [Meld[], Meld[], Meld[], Meld[]];
   jingPrimary: TileType | null;
   jingSecondary: TileType | null;
   /** Per-player spirit tile counts (for the settlement breakdown display). */
