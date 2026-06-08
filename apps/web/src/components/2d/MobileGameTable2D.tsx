@@ -10,7 +10,7 @@
  *
  *   ┌─────────────────────────────────────────────────────┐  ← ~812 px wide
  *   │ [status bar managed by game-page.tsx z-10 overlay]  │
- *   │             [TopBadge — horizontally centred]        │
+ *   │ [PlayerBadge TL]  [TopBadge — horizontally centred] │
  *   │                                                      │
  *   │ [LeftBadge]  [CombinedDiscardPool/MobileDiscardPool] [RightBadge]
  *   │              [round wind watermark beneath]          │
@@ -19,9 +19,19 @@
  *   │  ━━━━━━━━━━━[PlayerHand — full width]━━━━━━━━━━━━  │
  *   └─────────────────────────────────────────────────────┘  ← ~375 px tall
  *
- * Drag is disabled on PlayerHand2D (disableDrag={true}) because CSS rotate(90deg)
- * swaps the physical X/Y axes making Framer Motion drag coordinates incorrect.
- * Players use tap-to-select → tap-to-discard exclusively on mobile.
+ * Drag-and-drop reordering:
+ *  - native-landscape: coordinates are correct as-is (device rotated natively).
+ *  - css-landscape:    MotionConfig.transformPagePoint remaps physical portrait
+ *    touch coordinates to the rotated visual space so drag tracks correctly.
+ *    Formula: physical (px, py) → visual (py, −px) for a 90° CW rotation.
+ *
+ * PlayerHand2D uses confirmMode=true so a separate floating "Discard" button
+ * is required to fire a discard — dragging never accidentally discards a tile.
+ *
+ * Item 1 audit: SeatLabel2D is NOT used in this component. OpponentBadge2D
+ * provides all opponent info. Any prior duplicate-badge symptom was caused by
+ * the orientation hook returning 'desktop' for phones in landscape (fixed in
+ * PR #64 by navigator.maxTouchPoints detection).
  */
 
 import { MotionConfig } from 'framer-motion';
@@ -31,6 +41,7 @@ import { useGameStore } from '../../stores/game.store';
 import { DiscardContext } from './DiscardContext';
 import { useState } from 'react';
 import { FeltSurface2D } from './FeltSurface2D';
+import { MobilePlayerBadge2D } from './MobilePlayerBadge2D';
 import { OpponentBadge2D } from './OpponentBadge2D';
 import { MobileDiscardPool2D } from './MobileDiscardPool2D';
 import { OpenMelds2D } from './OpenMelds2D';
@@ -39,6 +50,22 @@ import { PlayerHand2D } from './PlayerHand2D';
 // ── Module-level constants ────────────────────────────────────────────────────
 
 const REDUCED_MOTION = 'user' as const;
+
+/**
+ * Touch coordinate transform for css-landscape mode.
+ *
+ * ForcedLandscapeWrapper applies rotate(90deg) clockwise, which maps:
+ *   physical Y axis (portrait, downward)  → visual X axis (landscape, rightward)
+ *   physical X axis (portrait, rightward) → visual Y axis (landscape, downward, inverted)
+ *
+ * So a finger dragged physically downward moves a tile visually to the right.
+ * Passing this to MotionConfig.transformPagePoint corrects Framer Motion's
+ * drag tracking for all Reorder.Group/Item descendants.
+ */
+const CSS_LANDSCAPE_POINT_TRANSFORM = (point: { x: number; y: number }) => ({
+  x: point.y,
+  y: -point.x,
+});
 
 /** Width reserved on each side for left/right opponent badges. */
 const BADGE_W = 52;
@@ -98,11 +125,18 @@ function RoundWatermark() {
 
 export interface MobileGameTable2DProps {
   onDiscard: (tile: TileType) => void;
+  /**
+   * True when the parent ForcedLandscapeWrapper is active (mode === 'css-landscape').
+   * Injects transformPagePoint into MotionConfig so Framer Motion drag tracking
+   * correctly maps physical portrait touch coordinates to the rotated visual space.
+   * False for native-landscape (device rotated natively; coordinates are correct).
+   */
+  isCssLandscape?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MobileGameTable2D({ onDiscard }: MobileGameTable2DProps) {
+export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileGameTable2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
 
   // ── Discard-flight context ────────────────────────────────────────────────
@@ -115,7 +149,15 @@ export function MobileGameTable2D({ onDiscard }: MobileGameTable2DProps) {
 
   return (
     <DiscardContext.Provider value={{ lastDiscardId, setLastDiscardId }}>
-      <MotionConfig reducedMotion={REDUCED_MOTION}>
+      {/*
+       * transformPagePoint corrects Framer Motion drag coordinates for
+       * css-landscape mode (ForcedLandscapeWrapper rotates content 90° CW).
+       * Omitted in native-landscape (device is physically rotated; coords are fine).
+       */}
+      <MotionConfig
+        reducedMotion={REDUCED_MOTION}
+        transformPagePoint={isCssLandscape ? CSS_LANDSCAPE_POINT_TRANSFORM : undefined}
+      >
         <div
           data-testid="mobile-game-table-2d"
           style={{ position: 'relative', width: '100%', height: '100%' }}
@@ -125,6 +167,20 @@ export function MobileGameTable2D({ onDiscard }: MobileGameTable2DProps) {
 
           {/* ── Round watermark — decorative centred behind discard pool ── */}
           <RoundWatermark />
+
+          {/* ── Viewer self-badge — top-left, below status bar ───────────── */}
+          {/* Moves the player's own wind/score out of the hand strip so the  */}
+          {/* bottom edge stays fully clear for the interactive tile row.      */}
+          <div
+            style={{
+              position: 'absolute',
+              top: STATUS_H + 8,
+              left: `calc(4px + var(--mj-safe-left, 0px))`,
+              zIndex: 2,
+            }}
+          >
+            <MobilePlayerBadge2D />
+          </div>
 
           {/* ── Top opponent badge ───────────────────────────────────────── */}
           <div
@@ -199,9 +255,10 @@ export function MobileGameTable2D({ onDiscard }: MobileGameTable2DProps) {
           </div>
 
           {/* ── Viewer hand — full width, pins to bottom ─────────────────── */}
-          {/* disableDrag={true}: CSS rotation makes Framer Motion drag        */}
-          {/* coordinates incorrect (physical X/Y axes are swapped 90°).      */}
-          {/* Players use tap-to-select → tap-to-discard exclusively.         */}
+          {/* confirmMode=true: drag freely reorders tiles (coordinate fix     */}
+          {/* applied via MotionConfig.transformPagePoint for css-landscape).   */}
+          {/* A floating "Discard" button above the selected tile is the only   */}
+          {/* way to fire a discard — no accidental discard during sorting.     */}
           <div
             style={{
               position: 'absolute',
@@ -211,7 +268,7 @@ export function MobileGameTable2D({ onDiscard }: MobileGameTable2DProps) {
               zIndex: 3,
             }}
           >
-            <PlayerHand2D onDiscard={onDiscard} disableDrag />
+            <PlayerHand2D onDiscard={onDiscard} confirmMode />
           </div>
         </div>
       </MotionConfig>
