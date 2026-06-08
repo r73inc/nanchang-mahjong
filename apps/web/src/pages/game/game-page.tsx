@@ -19,7 +19,7 @@
  * accessible interface).
  */
 
-import { useNavigate, useParams, useSearchParams, useBlocker } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
@@ -631,50 +631,6 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
             style={{ background: '#c0392b', color: '#f5efdf' }}
           >
             {t('gameConcedeConfirm')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Leave-game confirmation sheet — slides up from the bottom when the player
- * attempts to navigate away (back button / link) during an active hand.
- *
- * Uses `position:fixed` so it overlays the entire viewport regardless of
- * where in the component tree it is mounted (z-60, above ReconnectingOverlay).
- */
-function LeaveGameSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
-    >
-      <div
-        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
-        role="dialog"
-        aria-label={t('gameLeaveTitle')}
-        aria-modal="true"
-      >
-        <h2 className="font-bold text-lg text-mj-bone">{t('gameLeaveTitle')}</h2>
-        <p className="text-sm text-mj-bone/60">{t('gameLeaveDesc')}</p>
-        <div className="flex gap-3 mt-2">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
-          >
-            {t('gameLeaveCancel')}
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-3 rounded-xl font-bold text-sm"
-            style={{ background: '#c0392b', color: '#f5efdf' }}
-          >
-            {t('gameLeaveConfirm')}
           </button>
         </div>
       </div>
@@ -1584,10 +1540,20 @@ export function GamePage() {
 
   const isActiveGame = snapshot?.phase === 'playing' || snapshot?.phase === 'awaiting_claims';
 
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      isActiveGame && currentLocation.pathname !== nextLocation.pathname,
-  );
+  // Warn before the browser tab is closed / refreshed during an active hand.
+  // Note: useBlocker (React Router's in-app navigation blocker) requires a
+  // data router (createBrowserRouter) which this app does not use. Replacing
+  // it with a beforeunload handler covers the page-close case; in-app back
+  // navigation during a game is allowed to proceed without a confirmation
+  // dialog until we migrate to a data router.
+  useEffect(() => {
+    if (!isActiveGame) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isActiveGame]);
 
   if (!gameId) {
     return <LoadingScreen />;
@@ -1648,17 +1614,6 @@ export function GamePage() {
       )}
 
       {connection === 'reconnecting' && <ReconnectingOverlay />}
-
-      {/* ── Leave-game confirmation (back-button intercept) ─────────────── */}
-      {blocker.state === 'blocked' && (
-        <LeaveGameSheet
-          onConfirm={() => {
-            localStorage.removeItem(ACTIVE_GAME_KEY);
-            blocker.proceed();
-          }}
-          onCancel={() => blocker.reset()}
-        />
-      )}
     </>
   );
 }
