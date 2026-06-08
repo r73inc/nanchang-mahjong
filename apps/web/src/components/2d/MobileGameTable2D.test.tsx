@@ -15,10 +15,11 @@ vi.mock('../../stores/game.store', () => ({ useGameStore: vi.fn() }));
 const mockUseGameStore = vi.mocked(useGameStore);
 
 vi.mock('../../stores/auth.store', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useAuthStore: vi
     .fn()
-    .mockImplementation((sel: (s: any) => unknown) => sel({ user: { displayName: 'TestPlayer' } })),
+    .mockImplementation((sel: (s: { user: { displayName: string } | null }) => unknown) =>
+      sel({ user: { displayName: 'TestPlayer' } }),
+    ),
 }));
 
 // ── Framer Motion passthrough ─────────────────────────────────────────────────
@@ -120,20 +121,6 @@ describe('MobileGameTable2D', () => {
     setupStore(makeSnapshot());
     renderMobileTable();
     expect(screen.getByTestId('mobile-score-strip')).toBeInTheDocument();
-  });
-
-  it("MobileTable·turn-indicator-shown: turn indicator is visible on the viewer's turn", () => {
-    // viewerSeat=0, currentSeat=0, phase='playing' → isMyTurn
-    setupStore(makeSnapshot({ viewerSeat: 0, currentSeat: 0, phase: 'playing' }));
-    renderMobileTable();
-    expect(screen.getByTestId('mobile-turn-indicator')).toBeInTheDocument();
-  });
-
-  it("MobileTable·turn-indicator-hidden: turn indicator absent when it is not the viewer's turn", () => {
-    // viewerSeat=0, currentSeat=1 → not isMyTurn
-    setupStore(makeSnapshot({ viewerSeat: 0, currentSeat: 1, phase: 'playing' }));
-    renderMobileTable();
-    expect(screen.queryByTestId('mobile-turn-indicator')).toBeNull();
   });
 
   it('MobileTable·no-legacy-pills: SeatLabel2D pill elements are absent from the mobile layout', () => {

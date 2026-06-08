@@ -70,7 +70,6 @@ const CSS_LANDSCAPE_POINT_TRANSFORM = (point: { x: number; y: number }) => ({
 
 // ── i18n key constants (avoids i18next/no-literal-string on JSX text nodes) ──
 
-const I18N_TURN_INDICATOR = 'mobileTurnIndicator' as const;
 const I18N_SCORE_STRIP = 'mobileScoreStrip' as const;
 
 /** Width reserved on each side for left/right opponent badges. */
@@ -175,7 +174,6 @@ export interface MobileGameTable2DProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileGameTable2DProps) {
-  const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
 
   // ── Discard-flight context ────────────────────────────────────────────────
@@ -184,7 +182,6 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
   if (!snapshot) return null;
 
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
-  const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const { right: rightSeat, across: acrossSeat, left: leftSeat } = getCompassSeats(viewerSeat);
 
   return (
@@ -207,36 +204,6 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
 
           {/* ── Round watermark — decorative centred behind discard pool ── */}
           <RoundWatermark />
-
-          {/* ── Turn indicator — top-left, below status bar ─────────────── */}
-          {/* Shown only when it is the viewer's active turn. "[ Your Turn ]" */}
-          {/* / "[ 你的回合 ]". Replaces the old MobilePlayerBadge2D that was  */}
-          {/* previously pinned here. Score/name move to the score strip above */}
-          {/* the hand tiles (see below).                                       */}
-          {isMyTurn && (
-            <div
-              data-testid="mobile-turn-indicator"
-              style={{
-                position: 'absolute',
-                top: STATUS_H + 8,
-                left: `calc(4px + var(--mj-safe-left, 0px))`,
-                zIndex: 2,
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '3px 8px',
-                borderRadius: 6,
-                background: 'rgba(201,169,97,0.18)',
-                border: '1px solid rgba(201,169,97,0.55)',
-                color: '#c9a961',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                pointerEvents: 'none',
-              }}
-            >
-              {t(I18N_TURN_INDICATOR)}
-            </div>
-          )}
 
           {/* ── Top opponent badge ───────────────────────────────────────── */}
           <div

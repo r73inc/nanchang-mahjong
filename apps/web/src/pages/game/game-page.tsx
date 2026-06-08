@@ -48,6 +48,8 @@ const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '
 // Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
 const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
+const JING_CHAR = '节' as const;
+const JING_ARROW = '→' as const;
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
   south: '#a36d3e',
@@ -1145,6 +1147,90 @@ function GameHistoryPanel({
 const JING_CHIP_ARIA = 'Spirit tile – tap to enlarge' as const;
 
 /**
+ * Mobile-only spirit tile button shown in the status bar.
+ *
+ * A compact "节" chip (gold serif, always visible when jing is revealed).
+ * Tapping it opens a full-screen overlay showing the jing indicator tile and
+ * all primary/secondary spirit tiles at large size. Tapping the overlay
+ * closes it. Uses position:fixed so it covers the full viewport on both
+ * native-landscape and css-landscape devices.
+ */
+function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  if (!snapshot.jingPrimary) return null;
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label={t('gameSpirit')}
+        style={{
+          background: 'rgba(201,169,97,0.12)',
+          border: '1px solid rgba(201,169,97,0.3)',
+          borderRadius: 4,
+          padding: '1px 5px',
+          color: '#c9a961',
+          fontSize: 11,
+          fontFamily: 'serif',
+          fontWeight: 700,
+          cursor: 'pointer',
+          lineHeight: 1.4,
+          flexShrink: 0,
+        }}
+      >
+        {JING_CHAR}
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 flex flex-col items-center justify-center gap-4"
+          style={{ zIndex: 70, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setOpen(false)}
+        >
+          <p
+            className="text-[10px] tracking-widest uppercase"
+            style={{ color: 'rgba(201,169,97,0.7)' }}
+          >
+            {t('gameSpiritTiles')}
+          </p>
+          <div className="flex gap-4 items-center">
+            {snapshot.jingIndicator && (
+              <MahjongTile2D
+                tile={snapshot.jingIndicator}
+                size="lg"
+                role="bottom"
+                interactive={false}
+              />
+            )}
+            <span style={{ color: 'rgba(245,239,223,0.3)', fontSize: 20 }}>{JING_ARROW}</span>
+            <MahjongTile2D
+              tile={snapshot.jingPrimary}
+              size="lg"
+              role="bottom"
+              isJing
+              interactive={false}
+            />
+            {snapshot.jingSecondary && (
+              <MahjongTile2D
+                tile={snapshot.jingSecondary}
+                size="lg"
+                role="bottom"
+                isJing
+                interactive={false}
+              />
+            )}
+          </div>
+          <p className="text-[9px]" style={{ color: 'rgba(245,239,223,0.25)' }}>
+            {t('gameSpirit')}
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
  * Spirit tile chip shown in the top status bar.
  *
  * Uses MahjongTile2D (SVG textures) instead of the old text-glyph MahjongTile.
@@ -1314,9 +1400,7 @@ function GameTable({
   };
 
   return (
-    <div
-      className={`mj-game-surface relative w-full h-dvh overflow-hidden bg-black${isMyTurn ? ' mj-turn-border-glow' : ''}`}
-    >
+    <div className="mj-game-surface relative w-full h-dvh overflow-hidden bg-black">
       {/* ── Table renderer — fills entire screen ──────────────────────────── */}
       {/* Branched on snapshot.viewMode set by the host before game start.    */}
       {/* All overlays (z-10+) are identical in both modes.                   */}
@@ -1335,6 +1419,19 @@ function GameTable({
           <GameCanvas />
         )}
       </div>
+
+      {/* ── Active-turn border glow — transparent overlay, above the table ── */}
+      {/* Applied ABOVE FeltSurface2D (which would cover an inset box-shadow   */}
+      {/* applied directly to the root div). pointer-events:none so no clicks  */}
+      {/* are intercepted. z-5 sits between the game table (z-auto) and the    */}
+      {/* status bar (z-10).                                                    */}
+      {isMyTurn && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none mj-turn-border-glow"
+          style={{ zIndex: 5 }}
+        />
+      )}
 
       {/* ── Status bar ─────────────────────────────────────────────────────── */}
       <div
@@ -1361,12 +1458,18 @@ function GameTable({
             {WIND_CHAR[snapshot.roundWind]}
             {!isMobile && <> {t('gameRound')}</>}
           </span>
-          {!isMobile && snapshot.jingPrimary && (
-            <div className="flex items-center gap-1">
-              <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
-              <JingTileChip tile={snapshot.jingPrimary} />
-              {snapshot.jingSecondary && <JingTileChip tile={snapshot.jingSecondary} />}
-            </div>
+          {isMobile ? (
+            // Mobile: compact "节" button → taps to show full spirit tile overlay
+            <MobileJingButton snapshot={snapshot} />
+          ) : (
+            // Desktop: always-visible xs tile chips in the status bar
+            snapshot.jingPrimary && (
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
+                <JingTileChip tile={snapshot.jingPrimary} />
+                {snapshot.jingSecondary && <JingTileChip tile={snapshot.jingSecondary} />}
+              </div>
+            )
           )}
         </div>
 
@@ -1432,29 +1535,36 @@ function GameTable({
       <SeatHUD snapshot={snapshot} />
 
       {/* ── Turn indicator ────────────────────────────────────────────────── */}
-      {/* 3D: bottom-40 sits above the ViewerHandHUD (~80 px gradient).      */}
-      {/* 2D: bottom-2 sits inside the board's own bottom zone.              */}
-      <div
-        className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
-      >
-        <span
-          className="text-[11px] font-bold px-3 py-1 rounded-full"
-          style={{
-            background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
-            color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
-            border: isMyTurn ? '1px solid rgba(201,169,97,0.4)' : '1px solid rgba(245,239,223,0.1)',
-          }}
+      {/* Hidden on mobile: the viewport-wide glow (mj-turn-border-glow) is   */}
+      {/* the turn signal for mobile players. The bottom pill at bottom-2      */}
+      {/* would sit directly on top of the hand tile row.                      */}
+      {/* 3D: bottom-40 sits above the ViewerHandHUD (~80 px gradient).        */}
+      {/* 2D: bottom-2 sits inside the board's own bottom zone.                */}
+      {!isMobile && (
+        <div
+          className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
         >
-          {isMyTurn
-            ? t('gameYourTurn')
-            : `${WIND_CHAR[snapshot.seats[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
-        </span>
-        {!isMyTurn && snapshot.viewerSeat !== null && (
-          <span className="text-[9px] text-mj-bone/30">
-            {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
+          <span
+            className="text-[11px] font-bold px-3 py-1 rounded-full"
+            style={{
+              background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
+              color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
+              border: isMyTurn
+                ? '1px solid rgba(201,169,97,0.4)'
+                : '1px solid rgba(245,239,223,0.1)',
+            }}
+          >
+            {isMyTurn
+              ? t('gameYourTurn')
+              : `${WIND_CHAR[snapshot.seats[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
           </span>
-        )}
-      </div>
+          {!isMyTurn && snapshot.viewerSeat !== null && (
+            <span className="text-[9px] text-mj-bone/30">
+              {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
       {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
