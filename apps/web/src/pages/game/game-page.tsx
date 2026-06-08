@@ -226,9 +226,10 @@ function PreGameFlow({
   if (phase === 'settlement' && settlementPreview) {
     return (
       <div
-        className="flex flex-col items-center justify-center gap-8 min-h-dvh px-6 text-center bg-mj-bg-page"
+        className="flex flex-col items-center gap-6 min-h-dvh px-6 py-8 text-center bg-mj-bg-page overflow-y-auto"
         aria-label={t('preGameSettlementTitle')}
       >
+        {/* Header */}
         <div>
           <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
             {t('preGameBonusTile')}
@@ -239,10 +240,23 @@ function PreGameFlow({
           <p className="text-sm text-mj-bone/50 mt-1">{t('preGameSettlementDesc')}</p>
         </div>
 
-        <div className="flex flex-col items-center gap-3">
-          <MahjongTile tile={settlementPreview.settlementTile} size="lg" isJing />
+        {/* Settlement tile (large) + indicator tile (small) */}
+        <div className="flex items-end justify-center gap-4">
+          <div className="flex flex-col items-center gap-2">
+            <MahjongTile tile={settlementPreview.settlementTile} size="lg" isJing />
+            <p className="text-[10px] text-mj-gold/70 font-bold uppercase tracking-wider">
+              {t('preGameBonusTile2pt')}
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-2 pb-1">
+            <MahjongTile tile={settlementPreview.nextTile} size="sm" />
+            <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider">
+              {t('preGameIndicatorHint')}
+            </p>
+          </div>
         </div>
 
+        {/* Per-player score preview */}
         <div className="flex flex-col gap-2 w-full max-w-xs">
           {settlementPreview.delta.map((delta, i) => {
             const wind = snapshot.seats[i].wind;
@@ -279,6 +293,25 @@ function PreGameFlow({
             );
           })}
         </div>
+
+        {/* Viewer's own hand — always visible so they can count their bonus tiles */}
+        {myHand.length > 0 && (
+          <div className="w-full max-w-sm">
+            <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider mb-2">
+              {t('preGameYourHand')}
+            </p>
+            <div className="flex flex-wrap justify-center gap-1">
+              {myHand.map((tile, i) => (
+                <MahjongTile
+                  key={`${tile}-${i}`}
+                  tile={tile}
+                  size="xs"
+                  isJing={tile === settlementPreview.settlementTile}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {isHost ? (
           <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
@@ -2124,8 +2157,11 @@ export function GamePage() {
         />
       )}
 
-      {/* ── Pre-game reveal flow (jing_reveal phase) ─────────────────────── */}
-      {!handReveal && snapshot.phase === 'jing_reveal' && (
+      {/* ── Pre-game reveal flow ──────────────────────────────────────────── */}
+      {/* Shown whenever preGamePhase is not null — this covers both the         */}
+      {/* jing_reveal engine phase (hands/settlement steps) AND the playing      */}
+      {/* engine phase with preGamePhase='jing' (jing step after revealJing).   */}
+      {!handReveal && snapshot.preGamePhase !== null && (
         <PreGameFlow
           snapshot={snapshot}
           settlementPreview={settlementPreview}
@@ -2135,23 +2171,26 @@ export function GamePage() {
       )}
 
       {/* ── Active game table ─────────────────────────────────────────────── */}
-      {!handReveal && (snapshot.phase === 'playing' || snapshot.phase === 'awaiting_claims') && (
-        <GameTable
-          snapshot={snapshot}
-          selectedTileIdx={selectedTileIdx}
-          claimWindow={claimWindow}
-          toast={toast}
-          pendingMove={pendingMove}
-          onSelect={selectTile}
-          onDiscard={discard}
-          onClaim={claim}
-          onPass={pass}
-          onConcede={concede}
-        />
-      )}
+      {/* Only rendered when the pre-game sequence is complete (preGamePhase=null). */}
+      {!handReveal &&
+        snapshot.preGamePhase === null &&
+        (snapshot.phase === 'playing' || snapshot.phase === 'awaiting_claims') && (
+          <GameTable
+            snapshot={snapshot}
+            selectedTileIdx={selectedTileIdx}
+            claimWindow={claimWindow}
+            toast={toast}
+            pendingMove={pendingMove}
+            onSelect={selectTile}
+            onDiscard={discard}
+            onClaim={claim}
+            onPass={pass}
+            onConcede={concede}
+          />
+        )}
 
       {/* ── Session end screen ────────────────────────────────────────────── */}
-      {!handReveal && snapshot.phase === 'finished' && (
+      {!handReveal && snapshot.preGamePhase === null && snapshot.phase === 'finished' && (
         <GameEndScreen
           snapshot={snapshot}
           ended={ended}
@@ -2163,10 +2202,10 @@ export function GamePage() {
 
       {/* ── Loading / dealing ─────────────────────────────────────────────── */}
       {!handReveal &&
-        (snapshot.phase === 'dealing' ||
-          !['jing_reveal', 'playing', 'awaiting_claims', 'finished'].includes(snapshot.phase)) && (
-          <LoadingScreen />
-        )}
+        snapshot.preGamePhase === null &&
+        snapshot.phase !== 'playing' &&
+        snapshot.phase !== 'awaiting_claims' &&
+        snapshot.phase !== 'finished' && <LoadingScreen />}
 
       {connection === 'reconnecting' && <ReconnectingOverlay />}
     </>

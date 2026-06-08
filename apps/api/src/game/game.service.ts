@@ -285,14 +285,16 @@ export class GameService {
         // Step 1 (ruleTopBottomJing): compute and broadcast settlement preview.
         // Scores are NOT updated yet — that happens when revealJing() is called.
         const state = session.engine.state;
-        if (state.wall.length < 1) return this.emitError(socket, 'ENGINE_ERROR');
+        if (state.wall.length < 2) return this.emitError(socket, 'ENGINE_ERROR');
         const settlementTile = typeOf(state.wall[0]);
+        // wall[1] is the indicator tile (上精) that will become jingIndicator
+        const nextTile = typeOf(state.wall[1]);
         const seatCounts = state.seats.map(
           (s) => s.hand.filter((t) => t === settlementTile).length,
         ) as [number, number, number, number];
         const delta = calculateOpeningJingSettlement(settlementTile, state.seats);
 
-        const preview: SettlementPreviewPayload = { settlementTile, seatCounts, delta };
+        const preview: SettlementPreviewPayload = { settlementTile, nextTile, seatCounts, delta };
         session.preGamePhase = 'settlement';
         session.lastSettlementPreview = preview;
 

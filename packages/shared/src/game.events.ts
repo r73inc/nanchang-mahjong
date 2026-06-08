@@ -175,8 +175,14 @@ export interface SpiritCount {
  * Spirit" and the engine's `revealJing()` runs.
  */
 export interface SettlementPreviewPayload {
-  /** The flipped settlement tile (下精). */
+  /** The flipped settlement tile (下精). Pays 2 pts per copy held. */
   settlementTile: TileType;
+  /**
+   * The indicator tile (上精 / wall[1]). Shown as the smaller "next in sequence"
+   * tile beside the settlement tile. This tile is consumed when revealJing() runs
+   * and becomes jingIndicator, from which jingPrimary / jingSecondary are derived.
+   */
+  nextTile: TileType;
   /** How many copies of the settlement tile each seat holds in their initial hand. */
   seatCounts: [number, number, number, number];
   /** Preview score delta (zero-sum) if settlement were applied now. */
