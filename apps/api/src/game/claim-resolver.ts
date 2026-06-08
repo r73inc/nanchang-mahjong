@@ -8,7 +8,7 @@
  * independently of the gateway and engine state machine.
  */
 
-import { canWin, canKongFromDiscard, chowOptions, separateJing } from '@nanchang/engine';
+import { canWin, chowOptions, separateJing } from '@nanchang/engine';
 import type { GameState, TileType } from '@nanchang/engine';
 import type { ClaimAction } from '@nanchang/shared';
 
@@ -75,7 +75,13 @@ export function computeEligibleClaims(state: GameState): Map<Seat4, ClaimAction[
     const naturalCount = naturals.filter((t) => t === pendingDiscard).length;
 
     if (naturalCount >= 2) actions.push({ kind: 'pung' });
-    if (canKongFromDiscard(hand, pendingDiscard, jingTypes)) actions.push({ kind: 'kong' });
+
+    // Family rule: wildcards may NOT substitute in open kongs.
+    // Only offer kong when the player holds 3 exact copies of the discarded tile.
+    // This also handles the edge case where the discarded tile IS a wildcard:
+    // if a player holds 3 of the same wildcard naturally, kongCount = 3 → allowed.
+    const kongCount = hand.filter((t) => t === pendingDiscard).length;
+    if (kongCount >= 3) actions.push({ kind: 'kong' });
 
     // Chow is restricted to the single seat immediately after the discarder.
     // Only offer sequences achievable without any jing substitution.
