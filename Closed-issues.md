@@ -1,8 +1,8 @@
 # Closed Issues & Improvements
 
-This document details all closed bugs, fixed issues, and completed improvements with their root causes, fixes, and key learnings.
+This document details all closed bugs (BUG-XXX) and completed improvements (IMP-XXX) with their root causes, fixes, and key learnings. Organized chronologically by PR/branch.
 
-Chronologically organized by PR/branch when the fix was implemented.
+For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
@@ -288,7 +288,7 @@ Bugs discovered during family testing of the hand-reveal-flow feature.
 
 ---
 
-### IMPROVEMENT-001 · Spirit tile screen showed redundant indicator tile
+### IMP-001 · Spirit tile screen showed redundant indicator tile
 
 **Observation:** Jing step displayed three tiles: Indicator → Primary Spirit → Secondary Spirit. Indicator already visible on Settlement step; only care about primary and secondary spirits.
 
@@ -296,7 +296,7 @@ Bugs discovered during family testing of the hand-reveal-flow feature.
 
 ---
 
-### IMPROVEMENT-002 · Hand reveal screen did not show open melds
+### IMP-002 · Hand reveal screen did not show open melds
 
 **Observation:** Post-hand reveal screen showed concealed hands but not open melds (pungs, chows, kongs). Impossible to see full hand picture, especially for winner.
 
@@ -310,17 +310,17 @@ All 3D-specific bugs found and fixed during local testing. See `3D-BUG-LOG.md` f
 
 ### 3D Closed Bugs Summary
 
-| ID     | Symptom                                          | Root cause                                        | Fix                                                  |
-| ------ | ------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------- |
-| BUG-01 | Tile faces render with black background          | Transparent SVG + MeshBasicMaterial alpha=0       | `transparent: true, depthWrite: false`               |
-| BUG-02 | Tile face images upside down                     | `flipY = false` was wrong for browser SVGs        | `flipY = true`                                       |
-| BUG-03 | Flat tile faces blown out / invisible            | Clearcoat overwhelmed SVG under directional light | Switch face to `MeshBasicMaterial` (unlit)           |
-| BUG-04 | Left/right opponent tiles appear elongated       | Tiles laid flat; edge-on from camera              | Standing orientation (rx=0, ry=π)                    |
-| BUG-05 | Discards/melds for side players unreadable       | `ry` varied per seat; texture V-axis sideways     | All discard/meld configs use `ry: Math.PI`           |
-| BUG-06 | TileWall3D renders as large red cross            | `Back.svg` has `fill:#ff3737` background          | Removed TileWall3D (see BUG-09 in open issues)       |
-| BUG-07 | ViewerHandHUD shows text tiles instead of images | `<MahjongTile>` is text/CSS component             | New `SvgHandTile` with `<img src={tileTexturePath}>` |
-| IMP-01 | Camera angle too steep (top-down feel)           | Camera Y too high, Z too close, FOV too narrow    | `position: [0, 8, 13]`, `fov: 58`                    |
-| IMP-02 | Tiles too shiny / lacquer-like                   | High clearcoat + studio IBL                       | Reduced clearcoat/roughness; face is unlit           |
+| ID      | Symptom                                          | Root cause                                        | Fix                                                  |
+| ------- | ------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------- |
+| BUG-01  | Tile faces render with black background          | Transparent SVG + MeshBasicMaterial alpha=0       | `transparent: true, depthWrite: false`               |
+| BUG-02  | Tile face images upside down                     | `flipY = false` was wrong for browser SVGs        | `flipY = true`                                       |
+| BUG-03  | Flat tile faces blown out / invisible            | Clearcoat overwhelmed SVG under directional light | Switch face to `MeshBasicMaterial` (unlit)           |
+| BUG-04  | Left/right opponent tiles appear elongated       | Tiles laid flat; edge-on from camera              | Standing orientation (rx=0, ry=π)                    |
+| BUG-05  | Discards/melds for side players unreadable       | `ry` varied per seat; texture V-axis sideways     | All discard/meld configs use `ry: Math.PI`           |
+| BUG-06  | TileWall3D renders as large red cross            | `Back.svg` has `fill:#ff3737` background          | Removed TileWall3D (see BUG-09 in open issues)       |
+| BUG-07  | ViewerHandHUD shows text tiles instead of images | `<MahjongTile>` is text/CSS component             | New `SvgHandTile` with `<img src={tileTexturePath}>` |
+| IMP-003 | Camera angle too steep (top-down feel)           | Camera Y too high, Z too close, FOV too narrow    | `position: [0, 8, 13]`, `fov: 58`                    |
+| IMP-004 | Tiles too shiny / lacquer-like                   | High clearcoat + studio IBL                       | Reduced clearcoat/roughness; face is unlit           |
 
 ---
 
