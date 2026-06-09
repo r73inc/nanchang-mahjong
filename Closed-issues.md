@@ -324,6 +324,38 @@ All 3D-specific bugs found and fixed during local testing. See `3D-BUG-LOG.md` f
 
 ---
 
+## PR #83 · `feat/improvements-005-007` (2026-06-09)
+
+### IMP-005 · Settlement phase — consolidate scoring table with per-player breakdown
+
+**Previous state:** Settlement phase displayed two separate tables (one for the 2pt tile, one for the 1pt tile), which was visually cluttered and hard to parse at a glance.
+
+**Fix:** Extracted settlement display into a new `SettlementPreview` component (`apps/web/src/components/game/SettlementPreview.tsx`). Replaced the two-table layout with a single consolidated table showing each player's total settlement delta. Each player row has an expandable dropdown (chevron) that reveals a line-item breakdown of tile contributions, using `MahjongTile2D` tile textures instead of text labels. Player names and wind indicators are shown throughout.
+
+**Learning:** When displaying zero-sum multi-item scores, always lead with the total and make the breakdown opt-in. Accordion/expand patterns prevent visual clutter on small screens while keeping detail accessible.
+
+---
+
+### IMP-006 · End game — animated winner announcement and two-step result flow
+
+**Previous state:** End game immediately showed the score table without any celebratory moment — felt abrupt, especially on mobile.
+
+**Fix:** Created `GameWinnerPopup` component (`apps/web/src/components/game/GameWinnerPopup.tsx`) that renders as a full-screen overlay when the game ends. Plays the existing winning chime from `useSound` on mount. Auto-dismisses after 3 seconds (or on tap). `GameEndScreen` now shows the popup first; only after it closes does the score table appear. Keyframe animations (`winner-pop`, `winner-fade-in`) defined in `tailwind.config.ts` alongside all other project keyframes — no inline `<style>` blocks.
+
+**Learning:** Celebratory moments should be a distinct step, not bolted onto the results screen. Defining animations in `tailwind.config.ts` keeps component code clean and consistent with project conventions.
+
+---
+
+### IMP-007 · Auth — password visibility toggle
+
+**Previous state:** Password fields had no way for users to verify what they had typed before submitting. Autofill placeholder text ("temp") was no longer present in code at fix time.
+
+**Fix:** Enhanced the shared `FormField` component (`apps/web/src/components/ui/form-field.tsx`) with a password visibility toggle. When `type="password"`, an eye icon button appears inside the field. Clicking it swaps the input type between `password` and `text`. Tooltip text (`passwordShowTooltip` / `passwordHideTooltip`) is i18n-translated in EN + ZH. The toggle applies universally to all password fields (sign-in, sign-up, change-password) since they all use `FormField`.
+
+**Learning:** Add visibility toggles at the shared component layer (`FormField`) rather than per-page to ensure all password inputs get the improvement automatically.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
