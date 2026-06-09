@@ -386,6 +386,66 @@ Bugs and improvements discovered during family testing of the hand-reveal-flow f
 
 ---
 
+## Branch `fix/issue-03-05-06-game-polish` — PR #77 (2026-06-09)
+
+---
+
+### BUG-020 · Last-discard red pulse never visible to end user — ACTIVE, UNRESOLVED
+
+**Symptom:** The most recently discarded tile should display a pulsing red outline during the claim window so players can see which tile is "in play." No red pulse is ever visible during live gameplay regardless of the fix applied.
+
+**Root cause:** Unknown. Every plausible rendering, data-flow, and animation layer has been addressed without success. The end user reports no visible change across all iterations.
+
+**All fixes attempted (none worked):**
+
+1. **Framer Motion bleed isolation (commit `5067f95` predecessor):** The original pulse logic applied `repeat: Infinity` directly on the pool's wrapper `motion.div` which also had `initial: { opacity: 0, scale: 0.7 }`. Framer Motion looped all properties back to their `initial` values, making the tile invisible. Fix: moved pulse into a dedicated absolutely-positioned overlay `motion.div` inside `MahjongTile2D` with no `initial` prop so the entry keyframes are completely isolated from the loop.
+
+2. **Increased contrast — red outline (commit `5067f95`):** Original glow was a near-invisible gold shimmer. Replaced with `rgba(220,38,38,0.95)` red spread ring. No visible change reported.
+
+3. **React 18 batching race fix (commit `5067f95`):** `snapshot.pendingDiscard` is cleared in the same synchronous Node.js tick as the discard (server emits discard-snapshot + draw-snapshot in one event loop turn; React 18 automatic batching collapses both `setSnapshot` calls into one render, always seeing `pendingDiscard: null`). Fix: added `lastDiscard: { seat, tile } | null` to the Zustand store, driven exclusively by `game:event { kind:'discard' }` (set) and `game:event { kind:'pung'|'chow'|'kong_open'|'win' }` (clear). Intentionally NOT cleared on `draw`. Reconnect guard in `setSnapshot` restores `lastDiscard` from snapshot fields when rejoining mid-claim-window.
+
+4. **Exact tile+seat coordinate match (commit `ae767b1`):** `isPulse` previously used an index-based "isLast tile in array" check which was fragile if the array had already advanced by render time. Replaced with `lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile` — an unambiguous value match. No visible change reported.
+
+5. **zIndex + shadow visibility fix (commit `f2ac30e`):** Added `zIndex: 20` to the overlay so it paints above the tile's `motion.div` stacking context (Framer Motion adds `will-change: transform` which can create a stacking context and bury the sibling overlay). Changed shadow keyframes from `'0 0 0 2px rgba(220,38,38,0.95)'` (zero blur, invisible on dark felt) to `'0 0 4px 1px rgb(220, 38, 38)' → '0 0 10px 3px rgb(220, 38, 38)'` (real blur radius). Added `border: '2px solid rgb(220, 38, 38)'` as a static fallback that renders regardless of `boxShadow` clipping by ancestor `overflow: hidden`. No visible change reported.
+
+6. **Key-based remount to force Framer Motion new mount (commit `17bfe23`):** React re-uses existing DOM nodes when the key is stable, updating props in place. Framer Motion's `repeat: Infinity` animation requires a genuine new element mount to initialise its animation cycle. Fix: changed wrapper keys from `key={i}` / `key={`${seatIdx}-${posInSeat}`}` to `key={`${i}-${isPulse ? 'pulsing' : 'idle'}`}` / `key={`${seatIdx}-${posInSeat}-${isPulse ? 'pulsing' : 'idle'}`}`. Also set `initial={isPulse ? TILE_ANIMATE : TILE_INITIAL}` to prevent already-visible tiles from briefly flashing on the forced remount. No visible change reported.
+
+**Current state:** All code changes are on branch `fix/issue-03-05-06-game-polish` (PR #77). The overlay infrastructure, z-index, border fallback, shadow keyframes, exact-match logic, and key-based remount are all present in the codebase. The pulse is still not visible to the end user.
+
+**Suspected remaining causes (not yet investigated):**
+
+- `lastDiscard` in the Zustand store may never be getting set (i.e., `game:event { kind:'discard' }` is never being received by the client, or `use-game.ts`'s `handleGameEvent` is not wired up to the socket). A `console.log` inside that branch would confirm or deny this.
+- The `CombinedDiscardPool2D` may not be the component actually rendered in the current game table path (worth logging the render of both pool components to confirm).
+- The exact tile value in `lastDiscard.tile` (set from `game:event`) may not match the value in `discards` array (set from `game:snapshot`) due to some server-side normalisation difference.
+- `Table2DContext`'s `tileScale` making tile dimensions collapse to unexpected values, causing the overlay to render at 0×0.
+
+**Learning:** Before writing any more rendering fixes, add a `console.log('lastDiscard changed', lastDiscard)` to the pool component's render and a `console.log('setLastDiscard called', d)` inside `use-game.ts handleGameEvent`. If neither fires, the data never reached the component and no amount of overlay styling will help. Verify the pipeline before the presentation layer.
+
+---
+
+### BUG-021 · Hand-reveal meld grouping does not work — ACTIVE, UNRESOLVED
+
+**Symptom:** On the post-hand reveal screen, the winner's concealed hand should be displayed decomposed into its constituent melds (chow/pung/kong groups) and pair, with labeled group headers. Instead the hand appears as a flat row of individual tiles with no grouping.
+
+**Root cause:** Unknown. The decomposition logic was implemented and appears correct, but the visual result is unchanged according to the end user.
+
+**Fix attempted (commit `5067f95` predecessor):**
+
+1. Re-exported `decomposeHand` and `Decomposition` from `@nanchang/shared` (previously only accessible from `@nanchang/engine` directly).
+2. In `HandRevealScreen` inside `game-page.tsx`, the winner's concealed hand section was replaced with an IIFE: if `isWinner && hand.length === 14`, calls `decomposeHand(hand, jingTypes)` and renders the first decomposition's `melds` (each with a `MELD_KIND_LABEL` header and `MahjongTile2D` tiles) followed by the pair (two copies of `decomp.pair` with a `PAIR` label). Falls back to the original flat tile list if `hand.length !== 14` (partial concealed hand — winner had open melds) or if `decomposeHand` returns an empty array.
+
+**Current state:** Code is present on branch `fix/issue-03-05-06-game-polish` (PR #77). The grouping is not visible to the end user.
+
+**Suspected remaining causes (not yet investigated):**
+
+- The winner's hand at reveal time may routinely have fewer than 14 tiles (the winning tile is drawn or claimed, and open melds are tracked separately — so the concealed hand could be as small as 2 tiles). If `hand.length !== 14` is always true for the winner, the code always falls through to the flat fallback. The guard `hand.length === 14` may need to be changed to account for the total tile count across concealed hand + open melds.
+- `decomposeHand` may be returning an empty array for valid winning hands (e.g., if jing tile accounting is off, or if the engine's decomposition doesn't handle all hand shapes in this ruleset).
+- The `handReveal.jingPrimary` / `handReveal.jingSecondary` values passed as `jingTypes` may be undefined/null, causing `decomposeHand` to fail silently.
+
+**Learning:** Before writing more rendering code, log `hand.length`, the result of `decomposeHand(hand, jingTypes)`, and the `jingTypes` array at the point where the IIFE executes. The flat fallback path is almost certainly the one being taken — the guard condition needs to be verified against actual `HandRevealPayload` data from a real completed hand.
+
+---
+
 ## Template for future entries
 
 ```
