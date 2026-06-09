@@ -31,6 +31,19 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 
 ## 3. Core Guidelines
 
+### Branching & PR Workflow
+
+- **All work branches off `main`.** Unless explicitly told otherwise, create all branches from `main`, not off other feature branches. Do not create nested branches.
+- **Complete work and raise a PR.** Complete the work in a single branch, ensure all tests pass and type checking is clean, then raise a PR for review.
+- **One PR at a time, always.** Open one PR and stop. Do not open a second PR, do not start a second branch, and do not write additional code until:
+  1. The first PR has been reviewed
+  2. Any requested changes have been addressed and committed
+  3. The PR is confirmed merged into `main`
+  - **Never branch a PR off another unmerged PR** — if the base PR changes, the dependent branch becomes wasted or broken work.
+  - **Exception:** If the user explicitly asks for a stacked PR approach, ask first before doing it; even then, proceed only with explicit confirmation.
+
+### Code Guidelines
+
 - **`main` is protected.** All changes via PR from a branch. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
 - **Engine is immutable.** Every `GameEngine` method returns a new instance. Never mutate state directly.
 - **Scoring: locked rules only.** Base(1) × Multipliers system. No additive fan. Zero-sum invariant must hold on every hand.
@@ -38,7 +51,6 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 - **Redaction at the edge.** `toClientSnapshot(state, viewer)` hides concealed hands. Spectators and opponents never see `TileType[]`.
 - **i18n: no literal strings in JSX.** All visible text goes through `t()`. EN and ZH keys must stay in parity.
 - **PR scope discipline.** Engine-only changes → engine branch. Schema/API/FE changes → separate PRs. Never mix.
-- **One PR at a time. Always.** Open one PR, push it, then stop and wait. Do not open a second PR, do not start a second branch, do not write any more code until the first PR has been reviewed, any requested changes changed, and it is confirmed merged into `main`. Never branch a PR off another unmerged PR — if the first PR changes then the second branch becomes wasted or broken work. The only exception is if the user explicitly asks for a stacked PR approach; even then, ask first before doing it.
 - **ALWAYS use texture tiles (`MahjongTile2D`) for ANY new features or refactors.** Every mahjong tile rendered on screen — whether in new code, refactored code, or feature additions — MUST use `MahjongTile2D` from `apps/web/src/components/2d/MahjongTile2D.tsx`, which renders SVG textures from `public/textures/Tiles/Regular/`. **Never use the legacy text-glyph `MahjongTile` from `components/mahjong-tile.tsx` for any new work.** That component is ONLY retained for the existing Learn/Replay/History pages that were built before the texture migration and have not yet been refactored to use textures. The moment any of those pages are touched for a new feature or refactor, migrate them to `MahjongTile2D`. The text-based tile component is deprecated and should be completely removed from the project once those three pages are migrated. When in doubt, **always use `MahjongTile2D`.**
 
 ---
