@@ -1129,7 +1129,7 @@ function SideRail({
       {/* Prominent claimed tile with gold ring */}
       {pendingDiscard && (
         <div className="relative flex items-center justify-center" aria-hidden="true">
-          <MahjongTile tile={pendingDiscard} size="lg" />
+          <MahjongTile2D tile={pendingDiscard} size="lg" interactive={false} />
           <div
             className="absolute inset-[-3px] rounded-[6px] pointer-events-none"
             style={{ border: '2px solid #c9a961', boxShadow: '0 0 10px rgba(201,169,97,0.5)' }}
@@ -1152,13 +1152,18 @@ function SideRail({
                   onClaim(action.kind);
                 }
               }}
-              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl font-bold text-sm text-mj-ink flex-1 min-w-[60px] max-w-[100px]"
+              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl font-bold text-sm text-mj-ink flex-1 min-w-[70px] max-w-[140px]"
               style={{ background: color, boxShadow: `0 4px 12px ${color}44` }}
             >
               {preview.length > 0 && (
                 <div className="flex gap-[2px] justify-center" aria-hidden="true">
                   {preview.map((tile, ti) => (
-                    <MahjongTile key={`${tile}-${ti}`} tile={tile} size="xs" />
+                    <MahjongTile2D
+                      key={`${tile}-${ti}`}
+                      tile={tile}
+                      size="xs"
+                      interactive={false}
+                    />
                   ))}
                 </div>
               )}
@@ -1169,7 +1174,7 @@ function SideRail({
 
         <button
           onClick={onPass}
-          className="flex flex-col items-center justify-center flex-1 min-w-[60px] max-w-[100px] px-2 py-2 rounded-xl font-bold text-sm text-mj-bone/60"
+          className="flex flex-col items-center justify-center flex-1 min-w-[70px] max-w-[140px] px-2 py-2 rounded-xl font-bold text-sm text-mj-bone/60"
           style={{ border: '1px solid rgba(245,239,223,0.15)' }}
         >
           {t('gamePass')}
