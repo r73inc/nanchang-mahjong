@@ -549,12 +549,21 @@ export class GameEngine {
     const winType = isRon ? 'ron' : 'tsumo';
     const winnerSeat = this.state.seats[seatIdx];
 
-    // Reconstruct full 14-tile hand: open melds + concealed + (ron) discard
+    const robKongEvent = isRobKong
+      ? this.events
+          .slice()
+          .reverse()
+          .find((e): e is Extract<GameEvent, { kind: 'kong_added' }> => e.kind === 'kong_added')
+      : null;
+    const robTile = robKongEvent?.tile ?? null;
+
+    // Reconstruct full 14-tile hand: open melds + concealed + (ron) discard + (rob-kong) tile
     const openMeldTiles = winnerSeat.openMelds.flatMap((m) => [...m.tiles]);
     const winningHand: TileType[] = [
       ...openMeldTiles,
       ...winnerSeat.hand,
       ...(isRon ? [this.state.pendingDiscard!] : []),
+      ...(isRobKong && robTile ? [robTile] : []),
     ];
 
     if (!isWinningHand(winningHand, this.jingTypes)) {

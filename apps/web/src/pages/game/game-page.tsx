@@ -24,7 +24,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
 import { useI18n } from '../../i18n';
-import { tileAriaLabel, engineToDesignTile } from '@nanchang/shared';
+import { tileAriaLabel, engineToDesignTile, decomposeHand } from '@nanchang/shared';
 import type {
   ClientGameState,
   TileType,
@@ -66,6 +66,7 @@ const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
   chow: 'CHOW',
   kong: 'KONG',
 } as const;
+const PAIR_LABEL = 'PAIR' as const;
 
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
@@ -644,20 +645,76 @@ function HandRevealScreen({
                     </div>
                   )}
 
-                  {/* Concealed hand */}
-                  <div className="flex flex-wrap gap-0.5">
-                    {hand.map((tile, j) => (
-                      <MahjongTile2D
-                        key={`${i}-${tile}-${j}`}
-                        tile={tile}
-                        size="xs"
-                        interactive={false}
-                        isJing={
-                          tile === handReveal.jingPrimary || tile === handReveal.jingSecondary
-                        }
-                      />
-                    ))}
-                  </div>
+                  {/* Concealed hand — grouped into melds+pair for winner with full 14-tile hand */}
+                  {(() => {
+                    const jingTypes: TileType[] = [
+                      handReveal.jingPrimary,
+                      handReveal.jingSecondary,
+                    ].filter((t): t is TileType => t !== undefined);
+                    const isJing = (tile: TileType) =>
+                      tile === handReveal.jingPrimary || tile === handReveal.jingSecondary;
+
+                    if (isWinner && hand.length === 14) {
+                      const decomps = decomposeHand(hand, jingTypes);
+                      if (decomps.length > 0) {
+                        const decomp = decomps[0];
+                        return (
+                          <div className="flex flex-wrap gap-2">
+                            {decomp.melds.map((meld, mi) => (
+                              <div key={mi} className="flex flex-col items-center gap-0.5">
+                                <div className="flex gap-0.5">
+                                  {meld.tiles.map((tile, ti) => (
+                                    <MahjongTile2D
+                                      key={`d${i}-${mi}-${ti}`}
+                                      tile={tile}
+                                      size="xs"
+                                      interactive={false}
+                                      isJing={isJing(tile)}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-[8px] text-mj-bone/30 uppercase tracking-wider">
+                                  {MELD_KIND_LABEL[meld.kind]}
+                                </span>
+                              </div>
+                            ))}
+                            {/* Pair */}
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex gap-0.5">
+                                {[decomp.pair, decomp.pair].map((tile, ti) => (
+                                  <MahjongTile2D
+                                    key={`dp${i}-${ti}`}
+                                    tile={tile}
+                                    size="xs"
+                                    interactive={false}
+                                    isJing={isJing(tile)}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-[8px] text-mj-bone/30 uppercase tracking-wider">
+                                {PAIR_LABEL}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+                    }
+
+                    // Fallback: flat tile list (non-winners, or winners with open melds)
+                    return (
+                      <div className="flex flex-wrap gap-0.5">
+                        {hand.map((tile, j) => (
+                          <MahjongTile2D
+                            key={`${i}-${tile}-${j}`}
+                            tile={tile}
+                            size="xs"
+                            interactive={false}
+                            isJing={isJing(tile)}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

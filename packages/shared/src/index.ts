@@ -4,4 +4,8 @@ export * from './game.events';
 export * from './replay.types';
 export * from './tile-map';
 
+// Re-export engine helpers useful in frontend without adding engine as a direct web dep
+export { decomposeHand } from '@nanchang/engine';
+export type { Decomposition } from '@nanchang/engine';
+
 export const SHARED_VERSION = '0.0.1';

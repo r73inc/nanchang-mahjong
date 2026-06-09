@@ -41,8 +41,8 @@ export const RoomSettingsSchema = z.object({
   /** Minimum fan required to win (reserved for future rule variants). */
   minFan: z.number().int().min(1).max(8).default(1),
 
-  /** Which game table renderer to use. Defaults to 3D; host can switch to 2D. */
-  viewMode: z.enum(['2D', '3D']).default('3D'),
+  /** Which game table renderer to use. Defaults to 2D; host can switch to 3D (WIP). */
+  viewMode: z.enum(['2D', '3D']).default('2D'),
 
   /**
    * Opening Top & Bottom Spirit Flip (开局上下翻精).

@@ -64,7 +64,6 @@ export interface DiscardPool2DProps {
 
 export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
-  const claimWindow = useGameStore((s) => s.claimWindow);
   const { lastDiscardId } = useDiscardContext();
 
   if (!snapshot) return null;
@@ -78,8 +77,9 @@ export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
 
   if (discards.length === 0) return null;
 
-  // Last discard pulses gold when this seat's discard triggered an open claim window
-  const isLastDiscard = claimWindow !== null && snapshot.discardedBySeat === seatIdx;
+  // Pulse gold while a discard is pending (from the moment the tile lands until
+  // it is claimed or the next draw begins — pendingDiscard becomes null).
+  const isLastDiscard = snapshot.pendingDiscard !== null && snapshot.discardedBySeat === seatIdx;
 
   // For the viewer's seat: the newest tile gets the layoutId from DiscardContext
   // so Framer Motion can animate the shared-element flight from PlayerHand2D.

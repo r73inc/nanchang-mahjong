@@ -131,7 +131,15 @@ export function useRoomActions() {
   );
 
   const updateSettings = useCallback(
-    async (roomId: string, updates: { viewMode?: '2D' | '3D'; ruleTopBottomJing?: boolean }) => {
+    async (
+      roomId: string,
+      updates: {
+        viewMode?: '2D' | '3D';
+        ruleTopBottomJing?: boolean;
+        rounds?: 'east' | 'east+south';
+        terminationType?: 'rounds' | 'bust';
+      },
+    ) => {
       try {
         const { data } = await api.patch<RoomState>(`/rooms/${roomId}/settings`, updates);
         setRoom(data);

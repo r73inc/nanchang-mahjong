@@ -84,7 +84,6 @@ function buildInterleavedDiscards(seats: readonly ClientSeatState[]): DiscardEnt
 
 export function CombinedDiscardPool2D() {
   const snapshot = useGameStore((s) => s.snapshot);
-  const claimWindow = useGameStore((s) => s.claimWindow);
   const { lastDiscardId } = useDiscardContext();
 
   if (!snapshot) return null;
@@ -115,10 +114,11 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Pulse the tile that was just discarded when a claim window is open.
+          // Pulse the tile that was just discarded while pendingDiscard is set
+          // (from the moment the tile lands until claimed or next draw begins).
           const isThisTheLastDiscard =
             discardedBySeat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
-          const isPulse = isThisTheLastDiscard && claimWindow !== null;
+          const isPulse = isThisTheLastDiscard && snapshot.pendingDiscard !== null;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =
