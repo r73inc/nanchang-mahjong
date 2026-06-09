@@ -158,6 +158,10 @@ Replaced the DOM `GameTable` compass layout with a React Three Fiber 3D scene. A
 
 ## 6. Issues & Bug Management
 
+### Issue Tracking Rule
+
+**Whenever work addresses an item in `Open-issues.md`, that item must be moved to `Closed-issues.md` in the same PR that contains the fix.** Do not leave resolved items in `Open-issues.md` after the work is done. The PR description should note which issues were closed. If the PR only partially addresses an item, update the item's status in `Open-issues.md` rather than moving it.
+
 ### Open Issues
 
 `Open-issues.md` (repo root) tracks all currently open bugs and improvements:
