@@ -10,27 +10,36 @@ import { useEffect, useCallback } from 'react';
 import { api, getApiErrorMessage } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { useRoomStore } from '../stores/room.store';
-import type { RoomState, WsRoomUpdatePayload, WsRoomStartedPayload } from '@nanchang/shared';
+import type {
+  RoomState,
+  WsRoomUpdatePayload,
+  WsRoomStartedPayload,
+  BotConfig,
+} from '@nanchang/shared';
 
 // ── REST action hooks ─────────────────────────────────────────────────────────
 
 export function useRoomActions() {
   const { setRoom, setLoading, setError } = useRoomStore();
 
-  const createRoom = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await api.post<RoomState>('/rooms');
-      setRoom(data);
-      return data;
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [setRoom, setLoading, setError]);
+  const createRoom = useCallback(
+    async (bots?: BotConfig) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const body = bots && bots.count > 0 ? { bots } : {};
+        const { data } = await api.post<RoomState>('/rooms', body);
+        setRoom(data);
+        return data;
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [setRoom, setLoading, setError],
+  );
 
   const joinRoom = useCallback(
     async (code: string) => {

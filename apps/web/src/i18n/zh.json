@@ -177,6 +177,16 @@
   "creating": "创建中…",
   "joining": "加入中…",
 
+  "botCountLabel": "电脑玩家",
+  "botCountNone": "无 — 仅好友",
+  "botDifficultyLabel": "机器人难度",
+  "botDifficultyEasy": "简单",
+  "botDifficultyNormal": "普通",
+  "botBadge": "机器人",
+  "botSeatLabel": "机器人（{{0}}）",
+  "botDifficultyEasyFull": "简单机器人",
+  "botDifficultyNormalFull": "普通机器人",
+
   "settingStyleLabel": "玩法",
   "settingStyle": "南昌麻将",
   "settingRoundsLabel": "局数",

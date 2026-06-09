@@ -136,8 +136,9 @@ export function RoomPage() {
   const isHost = myUserId === room.hostUserId;
   const mySeat = room.seats.find((s) => s.userId === myUserId);
   const filledSeats = room.seats.filter((s) => s.userId !== null);
-  // Host is implicitly ready — they confirm readiness by clicking Start.
-  const allReady = filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.ready);
+  // Host and bots are implicitly ready — host confirms by clicking Start.
+  const allReady =
+    filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.isBot || s.ready);
 
   return (
     <ScreenShell title={t('privateRoom')} onBack={handleLeave}>
@@ -235,37 +236,64 @@ export function RoomPage() {
 
                   {/* Name / status */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-mj-bone truncate">
-                      {isEmpty
-                        ? t('waiting')
-                        : [seat.displayName, isMe && t('youSuffix'), seat.isHost && t('hostBadge')]
-                            .filter(Boolean)
-                            .join(' ')}
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold text-mj-bone truncate">
+                        {isEmpty
+                          ? t('waiting')
+                          : [
+                              seat.displayName,
+                              isMe && t('youSuffix'),
+                              seat.isHost && t('hostBadge'),
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                      </p>
+                      {/* Bot chip */}
+                      {seat.isBot && (
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider flex-shrink-0"
+                          style={{
+                            background: 'rgba(90,125,140,0.2)',
+                            border: '1px solid rgba(90,125,140,0.5)',
+                            color: '#7ab5cc',
+                          }}
+                        >
+                          {t('botBadge')}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-mj-bone/60">
                       {isEmpty
                         ? t('openSeat')
-                        : seat.isHost || seat.ready
-                          ? t('ready')
-                          : t('notReady')}
+                        : seat.isBot
+                          ? t(
+                              seat.botDifficulty === 'normal'
+                                ? 'botDifficultyNormalFull'
+                                : 'botDifficultyEasyFull',
+                            )
+                          : seat.isHost || seat.ready
+                            ? t('ready')
+                            : t('notReady')}
                     </p>
                   </div>
 
-                  {/* Ready badge — host is always shown as ready */}
-                  {!isEmpty && (seat.isHost || seat.ready) && (
+                  {/* Ready badge — host and bots are always shown as ready */}
+                  {!isEmpty && (seat.isHost || seat.isBot || seat.ready) && (
                     <span
                       className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider"
                       style={{
-                        background: 'rgba(31,122,77,0.2)',
-                        border: '1px solid rgba(31,122,77,0.5)',
-                        color: '#7fc299',
+                        background: seat.isBot ? 'rgba(90,125,140,0.2)' : 'rgba(31,122,77,0.2)',
+                        border: seat.isBot
+                          ? '1px solid rgba(90,125,140,0.5)'
+                          : '1px solid rgba(31,122,77,0.5)',
+                        color: seat.isBot ? '#7ab5cc' : '#7fc299',
                       }}
                     >
                       {t('ready').toUpperCase()}
                     </span>
                   )}
 
-                  {/* Host kick button */}
+                  {/* Host kick button — bots can be kicked like any seat */}
                   {isHost && !isEmpty && !isMe && room.status === 'waiting' && (
                     <button
                       onClick={() => handleKick(seat.seatIdx)}
@@ -441,7 +469,7 @@ export function RoomPage() {
           >
             {allReady
               ? t('startMatch')
-              : `${t('waiting')} ${filledSeats.filter((s) => !s.isHost && !s.ready).length} ${t('notReady').toLowerCase()}`}
+              : `${t('waiting')} ${filledSeats.filter((s) => !s.isHost && !s.isBot && !s.ready).length} ${t('notReady').toLowerCase()}`}
           </button>
         )}
       </div>

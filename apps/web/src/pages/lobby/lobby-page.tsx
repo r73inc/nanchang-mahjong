@@ -8,9 +8,12 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { BotDifficulty } from '@nanchang/shared';
 
 /** localStorage key shared with game-page.tsx */
 const ACTIVE_GAME_KEY = 'mj:active-game';
+const MINUS_GLYPH = '−' as const;
+const PLUS_GLYPH = '+' as const;
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
 import { useRoomActions } from '../../hooks/use-room';
@@ -27,6 +30,10 @@ export function LobbyPage() {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [code, setCode] = useState('');
+
+  // Bot config state
+  const [botCount, setBotCount] = useState(0);
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>('easy');
 
   // Rejoin card — shown when a gameId was stored by game-page before navigating away.
   const [activeGameId, setActiveGameId] = useState<string | null>(() =>
@@ -49,7 +56,9 @@ export function LobbyPage() {
 
   async function handleCreate() {
     ensureSocket();
-    const room = await createRoom();
+    const room = await createRoom(
+      botCount > 0 ? { count: botCount, difficulty: botDifficulty } : undefined,
+    );
     if (room) {
       navigate(`/room/${room.code}`);
     }
@@ -135,6 +144,89 @@ export function LobbyPage() {
         >
           <h2 className="text-base font-bold text-mj-bone mb-1">{t('createRoom')}</h2>
           <p className="text-xs text-mj-bone/60 mb-4">{t('createRoomSub')}</p>
+
+          {/* ── Bot count stepper ──────────────────────────────────────── */}
+          <div className="mb-3">
+            <p className="text-[11px] font-semibold tracking-wider text-mj-bone/65 mb-1.5">
+              {t('botCountLabel')}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBotCount((n) => Math.max(0, n - 1))}
+                disabled={botCount === 0}
+                aria-label="Decrease bot count"
+                className="w-8 h-8 rounded-lg font-bold text-base flex items-center justify-center"
+                style={{
+                  background: botCount === 0 ? 'rgba(245,239,223,0.04)' : 'rgba(201,169,97,0.15)',
+                  border:
+                    botCount === 0
+                      ? '1px solid rgba(245,239,223,0.1)'
+                      : '1px solid rgba(201,169,97,0.4)',
+                  color: botCount === 0 ? 'rgba(245,239,223,0.25)' : '#c9a961',
+                }}
+              >
+                {MINUS_GLYPH}
+              </button>
+              <span
+                className="w-6 text-center font-bold text-sm text-mj-bone tabular-nums"
+                aria-live="polite"
+                aria-label={`${botCount} computer players`}
+              >
+                {botCount}
+              </span>
+              <button
+                onClick={() => setBotCount((n) => Math.min(3, n + 1))}
+                disabled={botCount === 3}
+                aria-label="Increase bot count"
+                className="w-8 h-8 rounded-lg font-bold text-base flex items-center justify-center"
+                style={{
+                  background: botCount === 3 ? 'rgba(245,239,223,0.04)' : 'rgba(201,169,97,0.15)',
+                  border:
+                    botCount === 3
+                      ? '1px solid rgba(245,239,223,0.1)'
+                      : '1px solid rgba(201,169,97,0.4)',
+                  color: botCount === 3 ? 'rgba(245,239,223,0.25)' : '#c9a961',
+                }}
+              >
+                {PLUS_GLYPH}
+              </button>
+              {botCount === 0 && (
+                <span className="text-xs text-mj-bone/40 ml-1">{t('botCountNone')}</span>
+              )}
+            </div>
+          </div>
+
+          {/* ── Difficulty toggle — only shown when bots > 0 ─────────── */}
+          {botCount > 0 && (
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold tracking-wider text-mj-bone/65 mb-1.5">
+                {t('botDifficultyLabel')}
+              </p>
+              <div className="flex gap-2" role="group" aria-label={t('botDifficultyLabel')}>
+                {(['easy', 'normal'] as BotDifficulty[]).map((diff) => {
+                  const active = botDifficulty === diff;
+                  return (
+                    <button
+                      key={diff}
+                      onClick={() => setBotDifficulty(diff)}
+                      aria-pressed={active}
+                      className="px-3 py-1.5 rounded-full text-xs font-bold"
+                      style={{
+                        background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                        border: active
+                          ? '1px solid rgba(201,169,97,0.6)'
+                          : '1px solid rgba(245,239,223,0.12)',
+                        color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                      }}
+                    >
+                      {diff === 'easy' ? t('botDifficultyEasy') : t('botDifficultyNormal')}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleCreate}
             disabled={loading}

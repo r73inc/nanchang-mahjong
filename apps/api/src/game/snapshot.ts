@@ -12,10 +12,13 @@
  */
 
 import type { GameState } from '@nanchang/engine';
-import type { ClientGameState, ClientSeatState } from '@nanchang/shared';
+import type { ClientGameState, ClientSeatState, BotDifficulty } from '@nanchang/shared';
 import type { ConnState } from './game-session';
 
 export type ViewerSeat = 0 | 1 | 2 | 3 | null;
+
+/** Per-seat bot metadata to embed in the snapshot — undefined means human seat. */
+export type SeatBotMeta = { isBot: boolean; botDifficulty?: BotDifficulty } | undefined;
 
 export function toClientSnapshot(
   state: GameState,
@@ -25,9 +28,11 @@ export function toClientSnapshot(
   viewMode: '2D' | '3D' = '3D',
   ruleTopBottomJing = false,
   preGamePhase: 'hands' | 'settlement' | 'jing' | null = null,
+  botMeta?: readonly [SeatBotMeta, SeatBotMeta, SeatBotMeta, SeatBotMeta],
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
+    const bot = botMeta?.[i];
     return {
       wind: seat.wind,
       score: seat.score,
@@ -37,6 +42,7 @@ export function toClientSnapshot(
       discards: seat.discards,
       hand: isOwnSeat ? [...seat.hand] : null,
       handCount: seat.hand.length,
+      ...(bot?.isBot ? { isBot: true, botDifficulty: bot.botDifficulty } : {}),
     };
   }) as [ClientSeatState, ClientSeatState, ClientSeatState, ClientSeatState];
 

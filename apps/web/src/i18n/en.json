@@ -177,6 +177,16 @@
   "creating": "Creating…",
   "joining": "Joining…",
 
+  "botCountLabel": "Computer Players",
+  "botCountNone": "None — friends only",
+  "botDifficultyLabel": "Bot Difficulty",
+  "botDifficultyEasy": "Easy",
+  "botDifficultyNormal": "Normal",
+  "botBadge": "BOT",
+  "botSeatLabel": "Bot ({{0}})",
+  "botDifficultyEasyFull": "Easy Bot",
+  "botDifficultyNormalFull": "Normal Bot",
+
   "settingStyleLabel": "Style",
   "settingStyle": "Nanchang (南昌)",
   "settingRoundsLabel": "Rounds",

@@ -51,6 +51,7 @@ import type { Seat4 } from './game-session';
 import { computeEligibleClaims, computeRobKongEligible, resolveClaims } from './claim-resolver';
 import type { IncomingClaim } from './claim-resolver';
 import { toClientSnapshot } from './snapshot';
+import type { SeatBotMeta } from './snapshot';
 import { StatsService } from './stats.service';
 import { StorageService } from '../storage/storage.service';
 import { PushService } from '../push/push.service';
@@ -1323,6 +1324,11 @@ export class GameService {
   private emitSnapshotToSocket(socketId: string, session: GameSession, userId: string): void {
     if (!this.server) return;
     const viewerSeat = session.getSeat(userId) ?? null;
+    const botMeta = [0, 1, 2, 3].map((i): SeatBotMeta => {
+      const seat = i as Seat4;
+      if (!session.isBotSeat(seat)) return undefined;
+      return { isBot: true, botDifficulty: session.getBotDifficulty(seat) };
+    }) as [SeatBotMeta, SeatBotMeta, SeatBotMeta, SeatBotMeta];
     const snapshot = toClientSnapshot(
       session.engine.state,
       session.gameId,
@@ -1331,6 +1337,7 @@ export class GameService {
       session.settings.viewMode,
       session.settings.ruleTopBottomJing,
       session.preGamePhase,
+      botMeta,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

@@ -10,10 +10,11 @@
 
 import { useI18n } from '../../i18n';
 import { useGameStore } from '../../stores/game.store';
-import type { SeatWind } from '@nanchang/shared';
 
 // ── Wind display tables ───────────────────────────────────────────────────────
 // Module-level constants satisfy i18next/no-literal-string (variable refs in JSX)
+
+type SeatWind = 'east' | 'south' | 'west' | 'north';
 
 const WIND_CHAR: Record<SeatWind, string> = {
   east: '東',
@@ -102,21 +103,44 @@ export function SeatLabel2D({ seatIdx }: SeatLabel2DProps) {
         {seat.score}
       </span>
 
-      {/* AFK indicator */}
-      {seat.afk && <span style={{ color: '#ef5350', fontSize: 9 }}>{t('gameWaitingTurn')}</span>}
-
-      {/* Disconnected dot */}
-      {!seat.connected && (
+      {/* Bot chip — shown instead of AFK/disconnect indicators */}
+      {seat.isBot ? (
         <span
-          aria-label={t('gameReconnecting')}
+          aria-label={t(
+            seat.botDifficulty === 'normal' ? 'botDifficultyNormalFull' : 'botDifficultyEasyFull',
+          )}
           style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            background: '#ef5350',
-            flexShrink: 0,
+            fontSize: 8,
+            fontWeight: 700,
+            padding: '0 3px',
+            borderRadius: 3,
+            background: 'rgba(90,125,140,0.3)',
+            color: '#7ab5cc',
           }}
-        />
+        >
+          {t('botBadge')}
+        </span>
+      ) : (
+        <>
+          {/* AFK indicator */}
+          {seat.afk && (
+            <span style={{ color: '#ef5350', fontSize: 9 }}>{t('gameWaitingTurn')}</span>
+          )}
+
+          {/* Disconnected dot */}
+          {!seat.connected && (
+            <span
+              aria-label={t('gameReconnecting')}
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: '50%',
+                background: '#ef5350',
+                flexShrink: 0,
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   );
