@@ -2,8 +2,9 @@
  * DiscardPool2D — discard history grid for one seat.
  *
  * Tiles flow left-to-right, top-to-bottom in a 6-column grid.
- * The last discarded tile pulses gold when a claim window is open and this
- * seat is identified as the discarding seat (`snapshot.discardedBySeat`).
+ * The last discarded tile shows a red pulsing outline while pendingDiscard is
+ * set (from the moment the tile lands until it is claimed or the next draw
+ * begins). The discarding seat is identified via `snapshot.discardedBySeat`.
  *
  * Phase G additions:
  *  - AnimatePresence wraps the tile list so newly discarded tiles animate in.
@@ -30,15 +31,15 @@ import type { SeatRole } from './layout-2d';
 
 const EASE_IN_OUT = 'easeInOut' as const;
 
-// Claim-window gold pulse on last discard tile
+// Red outline pulse on last discard tile — solid spread so it reads as a border
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const SHADOW_PULSE: any[] = [
-  '0 0 0px rgba(201,169,97,0)',
-  '0 0 8px rgba(201,169,97,0.8)',
-  '0 0 0px rgba(201,169,97,0)',
+  '0 0 0 2px rgba(220,38,38,0.95)',
+  '0 0 0 4px rgba(220,38,38,0.4)',
+  '0 0 0 2px rgba(220,38,38,0.95)',
 ];
 const ANIMATE_PULSE = { boxShadow: SHADOW_PULSE };
-const TRANSITION_PULSE = { duration: 1.2, repeat: Infinity, ease: EASE_IN_OUT };
+const TRANSITION_PULSE = { duration: 0.9, repeat: Infinity, ease: EASE_IN_OUT };
 
 /** New discard enters: fade + scale from 70%. */
 const TILE_INITIAL = { opacity: 0, scale: 0.7 };

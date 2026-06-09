@@ -9,7 +9,7 @@
  * per turn cycle, so the round-robin matches actual game flow).
  *
  * Special treatments preserved from the per-seat pools:
- *  - Gold pulse on the last discarded tile when a claim window is open.
+ *  - Red pulsing outline on the last discarded tile while pendingDiscard is set.
  *  - Shared-element layoutId on the viewer's most recently discarded tile
  *    (connects the discard-flight animation from PlayerHand2D).
  */
@@ -35,14 +35,15 @@ const TILE_SIZE = 'sm' as const;
 
 const EASE_IN_OUT = 'easeInOut' as const;
 
+// Red outline pulse on last discard tile — solid spread so it reads as a border
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const SHADOW_PULSE: any[] = [
-  '0 0 0px rgba(201,169,97,0)',
-  '0 0 8px rgba(201,169,97,0.8)',
-  '0 0 0px rgba(201,169,97,0)',
+  '0 0 0 2px rgba(220,38,38,0.95)',
+  '0 0 0 4px rgba(220,38,38,0.4)',
+  '0 0 0 2px rgba(220,38,38,0.95)',
 ];
 const ANIMATE_PULSE = { boxShadow: SHADOW_PULSE };
-const TRANSITION_PULSE = { duration: 1.2, repeat: Infinity, ease: EASE_IN_OUT };
+const TRANSITION_PULSE = { duration: 0.9, repeat: Infinity, ease: EASE_IN_OUT };
 
 const TILE_INITIAL = { opacity: 0, scale: 0.7 };
 const TILE_ANIMATE = { opacity: 1, scale: 1 };
