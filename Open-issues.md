@@ -113,31 +113,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-024 · Winning player's hand missing the winning tile
-
-**Symptom:** In the end game summary hand reveal, the winning player's concealed hand does not contain the tile they acquired to win. The hand is missing the drawn, pungged, chowed, or konged tile that completed their winning hand.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** The winner's hand display should include all 14 tiles, including the winning tile.
-
-**Suspected cause:** The winning tile is consumed somewhere before the hand reveal payload is constructed:
-
-- `engine.declareWin()` may be removing the tile from hand before final state is captured
-- `toClientSnapshot()` or hand redaction logic may be filtering the winning tile
-- `HandRevealPayload` construction doesn't include the winning tile from the draw/claim
-
-**Where to look:**
-
-- `packages/engine/src/game-engine.ts` — `declareWin()` method, final hand state
-- `apps/api/src/game/game.service.ts` — `handleHandEnd()`, hand reveal payload construction
-- `apps/api/src/game/snapshot.ts` — hand redaction logic
-- `apps/web/src/pages/game/game-page.tsx` — `HandRevealScreen` rendering logic
-
-**Next steps:** Log the full hand state from `engine.state.seats[winnerSeat].hand` at the moment `declareWin()` is called. Verify that the winning tile is still present in the engine's final state before constructing `HandRevealPayload`.
-
----
-
 ### BUG-08 · Viewer discard tiles not visible in the center of the table — 3D UI
 
 **Symptom:** The viewer's own discard tiles (pile in center-south zone) do not appear visible in the 3D scene.
