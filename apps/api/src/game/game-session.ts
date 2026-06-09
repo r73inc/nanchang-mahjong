@@ -95,6 +95,9 @@ export class GameSession {
   /** userId at each seat index. Immutable for the session lifetime. */
   readonly seatMap: [string, string, string, string];
 
+  /** Display name at each seat index — player displayName or bot-generated name. Immutable. */
+  readonly seatNames: readonly [string, string, string, string];
+
   /** userId → seat index (derived from seatMap, for O(1) lookup). */
   readonly userToSeat: Map<string, Seat4>;
 
@@ -185,6 +188,7 @@ export class GameSession {
     roomId: string;
     settings: RoomSettings;
     seatMap: [string, string, string, string];
+    seatNames: [string, string, string, string];
     startedAt: string;
   }) {
     this.engine = params.engine;
@@ -192,6 +196,7 @@ export class GameSession {
     this.roomId = params.roomId;
     this.settings = params.settings;
     this.seatMap = params.seatMap;
+    this.seatNames = params.seatNames;
     this.startedAt = params.startedAt;
 
     this.userToSeat = new Map(params.seatMap.map((userId, i) => [userId, i as Seat4]));

@@ -65,6 +65,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: ['1m', '2m', '3m'],
         handCount: 3,
+        seatName: 'Player',
       },
       {
         wind: 'south',
@@ -75,6 +76,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: null,
         handCount: 13,
+        seatName: 'Player',
       },
       {
         wind: 'west',
@@ -85,6 +87,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: null,
         handCount: 13,
+        seatName: 'Player',
       },
       {
         wind: 'north',
@@ -95,6 +98,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: null,
         handCount: 13,
+        seatName: 'Player',
       },
     ],
     ...overrides,
@@ -241,6 +245,7 @@ describe('PlayerHand2D render · 2DHand·render', () => {
             discards: [],
             hand: [],
             handCount: 0,
+            seatName: 'Player',
           },
           {
             wind: 'south',
@@ -251,6 +256,7 @@ describe('PlayerHand2D render · 2DHand·render', () => {
             discards: [],
             hand: null,
             handCount: 13,
+            seatName: 'Player',
           },
           {
             wind: 'west',
@@ -261,6 +267,7 @@ describe('PlayerHand2D render · 2DHand·render', () => {
             discards: [],
             hand: null,
             handCount: 13,
+            seatName: 'Player',
           },
           {
             wind: 'north',
@@ -271,6 +278,7 @@ describe('PlayerHand2D render · 2DHand·render', () => {
             discards: [],
             hand: null,
             handCount: 13,
+            seatName: 'Player',
           },
         ],
       }),

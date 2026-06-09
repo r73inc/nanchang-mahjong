@@ -31,6 +31,7 @@ function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
     openMelds: [],
     connected: true,
     afk: false,
+    seatName: 'Player',
     ...overrides,
   };
 }

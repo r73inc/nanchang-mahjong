@@ -14,13 +14,6 @@ import type { SeatWind } from '@nanchang/shared';
 
 // ── Wind display tables ───────────────────────────────────────────────────────
 
-const WIND_CHAR: Record<SeatWind, string> = {
-  east: '東',
-  south: '南',
-  west: '西',
-  north: '北',
-};
-
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
   south: '#a36d3e',
@@ -75,9 +68,17 @@ export function MobilePlayerBadge2D() {
         />
         <span
           aria-hidden="true"
-          style={{ color: windColor, fontFamily: 'serif', fontSize: 11, fontWeight: 700 }}
+          style={{
+            color: windColor,
+            fontSize: 10,
+            fontWeight: 700,
+            maxWidth: 56,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
         >
-          {WIND_CHAR[seat.wind]}
+          {seat.seatName}
         </span>
         {isDealer && (
           <span

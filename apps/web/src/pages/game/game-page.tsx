@@ -498,12 +498,12 @@ function HandRevealScreen({
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{resultLabel}</h1>
           {handReveal.winnerSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
-              {t('handRevealWinner', WIND_CHAR[snapshot.seats[handReveal.winnerSeat].wind])}
+              {t('handRevealWinner', snapshot.seats[handReveal.winnerSeat].seatName)}
             </p>
           )}
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
-              {t('handRevealConcedeBy', WIND_CHAR[snapshot.seats[handReveal.concedeSeat].wind])}
+              {t('handRevealConcedeBy', snapshot.seats[handReveal.concedeSeat].seatName)}
             </p>
           )}
         </div>
@@ -522,8 +522,15 @@ function HandRevealScreen({
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-base font-bold" style={{ color: WIND_COLOR[wind] }}>
-                    {WIND_CHAR[wind]}
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: WIND_COLOR[wind] }}
+                  />
+                  <span
+                    className="text-base font-bold max-w-[120px] truncate"
+                    style={{ color: WIND_COLOR[wind] }}
+                  >
+                    {snapshot.seats[i].seatName}
                   </span>
                   {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
                   {isWinner && (
@@ -564,8 +571,11 @@ function HandRevealScreen({
                       isViewer ? 'bg-mj-gold/10' : 'bg-white/4'
                     }`}
                   >
-                    <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
-                      {WIND_CHAR[wind]}
+                    <span
+                      className="text-sm font-bold max-w-[100px] truncate"
+                      style={{ color: WIND_COLOR[wind] }}
+                    >
+                      {snapshot.seats[i].seatName}
                     </span>
                     <span className="text-xs text-mj-bone/50">
                       {counts.primary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.primary} `}
@@ -807,10 +817,10 @@ function GameEndScreen({
             <div key={i} className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <span
-                  className="w-2 h-2 rounded-full"
+                  className="w-2 h-2 rounded-full shrink-0"
                   style={{ background: WIND_COLOR[seat.wind] }}
                 />
-                <span className="text-mj-bone/70">{WIND_CHAR[seat.wind]}</span>
+                <span className="text-mj-bone/70 max-w-[110px] truncate">{seat.seatName}</span>
                 {seatPlacement && (
                   <span
                     className="text-[10px] font-bold"
@@ -900,6 +910,7 @@ function Nameplate({
         className="w-2 h-2 rounded-full shrink-0"
         style={{ background: WIND_COLOR[seat.wind] }}
       />
+      <span className="font-semibold text-mj-bone/90 max-w-[80px] truncate">{seat.seatName}</span>
       {isDealer && (
         <span
           className="text-[9px] font-bold px-1 rounded shrink-0"
@@ -1140,10 +1151,10 @@ function ActionToast({
       >
         {!isContested && (
           <span
-            className="text-[10px] font-bold tracking-widest uppercase"
+            className="text-[10px] font-bold tracking-widest uppercase max-w-[120px] truncate"
             style={{ color: WIND_COLOR[seat.wind] }}
           >
-            {WIND_CHAR[seat.wind]}
+            {seat.seatName}
           </span>
         )}
         <span
@@ -2434,7 +2445,6 @@ function WinAnnouncementOverlay({
   const { t } = useI18n();
   const hasWinner = ended?.result === 'win' && ended.winnerSeat !== undefined;
   const winnerSeat = hasWinner ? (ended!.winnerSeat as 0 | 1 | 2 | 3) : null;
-  const winnerWind = winnerSeat !== null ? snapshot.seats[winnerSeat].wind : null;
   const isViewerWinner = viewerSeat !== null && winnerSeat === viewerSeat;
   const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
 
@@ -2454,14 +2464,14 @@ function WinAnnouncementOverlay({
         className="flex flex-col items-center gap-6 text-center px-8"
         onClick={(e) => e.stopPropagation()}
       >
-        {hasWinner && winnerWind ? (
+        {hasWinner && winnerSeat !== null ? (
           <>
-            {/* Large wind character for the winner */}
+            {/* Winner name */}
             <div
-              className="text-8xl font-serif font-bold"
-              style={{ color: WIND_COLOR[winnerWind] }}
+              className="text-4xl font-serif font-bold text-center break-words max-w-xs"
+              style={{ color: WIND_COLOR[snapshot.seats[winnerSeat].wind] }}
             >
-              {WIND_CHAR[winnerWind]}
+              {snapshot.seats[winnerSeat].seatName}
             </div>
             <p
               className="text-2xl font-bold tracking-wide"

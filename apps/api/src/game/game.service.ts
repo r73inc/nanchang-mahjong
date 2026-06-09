@@ -107,6 +107,7 @@ export class GameService {
     settings: RoomSettings,
     /** Game ID assigned by RoomsService.startGame() — reuse it so room + game IDs agree. */
     gameId: string,
+    seatNames: [string, string, string, string],
   ): Promise<void> {
     const seed = (Math.random() * 0x7fff_ffff) >>> 0; // non-negative 31-bit int
     const now = new Date().toISOString();
@@ -131,6 +132,7 @@ export class GameService {
       roomId,
       settings,
       seatMap,
+      seatNames,
       startedAt: now,
     });
 
@@ -1338,6 +1340,7 @@ export class GameService {
       session.settings.ruleTopBottomJing,
       session.preGamePhase,
       botMeta,
+      session.seatNames,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }
