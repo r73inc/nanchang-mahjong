@@ -1,6 +1,16 @@
 import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class BotConfigDto {
+  @IsInt()
+  @Min(0)
+  @Max(3)
+  count!: number;
+
+  @IsIn(['easy', 'normal'])
+  difficulty!: 'easy' | 'normal';
+}
+
 export class RoomSettingsDto {
   @IsOptional()
   @IsIn(['east', 'east+south'])
@@ -42,4 +52,9 @@ export class CreateRoomDto {
   @ValidateNested()
   @Type(() => RoomSettingsDto)
   settings?: RoomSettingsDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BotConfigDto)
+  bots?: BotConfigDto;
 }

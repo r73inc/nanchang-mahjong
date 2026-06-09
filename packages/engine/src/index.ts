@@ -98,3 +98,8 @@ export { GameEngine, nextDealer } from './engine';
 
 export { replayHand } from './replay';
 export type { ReplayHandConfig } from './replay';
+
+// ── Bot decision engine ───────────────────────────────────────────────────────
+
+export { getBotDiscard, getBotClaim } from './bot/bot-engine';
+export type { BotDifficulty, BotClaimOption, BotClaimDecision } from './bot/bot-engine';
