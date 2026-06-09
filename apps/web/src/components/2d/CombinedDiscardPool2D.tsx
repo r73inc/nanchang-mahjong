@@ -107,12 +107,12 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // The pulse belongs to the last tile in the discarding seat's array.
-          // The pulse overlay is rendered inside MahjongTile2D, not on this
-          // motion.div — see note above about the repeat:Infinity bleed bug.
-          // Use optional chaining so null/undefined lastDiscard safely → false.
-          const isPulse =
-            lastDiscard?.seat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
+          // Exact coordinate match: seat + tile value. Index-based "isLast" checks
+          // are fragile because the discard array may have already advanced by the
+          // time the component renders. Matching on tile identity is unambiguous.
+          // The pulse overlay is rendered inside MahjongTile2D (isLastDiscard prop)
+          // — see module-level comment about the repeat:Infinity bleed bug.
+          const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =

@@ -2,9 +2,9 @@
  * DiscardPool2D — discard history grid for one seat.
  *
  * Tiles flow left-to-right, top-to-bottom in a 6-column grid.
- * The last discarded tile shows a red pulsing outline while pendingDiscard is
- * set (from the moment the tile lands until it is claimed or the next draw
- * begins). The discarding seat is identified via `snapshot.discardedBySeat`.
+ * The last discarded tile shows a red pulsing outline, driven by the store's
+ * `lastDiscard` field (set via game:event {kind:'discard'}). The pulse uses an
+ * exact seat+tile match rather than index position for reliability.
  *
  * Phase G additions:
  *  - AnimatePresence wraps the tile list so newly discarded tiles animate in.
@@ -70,10 +70,6 @@ export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
 
   if (discards.length === 0) return null;
 
-  // The pulse belongs to this seat if the last discard came from it.
-  // Use optional chaining so a null/undefined lastDiscard safely evaluates to false.
-  const thisSeatsDiscardIsPending = lastDiscard?.seat === seatIdx;
-
   // For the viewer's seat: the newest tile gets the layoutId from DiscardContext
   // so Framer Motion can animate the shared-element flight from PlayerHand2D.
   const isViewerSeat = viewerSeat === seatIdx;
@@ -92,12 +88,15 @@ export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
     >
       <AnimatePresence>
         {discards.map((tile, i) => {
-          const isLast = i === discards.length - 1;
-          // The pulse overlay is rendered inside MahjongTile2D, not on this
-          // motion.div — see note above about the repeat:Infinity bleed bug.
-          const isPulse = isLast && thisSeatsDiscardIsPending;
+          // Exact coordinate match: seat + tile value. Index-based "isLast" checks
+          // are fragile because the discard array may have already advanced by the
+          // time the component renders. Matching on tile identity is unambiguous.
+          // The pulse overlay is rendered inside MahjongTile2D (isLastDiscard prop)
+          // — see module-level comment about the repeat:Infinity bleed bug.
+          const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
           // Assign discard-flight layoutId only to the most recently added tile
           // (last index) of the viewer's own pool.
+          const isLast = i === discards.length - 1;
           const tileLayoutId = isLast && isViewerSeat ? flightLayoutId : undefined;
 
           return (
