@@ -39,6 +39,8 @@ import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
+import { SettlementPreview } from '../../components/game/SettlementPreview';
+import { GameWinnerPopup } from '../../components/game/GameWinnerPopup';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 import { useOrientation } from '../../hooks/use-orientation';
 
@@ -236,174 +238,50 @@ function PreGameFlow({
   // ── Step 2: Settlement preview (ruleTopBottomJing only) ────────────────────
   if (phase === 'settlement' && settlementPreview) {
     return (
-      <div
-        className="flex flex-col items-center gap-6 min-h-dvh px-6 py-8 text-center bg-mj-bg-page overflow-y-auto"
-        aria-label={t('preGameSettlementTitle')}
-      >
-        {/* Header */}
-        <div>
-          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
-            {t('preGameBonusTile')}
-          </p>
-          <h1 className="text-2xl font-serif font-bold text-mj-bone">
-            {t('preGameSettlementTitle')}
-          </h1>
-          <p className="text-sm text-mj-bone/50 mt-1">{t('preGameSettlementDesc')}</p>
-        </div>
-
-        {/* Settlement tile (large) + indicator tile (small) */}
-        <div className="flex items-end justify-center gap-4">
-          <div className="flex flex-col items-center gap-2">
-            <MahjongTile2D
-              tile={settlementPreview.settlementTile}
-              size="lg"
-              isJing
-              interactive={false}
-            />
-            <p className="text-[10px] text-mj-gold/70 font-bold uppercase tracking-wider">
-              {t('preGameBonusTile2pt')}
-            </p>
-          </div>
-          <div className="flex flex-col items-center gap-2 pb-1">
-            <MahjongTile2D tile={settlementPreview.nextTile} size="sm" interactive={false} />
-            <p className="text-[10px] text-mj-gold/50 font-bold uppercase tracking-wider">
-              {t('preGameBonusTile1pt')}
-            </p>
-          </div>
-        </div>
-
-        {/* Per-player score preview — 2pt settlement tile */}
-        <div className="flex flex-col gap-1.5 w-full max-w-xs">
-          {settlementPreview.delta.map((delta, i) => {
-            const wind = snapshot.seats[i].wind;
-            const count = settlementPreview.seatCounts[i];
-            const isViewer = i === viewerSeat;
-            return (
-              <div
-                key={i}
-                className={`flex items-center justify-between px-4 py-2 rounded-xl ${
-                  isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
-                }`}
-              >
-                <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
-                  {WIND_CHAR[wind]}
-                  {isViewer && (
-                    <span className="text-mj-bone/50 font-normal ml-1 text-xs">
-                      {t('preGameYou')}
-                    </span>
-                  )}
-                </span>
-                <span className="text-xs text-mj-bone/60">
-                  {MULT_CHAR}
-                  {count}
-                </span>
-                <span
-                  className={`text-sm font-bold tabular-nums ${
-                    delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-mj-bone/40'
-                  }`}
-                >
-                  {delta > 0 ? '+' : ''}
-                  {delta}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Per-player score preview — 1pt indicator tile */}
-        {settlementPreview.nextTileDelta.some((d) => d !== 0) && (
-          <div className="flex flex-col gap-1.5 w-full max-w-xs">
-            <p className="text-[9px] text-mj-gold/40 uppercase tracking-widest text-center">
-              {t('preGameBonusTile1pt')}
-            </p>
-            {settlementPreview.nextTileDelta.map((delta, i) => {
-              const wind = snapshot.seats[i].wind;
-              const count = settlementPreview.nextTileSeatCounts[i];
-              const isViewer = i === viewerSeat;
-              if (count === 0 && delta === 0) {
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between px-4 py-1.5 rounded-lg ${
-                      isViewer ? 'bg-mj-gold/8 border border-mj-gold/20' : 'bg-white/3'
-                    }`}
-                  >
-                    <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
-                      {WIND_CHAR[wind]}
-                    </span>
-                    <span className="text-xs text-mj-bone/30">{MULT_CHAR}0</span>
-                    <span className="text-sm font-bold tabular-nums text-mj-bone/30">0</span>
-                  </div>
-                );
-              }
-              return (
-                <div
-                  key={i}
-                  className={`flex items-center justify-between px-4 py-1.5 rounded-lg ${
-                    isViewer ? 'bg-mj-gold/8 border border-mj-gold/20' : 'bg-white/3'
-                  }`}
-                >
-                  <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
-                    {WIND_CHAR[wind]}
-                    {isViewer && (
-                      <span className="text-mj-bone/50 font-normal ml-1 text-xs">
-                        {t('preGameYou')}
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-xs text-mj-bone/60">
-                    {MULT_CHAR}
-                    {count}
-                  </span>
-                  <span
-                    className={`text-sm font-bold tabular-nums ${
-                      delta > 0
-                        ? 'text-emerald-400'
-                        : delta < 0
-                          ? 'text-red-400'
-                          : 'text-mj-bone/40'
-                    }`}
-                  >
-                    {delta > 0 ? '+' : ''}
-                    {delta}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <>
+        <SettlementPreview
+          settlementPreview={settlementPreview}
+          snapshot={snapshot}
+          viewerSeat={viewerSeat}
+        />
 
         {/* Viewer's own hand — always visible so they can count their bonus tiles */}
-        {myHand.length > 0 && (
-          <div className="w-full max-w-sm">
-            <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider mb-2">
-              {t('preGameYourHand')}
-            </p>
-            <div className="flex flex-wrap justify-center gap-1">
-              {myHand.map((tile, i) => (
-                <MahjongTile2D
-                  key={`${tile}-${i}`}
-                  tile={tile}
-                  size="xs"
-                  interactive={false}
-                  isJing={
-                    tile === settlementPreview.settlementTile || tile === settlementPreview.nextTile
-                  }
-                />
-              ))}
+        <div className="flex flex-col items-center px-6 pb-24 max-w-xs mx-auto">
+          {myHand.length > 0 && (
+            <div className="w-full">
+              <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider mb-2">
+                {t('preGameYourHand')}
+              </p>
+              <div className="flex flex-wrap justify-center gap-1">
+                {myHand.map((tile, i) => (
+                  <MahjongTile2D
+                    key={`${tile}-${i}`}
+                    tile={tile}
+                    size="xs"
+                    interactive={false}
+                    isJing={
+                      tile === settlementPreview.settlementTile ||
+                      tile === settlementPreview.nextTile
+                    }
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {isHost ? (
-          <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
-            <WaitingDots />
-            <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+          {/* Continue button */}
+          <div className="w-full mt-8">
+            {isHost ? (
+              <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
+            ) : (
+              <div className="flex flex-col items-center gap-3">
+                <WaitingDots />
+                <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -770,13 +648,29 @@ function GameEndScreen({
   onRematch: () => void;
 }) {
   const { t } = useI18n();
+  const [showResults, setShowResults] = useState(false);
   const scores = snapshot.seats.map((s) => s.score);
   const sorted = [...scores].sort((a, b) => b - a);
   const myScore = viewerSeat !== null ? scores[viewerSeat] : null;
   const iWon = myScore !== null && myScore === sorted[0];
+  const maxScore = Math.max(...scores);
+  const winnerSeat = snapshot.seats.findIndex((s) => s.score === maxScore);
+  const winnerName = winnerSeat >= 0 ? snapshot.seats[winnerSeat].seatName : 'Player';
   const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
   const myRatingDelta =
     viewerSeat !== null && ended?.ratingDeltas ? ended.ratingDeltas[viewerSeat] : null;
+
+  // Show winner pop-up then transition to results
+  if (!showResults) {
+    return (
+      <GameWinnerPopup
+        winnerName={winnerName}
+        isViewer={iWon}
+        duration={3000}
+        onClose={() => setShowResults(true)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">

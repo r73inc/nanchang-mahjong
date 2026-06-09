@@ -1,0 +1,107 @@
+import { useEffect, useState } from 'react';
+import { useSound } from '../../hooks/use-sound';
+import { useI18n } from '../../i18n';
+
+interface GameWinnerPopupProps {
+  winnerName: string;
+  isViewer: boolean;
+  duration?: number; // ms before auto-close
+  onClose: () => void;
+}
+
+export function GameWinnerPopup({
+  winnerName,
+  isViewer,
+  duration = 3000,
+  onClose,
+}: GameWinnerPopupProps) {
+  const { t } = useI18n();
+  const { playChime } = useSound();
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    playChime();
+  }, [playChime]);
+
+  useEffect(() => {
+    if (!isVisible) {
+      onClose();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setIsVisible(false);
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [isVisible, duration, onClose]);
+
+  if (!isVisible) return null;
+
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 bg-black/40"
+      onClick={() => setIsVisible(false)}
+    >
+      <div className="animate-scale-in text-center px-8" onClick={(e) => e.stopPropagation()}>
+        <h1
+          className="text-5xl md:text-6xl font-serif font-bold mb-4 leading-tight"
+          style={{
+            color: isViewer ? '#7fc299' : '#c9a961',
+            textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            animation: 'pulse-scale 0.6s ease-out',
+          }}
+        >
+          {isViewer ? t('gameWinnerPopupYou') : t('gameWinnerPopupOther', winnerName)}
+        </h1>
+        <p className="text-sm text-mj-bone/70 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          {t('gameWinnerPopupWaiting')}
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.5);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes pulse-scale {
+          0% {
+            transform: scale(0.5);
+            opacity: 0;
+          }
+          50% {
+            transform: scale(1.1);
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        .animate-scale-in {
+          animation: scale-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+      `}</style>
+    </div>
+  );
+}
