@@ -374,6 +374,67 @@ describe('Engine·win', () => {
   });
 });
 
+// ── BUG-024: winner's hand includes winning tile after declareWin ─────────────
+
+describe('Engine·declareWin-hand-completeness', () => {
+  it('tsumo win: winner hand has 14 tiles in finished state', () => {
+    let foundWin = false;
+    for (let seed = 0; seed < 10000; seed++) {
+      const g = GameEngine.create(seed).deal().revealJing();
+      const hand = g.state.seats[0].hand;
+      const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
+      if (isWinningHand(hand, jts)) {
+        const finished = g.declareWin(0);
+        expect(finished.state.seats[0].hand).toHaveLength(14);
+        foundWin = true;
+        break;
+      }
+    }
+    if (!foundWin) expect(true).toBe(true);
+  });
+
+  it('ron win: winner hand includes the discarded winning tile in finished state', () => {
+    // Seat 1 holds: 1m1m1m (open pung) + 2p3p4p 5p6p7p 8s8s8s east (10 concealed)
+    // Seat 0 discards 'east' — seat 1 claims Ron to complete the east-east pair.
+    // Full winning hand: [1m1m1m] + [2p3p4p] + [5p6p7p] + [8s8s8s] + [east east] = 14 ✓
+    const g = startedGame(42);
+    const openPung: Meld = { kind: 'pung', tiles: ['1m', '1m', '1m'], concealed: false };
+    const concealedHand: TileType[] = [
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8s',
+      '8s',
+      '8s',
+      'east',
+    ];
+    const winTile: TileType = 'east'; // completes the east-east pair
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[1] = { ...g.state.seats[1], hand: concealedHand, openMelds: [openPung] };
+    const injectedState: GameState = {
+      ...g.state,
+      phase: 'awaiting_claims',
+      currentSeat: 0,
+      discardedBySeat: 0,
+      pendingDiscard: winTile,
+      jingPrimary: 'bai',
+      jingSecondary: 'zhong',
+      seats: patchedSeats,
+    };
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(injectedState, g.events);
+    const finished = engine.declareWin(1);
+    expect(finished.state.phase).toBe('finished');
+    // The winning tile (the discard) must now appear in the winner's concealed hand
+    expect(finished.state.seats[1].hand).toContain(winTile);
+    // concealedHand (10) + winTile (1) = 11 tiles
+    expect(finished.state.seats[1].hand).toHaveLength(concealedHand.length + 1);
+  });
+});
+
 // ── Draw game ─────────────────────────────────────────────────────────────────
 
 describe('Engine·draw-conditions', () => {

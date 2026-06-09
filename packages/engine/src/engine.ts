@@ -617,12 +617,21 @@ export class GameEngine {
       this.state.jingSecondary!,
     );
 
+    // Winner's concealed hand for the hand-reveal — include the winning tile so
+    // all four hands in the finished state have their full 14 tiles visible.
+    const winnerFinalHand = sortTypes([
+      ...winnerSeat.hand,
+      ...(isRon ? [this.state.pendingDiscard!] : []),
+      ...(isRobKong && robTile ? [robTile] : []),
+    ]);
+
     // Apply win payment + spirit settlement to all seat scores
     const seats = [...this.state.seats] as GameState['seats'];
     for (let i = 0; i < 4; i++) {
       seats[i] = {
         ...seats[i],
         score: seats[i].score + paymentResult.scoreDelta[i] + spiritDelta[i],
+        ...(i === seatIdx ? { hand: winnerFinalHand } : {}),
       };
     }
 

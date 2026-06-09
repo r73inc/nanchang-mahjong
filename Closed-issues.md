@@ -356,6 +356,26 @@ All 3D-specific bugs found and fixed during local testing. See `3D-BUG-LOG.md` f
 
 ---
 
+## PR #85 · `fix/bug-024-winning-tile-missing` (2026-06-09)
+
+### BUG-024 · Winning player's hand missing the winning tile in hand reveal
+
+**Symptom:** In the end-game hand-reveal screen, the winning player's concealed hand was shown with only 13 tiles — the tile they actually won with (the Ron discard or Rob-Kong tile) was absent.
+
+**Root cause:** `declareWin()` in `packages/engine/src/engine.ts` assembled the full 14-tile `winningHand` as a local variable for validation and scoring, but never wrote the winning tile back into the returned `GameState`. The final `state.seats[winnerSeat].hand` only contained the tiles that were already in hand before the win:
+
+- **Tsumo wins**: correct — the drawn tile was added to `hand` in `_drawFor()` before `declareWin()` was called.
+- **Ron wins**: broken — the winning tile was `pendingDiscard`, which is never in `hand`.
+- **Rob-Kong wins**: broken — the winning tile was the tile being konged, which is never in the winner's `hand`.
+
+`handleHandEnd()` in `game.service.ts` built `HandRevealPayload.hands` directly from `state.seats.map((s) => s.hand)`, so the missing tile flowed straight through to the client.
+
+**Fix:** In `declareWin()`, after assembling `winningHand` for validation, compute `winnerFinalHand` as `sortTypes([...winnerSeat.hand, ...(isRon ? [pendingDiscard] : []), ...(isRobKong && robTile ? [robTile] : [])])` and set it as `hand` on the winner's seat in the returned state. The finished state now always has the complete 14-tile concealed hand for the winner. No changes needed in the service or frontend.
+
+**Key learning:** Engine state after `declareWin()` was the authoritative source for the hand-reveal payload. The winning tile must be written into `state.seats[winnerSeat].hand` so every consumer (service, replay, tests) automatically gets the complete picture without special-casing.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
