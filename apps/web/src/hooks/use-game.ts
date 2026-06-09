@@ -47,6 +47,7 @@ export function useGame(gameId: string, spectate = false) {
     setPendingMove,
     setToast,
     setGameError,
+    setYourTurnFlash,
     reset,
   } = useGameStore();
 
@@ -168,11 +169,22 @@ export function useGame(gameId: string, spectate = false) {
       setGameError(payload.code);
     };
 
+    // game:your-turn — fires when the server gives the viewer a fresh draw.
+    // Show the centre-screen flash for 2s; only act on the viewer's own seat.
+    const handleYourTurn = (payload: { seat: 0 | 1 | 2 | 3 }) => {
+      const viewerSeat = useGameStore.getState().snapshot?.viewerSeat ?? null;
+      if (viewerSeat === payload.seat) {
+        setYourTurnFlash(true);
+        setTimeout(() => setYourTurnFlash(false), 2000);
+      }
+    };
+
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
     // on the FE we just need a toast/alert if it's us.
     // We rely on game:snapshot reflecting the afk flag; no extra state needed here.
 
     s.on('game:snapshot', handleSnapshot);
+    s.on('game:your-turn', handleYourTurn);
     s.on('game:claim-window', handleClaimWindow);
     s.on('game:rob-kong-window', handleClaimWindow); // same UI
     s.on('game:contested', handleContested);
@@ -219,6 +231,7 @@ export function useGame(gameId: string, spectate = false) {
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {
       s.off('game:snapshot', handleSnapshot);
+      s.off('game:your-turn', handleYourTurn);
       s.off('game:claim-window', handleClaimWindow);
       s.off('game:rob-kong-window', handleClaimWindow);
       s.off('game:contested', handleContested);

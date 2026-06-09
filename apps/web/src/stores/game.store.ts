@@ -104,6 +104,12 @@ interface GameStore {
    */
   gameError: string | null;
 
+  /**
+   * True for ~2 seconds after game:your-turn fires for the viewer's seat.
+   * Drives the YourTurnBanner centre-screen flash.
+   */
+  yourTurnFlash: boolean;
+
   // ── Actions ────────────────────────────────────────────────────────────────
   setSnapshot: (s: ClientGameState) => void;
   setEnded: (e: GameEndedPayload) => void;
@@ -117,6 +123,7 @@ interface GameStore {
   setPendingMove: (v: boolean) => void;
   setToast: (t: GameToast | null) => void;
   setGameError: (err: string | null) => void;
+  setYourTurnFlash: (v: boolean) => void;
   reset: () => void;
 }
 
@@ -133,6 +140,7 @@ const initialState = {
   toast: null,
   connection: 'live' as ConnectionStatus,
   gameError: null,
+  yourTurnFlash: false,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -170,6 +178,8 @@ export const useGameStore = create<GameStore>()(
     setToast: (toast) => set({ toast }),
 
     setGameError: (gameError) => set({ gameError }),
+
+    setYourTurnFlash: (yourTurnFlash) => set({ yourTurnFlash }),
 
     reset: () => set(initialState),
   })),

@@ -55,7 +55,13 @@
   /* Kill the viewport turn-glow animation, fall back to a static inset border. */
   .mj-turn-border-glow {
     animation: none !important;
-    box-shadow: inset 0 0 0 2px rgba(201, 169, 97, 0.7) !important;
+    box-shadow: inset 0 0 0 3px rgba(201, 169, 97, 0.85) !important;
+  }
+
+  /* Kill the turn-pill pulse, fall back to a static gold outline. */
+  .mj-your-turn-pill {
+    animation: none !important;
+    box-shadow: 0 0 0 2px rgba(201, 169, 97, 0.6) !important;
   }
 }
 
@@ -67,18 +73,35 @@
   0%,
   100% {
     box-shadow:
-      inset 0 0 0 2px rgba(201, 169, 97, 0.45),
-      inset 0 0 20px rgba(201, 169, 97, 0.12);
+      inset 0 0 0 3px rgba(201, 169, 97, 0.6),
+      inset 0 0 30px rgba(201, 169, 97, 0.2);
   }
   50% {
     box-shadow:
-      inset 0 0 0 3px rgba(201, 169, 97, 0.9),
-      inset 0 0 32px rgba(201, 169, 97, 0.3);
+      inset 0 0 0 5px rgba(201, 169, 97, 1),
+      inset 0 0 55px rgba(201, 169, 97, 0.42);
   }
 }
 
 .mj-turn-border-glow {
   animation: mj-turn-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Active turn pill pulse (desktop turn indicator) ────────────────────────── */
+@keyframes mj-your-turn-pill {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 169, 97, 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(201, 169, 97, 0.45),
+      0 0 14px rgba(201, 169, 97, 0.3);
+  }
+}
+
+.mj-your-turn-pill {
+  animation: mj-your-turn-pill 1.6s ease-in-out infinite;
 }
 
 /* ── Mobile game surface — long-press context menu suppression ───────────────── */
