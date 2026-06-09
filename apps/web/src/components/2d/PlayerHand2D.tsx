@@ -232,11 +232,17 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
     if (selectedId === null) return;
     const entry = localOrder.find((e) => e.id === selectedId);
     if (!entry) return;
-    setLastDiscardId(entry.id);
-    setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
+    // Jing tiles go through a separate confirmation sheet before the actual
+    // discard fires. Don't remove optimistically — let the server snapshot
+    // (or a cancel) settle the hand instead.
+    const isJingTile = entry.tile === jingPrimary || entry.tile === jingSecondary;
+    if (!isJingTile) {
+      setLastDiscardId(entry.id);
+      setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
+    }
     setSelectedId(null);
     onDiscard(entry.tile);
-  }, [selectedId, localOrder, onDiscard, setLastDiscardId]);
+  }, [selectedId, localOrder, onDiscard, setLastDiscardId, jingPrimary, jingSecondary]);
 
   const handleTileSelect = useCallback(
     (entry: LocalEntry) => {
@@ -249,8 +255,13 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
         // Store the tile's local ID in context before removing it from localOrder,
         // so DiscardPool2D can use the matching layoutId for the discard flight.
         if (selectedId === entry.id) {
-          setLastDiscardId(entry.id);
-          setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
+          // Same guard as handleConfirmDiscard: jing tiles go through the
+          // confirm sheet, so don't optimistically remove from localOrder.
+          const isJingTile = entry.tile === jingPrimary || entry.tile === jingSecondary;
+          if (!isJingTile) {
+            setLastDiscardId(entry.id);
+            setLocalOrder((prev) => prev.filter((e) => e.id !== entry.id));
+          }
           setSelectedId(null);
           onDiscard(entry.tile);
         } else {
@@ -259,7 +270,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
         }
       }
     },
-    [confirmMode, selectedId, onDiscard, setLastDiscardId],
+    [confirmMode, selectedId, onDiscard, setLastDiscardId, jingPrimary, jingSecondary],
   );
 
   // ── Render ────────────────────────────────────────────────────────────────
