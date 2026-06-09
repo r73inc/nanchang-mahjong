@@ -117,6 +117,15 @@ const config: Config = {
           '70%': { opacity: '1', transform: 'scale(1.0)' },
           '100%': { opacity: '0', transform: 'scale(0.96)' },
         },
+        'winner-pop': {
+          '0%': { opacity: '0', transform: 'scale(0.5)' },
+          '50%': { opacity: '1', transform: 'scale(1.1)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'winner-fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       animation: {
         'tile-discard': 'tile-discard 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
@@ -124,6 +133,8 @@ const config: Config = {
         'last-discard-pulse': 'last-discard-pulse 1600ms ease-in-out infinite',
         shimmer: 'shimmer 1400ms linear infinite',
         'your-turn-flash': 'your-turn-flash 2000ms ease-out forwards',
+        'winner-pop': 'winner-pop 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'winner-fade-in': 'winner-fade-in 600ms ease-out forwards',
       },
     },
   },
