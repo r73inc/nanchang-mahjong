@@ -5,7 +5,6 @@ import { api } from '../lib/api';
 
 export interface MyProfile {
   sub: string;
-  email: string;
   handle: string;
   displayName: string;
   role: 'user' | 'admin';

@@ -15,8 +15,6 @@ vi.mock('./stores/auth.store', () => ({
 vi.mock('./hooks/use-auth', () => ({
   useSignin: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSignup: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useForgotPassword: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useConfirmReset: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useChangePassword: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSignout: () => vi.fn(),
@@ -55,17 +53,5 @@ describe('App routing', () => {
     renderApp('/home');
     // HomeStubPage renders the home title
     expect(screen.getByText(/nanchang mahjong/i)).toBeInTheDocument();
-  });
-
-  it('shows the forgot-password page at /forgot-password', () => {
-    mockUseAuthStore.mockReturnValue(null as never);
-    renderApp('/forgot-password');
-    expect(screen.getByRole('button', { name: /send reset code/i })).toBeInTheDocument();
-  });
-
-  it('shows the confirm-reset page at /confirm-reset', () => {
-    mockUseAuthStore.mockReturnValue(null as never);
-    renderApp('/confirm-reset');
-    expect(screen.getByLabelText(/reset code/i)).toBeInTheDocument();
   });
 });

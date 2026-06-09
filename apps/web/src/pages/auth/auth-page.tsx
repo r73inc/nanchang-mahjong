@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { SignupSchema, SigninSchema, type SignupInput, type SigninInput } from '@nanchang/shared';
 import { useSignup, useSignin, getApiErrorMessage } from '../../hooks/use-auth';
 import { FormField } from '../../components/ui/form-field';
@@ -37,12 +37,12 @@ function SignInForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <form onSubmit={onSubmit} noValidate>
       <FormField
-        label={t('email')}
-        type="email"
-        autoComplete="email"
-        placeholder={t('emailPlaceholder')}
-        error={errors.email}
-        {...register('email')}
+        label={t('handle')}
+        type="text"
+        autoComplete="username"
+        placeholder={t('handlePlaceholder')}
+        error={errors.handle}
+        {...register('handle')}
       />
       <FormField
         label={t('password')}
@@ -52,12 +52,6 @@ function SignInForm({ onSuccess }: { onSuccess: () => void }) {
         error={errors.password}
         {...register('password')}
       />
-
-      <div className="flex justify-end mb-1 -mt-1">
-        <Link to="/forgot-password" className="text-[12px] font-semibold text-mj-gold">
-          {t('forgotPassword')}
-        </Link>
-      </div>
 
       {apiError && (
         <p role="alert" className="mb-3 text-xs text-mj-loss-light font-medium">
@@ -128,14 +122,6 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
         hint={t('handleHint')}
         error={errors.handle}
         {...register('handle')}
-      />
-      <FormField
-        label={t('email')}
-        type="email"
-        autoComplete="email"
-        placeholder={t('emailPlaceholder')}
-        error={errors.email}
-        {...register('email')}
       />
       <FormField
         label={t('password')}

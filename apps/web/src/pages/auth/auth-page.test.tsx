@@ -37,10 +37,8 @@ describe('AuthPage', () => {
     const signinTab = screen.getByRole('tab', { name: /sign in/i });
     expect(signinTab).toHaveAttribute('aria-selected', 'true');
     // Form fields
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/handle/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    // Forgot password link
-    expect(screen.getByRole('link', { name: /forgot password/i })).toBeInTheDocument();
   });
 
   it('switches to the sign-up form when the Create Account tab is clicked', async () => {

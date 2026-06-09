@@ -5,13 +5,13 @@ import type { UserRole } from '../common/interfaces/authenticated-user.interface
 
 export interface UserProfile {
   sub: string;
-  email: string;
   handle: string;
   displayName: string;
   role: UserRole;
   createdAt: string;
   updatedAt: string;
   disabled: boolean;
+  passwordHash?: string;
   gamesPlayed?: number;
   gamesWon?: number;
   rating?: number;
@@ -34,10 +34,10 @@ export interface PublicProfile {
 
 export interface CreateProfileInput {
   sub: string;
-  email: string;
   handle: string;
   displayName: string;
   role: UserRole;
+  passwordHash: string;
 }
 
 @Injectable()
@@ -46,15 +46,13 @@ export class UsersService {
 
   async createProfile(input: CreateProfileInput): Promise<UserProfile> {
     const now = new Date().toISOString();
-    // Profile item: primary key = USER#<sub>/PROFILE, GSI-1 = EMAIL#<email>/USER
     const item: UserProfile & Record<string, unknown> = {
       ...DK.userProfile(input.sub),
-      ...DK.userByEmail(input.email),
       sub: input.sub,
-      email: input.email.toLowerCase(),
       handle: input.handle.toLowerCase(),
       displayName: input.displayName,
       role: input.role,
+      passwordHash: input.passwordHash,
       createdAt: now,
       updatedAt: now,
       disabled: false,
@@ -92,16 +90,12 @@ export class UsersService {
     return (res.Item as UserProfile) ?? null;
   }
 
-  async findByEmail(email: string): Promise<UserProfile | null> {
-    const res = await this.db.query({
-      IndexName: 'gsi1',
-      KeyConditionExpression: 'gsi1pk = :pk AND gsi1sk = :sk',
-      ExpressionAttributeValues: {
-        ':pk': DK.userByEmail(email).gsi1pk,
-        ':sk': 'USER',
-      },
-    });
-    return (res.Items?.[0] as UserProfile) ?? null;
+  /** Look up the owner sub from the handle lock, then load the full profile. */
+  async findByHandle(handle: string): Promise<UserProfile | null> {
+    const lockRes = await this.db.get({ Key: DK.handleLock(handle) });
+    const lock = lockRes.Item as { ownerSub?: string } | undefined;
+    if (!lock?.ownerSub) return null;
+    return this.findBySub(lock.ownerSub);
   }
 
   async isHandleTaken(handle: string): Promise<boolean> {
@@ -130,6 +124,16 @@ export class UsersService {
     });
   }
 
+  async updatePasswordHash(sub: string, passwordHash: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.db.update({
+      Key: DK.userProfile(sub),
+      UpdateExpression: 'SET passwordHash = :hash, updatedAt = :now',
+      ExpressionAttributeValues: { ':hash': passwordHash, ':now': now },
+      ConditionExpression: 'attribute_exists(PK)',
+    });
+  }
+
   /** Soft-delete: anonymise PII, keep the record for history integrity. */
   async softDelete(sub: string): Promise<void> {
     const profile = await this.findBySub(sub);
@@ -139,7 +143,7 @@ export class UsersService {
     await this.db.update({
       Key: DK.userProfile(sub),
       UpdateExpression:
-        'SET email = :anon, displayName = :anon, disabled = :true, deletedAt = :now, updatedAt = :now REMOVE gsi1pk, gsi1sk',
+        'SET displayName = :anon, disabled = :true, deletedAt = :now, updatedAt = :now REMOVE passwordHash',
       ExpressionAttributeValues: {
         ':anon': `deleted-${sub}`,
         ':true': true,
@@ -254,7 +258,7 @@ export class UsersService {
   }
 
   /**
-   * Search users by handle prefix. Returns only public fields (no email).
+   * Search users by handle prefix. Returns only public fields.
    * Used for friend search — safe to expose to any authenticated user.
    */
   async searchPublic(query: string): Promise<PublicProfile[]> {
@@ -274,21 +278,20 @@ export class UsersService {
   }
 
   /**
-   * List all user profiles. Optionally filter by handle or email substring.
-   * Uses a table Scan — acceptable at ≤50 users. Add a GSI partition key
-   * (e.g. gsi2pk='USERS') for cursor-based pagination if the user count grows.
+   * List all user profiles. Optionally filter by handle substring.
+   * Uses a table Scan — acceptable at ≤50 users.
    */
   async listAll(search?: string): Promise<UserProfile[]> {
     const filter = search?.trim().toLowerCase();
     const res = await this.db.scan({
       FilterExpression: filter
-        ? 'begins_with(PK, :pkPrefix) AND SK = :sk AND (contains(handle, :s) OR contains(#em, :s))'
+        ? 'begins_with(PK, :pkPrefix) AND SK = :sk AND contains(handle, :s)'
         : 'begins_with(PK, :pkPrefix) AND SK = :sk',
       ExpressionAttributeValues: filter
         ? { ':pkPrefix': 'USER#', ':sk': 'PROFILE', ':s': filter }
         : { ':pkPrefix': 'USER#', ':sk': 'PROFILE' },
-      ...(filter && { ExpressionAttributeNames: { '#em': 'email' } }),
     });
-    return (res.Items ?? []) as UserProfile[];
+    // Strip passwordHash before returning to callers
+    return ((res.Items ?? []) as UserProfile[]).map(({ passwordHash: _ph, ...rest }) => rest);
   }
 }

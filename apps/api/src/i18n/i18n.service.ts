@@ -16,10 +16,8 @@ const LOCALES: Record<SupportedLang, Record<string, string>> = { en, zh };
 const MESSAGE_TO_KEY: Record<string, I18nKey> = {
   // auth.service.ts
   'Handle is already taken': 'auth.handleAlreadyTaken',
-  'Email is already registered': 'auth.emailAlreadyRegistered',
-  'Email or handle already in use.': 'auth.emailOrHandleInUse',
-  'Invalid email or password': 'auth.invalidCredentials',
-  'Account not found': 'auth.invalidCredentials', // intentionally opaque
+  'Invalid handle or password': 'auth.invalidCredentials',
+  'Account not found': 'auth.invalidCredentials',
   'Account is disabled': 'auth.accountDisabled',
   'Current password is incorrect': 'auth.wrongCurrentPassword',
   'Invalid or expired refresh token': 'auth.invalidRefreshToken',
@@ -45,12 +43,9 @@ const MESSAGE_TO_KEY: Record<string, I18nKey> = {
 };
 
 /**
- * Minimal server-side i18n service for Phase 2.
- *
+ * Minimal server-side i18n service.
  * Translates error messages thrown by the API based on the caller's
  * preferred language (resolved from the Accept-Language header).
- *
- * Future phases will extend this with email / push-notification copy.
  */
 @Injectable()
 export class I18nService {

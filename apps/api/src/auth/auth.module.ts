@@ -4,7 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { CognitoService } from './cognito.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { InvitesModule } from '../invites/invites.module';
@@ -24,7 +23,7 @@ import type { AppConfig } from '../config/configuration';
     InvitesModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, CognitoService, JwtStrategy],
-  exports: [AuthService, CognitoService],
+  providers: [AuthService, JwtStrategy],
+  exports: [AuthService],
 })
 export class AuthModule {}

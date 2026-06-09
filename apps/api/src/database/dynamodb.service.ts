@@ -81,7 +81,6 @@ export class DynamoDBService implements OnModuleInit {
 // Single-table design: PK / SK primary key, gsi1pk / gsi1sk for GSI-1.
 export const DK = {
   userProfile: (sub: string) => ({ PK: `USER#${sub}`, SK: 'PROFILE' }),
-  userByEmail: (email: string) => ({ gsi1pk: `EMAIL#${email.toLowerCase()}`, gsi1sk: 'USER' }),
   handleLock: (handle: string) => ({ PK: `HANDLE#${handle.toLowerCase()}`, SK: 'LOCK' }),
   invite: (code: string) => ({ PK: `INVITE#${code.toUpperCase()}`, SK: 'META' }),
   invitesByStatus: (status: string) => ({ gsi1pk: `INVITE_STATUS#${status}` }),

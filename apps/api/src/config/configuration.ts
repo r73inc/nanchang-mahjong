@@ -15,7 +15,6 @@ export const configuration = () => ({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     endpoints: {
       dynamodb: process.env.AWS_ENDPOINT_URL_DYNAMODB,
-      cognitoIdp: process.env.AWS_ENDPOINT_URL_COGNITO_IDP,
       s3: process.env.AWS_ENDPOINT_URL_S3,
     },
   },
@@ -26,11 +25,6 @@ export const configuration = () => ({
 
   s3: {
     replayBucket: process.env.S3_REPLAY_BUCKET ?? 'nanchang-replays',
-  },
-
-  cognito: {
-    userPoolId: process.env.COGNITO_USER_POOL_ID ?? '',
-    clientId: process.env.COGNITO_CLIENT_ID ?? '',
   },
 
   rateLimit: {

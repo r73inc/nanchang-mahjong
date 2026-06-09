@@ -3,7 +3,6 @@ import { randomBytes } from 'crypto';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { InvitesService, type InviteRecord } from '../invites/invites.service';
 import { UsersService, type UserProfile } from '../users/users.service';
-import { CognitoService } from '../auth/cognito.service';
 import type { UserRole } from '../common/interfaces/authenticated-user.interface';
 
 export interface AuditEntry {
@@ -20,7 +19,6 @@ export class AdminService {
     private readonly db: DynamoDBService,
     private readonly invites: InvitesService,
     private readonly users: UsersService,
-    private readonly cognito: CognitoService,
   ) {}
 
   // ── Audit log ────────────────────────────────────────────────────────────────
@@ -81,9 +79,6 @@ export class AdminService {
       throw new ForbiddenException('Cannot change your own role');
     }
     await this.users.setRole(targetSub, role);
-    // Mirror role change to Cognito custom attribute so JWTs issued after
-    // this point carry the new role.
-    await this.cognito.adminSetRole(targetSub, role);
     await this.writeAudit({ action: 'SET_ROLE', actorSub, targetSub, payload: { role } });
   }
 
@@ -92,13 +87,6 @@ export class AdminService {
       throw new ForbiddenException('Cannot disable your own account');
     }
     await this.users.setDisabled(targetSub, disabled);
-    // Mirror enable/disable to Cognito so the user cannot exchange credentials
-    // for a new JWT while disabled.
-    if (disabled) {
-      await this.cognito.adminDisableUser(targetSub);
-    } else {
-      await this.cognito.adminEnableUser(targetSub);
-    }
     await this.writeAudit({
       action: disabled ? 'DISABLE_USER' : 'ENABLE_USER',
       actorSub,

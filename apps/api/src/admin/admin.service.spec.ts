@@ -4,18 +4,12 @@ import { AdminService } from './admin.service';
 import { DynamoDBService } from '../database/dynamodb.service';
 import { InvitesService } from '../invites/invites.service';
 import { UsersService } from '../users/users.service';
-import { CognitoService } from '../auth/cognito.service';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────
 
 const mockDb = { put: jest.fn() };
 const mockInvites = { create: jest.fn(), revoke: jest.fn(), listAll: jest.fn() };
 const mockUsers = { listAll: jest.fn(), setRole: jest.fn(), setDisabled: jest.fn() };
-const mockCognito = {
-  adminSetRole: jest.fn(),
-  adminDisableUser: jest.fn(),
-  adminEnableUser: jest.fn(),
-};
 
 // ── Suite ──────────────────────────────────────────────────────────────────────
 
@@ -28,9 +22,6 @@ describe('AdminService', () => {
     mockInvites.create.mockResolvedValue({ code: 'TESTCODE', status: 'active' });
     mockUsers.setRole.mockResolvedValue(undefined);
     mockUsers.setDisabled.mockResolvedValue(undefined);
-    mockCognito.adminSetRole.mockResolvedValue(undefined);
-    mockCognito.adminDisableUser.mockResolvedValue(undefined);
-    mockCognito.adminEnableUser.mockResolvedValue(undefined);
 
     const module = await Test.createTestingModule({
       providers: [
@@ -38,7 +29,6 @@ describe('AdminService', () => {
         { provide: DynamoDBService, useValue: mockDb },
         { provide: InvitesService, useValue: mockInvites },
         { provide: UsersService, useValue: mockUsers },
-        { provide: CognitoService, useValue: mockCognito },
       ],
     }).compile();
 
@@ -55,7 +45,7 @@ describe('AdminService', () => {
     });
 
     it('throws BadRequestException when expiresAt is in the past', async () => {
-      const pastDate = new Date(Date.now() - 60_000).toISOString(); // 1 minute ago
+      const pastDate = new Date(Date.now() - 60_000).toISOString();
       await expect(service.createInvites('admin-sub', 1, pastDate)).rejects.toThrow(
         BadRequestException,
       );
@@ -63,7 +53,6 @@ describe('AdminService', () => {
     });
 
     it('throws BadRequestException when expiresAt is exactly now (<=)', async () => {
-      // Use a date that is definitely in the past by the time the check runs
       const justNow = new Date(Date.now() - 1).toISOString();
       await expect(service.createInvites('admin-sub', 1, justNow)).rejects.toThrow(
         BadRequestException,
@@ -71,7 +60,7 @@ describe('AdminService', () => {
     });
 
     it('accepts a future expiresAt without throwing', async () => {
-      const futureDate = new Date(Date.now() + 86_400_000).toISOString(); // +1 day
+      const futureDate = new Date(Date.now() + 86_400_000).toISOString();
       await expect(service.createInvites('admin-sub', 1, futureDate)).resolves.not.toThrow();
       expect(mockInvites.create).toHaveBeenCalledTimes(1);
     });
@@ -95,10 +84,9 @@ describe('AdminService', () => {
       expect(mockUsers.setRole).not.toHaveBeenCalled();
     });
 
-    it('delegates to UsersService and CognitoService for a different target', async () => {
+    it('delegates to UsersService for a different target', async () => {
       await service.setRole('admin-sub', 'user-sub', 'admin');
       expect(mockUsers.setRole).toHaveBeenCalledWith('user-sub', 'admin');
-      expect(mockCognito.adminSetRole).toHaveBeenCalledWith('user-sub', 'admin');
     });
   });
 
@@ -112,16 +100,14 @@ describe('AdminService', () => {
       expect(mockUsers.setDisabled).not.toHaveBeenCalled();
     });
 
-    it('calls adminDisableUser on Cognito when disabled=true', async () => {
+    it('calls setDisabled with disabled=true', async () => {
       await service.setDisabled('admin-sub', 'user-sub', true);
-      expect(mockCognito.adminDisableUser).toHaveBeenCalledWith('user-sub');
-      expect(mockCognito.adminEnableUser).not.toHaveBeenCalled();
+      expect(mockUsers.setDisabled).toHaveBeenCalledWith('user-sub', true);
     });
 
-    it('calls adminEnableUser on Cognito when disabled=false', async () => {
+    it('calls setDisabled with disabled=false', async () => {
       await service.setDisabled('admin-sub', 'user-sub', false);
-      expect(mockCognito.adminEnableUser).toHaveBeenCalledWith('user-sub');
-      expect(mockCognito.adminDisableUser).not.toHaveBeenCalled();
+      expect(mockUsers.setDisabled).toHaveBeenCalledWith('user-sub', false);
     });
   });
 });

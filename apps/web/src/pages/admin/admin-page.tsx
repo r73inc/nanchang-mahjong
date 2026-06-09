@@ -313,8 +313,6 @@ function UserRow({
         )}
       </div>
 
-      <p className="text-[11px] text-mj-bone/40">{user.email}</p>
-
       {/* Action buttons — hidden for the acting admin's own row */}
       {!isSelf && (
         <div className="flex gap-1.5 flex-wrap pt-0.5">

@@ -21,7 +21,6 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { AppModule } from '../src/app.module';
 import { DynamoDBService } from '../src/database/dynamodb.service';
-import { CognitoService } from '../src/auth/cognito.service';
 
 // ── Token helper ──────────────────────────────────────────────────────────────
 
@@ -29,7 +28,6 @@ function makeToken(
   jwtService: JwtService,
   payload: {
     sub: string;
-    email: string;
     handle: string;
     displayName: string;
     role: 'user' | 'admin';
@@ -47,10 +45,7 @@ function buildDdbStub() {
   store.set('USER#alice-sub|PROFILE', {
     PK: 'USER#alice-sub',
     SK: 'PROFILE',
-    gsi1pk: 'EMAIL#alice@example.com',
-    gsi1sk: 'USER',
     sub: 'alice-sub',
-    email: 'alice@example.com',
     handle: 'alice',
     displayName: 'Alice',
     role: 'user',
@@ -64,10 +59,7 @@ function buildDdbStub() {
   store.set('USER#bob-sub|PROFILE', {
     PK: 'USER#bob-sub',
     SK: 'PROFILE',
-    gsi1pk: 'EMAIL#bob@example.com',
-    gsi1sk: 'USER',
     sub: 'bob-sub',
-    email: 'bob@example.com',
     handle: 'bob',
     displayName: 'Bob',
     role: 'user',
@@ -183,9 +175,7 @@ function buildDdbStub() {
           if (pkPrefix && !String(item.PK ?? '').startsWith(pkPrefix)) return false;
           if (sk && item.SK !== sk) return false;
           if (search) {
-            const handleMatch = String(item.handle ?? '').includes(search);
-            const emailMatch = String(item.email ?? '').includes(search);
-            return handleMatch || emailMatch;
+            return String(item.handle ?? '').includes(search);
           }
           return true;
         });
@@ -276,23 +266,6 @@ function buildDdbStub() {
   };
 }
 
-// ── Cognito stub ──────────────────────────────────────────────────────────────
-
-function buildCognitoStub() {
-  return {
-    adminCreateUser: jest.fn(() => Promise.resolve('new-sub')),
-    initiateAuth: jest.fn(() => Promise.resolve('some-sub')),
-    forgotPassword: jest.fn(() => Promise.resolve()),
-    confirmForgotPassword: jest.fn(() => Promise.resolve()),
-    changePassword: jest.fn(() => Promise.resolve()),
-    adminDeleteUser: jest.fn(() => Promise.resolve()),
-    adminGetUserAttributes: jest.fn(() => Promise.resolve([])),
-    adminDisableUser: jest.fn(() => Promise.resolve()),
-    adminEnableUser: jest.fn(() => Promise.resolve()),
-    adminSetRole: jest.fn(() => Promise.resolve()),
-  };
-}
-
 // ── Test setup ────────────────────────────────────────────────────────────────
 
 describe('Friends & Profile (e2e)', () => {
@@ -307,8 +280,6 @@ describe('Friends & Profile (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(DynamoDBService)
       .useValue(ddbStub)
-      .overrideProvider(CognitoService)
-      .useValue(buildCognitoStub())
       .compile();
 
     app = moduleRef.createNestApplication(new FastifyAdapter({ logger: false }));
@@ -321,14 +292,12 @@ describe('Friends & Profile (e2e)', () => {
     const jwtService = moduleRef.get(JwtService);
     aliceToken = makeToken(jwtService, {
       sub: 'alice-sub',
-      email: 'alice@example.com',
       handle: 'alice',
       displayName: 'Alice',
       role: 'user',
     });
     bobToken = makeToken(jwtService, {
       sub: 'bob-sub',
-      email: 'bob@example.com',
       handle: 'bob',
       displayName: 'Bob',
       role: 'user',
@@ -349,7 +318,6 @@ describe('Friends & Profile (e2e)', () => {
       expect(res.statusCode).toBe(200);
       const body = res.json<Record<string, unknown>>();
       expect(body.handle).toBe('alice');
-      expect(body.email).toBe('alice@example.com');
       expect(body.gamesPlayed).toBe(0);
       expect(body.rating).toBe(1500);
     });
@@ -553,7 +521,6 @@ describe('Friends & Profile (e2e)', () => {
         PK: 'USER#bob-sub',
         SK: 'PROFILE',
         sub: 'bob-sub',
-        email: 'bob@example.com',
         handle: 'bob',
         displayName: 'Bob',
         role: 'user',

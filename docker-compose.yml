@@ -63,27 +63,6 @@ services:
       "
     restart: 'no'
 
-  # ── Cognito Local ────────────────────────────────────────────
-  # Prod equivalent: AWS Cognito User Pool (ap-east-1)
-  cognito:
-    image: jagregory/cognito-local:latest
-    container_name: mj-cognito
-    ports:
-      - '9229:9229'
-    volumes:
-      - cognito-data:/app/.cognito
-
-  # ── MailHog ──────────────────────────────────────────────────
-  # Prod equivalent: AWS SES (ap-east-1)
-  # Catches all outbound email locally.
-  # Web UI → http://localhost:8025
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: mj-mailhog
-    ports:
-      - '1025:1025' # SMTP (API sends here)
-      - '8025:8025' # Web UI (read captured emails)
-
   # ── Redis ────────────────────────────────────────────────────
   # Prod equivalent: ElastiCache Serverless Redis
   # Used for Socket.IO multi-instance pub/sub and rate-limit state.
@@ -101,4 +80,3 @@ services:
 volumes:
   dynamodb-data: # persists DynamoDB table data across container/PC restarts
   minio-data:
-  cognito-data:

@@ -1,0 +1,185 @@
+/**
+ * seed.ts
+ *
+ * Creates all local dev accounts in DynamoDB:
+ *   - 1 admin  (handle: admin,   password: Admin1234!)
+ *   - 4 players (handle: player1–4, password: Player1234!)
+ *
+ * Also generates an initial invite code so the admin can invite family members.
+ *
+ * Pre-requisites:
+ *   - docker compose up -d
+ *   - pnpm --filter @nanchang/api run setup:local
+ *
+ * Usage:
+ *   pnpm --filter @nanchang/api run seed
+ *
+ * Idempotent: existing accounts (by handle) are skipped cleanly.
+ */
+
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
+
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+
+const REGION = process.env.AWS_REGION ?? 'ap-east-1';
+const DDB_ENDPOINT = process.env.AWS_ENDPOINT_URL_DYNAMODB ?? 'http://localhost:8000';
+const TABLE_NAME = process.env.DYNAMODB_TABLE_NAME ?? 'nanchang_main';
+const CREDENTIALS = { accessKeyId: 'local', secretAccessKey: 'local' };
+
+const BCRYPT_ROUNDS = 10;
+
+// ── Key helpers (inline to avoid importing compiled app) ─────────────────────
+
+const DK = {
+  userProfile: (sub: string) => ({ PK: `USER#${sub}`, SK: 'PROFILE' }),
+  handleLock: (handle: string) => ({ PK: `HANDLE#${handle.toLowerCase()}`, SK: 'LOCK' }),
+  invite: (code: string) => ({ PK: `INVITE#${code.toUpperCase()}`, SK: 'META' }),
+};
+
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.randomBytes(8);
+  return Array.from(bytes)
+    .map((b) => chars[b % chars.length])
+    .join('');
+}
+
+// ── Account definitions ───────────────────────────────────────────────────────
+
+interface AccountDef {
+  handle: string;
+  displayName: string;
+  password: string;
+  role: 'admin' | 'user';
+}
+
+const ACCOUNTS: AccountDef[] = [
+  { handle: 'admin', displayName: 'Admin', password: 'Admin1234!', role: 'admin' },
+  { handle: 'player1', displayName: 'Player One', password: 'Player1234!', role: 'user' },
+  { handle: 'player2', displayName: 'Player Two', password: 'Player1234!', role: 'user' },
+  { handle: 'player3', displayName: 'Player Three', password: 'Player1234!', role: 'user' },
+  { handle: 'player4', displayName: 'Player Four', password: 'Player1234!', role: 'user' },
+];
+
+// ── Seed a single account ────────────────────────────────────────────────────
+
+async function seedAccount(
+  account: AccountDef,
+  db: DynamoDBDocumentClient,
+): Promise<string | null> {
+  const { handle, displayName, password, role } = account;
+
+  // Check if handle lock already exists — skip if so
+  const lockKey = DK.handleLock(handle);
+  const existing = await db.send(new GetCommand({ TableName: TABLE_NAME, Key: lockKey }));
+  if (existing.Item) {
+    const existingSub = existing.Item.ownerSub as string;
+    console.log(`  ✓ @${handle} already exists (sub: ${existingSub}) — skipping.`);
+    return existingSub;
+  }
+
+  const sub = crypto.randomUUID();
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  const now = new Date().toISOString();
+
+  // Write profile
+  await db.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        ...DK.userProfile(sub),
+        sub,
+        handle: handle.toLowerCase(),
+        displayName,
+        role,
+        passwordHash,
+        createdAt: now,
+        updatedAt: now,
+        disabled: false,
+      },
+      ConditionExpression: 'attribute_not_exists(PK)',
+    }),
+  );
+
+  // Write handle lock
+  await db.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: { ...lockKey, ownerSub: sub, createdAt: now },
+    }),
+  );
+
+  console.log(`  ✓ @${handle} created (sub: ${sub}, role: ${role})`);
+  return sub;
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  console.log('🌱  Seeding local dev accounts…\n');
+
+  const ddbRaw = new DynamoDBClient({
+    region: REGION,
+    endpoint: DDB_ENDPOINT,
+    credentials: CREDENTIALS,
+  });
+  const db = DynamoDBDocumentClient.from(ddbRaw, {
+    marshallOptions: { removeUndefinedValues: true },
+  });
+
+  let adminSub: string | null = null;
+
+  for (const account of ACCOUNTS) {
+    const sub = await seedAccount(account, db);
+    if (account.role === 'admin' && sub) {
+      adminSub = sub;
+    }
+  }
+
+  // Generate one initial invite code (for the admin to share)
+  const inviteCode = generateInviteCode();
+  const now = new Date().toISOString();
+  await db.send(
+    new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        ...DK.invite(inviteCode),
+        gsi1pk: 'INVITE_STATUS#active',
+        gsi1sk: inviteCode,
+        code: inviteCode,
+        status: 'active',
+        createdBy: adminSub ?? 'seed',
+        createdAt: now,
+        updatedAt: now,
+        note: 'Initial invite generated by seed script',
+      },
+    }),
+  );
+
+  console.log(`
+───────────────────────────────────────────────
+  ✅  Seed complete!
+
+  Admin:
+    Handle:   admin
+    Password: Admin1234!
+
+  Players (all share password: Player1234!):
+    @player1  @player2  @player3  @player4
+
+  Initial invite code: ${inviteCode}
+  Share this code with a new family member.
+───────────────────────────────────────────────
+`);
+}
+
+main().catch((err) => {
+  console.error('❌ seed failed:', err);
+  process.exit(1);
+});

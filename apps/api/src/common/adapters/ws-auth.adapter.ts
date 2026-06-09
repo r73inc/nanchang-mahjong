@@ -23,7 +23,6 @@ import type { AppConfig } from '../../config/configuration';
 
 interface JwtPayload {
   sub: string;
-  email: string;
   handle: string;
   displayName: string;
   role: 'user' | 'admin';

@@ -1,28 +1,21 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
-import { CognitoService } from './cognito.service';
 import { UsersService } from '../users/users.service';
 import { InvitesService } from '../invites/invites.service';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-const mockCognito = {
-  adminCreateUser: jest.fn(),
-  initiateAuth: jest.fn(),
-  forgotPassword: jest.fn(),
-  confirmForgotPassword: jest.fn(),
-  changePassword: jest.fn(),
-  adminDeleteUser: jest.fn(),
-};
-
 const mockUsers = {
   isHandleTaken: jest.fn(),
   createProfile: jest.fn(),
   findBySub: jest.fn(),
+  findByHandle: jest.fn(),
   softDelete: jest.fn(),
+  updatePasswordHash: jest.fn(),
   getOrThrow: jest.fn(),
 };
 
@@ -56,8 +49,9 @@ const mockConfig = {
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
+const HASH = '$2b$12$testhashfortesting1234567890123456789012345678901234'; // fake hash
+
 const signupDto = {
-  email: 'alice@example.com',
   password: 'Password1',
   handle: 'alice',
   displayName: 'Alice',
@@ -66,13 +60,13 @@ const signupDto = {
 
 const userProfile = {
   sub: 'sub-123',
-  email: 'alice@example.com',
   handle: 'alice',
   displayName: 'Alice',
   role: 'user' as const,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
   disabled: false,
+  passwordHash: HASH,
 };
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
@@ -86,7 +80,6 @@ describe('AuthService', () => {
     const module = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: CognitoService, useValue: mockCognito },
         { provide: UsersService, useValue: mockUsers },
         { provide: InvitesService, useValue: mockInvites },
         { provide: JwtService, useValue: mockJwt },
@@ -103,7 +96,6 @@ describe('AuthService', () => {
     beforeEach(() => {
       mockInvites.validateOrThrow.mockResolvedValue(undefined);
       mockUsers.isHandleTaken.mockResolvedValue(false);
-      mockCognito.adminCreateUser.mockResolvedValue('sub-123');
       mockInvites.redeemOrThrow.mockResolvedValue(undefined);
       mockUsers.createProfile.mockResolvedValue(userProfile);
     });
@@ -118,86 +110,90 @@ describe('AuthService', () => {
       expect(mockInvites.validateOrThrow).toHaveBeenCalledWith('INVITE01');
     });
 
-    it('atomically redeems the invite after Cognito user creation', async () => {
-      await service.signup(signupDto);
-      const cognitoCallOrder = mockCognito.adminCreateUser.mock.invocationCallOrder[0];
-      const redeemCallOrder = mockInvites.redeemOrThrow.mock.invocationCallOrder[0];
-      expect(cognitoCallOrder).toBeLessThan(redeemCallOrder);
-    });
-
     it('throws ConflictException when handle is already taken', async () => {
       mockUsers.isHandleTaken.mockResolvedValue(true);
       await expect(service.signup(signupDto)).rejects.toThrow(ConflictException);
-      expect(mockCognito.adminCreateUser).not.toHaveBeenCalled();
-    });
-
-    it('throws ConflictException when email is already registered in Cognito', async () => {
-      mockCognito.adminCreateUser.mockRejectedValue(
-        Object.assign(new Error(), { code: 'EMAIL_ALREADY_REGISTERED' }),
-      );
-      await expect(service.signup(signupDto)).rejects.toThrow(ConflictException);
-    });
-
-    it('throws BadRequestException for invalid password policy', async () => {
-      mockCognito.adminCreateUser.mockRejectedValue(
-        Object.assign(new Error(), { code: 'INVALID_PASSWORD' }),
-      );
-      await expect(service.signup(signupDto)).rejects.toThrow(BadRequestException);
+      expect(mockUsers.createProfile).not.toHaveBeenCalled();
     });
 
     it('creates the user profile with role=user', async () => {
       await service.signup(signupDto);
       expect(mockUsers.createProfile).toHaveBeenCalledWith(
-        expect.objectContaining({ role: 'user' }),
+        expect.objectContaining({ role: 'user', handle: 'alice' }),
       );
+    });
+
+    it('stores a bcrypt hash (not the raw password)', async () => {
+      await service.signup(signupDto);
+      const createCall = mockUsers.createProfile.mock.calls[0][0] as { passwordHash: string };
+      expect(createCall.passwordHash).toMatch(/^\$2[aby]\$/);
+      expect(createCall.passwordHash).not.toContain('Password1');
     });
   });
 
   // ── signin ─────────────────────────────────────────────────────────────────
 
   describe('signin', () => {
+    const realHash = bcrypt.hashSync('Password1', 4); // fast rounds for tests
+
     beforeEach(() => {
-      mockCognito.initiateAuth.mockResolvedValue('sub-123');
-      mockUsers.findBySub.mockResolvedValue(userProfile);
+      mockUsers.findByHandle.mockResolvedValue({ ...userProfile, passwordHash: realHash });
     });
 
     it('returns tokens for valid credentials', async () => {
-      const result = await service.signin({ email: 'alice@example.com', password: 'Password1' });
+      const result = await service.signin({ handle: 'alice', password: 'Password1' });
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
     });
 
-    it('throws UnauthorizedException for invalid Cognito credentials', async () => {
-      mockCognito.initiateAuth.mockRejectedValue(
-        Object.assign(new Error(), { code: 'INVALID_CREDENTIALS' }),
+    it('throws UnauthorizedException for an unknown handle', async () => {
+      mockUsers.findByHandle.mockResolvedValue(null);
+      await expect(service.signin({ handle: 'nobody', password: 'Password1' })).rejects.toThrow(
+        UnauthorizedException,
       );
-      await expect(
-        service.signin({ email: 'alice@example.com', password: 'wrong' }),
-      ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('throws UnauthorizedException when DDB profile is not found', async () => {
-      mockUsers.findBySub.mockResolvedValue(null);
-      await expect(
-        service.signin({ email: 'alice@example.com', password: 'Password1' }),
-      ).rejects.toThrow(UnauthorizedException);
+    it('throws UnauthorizedException for a wrong password', async () => {
+      await expect(service.signin({ handle: 'alice', password: 'WrongPass1' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws UnauthorizedException when account is disabled', async () => {
-      mockUsers.findBySub.mockResolvedValue({ ...userProfile, disabled: true });
-      await expect(
-        service.signin({ email: 'alice@example.com', password: 'Password1' }),
-      ).rejects.toThrow(UnauthorizedException);
+      mockUsers.findByHandle.mockResolvedValue({
+        ...userProfile,
+        disabled: true,
+        passwordHash: realHash,
+      });
+      await expect(service.signin({ handle: 'alice', password: 'Password1' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
-  // ── forgotPassword ─────────────────────────────────────────────────────────
+  // ── changePassword ─────────────────────────────────────────────────────────
 
-  describe('forgotPassword', () => {
-    it('delegates to cognito.forgotPassword', async () => {
-      mockCognito.forgotPassword.mockResolvedValue(undefined);
-      await service.forgotPassword('alice@example.com');
-      expect(mockCognito.forgotPassword).toHaveBeenCalledWith('alice@example.com');
+  describe('changePassword', () => {
+    const realHash = bcrypt.hashSync('OldPass1', 4);
+
+    beforeEach(() => {
+      mockUsers.findBySub.mockResolvedValue({ ...userProfile, passwordHash: realHash });
+      mockUsers.updatePasswordHash.mockResolvedValue(undefined);
+    });
+
+    it('updates the password hash when current password is correct', async () => {
+      await service.changePassword('sub-123', 'OldPass1', 'NewPass1');
+      expect(mockUsers.updatePasswordHash).toHaveBeenCalledWith(
+        'sub-123',
+        expect.stringMatching(/^\$2[aby]\$/),
+      );
+    });
+
+    it('throws UnauthorizedException when current password is wrong', async () => {
+      await expect(service.changePassword('sub-123', 'WrongPass', 'NewPass1')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockUsers.updatePasswordHash).not.toHaveBeenCalled();
     });
   });
 
@@ -207,7 +203,6 @@ describe('AuthService', () => {
     it('returns a new accessToken for a valid refresh token', () => {
       mockJwt.verify.mockReturnValue({
         sub: 'sub-123',
-        email: 'alice@example.com',
         handle: 'alice',
         displayName: 'Alice',
         role: 'user',
@@ -238,18 +233,10 @@ describe('AuthService', () => {
   // ── deleteAccount ──────────────────────────────────────────────────────────
 
   describe('deleteAccount', () => {
-    it('soft-deletes the DDB profile then hard-deletes from Cognito', async () => {
+    it('soft-deletes the DDB profile', async () => {
       mockUsers.softDelete.mockResolvedValue(undefined);
-      mockCognito.adminDeleteUser.mockResolvedValue(undefined);
-
-      await service.deleteAccount('sub-123', 'alice@example.com');
-
+      await service.deleteAccount('sub-123');
       expect(mockUsers.softDelete).toHaveBeenCalledWith('sub-123');
-      expect(mockCognito.adminDeleteUser).toHaveBeenCalledWith('alice@example.com');
-      // Ensure soft-delete happened before hard-delete
-      const softOrder = mockUsers.softDelete.mock.invocationCallOrder[0];
-      const hardOrder = mockCognito.adminDeleteUser.mock.invocationCallOrder[0];
-      expect(softOrder).toBeLessThan(hardOrder);
     });
   });
 });

@@ -1,13 +1,8 @@
-import {
-  Injectable,
-  ConflictException,
-  UnauthorizedException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { CognitoService } from './cognito.service';
+import * as bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InvitesService } from '../invites/invites.service';
 import type { AppConfig } from '../config/configuration';
@@ -20,12 +15,13 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+const BCRYPT_ROUNDS = 12;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private readonly cognito: CognitoService,
     private readonly users: UsersService,
     private readonly invites: InvitesService,
     private readonly jwt: JwtService,
@@ -33,7 +29,7 @@ export class AuthService {
   ) {}
 
   async signup(dto: SignupDto): Promise<AuthTokens> {
-    // 1. Validate invite (fast-fail read — atomic gate is in step 4)
+    // 1. Validate invite (fast-fail read — atomic gate is in step 3)
     await this.invites.validateOrThrow(dto.inviteCode);
 
     // 2. Check handle availability
@@ -42,104 +38,73 @@ export class AuthService {
       throw new ConflictException('Handle is already taken');
     }
 
-    // 3. Create Cognito user (validates email uniqueness in Cognito)
-    let cognitoSub: string;
-    try {
-      cognitoSub = await this.cognito.adminCreateUser(dto.email, dto.password);
-    } catch (err: unknown) {
-      const e = err as { code?: string };
-      if (e.code === 'EMAIL_ALREADY_REGISTERED') {
-        throw new ConflictException('Email is already registered');
-      }
-      if (e.code === 'INVALID_PASSWORD') {
-        throw new BadRequestException(
-          'Password does not meet requirements (min 8 chars, upper, lower, number)',
-        );
-      }
-      throw err;
-    }
+    // 3. Hash password and generate sub
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const sub = randomUUID();
 
     // 4. Atomically redeem the invite (prevents races)
-    await this.invites.redeemOrThrow(dto.inviteCode, cognitoSub);
+    await this.invites.redeemOrThrow(dto.inviteCode, sub);
 
     // 5. Create user profile in DDB
     await this.users.createProfile({
-      sub: cognitoSub,
-      email: dto.email,
+      sub,
       handle: dto.handle,
       displayName: dto.displayName,
       role: 'user',
+      passwordHash,
     });
 
     const user: AuthenticatedUser = {
-      sub: cognitoSub,
-      email: dto.email,
-      handle: dto.handle,
+      sub,
+      handle: dto.handle.toLowerCase(),
       displayName: dto.displayName,
       role: 'user',
     };
 
+    this.logger.log(`Signup: handle=${user.handle} sub=${sub}`);
     return this.issueTokens(user);
   }
 
   async signin(dto: SigninDto): Promise<AuthTokens> {
-    let cognitoSub: string;
-    try {
-      cognitoSub = await this.cognito.initiateAuth(dto.email, dto.password);
-    } catch (err: unknown) {
-      const e = err as { code?: string };
-      if (e.code === 'INVALID_CREDENTIALS' || e.code === 'TOO_MANY_ATTEMPTS') {
-        throw new UnauthorizedException('Invalid email or password');
-      }
-      throw err;
-    }
+    const profile = await this.users.findByHandle(dto.handle);
 
-    const profile = await this.users.findBySub(cognitoSub);
-    if (!profile) {
-      throw new UnauthorizedException('Account not found');
+    if (!profile || !profile.passwordHash) {
+      throw new UnauthorizedException('Invalid handle or password');
     }
     if (profile.disabled) {
       throw new UnauthorizedException('Account is disabled');
     }
 
+    const valid = await bcrypt.compare(dto.password, profile.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid handle or password');
+    }
+
     return this.issueTokens({
       sub: profile.sub,
-      email: profile.email,
       handle: profile.handle,
       displayName: profile.displayName,
       role: profile.role,
     });
   }
 
-  async forgotPassword(email: string): Promise<void> {
-    // CognitoService already suppresses UserNotFoundException to prevent enumeration
-    await this.cognito.forgotPassword(email);
-  }
+  async changePassword(sub: string, currentPassword: string, newPassword: string): Promise<void> {
+    const profile = await this.users.findBySub(sub);
+    if (!profile || !profile.passwordHash) {
+      throw new UnauthorizedException('Account not found');
+    }
 
-  async confirmForgotPassword(email: string, code: string, newPassword: string): Promise<void> {
-    await this.cognito.confirmForgotPassword(email, code, newPassword);
-  }
-
-  /** change-password requires the user to re-authenticate via Cognito using their current creds. */
-  async changePassword(
-    userEmail: string,
-    currentPassword: string,
-    newPassword: string,
-  ): Promise<void> {
-    // Re-auth to get a fresh Cognito access token for ChangePassword
-    let cognitoAccessToken: string;
-    try {
-      cognitoAccessToken = await this.getCognitoAccessToken(userEmail, currentPassword);
-    } catch {
+    const valid = await bcrypt.compare(currentPassword, profile.passwordHash);
+    if (!valid) {
       throw new UnauthorizedException('Current password is incorrect');
     }
-    await this.cognito.changePassword(cognitoAccessToken, currentPassword, newPassword);
+
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.users.updatePasswordHash(sub, newHash);
   }
 
-  async deleteAccount(sub: string, email: string): Promise<void> {
-    // Soft-delete profile in DDB (anonymise PII), then remove from Cognito
+  async deleteAccount(sub: string): Promise<void> {
     await this.users.softDelete(sub);
-    await this.cognito.adminDeleteUser(email);
     this.logger.log(`Account deleted: sub=${sub}`);
   }
 
@@ -157,7 +122,6 @@ export class AuthService {
     const accessToken = this.jwt.sign(
       {
         sub: payload.sub,
-        email: payload.email,
         handle: payload.handle,
         displayName: payload.displayName,
         role: payload.role,
@@ -174,7 +138,6 @@ export class AuthService {
   private issueTokens(user: AuthenticatedUser): AuthTokens {
     const base = {
       sub: user.sub,
-      email: user.email,
       handle: user.handle,
       displayName: user.displayName,
       role: user.role,
@@ -190,28 +153,5 @@ export class AuthService {
       { secret: jwtCfg.refreshSecret, expiresIn: jwtCfg.refreshExpiresIn },
     );
     return { accessToken, refreshToken };
-  }
-
-  /** Re-authenticates to get a raw Cognito access token string (needed for ChangePassword API). */
-  private async getCognitoAccessToken(email: string, password: string): Promise<string> {
-    const { CognitoIdentityProviderClient, InitiateAuthCommand } =
-      await import('@aws-sdk/client-cognito-identity-provider');
-    const awsCfg = this.config.get('aws', { infer: true });
-    const cognitoCfg = this.config.get('cognito', { infer: true });
-
-    const client = new CognitoIdentityProviderClient({
-      region: awsCfg.region,
-      ...(awsCfg.endpoints.cognitoIdp && { endpoint: awsCfg.endpoints.cognitoIdp }),
-    });
-    const res = await client.send(
-      new InitiateAuthCommand({
-        AuthFlow: 'USER_PASSWORD_AUTH',
-        ClientId: cognitoCfg.clientId,
-        AuthParameters: { USERNAME: email, PASSWORD: password },
-      }),
-    );
-    const token = res.AuthenticationResult?.AccessToken;
-    if (!token) throw new Error('No Cognito access token returned');
-    return token;
   }
 }
