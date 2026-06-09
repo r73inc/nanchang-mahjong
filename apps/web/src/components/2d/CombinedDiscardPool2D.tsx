@@ -30,24 +30,13 @@ const TILE_SHADOW_ROLE: SeatRole = 'bottom';
 const TILE_SIZE = 'sm' as const;
 
 // ── Animation constants ───────────────────────────────────────────────────────
-// Framer Motion animate requires mutable arrays for keyframes — plain arrays
-// and objects are used intentionally (not `as const`).
-
-const EASE_IN_OUT = 'easeInOut' as const;
-
-// Red outline pulse on last discard tile — solid spread so it reads as a border
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const SHADOW_PULSE: any[] = [
-  '0 0 0 2px rgba(220,38,38,0.95)',
-  '0 0 0 4px rgba(220,38,38,0.4)',
-  '0 0 0 2px rgba(220,38,38,0.95)',
-];
-const ANIMATE_PULSE = { boxShadow: SHADOW_PULSE };
-const TRANSITION_PULSE = { duration: 0.9, repeat: Infinity, ease: EASE_IN_OUT };
 
 const TILE_INITIAL = { opacity: 0, scale: 0.7 };
 const TILE_ANIMATE = { opacity: 1, scale: 1 };
 const TILE_TRANSITION = { duration: 0.2 };
+// NOTE: The last-discard red pulse lives inside MahjongTile2D (isLastDiscard prop),
+// not here. Keeping pulse logic in the pool's motion.div caused Framer Motion to
+// apply repeat:Infinity to opacity/scale from `initial`, making the tile invisible.
 
 // ── Interleave helper ─────────────────────────────────────────────────────────
 
@@ -84,17 +73,19 @@ function buildInterleavedDiscards(seats: readonly ClientSeatState[]): DiscardEnt
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CombinedDiscardPool2D() {
-  const snapshot = useGameStore((s) => s.snapshot);
+  // Granular selectors — only the fields needed to decide which tile pulses.
+  const seats = useGameStore((s) => s.snapshot?.seats);
+  const pendingDiscard = useGameStore((s) => s.snapshot?.pendingDiscard ?? null);
+  const discardedBySeat = useGameStore((s) => s.snapshot?.discardedBySeat ?? null);
+  // viewerSeat can be null for spectators; default to 0 (same guard as GameTable2D).
+  const viewerSeat = (useGameStore((s) => s.snapshot?.viewerSeat) ?? 0) as 0 | 1 | 2 | 3;
   const { lastDiscardId } = useDiscardContext();
 
-  if (!snapshot) return null;
+  if (!seats) return null;
 
-  const entries = buildInterleavedDiscards(snapshot.seats);
+  const entries = buildInterleavedDiscards(seats);
   if (entries.length === 0) return null;
 
-  const { discardedBySeat, seats } = snapshot;
-  // viewerSeat can be null in the type; default to 0 (same guard as GameTable2D).
-  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const viewerDiscardCount = seats[viewerSeat].discards.length;
 
   return (
@@ -115,11 +106,12 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Pulse the tile that was just discarded while pendingDiscard is set
-          // (from the moment the tile lands until claimed or next draw begins).
+          // Which tile is the pending discard? Seat + last position in that seat's array.
           const isThisTheLastDiscard =
             discardedBySeat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
-          const isPulse = isThisTheLastDiscard && snapshot.pendingDiscard !== null;
+          // The pulse overlay is rendered inside MahjongTile2D, not on this
+          // motion.div — see note above about the repeat:Infinity bleed bug.
+          const isPulse = isThisTheLastDiscard && pendingDiscard !== null;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =
@@ -131,8 +123,8 @@ export function CombinedDiscardPool2D() {
             <motion.div
               key={`${seatIdx}-${posInSeat}`}
               initial={TILE_INITIAL}
-              animate={isPulse ? ANIMATE_PULSE : TILE_ANIMATE}
-              transition={isPulse ? TRANSITION_PULSE : TILE_TRANSITION}
+              animate={TILE_ANIMATE}
+              transition={TILE_TRANSITION}
               style={{ borderRadius: 4 }}
             >
               <MahjongTile2D
@@ -141,6 +133,7 @@ export function CombinedDiscardPool2D() {
                 role={TILE_SHADOW_ROLE}
                 interactive={false}
                 layoutId={tileLayoutId}
+                isLastDiscard={isPulse}
               />
             </motion.div>
           );
