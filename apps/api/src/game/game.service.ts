@@ -24,7 +24,10 @@ import {
   isWinningHand,
   typeOf,
   stepAbove,
+  getBotDiscard,
+  getBotClaim,
 } from '@nanchang/engine';
+import type { BotClaimOption } from '@nanchang/engine';
 import type {
   TileType,
   SeatWind,
@@ -56,6 +59,10 @@ import { PushService } from '../push/push.service';
 
 /** Claim window length in seconds. */
 const CLAIM_WINDOW_SECS = 8;
+
+/** Bot simulated think-time range (ms). */
+const BOT_THINK_MIN_MS = 1_000;
+const BOT_THINK_MAX_MS = 3_000;
 
 /** Rob-kong window length in seconds (shorter than regular claim window). */
 const ROB_KONG_WINDOW_SECS = 5;
@@ -163,6 +170,13 @@ export class GameService {
     return this.sessions.get(gameId);
   }
 
+  /** Resolves after a random human-like delay (BOT_THINK_MIN_MS – BOT_THINK_MAX_MS). */
+  private botDelay(): Promise<void> {
+    const ms =
+      Math.floor(Math.random() * (BOT_THINK_MAX_MS - BOT_THINK_MIN_MS + 1)) + BOT_THINK_MIN_MS;
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   private destroySession(gameId: string): void {
     const session = this.sessions.get(gameId);
     if (!session) return;
@@ -243,6 +257,20 @@ export class GameService {
       if (seat !== undefined) {
         this.logger.debug(`Player seat ${seat} disconnected from game ${session.gameId}`);
         this.broadcastPlayerConnection(session, seat, 'reconnecting');
+
+        // If this is a bot game and no human remains connected, tear down immediately
+        // to avoid orphaned sessions running forever.
+        if (session.hasBots) {
+          const anyHumanConnected = [0, 1, 2, 3].some(
+            (i) => !session.isBotSeat(i as Seat4) && session.connState[i as Seat4].connected,
+          );
+          if (!anyHumanConnected) {
+            this.logger.log(
+              `All humans disconnected from bot game ${session.gameId} — destroying session`,
+            );
+            this.destroySession(session.gameId);
+          }
+        }
       } else if (session.spectators.has(userId)) {
         session.spectators.delete(userId);
       }
@@ -270,10 +298,12 @@ export class GameService {
     const seat = session.getSeat(userId);
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
-    // Only the current dealer (host of this hand) may advance.
+    // Only the dealer (host of this hand) may advance.
+    // If the dealer seat is a bot, any connected human player may advance.
     const dealerSeat = session.engine.state.dealerSeat;
     const dealerUserId = session.seatMap[dealerSeat];
-    if (userId !== dealerUserId) {
+    const dealerIsBot = session.isBotSeat(dealerSeat);
+    if (!dealerIsBot && userId !== dealerUserId) {
       this.logger.warn(
         `advance-pre-game rejected: userId=${userId} is not dealer (${dealerUserId})`,
       );
@@ -403,9 +433,11 @@ export class GameService {
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
     // Only the dealer (host of the just-finished hand) may advance.
+    // If the dealer seat is a bot, any connected human player may advance.
     const dealerSeat = session.engine.state.dealerSeat;
     const dealerUserId = session.seatMap[dealerSeat];
-    if (userId !== dealerUserId) return this.emitError(socket, 'NOT_HOST');
+    const dealerIsBot = session.isBotSeat(dealerSeat);
+    if (!dealerIsBot && userId !== dealerUserId) return this.emitError(socket, 'NOT_HOST');
 
     const pending = session.pendingHandEnd;
     if (!pending) return this.emitError(socket, 'INVALID_PHASE');
@@ -455,6 +487,13 @@ export class GameService {
       }
     }
 
+    // Bot seat: schedule the async turn handler and return immediately.
+    // The bot will think, discard, and advance the game without a socket.
+    if (session.isBotSeat(activeSeat)) {
+      void this.handleBotTurn(session, activeSeat);
+      return;
+    }
+
     session.touch(activeSeat);
     session.clearAfkTimers();
 
@@ -466,8 +505,7 @@ export class GameService {
 
     // Player offline — fire a push notification (no-op if not subscribed or push disabled)
     if (!socketId) {
-      const userId = session.seatMap[activeSeat];
-      void this.push.sendTurnNotification(userId, session.gameId);
+      void this.push.sendTurnNotification(session.seatMap[activeSeat], session.gameId);
     }
 
     // AFK warning: emit overlay every 20s of inactivity (D4, no forced action)
@@ -493,6 +531,40 @@ export class GameService {
     };
 
     session.afkTimers[seat] = setTimeout(warn, AFK_WARNING_INTERVAL_SECS * 1000);
+  }
+
+  /**
+   * Drive a bot's discard turn: wait for a human-like delay, then discard the
+   * tile chosen by the bot engine and open the claim window as usual.
+   */
+  private async handleBotTurn(session: GameSession, seat: Seat4): Promise<void> {
+    await this.botDelay();
+
+    // Guard: game may have ended or been conceded during the delay.
+    if (session.engine.state.phase !== 'playing' || session.engine.state.currentSeat !== seat) {
+      return;
+    }
+
+    const state = session.engine.state;
+    const jingTypes: TileType[] = [];
+    if (state.jingPrimary) jingTypes.push(state.jingPrimary);
+    if (state.jingSecondary) jingTypes.push(state.jingSecondary);
+
+    const tile = getBotDiscard(state.seats[seat].hand, jingTypes, session.getBotDifficulty(seat));
+
+    try {
+      session.engine = session.engine.discard(tile);
+      session.touch(seat);
+      session.clearAfkTimers();
+      session.moveLog.push(...getNewEvents(session));
+    } catch (err) {
+      this.logger.error(`Bot discard failed — seat ${seat}, game ${session.gameId}: ${err}`);
+      return;
+    }
+
+    this.broadcastEvent(session, { kind: 'discard', seat, tile });
+    this.broadcastSnapshots(session);
+    this.openClaimWindowAfterDiscard(session);
   }
 
   /**
@@ -537,7 +609,7 @@ export class GameService {
 
     session.openClaimWindow(eligibleSeats, eligibilityMap, CLAIM_WINDOW_SECS, { isRobKong: false });
 
-    // Send claim-window event only to eligible seats
+    // Send claim-window event only to eligible human seats
     for (const [claimSeat, actions] of eligibilityMap) {
       const socketId = session.socketIdForSeat(claimSeat);
       if (socketId && this.server) {
@@ -550,6 +622,13 @@ export class GameService {
       () => this.resolveClaimWindow(session),
       CLAIM_WINDOW_SECS * 1000,
     );
+
+    // Schedule async reactions for eligible bot seats — runs in parallel with human timer.
+    for (const [claimSeat, actions] of eligibilityMap) {
+      if (session.isBotSeat(claimSeat)) {
+        void this.handleBotReaction(session, claimSeat, actions);
+      }
+    }
   }
 
   private openRobKongWindow(session: GameSession, kongSeat: Seat4, kongTile: TileType): void {
@@ -586,6 +665,57 @@ export class GameService {
       () => this.resolveClaimWindow(session),
       ROB_KONG_WINDOW_SECS * 1000,
     );
+
+    // Schedule async win reactions for eligible bot seats.
+    for (const s of eligibleSet) {
+      if (session.isBotSeat(s)) {
+        void this.handleBotReaction(session, s, [{ kind: 'win' }]);
+      }
+    }
+  }
+
+  private async handleBotReaction(
+    session: GameSession,
+    seat: Seat4,
+    actions: ClaimAction[],
+  ): Promise<void> {
+    await this.botDelay();
+
+    const w = session.claimWindow;
+    if (!w || !w.eligibleSeats.has(seat) || w.claims.has(seat) || w.passedSeats.has(seat)) return;
+
+    const available: BotClaimOption[] = actions.map((a) => {
+      if (a.kind === 'chow')
+        return { kind: 'chow', sequences: a.sequences ?? [] } as BotClaimOption;
+      return { kind: a.kind } as BotClaimOption;
+    });
+
+    const state = session.engine.state;
+    const discardedTile = state.pendingDiscard ?? '1m';
+    const openMeldCount = state.seats[seat].openMelds.length;
+    const decision = getBotClaim(
+      available,
+      discardedTile,
+      openMeldCount,
+      session.getBotDifficulty(seat),
+    );
+
+    if (!decision) {
+      w.passedSeats.add(seat);
+    } else {
+      const claim: IncomingClaim = {
+        seat,
+        kind: decision.kind,
+        ...(decision.kind === 'chow' ? { sequence: decision.sequence } : {}),
+      };
+      w.claims.set(seat, claim);
+    }
+
+    if (session.claimWindowComplete) {
+      clearTimeout(session.claimTimer);
+      session.claimTimer = undefined;
+      this.resolveClaimWindow(session);
+    }
   }
 
   /**
@@ -1076,12 +1206,13 @@ export class GameService {
             : 'win';
 
     // ── Update player stats + compute ELO deltas (before broadcast so payload is rich) ──
-    const ratingDeltas = await this.stats
-      .updateAfterGame(session.seatMap, placement)
-      .catch((err) => {
-        this.logger.error(`Stats update failed for game ${session.gameId}: ${err}`);
-        return [0, 0, 0, 0] as [number, number, number, number];
-      });
+    // Skip stats entirely for bot games — bot virtual accounts have no DDB profile.
+    const ratingDeltas = session.hasBots
+      ? ([0, 0, 0, 0] as [number, number, number, number])
+      : await this.stats.updateAfterGame(session.seatMap, placement).catch((err) => {
+          this.logger.error(`Stats update failed for game ${session.gameId}: ${err}`);
+          return [0, 0, 0, 0] as [number, number, number, number];
+        });
 
     const payload: GameEndedPayload = {
       result: actualResult,
@@ -1119,21 +1250,26 @@ export class GameService {
       })
       .catch((err) => this.logger.error(`Failed to update GAME#${session.gameId}/META: ${err}`));
 
-    // ── Write per-user history index ───────────────────────────────────────────
-    const writes = session.seatMap.map((userId, i) =>
-      this.db
-        .put({
-          Item: {
-            ...DK.userGameIdx(userId, session.startedAt, session.gameId),
-            gameId: session.gameId,
-            placement: placement[i],
-            finalScore: finalScores[i],
-            result: actualResult,
-            endedAt,
-          },
-        })
-        .catch((err) => this.logger.error(`Failed to write user game index for ${userId}: ${err}`)),
-    );
+    // ── Write per-user history index (skip bot virtual accounts) ─────────────
+    const writes = session.seatMap
+      .map((userId, i) => ({ userId, i }))
+      .filter(({ i }) => !session.isBotSeat(i as Seat4))
+      .map(({ userId, i }) =>
+        this.db
+          .put({
+            Item: {
+              ...DK.userGameIdx(userId, session.startedAt, session.gameId),
+              gameId: session.gameId,
+              placement: placement[i],
+              finalScore: finalScores[i],
+              result: actualResult,
+              endedAt,
+            },
+          })
+          .catch((err) =>
+            this.logger.error(`Failed to write user game index for ${userId}: ${err}`),
+          ),
+      );
     await Promise.all(writes);
 
     // ── Write replay to S3 ────────────────────────────────────────────────────
