@@ -34,6 +34,7 @@ import type {
   HandRevealPayload,
   Meld,
 } from '@nanchang/shared';
+import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D } from '../../components/2d';
@@ -950,6 +951,32 @@ function AccessibleHand({
           {tileAriaLabel(tile, lang)}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Centre-screen flash banner shown for ~2s when the viewer's turn begins. */
+function YourTurnBanner() {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
+      aria-live="assertive"
+      aria-atomic="true"
+    >
+      <div
+        className="px-8 py-4 rounded-2xl animate-your-turn-flash"
+        style={{
+          background: 'rgba(10,10,10,0.88)',
+          border: '2px solid rgba(201,169,97,0.85)',
+          boxShadow: '0 0 48px rgba(201,169,97,0.45), 0 8px 32px rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <span className="text-2xl font-bold tracking-wider font-serif" style={{ color: '#c9a961' }}>
+          {t('gameYourTurn')}
+        </span>
+      </div>
     </div>
   );
 }
@@ -1948,6 +1975,7 @@ function GameTable({
   onConcede: () => void;
 }) {
   const { t } = useI18n();
+  const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
   const [jingDiscardPending, setJingDiscardPending] = useState<TileType | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -2217,12 +2245,12 @@ function GameTable({
           className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
         >
           <span
-            className="text-[11px] font-bold px-3 py-1 rounded-full"
+            className={`text-[11px] font-bold px-3 py-1 rounded-full${isMyTurn ? ' mj-your-turn-pill' : ''}`}
             style={{
               background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
               color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
               border: isMyTurn
-                ? '1px solid rgba(201,169,97,0.4)'
+                ? '1px solid rgba(201,169,97,0.5)'
                 : '1px solid rgba(245,239,223,0.1)',
             }}
           >
@@ -2276,6 +2304,11 @@ function GameTable({
       {/* ── Action toast ───────────────────────────────────────────────────── */}
       {toast && !showConcedeSheet && !jingDiscardPending && (
         <ActionToast toast={toast} snapshot={snapshot} />
+      )}
+
+      {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
+      {yourTurnFlash && !claimWindow && !showConcedeSheet && !jingDiscardPending && (
+        <YourTurnBanner />
       )}
 
       {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
