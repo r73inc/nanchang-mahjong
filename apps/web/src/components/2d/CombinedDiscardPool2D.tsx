@@ -75,8 +75,9 @@ function buildInterleavedDiscards(seats: readonly ClientSeatState[]): DiscardEnt
 export function CombinedDiscardPool2D() {
   // Granular selectors — only the fields needed to decide which tile pulses.
   const seats = useGameStore((s) => s.snapshot?.seats);
-  const pendingDiscard = useGameStore((s) => s.snapshot?.pendingDiscard ?? null);
-  const discardedBySeat = useGameStore((s) => s.snapshot?.discardedBySeat ?? null);
+  // lastDiscard is driven by game:event {kind:'discard'}, NOT snapshot.pendingDiscard.
+  // See game.store.ts for the full explanation of why pendingDiscard races.
+  const lastDiscard = useGameStore((s) => s.lastDiscard);
   // viewerSeat can be null for spectators; default to 0 (same guard as GameTable2D).
   const viewerSeat = (useGameStore((s) => s.snapshot?.viewerSeat) ?? 0) as 0 | 1 | 2 | 3;
   const { lastDiscardId } = useDiscardContext();
@@ -106,12 +107,12 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Which tile is the pending discard? Seat + last position in that seat's array.
-          const isThisTheLastDiscard =
-            discardedBySeat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
+          // The pulse belongs to the last tile in the discarding seat's array.
           // The pulse overlay is rendered inside MahjongTile2D, not on this
           // motion.div — see note above about the repeat:Infinity bleed bug.
-          const isPulse = isThisTheLastDiscard && pendingDiscard !== null;
+          // Use optional chaining so null/undefined lastDiscard safely → false.
+          const isPulse =
+            lastDiscard?.seat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =

@@ -20,6 +20,18 @@ import type {
   HandRevealPayload,
 } from '@nanchang/shared';
 
+// ── Last-discard tracker ──────────────────────────────────────────────────────
+// Driven by game:event {kind:'discard'}, NOT by snapshot.pendingDiscard.
+// Reason: the server broadcasts discard+snapshot+draw+snapshot in the same
+// Node.js tick for no-claim turns. React 18 automatic batching collapses all
+// four updates into one render — by that time pendingDiscard is null. Tracking
+// it via game:event gives us a value that survives the batch because the
+// clearing signals (pung/chow/win) arrive in a later tick.
+export interface LastDiscard {
+  seat: 0 | 1 | 2 | 3;
+  tile: TileType;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ConnectionStatus = 'live' | 'reconnecting' | 'lost';
@@ -110,6 +122,15 @@ interface GameStore {
    */
   yourTurnFlash: boolean;
 
+  /**
+   * The most recently discarded tile, identified by seat + tile type.
+   * Set by game:event {kind:'discard'}, cleared by the next claim event
+   * (pung/chow/kong_open/win) or replaced by the next discard.
+   * Used by DiscardPool2D / CombinedDiscardPool2D to show the red pulse.
+   * Deliberately NOT driven by snapshot.pendingDiscard — see LastDiscard comment.
+   */
+  lastDiscard: LastDiscard | null;
+
   // ── Actions ────────────────────────────────────────────────────────────────
   setSnapshot: (s: ClientGameState) => void;
   setEnded: (e: GameEndedPayload) => void;
@@ -124,6 +145,7 @@ interface GameStore {
   setToast: (t: GameToast | null) => void;
   setGameError: (err: string | null) => void;
   setYourTurnFlash: (v: boolean) => void;
+  setLastDiscard: (d: LastDiscard | null) => void;
   reset: () => void;
 }
 
@@ -141,6 +163,7 @@ const initialState = {
   connection: 'live' as ConnectionStatus,
   gameError: null,
   yourTurnFlash: false,
+  lastDiscard: null as LastDiscard | null,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -148,14 +171,22 @@ export const useGameStore = create<GameStore>()(
     ...initialState,
 
     setSnapshot: (snapshot) =>
-      set({
+      set((state) => ({
         snapshot,
         // Server snapshot wins — clear any pending optimistic state
         pendingMove: false,
         // Clear claim window and pending claim once snapshot arrives
         claimWindow: null,
         viewerClaimSubmitted: null,
-      }),
+        // Reconnect guard: if we rejoin mid-claim-window, restore lastDiscard
+        // from the snapshot so the pulse shows without needing game:event replay.
+        // During normal play, game:event {kind:'discard'} has already set this
+        // before the snapshot arrives, so the conditional is a no-op.
+        lastDiscard:
+          snapshot.pendingDiscard !== null && snapshot.discardedBySeat !== null
+            ? { seat: snapshot.discardedBySeat, tile: snapshot.pendingDiscard }
+            : state.lastDiscard,
+      })),
 
     setEnded: (ended) => set({ ended }),
 
@@ -180,6 +211,8 @@ export const useGameStore = create<GameStore>()(
     setGameError: (gameError) => set({ gameError }),
 
     setYourTurnFlash: (yourTurnFlash) => set({ yourTurnFlash }),
+
+    setLastDiscard: (lastDiscard) => set({ lastDiscard }),
 
     reset: () => set(initialState),
   })),

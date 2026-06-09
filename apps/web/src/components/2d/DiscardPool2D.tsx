@@ -57,9 +57,10 @@ export interface DiscardPool2DProps {
 export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
   // Granular selectors — only the fields needed to decide which tile pulses.
   const discards = useGameStore((s) => s.snapshot?.seats[seatIdx]?.discards ?? []) as TileType[];
-  const pendingDiscard = useGameStore((s) => s.snapshot?.pendingDiscard ?? null);
-  const discardedBySeat = useGameStore((s) => s.snapshot?.discardedBySeat ?? null);
   const viewerSeat = useGameStore((s) => s.snapshot?.viewerSeat ?? null);
+  // lastDiscard is driven by game:event {kind:'discard'}, NOT snapshot.pendingDiscard.
+  // See game.store.ts for the full explanation of why pendingDiscard races.
+  const lastDiscard = useGameStore((s) => s.lastDiscard);
   const { lastDiscardId } = useDiscardContext();
 
   const spec = discardGrid(role);
@@ -69,8 +70,9 @@ export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
 
   if (discards.length === 0) return null;
 
-  // Which seat produced the last pending discard?
-  const thisSeatsDiscardIsPending = pendingDiscard !== null && discardedBySeat === seatIdx;
+  // The pulse belongs to this seat if the last discard came from it.
+  // Use optional chaining so a null/undefined lastDiscard safely evaluates to false.
+  const thisSeatsDiscardIsPending = lastDiscard?.seat === seatIdx;
 
   // For the viewer's seat: the newest tile gets the layoutId from DiscardContext
   // so Framer Motion can animate the shared-element flight from PlayerHand2D.

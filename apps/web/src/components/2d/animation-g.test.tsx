@@ -77,7 +77,7 @@ function setupStore(
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockUseGameStore.mockImplementation((selector: (s: any) => any) =>
-    selector({ snapshot, claimWindow, pendingMove }),
+    selector({ snapshot, claimWindow, pendingMove, lastDiscard: null }),
   );
 }
 
