@@ -228,6 +228,28 @@ This document consolidates all open bugs, unfixed issues, and pending improvemen
 
 ---
 
+### Auth UX — Password autofill removal and visibility toggle
+
+**Status:** Planned improvement
+
+**Current issue:** Username and password text boxes autofill with "temp" placeholder text. Users cannot easily verify what they typed/are typing without a password visibility toggle.
+
+**Desired improvements:**
+
+1. **Remove autofill:** Delete "temp" default text from username and password input fields
+2. **Password visibility toggle:** Add an eye icon button next to password field to toggle between hidden (•••) and visible text
+3. **User verification:** Users can verify their input before submitting, reducing login errors
+
+**Implementation notes:**
+
+- Affects `apps/web/src/pages/auth/` (signup, login screens)
+- Add state for `showPassword` boolean in auth form components
+- Toggle handler: `onChange={() => setShowPassword(!showPassword)}`
+- Eye icon can use existing icon library
+- Test on mobile (touch-friendly icon size)
+
+---
+
 ### Phase 12B · Push Frontend + A11y — IN PROGRESS
 
 **Status:** Planning/Early implementation
@@ -280,9 +302,9 @@ This document consolidates all open bugs, unfixed issues, and pending improvemen
 
 ---
 
-### Bot System Implementation — POST-MVP
+### Bot System Implementation — IN PROGRESS
 
-**Status:** Documented, not yet implemented
+**Status:** Active development
 
 **Scope:**
 
@@ -308,32 +330,18 @@ This document consolidates all open bugs, unfixed issues, and pending improvemen
 
 ---
 
-### 2FA / TOTP — FUTURE
+### Tournaments / Seasons — SOON
 
-**Status:** Documented in `PLAN.md` §6; design deferred
+**Status:** Planned for near-term development
 
-**Notes:** Auth screens already designed for 2FA; only library + UI work needed.
-
----
-
-### Social OAuth (Google) — FUTURE
-
-**Status:** Deferred post-MVP
+**Scope:** Ranked gameplay with seasonal/tournament structure
 
 ---
 
-### Landscape / Tablet Game Layout — FUTURE
+### Emoji System In-Game — FUTURE
 
-**Status:** Explicitly deferred per handoff; not in scope
+**Status:** Planned post-MVP feature
 
----
+**Scope:** Add emoji reactions/emotes for player communication during gameplay
 
-### Tournaments / Seasons — FUTURE
-
-**Status:** Not scheduled
-
----
-
-### Voice/Text Chat In-Game — FUTURE
-
-**Status:** Not scheduled (rate-limit and moderation cost)
+**Notes:** Alternative to text chat; lower complexity, no moderation overhead
