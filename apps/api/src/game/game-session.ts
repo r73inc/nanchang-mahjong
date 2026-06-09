@@ -19,7 +19,12 @@
 
 import { GameEngine } from '@nanchang/engine';
 import type { GameEvent, SeatWind, WinPaymentResult, WinType, HandType } from '@nanchang/engine';
-import type { RoomSettings, HandRevealPayload, SettlementPreviewPayload } from '@nanchang/shared';
+import type {
+  RoomSettings,
+  HandRevealPayload,
+  SettlementPreviewPayload,
+  BotDifficulty,
+} from '@nanchang/shared';
 import type { ClaimAction } from '@nanchang/shared';
 import type { IncomingClaim, Seat4 } from './claim-resolver';
 
@@ -141,6 +146,12 @@ export class GameSession {
   readonly startedAt: string;
 
   /**
+   * Set of seat indices occupied by bots (derived from seatMap at construction time).
+   * Used throughout GameService to decide whether to schedule async bot actions.
+   */
+  readonly botSeats: ReadonlySet<Seat4>;
+
+  /**
    * Pre-game reveal sub-phase for the current hand.
    * Advances via game:advance-pre-game (host-only).
    *   'hands'      — initial: hands dealt, awaiting host to start reveals
@@ -188,9 +199,19 @@ export class GameSession {
     const startScore = params.settings.startingScore;
     this.cumulativeScores = [startScore, startScore, startScore, startScore];
 
-    this.connState = [0, 1, 2, 3].map(
-      (): ConnState => ({ connected: false, lastSeenAt: Date.now(), afk: false }),
-    ) as [ConnState, ConnState, ConnState, ConnState];
+    // Derive bot seats from the userId naming convention ('bot-<difficulty>-<seatIdx>').
+    const bots = new Set<Seat4>();
+    params.seatMap.forEach((userId, i) => {
+      if (userId.startsWith('bot-')) bots.add(i as Seat4);
+    });
+    this.botSeats = bots;
+
+    // Bots have no real socket but should appear "connected" so clients don't show
+    // a reconnecting overlay for their seat.
+    this.connState = [0, 1, 2, 3].map((i): ConnState => {
+      const isBot = bots.has(i as Seat4);
+      return { connected: isBot, lastSeenAt: Date.now(), afk: false };
+    }) as [ConnState, ConnState, ConnState, ConnState];
   }
 
   // ── Player identity helpers ──────────────────────────────────────────────────
@@ -205,6 +226,22 @@ export class GameSession {
 
   isSpectator(userId: string): boolean {
     return this.spectators.has(userId);
+  }
+
+  // ── Bot helpers ──────────────────────────────────────────────────────────────
+
+  isBotSeat(seat: Seat4): boolean {
+    return this.botSeats.has(seat);
+  }
+
+  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal'. */
+  getBotDifficulty(seat: Seat4): BotDifficulty {
+    const userId = this.seatMap[seat];
+    return userId.startsWith('bot-normal') ? 'normal' : 'easy';
+  }
+
+  get hasBots(): boolean {
+    return this.botSeats.size > 0;
   }
 
   // ── Connection management ────────────────────────────────────────────────────

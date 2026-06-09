@@ -15,7 +15,13 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
-import type { RoomState, RoomSeat, RoomSettings, RoomStatus } from '@nanchang/shared';
+import type {
+  RoomState,
+  RoomSeat,
+  RoomSettings,
+  RoomStatus,
+  BotDifficulty,
+} from '@nanchang/shared';
 import type { CreateRoomDto } from './dto/create-room.dto';
 
 // ── Types stored in DDB ───────────────────────────────────────────────────────
@@ -46,6 +52,8 @@ interface RoomSeatItem {
   displayName: string;
   ready: boolean;
   joinedAt: string;
+  isBot?: boolean;
+  botDifficulty?: BotDifficulty;
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -95,6 +103,8 @@ export class RoomsService {
         displayName: s.displayName,
         ready: s.ready,
         isHost: s.userId === meta.hostUserId,
+        isBot: s.isBot,
+        botDifficulty: s.botDifficulty,
       };
     });
 
@@ -164,6 +174,33 @@ export class RoomsService {
       ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? false,
     };
 
+    // Build bot seat items (seats filled from the high end: 3, 2, 1).
+    // Each bot is pre-marked ready so the host can start without waiting for them.
+    const botCount = Math.min(dto?.bots?.count ?? 0, 3);
+    const botDifficulty: BotDifficulty = dto?.bots?.difficulty ?? 'easy';
+    const botSeatPuts = Array.from({ length: botCount }, (_, i) => {
+      const seatIdx = 3 - i; // seats 3, 2, 1 for bots 1, 2, 3
+      const botNumber = i + 1;
+      const diffLabel = botDifficulty === 'easy' ? 'Easy' : 'Normal';
+      return {
+        Put: {
+          TableName: this.db.tableName,
+          Item: {
+            ...DK.roomSeat(roomId, seatIdx),
+            roomId,
+            seatIdx,
+            userId: `bot-${botDifficulty}-${seatIdx}`,
+            handle: `Bot ${botNumber}`,
+            displayName: `Bot ${botNumber} (${diffLabel})`,
+            ready: true,
+            joinedAt: now,
+            isBot: true,
+            botDifficulty,
+          },
+        },
+      };
+    });
+
     await this.db.transactWrite({
       TransactItems: [
         {
@@ -201,6 +238,7 @@ export class RoomsService {
             },
           },
         },
+        ...botSeatPuts,
       ],
     });
 
