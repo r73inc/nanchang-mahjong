@@ -954,6 +954,28 @@ function AccessibleHand({
   );
 }
 
+/** Subtle indicator shown to non-eligible viewers while a claim window is open. */
+function WaitingForClaimIndicator({ isMobile = false }: { isMobile?: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute left-0 right-0 flex justify-center items-center px-4 py-3 max-w-viewport mx-auto animate-call-prompt-enter z-20"
+      style={{
+        bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
+        background: 'rgba(10,10,10,0.75)',
+        backdropFilter: 'blur(8px)',
+      }}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-mj-bone/40 animate-pulse" aria-hidden="true" />
+        <p className="text-[11px] text-mj-bone/60 font-medium">{t('gameWaitingClaim')}</p>
+      </div>
+    </div>
+  );
+}
+
 /** Floating action toast — pung, chow, kong, win, concede announcements. */
 function ActionToast({
   toast,
@@ -1046,6 +1068,9 @@ function ActionToast({
         >
           {label}
         </span>
+        {toast.outbidBy && (
+          <span className="text-[10px] text-mj-bone/50 mt-0.5">{t('gamePrecedenceLost')}</span>
+        )}
       </div>
     </div>
   );
@@ -2252,6 +2277,12 @@ function GameTable({
       {toast && !showConcedeSheet && !jingDiscardPending && (
         <ActionToast toast={toast} snapshot={snapshot} />
       )}
+
+      {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
+      {snapshot.phase === 'awaiting_claims' &&
+        !claimWindow &&
+        !showConcedeSheet &&
+        !jingDiscardPending && <WaitingForClaimIndicator isMobile={isMobile} />}
 
       {/* ── Claim window rail ──────────────────────────────────────────────── */}
       {claimWindow && !showConcedeSheet && !jingDiscardPending && (
