@@ -29,6 +29,7 @@ export function toClientSnapshot(
   ruleTopBottomJing = false,
   preGamePhase: 'hands' | 'settlement' | 'jing' | null = null,
   botMeta?: readonly [SeatBotMeta, SeatBotMeta, SeatBotMeta, SeatBotMeta],
+  seatNames?: readonly [string, string, string, string],
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
@@ -43,6 +44,7 @@ export function toClientSnapshot(
       hand: isOwnSeat ? [...seat.hand] : null,
       handCount: seat.hand.length,
       ...(bot?.isBot ? { isBot: true, botDifficulty: bot.botDifficulty } : {}),
+      seatName: seatNames?.[i] ?? seat.wind,
     };
   }) as [ClientSeatState, ClientSeatState, ClientSeatState, ClientSeatState];
 

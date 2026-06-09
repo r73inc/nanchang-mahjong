@@ -98,6 +98,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: ['1m', '2m', '3m', '4m', '5m', '1p', '2p', '3p', '4p', '5p', '1s', '2s', '3s'],
         handCount: 13,
+        seatName: 'Player',
       },
       {
         wind: 'south',
@@ -108,6 +109,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: null,
         handCount: 13,
+        seatName: 'Player',
       },
       {
         wind: 'west',
@@ -118,6 +120,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: null,
         handCount: 13,
+        seatName: 'Player',
       },
       {
         wind: 'north',
@@ -128,6 +131,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         discards: [],
         hand: null,
         handCount: 13,
+        seatName: 'Player',
       },
     ],
     ...overrides,

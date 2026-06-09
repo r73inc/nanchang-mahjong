@@ -44,6 +44,7 @@ function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
     discards: [],
     hand: ['1m', '2m', '3m'],
     handCount: 3,
+    seatName: 'Player',
     ...overrides,
   };
 }

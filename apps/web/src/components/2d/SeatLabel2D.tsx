@@ -16,13 +16,6 @@ import { useGameStore } from '../../stores/game.store';
 
 type SeatWind = 'east' | 'south' | 'west' | 'north';
 
-const WIND_CHAR: Record<SeatWind, string> = {
-  east: '東',
-  south: '南',
-  west: '西',
-  north: '北',
-};
-
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
   south: '#a36d3e',
@@ -77,9 +70,19 @@ export function SeatLabel2D({ seatIdx }: SeatLabel2DProps) {
         }}
       />
 
-      {/* Wind character */}
-      <span aria-hidden="true" style={{ color: windColor, fontFamily: 'serif' }}>
-        {WIND_CHAR[seat.wind]}
+      {/* Player / bot name */}
+      <span
+        aria-hidden="true"
+        style={{
+          color: windColor,
+          fontWeight: 600,
+          maxWidth: 72,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {seat.seatName}
       </span>
 
       {/* Dealer badge */}

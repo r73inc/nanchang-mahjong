@@ -138,13 +138,16 @@ export class RoomsController {
   async startGame(@CurrentUser() user: AuthenticatedUser, @Param('roomId') roomId: string) {
     const { room, gameId } = await this.service.startGame(roomId, user.sub);
 
-    // Build the seat map (4 players, sorted by seat index — all occupied by this point).
+    // Build the seat map and seat names (4 players, sorted by seat index).
     const seatMap = ([0, 1, 2, 3] as const).map(
       (i) => room.seats.find((s) => s.seatIdx === i)!.userId!,
     ) as [string, string, string, string];
+    const seatNames = ([0, 1, 2, 3] as const).map(
+      (i) => room.seats.find((s) => s.seatIdx === i)!.displayName,
+    ) as [string, string, string, string];
 
     // Create the in-memory GameSession using the room's pre-assigned gameId.
-    await this.gameService.createGame(roomId, seatMap, room.settings, gameId);
+    await this.gameService.createGame(roomId, seatMap, room.settings, gameId, seatNames);
 
     this.gateway.broadcastRoomUpdate(roomId, room);
     this.gateway.broadcastRoomStarted(roomId, gameId);
