@@ -49,7 +49,6 @@ const mockUseSetDisabled = vi.mocked(useSetDisabled);
 
 const adminUser = {
   sub: 'admin-sub',
-  email: 'admin@example.com',
   handle: 'admin',
   displayName: 'Admin',
   role: 'admin' as const,
@@ -65,7 +64,6 @@ const sampleInvite: InviteRecord = {
 
 const sampleUser: AdminUser = {
   sub: 'user-sub',
-  email: 'alice@example.com',
   handle: 'alice',
   displayName: 'Alice',
   role: 'user',
@@ -214,7 +212,7 @@ describe('AdminPage — Users', () => {
   it('renders the user list', () => {
     renderAdminPage();
     expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('alice@example.com')).toBeInTheDocument();
+    expect(screen.getByText('@alice')).toBeInTheDocument();
     expect(screen.getByText('User')).toBeInTheDocument();
   });
 
@@ -226,7 +224,7 @@ describe('AdminPage — Users', () => {
 
   it('calls useAdminUsers with debounced search term', async () => {
     renderAdminPage();
-    fireEvent.change(screen.getByPlaceholderText('Handle or email'), {
+    fireEvent.change(screen.getByPlaceholderText('Search by handle'), {
       target: { value: 'alice' },
     });
     // Immediately after typing the debounce hasn't fired yet

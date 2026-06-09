@@ -12,15 +12,12 @@ const mockAuth = {
   signup: jest.fn(),
   signin: jest.fn(),
   refreshAccessToken: jest.fn(),
-  forgotPassword: jest.fn(),
-  confirmForgotPassword: jest.fn(),
   changePassword: jest.fn(),
   deleteAccount: jest.fn(),
 };
 
 const mockUser: AuthenticatedUser = {
   sub: 'sub-123',
-  email: 'alice@example.com',
   handle: 'alice',
   displayName: 'Alice',
   role: 'user',
@@ -38,7 +35,6 @@ describe('AuthController', () => {
       controllers: [AuthController],
       providers: [{ provide: AuthService, useValue: mockAuth }],
     })
-      // Override ThrottlerGuard — no rate-limit state in unit tests
       .overrideGuard(ThrottlerGuard)
       .useValue({ canActivate: () => true })
       .compile();
@@ -49,7 +45,6 @@ describe('AuthController', () => {
   describe('signup', () => {
     it('delegates to authService.signup', async () => {
       const dto: SignupDto = {
-        email: 'alice@example.com',
         password: 'Password1',
         handle: 'alice',
         displayName: 'Alice',
@@ -66,7 +61,7 @@ describe('AuthController', () => {
 
   describe('signin', () => {
     it('delegates to authService.signin', async () => {
-      const dto: SigninDto = { email: 'alice@example.com', password: 'Password1' };
+      const dto: SigninDto = { handle: 'alice', password: 'Password1' };
       mockAuth.signin.mockResolvedValue({ accessToken: 'at', refreshToken: 'rt' });
 
       await controller.signin(dto);
@@ -86,36 +81,8 @@ describe('AuthController', () => {
     });
   });
 
-  describe('forgotPassword', () => {
-    it('delegates to authService.forgotPassword', async () => {
-      mockAuth.forgotPassword.mockResolvedValue(undefined);
-
-      await controller.forgotPassword({ email: 'alice@example.com' });
-
-      expect(mockAuth.forgotPassword).toHaveBeenCalledWith('alice@example.com');
-    });
-  });
-
-  describe('confirmForgotPassword', () => {
-    it('delegates to authService.confirmForgotPassword', async () => {
-      mockAuth.confirmForgotPassword.mockResolvedValue(undefined);
-
-      await controller.confirmForgotPassword({
-        email: 'alice@example.com',
-        code: '123456',
-        newPassword: 'NewPass1',
-      });
-
-      expect(mockAuth.confirmForgotPassword).toHaveBeenCalledWith(
-        'alice@example.com',
-        '123456',
-        'NewPass1',
-      );
-    });
-  });
-
   describe('changePassword', () => {
-    it('delegates to authService.changePassword with the current user email', async () => {
+    it('delegates to authService.changePassword with the current user sub', async () => {
       mockAuth.changePassword.mockResolvedValue(undefined);
 
       await controller.changePassword(mockUser, {
@@ -123,21 +90,17 @@ describe('AuthController', () => {
         newPassword: 'NewPass1',
       });
 
-      expect(mockAuth.changePassword).toHaveBeenCalledWith(
-        'alice@example.com',
-        'OldPass1',
-        'NewPass1',
-      );
+      expect(mockAuth.changePassword).toHaveBeenCalledWith('sub-123', 'OldPass1', 'NewPass1');
     });
   });
 
   describe('deleteAccount', () => {
-    it('delegates to authService.deleteAccount with sub and email', async () => {
+    it('delegates to authService.deleteAccount with sub only', async () => {
       mockAuth.deleteAccount.mockResolvedValue(undefined);
 
       await controller.deleteAccount(mockUser);
 
-      expect(mockAuth.deleteAccount).toHaveBeenCalledWith('sub-123', 'alice@example.com');
+      expect(mockAuth.deleteAccount).toHaveBeenCalledWith('sub-123');
     });
   });
 });

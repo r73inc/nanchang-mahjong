@@ -2,13 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, getApiErrorMessage } from '../lib/api';
 import { useAuthStore } from '../stores/auth.store';
-import type {
-  SignupInput,
-  SigninInput,
-  ForgotPasswordInput,
-  ConfirmForgotPasswordInput,
-  ChangePasswordInput,
-} from '@nanchang/shared';
+import type { SignupInput, SigninInput, ChangePasswordInput } from '@nanchang/shared';
 
 interface AuthTokens {
   accessToken: string;
@@ -46,24 +40,6 @@ export function useSignout() {
     clearAuth();
     navigate('/auth', { replace: true });
   };
-}
-
-// ── Forgot Password ───────────────────────────────────────────────────────────
-
-export function useForgotPassword() {
-  return useMutation({
-    mutationFn: (data: ForgotPasswordInput) =>
-      api.post('/auth/forgot-password', data).then(() => undefined),
-  });
-}
-
-// ── Confirm Reset Password ────────────────────────────────────────────────────
-
-export function useConfirmReset() {
-  return useMutation({
-    mutationFn: (data: ConfirmForgotPasswordInput) =>
-      api.post('/auth/confirm-forgot-password', data).then(() => undefined),
-  });
 }
 
 // ── Change Password ───────────────────────────────────────────────────────────

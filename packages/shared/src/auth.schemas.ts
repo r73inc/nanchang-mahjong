@@ -12,7 +12,6 @@ const handleSchema = z
   .regex(/^[a-zA-Z0-9_-]+$/, 'Handle can only contain letters, numbers, underscores and hyphens');
 
 export const SignupSchema = z.object({
-  email: z.string().email('Invalid email address'),
   password: passwordSchema,
   displayName: z.string().min(1).max(50),
   handle: handleSchema,
@@ -20,18 +19,8 @@ export const SignupSchema = z.object({
 });
 
 export const SigninSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  handle: handleSchema,
   password: z.string().min(1, 'Password is required'),
-});
-
-export const ForgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
-});
-
-export const ConfirmForgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  code: z.string().length(6, 'Confirmation code must be 6 characters'),
-  newPassword: passwordSchema,
 });
 
 export const ChangePasswordSchema = z.object({
@@ -41,6 +30,4 @@ export const ChangePasswordSchema = z.object({
 
 export type SignupInput = z.infer<typeof SignupSchema>;
 export type SigninInput = z.infer<typeof SigninSchema>;
-export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
-export type ConfirmForgotPasswordInput = z.infer<typeof ConfirmForgotPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;

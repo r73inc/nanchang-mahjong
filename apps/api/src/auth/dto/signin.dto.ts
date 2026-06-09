@@ -1,8 +1,13 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsString, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class SigninDto {
-  @IsEmail({}, { message: 'Invalid email address' })
-  email!: string;
+  @IsString()
+  @MinLength(2)
+  @MaxLength(30)
+  @Matches(/^[a-zA-Z0-9_-]+$/, {
+    message: 'Handle can only contain letters, numbers, underscores and hyphens',
+  })
+  handle!: string;
 
   @IsString()
   @MinLength(1, { message: 'Password is required' })

@@ -1,9 +1,6 @@
-import { IsEmail, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, MinLength, MaxLength, Matches } from 'class-validator';
 
 export class SignupDto {
-  @IsEmail({}, { message: 'Invalid email address' })
-  email!: string;
-
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   @MaxLength(100)

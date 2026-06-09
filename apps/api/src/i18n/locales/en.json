@@ -1,11 +1,9 @@
 {
-  "auth.emailOrHandleInUse": "Email or handle already in use.",
-  "auth.emailAlreadyRegistered": "Email is already registered.",
   "auth.handleAlreadyTaken": "Handle is already taken.",
   "auth.inviteNotFound": "Invite code not found.",
   "auth.inviteAlreadyUsed": "Invite code has already been used.",
   "auth.inviteInactive": "Invite code is no longer active.",
-  "auth.invalidCredentials": "Invalid email or password.",
+  "auth.invalidCredentials": "Invalid handle or password.",
   "auth.accountDisabled": "This account has been disabled.",
   "auth.invalidRefreshToken": "Invalid or expired refresh token.",
   "auth.wrongCurrentPassword": "Current password is incorrect.",

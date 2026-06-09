@@ -3,8 +3,6 @@ import { useEffect } from 'react';
 import { useThemeStore } from './stores/theme.store';
 import { applyTheme } from './lib/theme.utils';
 import { AuthPage } from './pages/auth/auth-page';
-import { ForgotPasswordPage } from './pages/auth/forgot-password-page';
-import { ConfirmResetPage } from './pages/auth/confirm-reset-page';
 import { HomeStubPage } from './pages/home/home-stub-page';
 import { ChangePasswordPage } from './pages/settings/change-password-page';
 import { DeleteAccountPage } from './pages/settings/delete-account-page';
@@ -45,8 +43,6 @@ export default function App() {
 
       {/* Public routes */}
       <Route path="/auth" element={<AuthPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/confirm-reset" element={<ConfirmResetPage />} />
 
       {/* Protected routes — unauthenticated users are redirected to /auth */}
       <Route element={<ProtectedRoute />}>

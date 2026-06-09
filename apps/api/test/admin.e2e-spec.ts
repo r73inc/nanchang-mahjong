@@ -21,7 +21,6 @@ import { JwtService } from '@nestjs/jwt';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { AppModule } from '../src/app.module';
 import { DynamoDBService } from '../src/database/dynamodb.service';
-import { CognitoService } from '../src/auth/cognito.service';
 
 // ── Token helper ──────────────────────────────────────────────────────────────
 
@@ -30,7 +29,6 @@ function makeToken(
   jwtService: JwtService,
   payload: {
     sub: string;
-    email: string;
     handle: string;
     displayName: string;
     role: 'user' | 'admin';
@@ -61,10 +59,7 @@ function buildDdbStub() {
   store.set('USER#admin-sub|PROFILE', {
     PK: 'USER#admin-sub',
     SK: 'PROFILE',
-    gsi1pk: 'EMAIL#admin@example.com',
-    gsi1sk: 'USER',
     sub: 'admin-sub',
-    email: 'admin@example.com',
     handle: 'admin',
     displayName: 'Admin',
     role: 'admin',
@@ -77,10 +72,7 @@ function buildDdbStub() {
   store.set('USER#user-sub|PROFILE', {
     PK: 'USER#user-sub',
     SK: 'PROFILE',
-    gsi1pk: 'EMAIL#alice@example.com',
-    gsi1sk: 'USER',
     sub: 'user-sub',
-    email: 'alice@example.com',
     handle: 'alice',
     displayName: 'Alice',
     role: 'user',
@@ -167,9 +159,7 @@ function buildDdbStub() {
           const skMatch = sk ? item.SK === sk : true;
           if (!pkMatch || !skMatch) return false;
           if (search) {
-            const handleMatch = String(item.handle ?? '').includes(search);
-            const emailMatch = String(item.email ?? '').includes(search);
-            return handleMatch || emailMatch;
+            return String(item.handle ?? '').includes(search);
           }
           return true;
         });
@@ -208,43 +198,22 @@ function buildDdbStub() {
   };
 }
 
-// ── Cognito stub ──────────────────────────────────────────────────────────────
-
-function buildCognitoStub() {
-  return {
-    adminCreateUser: jest.fn(() => Promise.resolve('new-sub')),
-    initiateAuth: jest.fn(() => Promise.resolve('some-sub')),
-    forgotPassword: jest.fn(() => Promise.resolve()),
-    confirmForgotPassword: jest.fn(() => Promise.resolve()),
-    changePassword: jest.fn(() => Promise.resolve()),
-    adminDeleteUser: jest.fn(() => Promise.resolve()),
-    adminGetUserAttributes: jest.fn(() => Promise.resolve([])),
-    adminDisableUser: jest.fn(() => Promise.resolve()),
-    adminEnableUser: jest.fn(() => Promise.resolve()),
-    adminSetRole: jest.fn(() => Promise.resolve()),
-  };
-}
-
 // ── Test setup ────────────────────────────────────────────────────────────────
 
 describe('Admin (e2e)', () => {
   let app: NestFastifyApplication;
   let ddbStub: ReturnType<typeof buildDdbStub>;
-  let cognitoStub: ReturnType<typeof buildCognitoStub>;
   let adminToken: string;
   let userToken: string;
 
   beforeAll(async () => {
     ddbStub = buildDdbStub();
-    cognitoStub = buildCognitoStub();
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(DynamoDBService)
       .useValue(ddbStub)
-      .overrideProvider(CognitoService)
-      .useValue(cognitoStub)
       .compile();
 
     app = moduleRef.createNestApplication(new FastifyAdapter({ logger: false }));
@@ -258,14 +227,12 @@ describe('Admin (e2e)', () => {
     const jwtService = moduleRef.get(JwtService);
     adminToken = makeToken(jwtService, {
       sub: 'admin-sub',
-      email: 'admin@example.com',
       handle: 'admin',
       displayName: 'Admin',
       role: 'admin',
     });
     userToken = makeToken(jwtService, {
       sub: 'user-sub',
-      email: 'alice@example.com',
       handle: 'alice',
       displayName: 'Alice',
       role: 'user',
@@ -405,7 +372,6 @@ describe('Admin (e2e)', () => {
         method: 'POST',
         url: '/auth/signup',
         payload: {
-          email: 'newuser@example.com',
           password: 'Password1',
           handle: 'newuser',
           displayName: 'New User',

@@ -11,7 +11,6 @@ import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.
 
 const adminUser: AuthenticatedUser = {
   sub: 'admin-sub',
-  email: 'admin@example.com',
   handle: 'admin',
   displayName: 'Admin',
   role: 'admin',
@@ -27,7 +26,6 @@ const sampleInvite = {
 
 const sampleUser = {
   sub: 'user-sub',
-  email: 'alice@example.com',
   handle: 'alice',
   displayName: 'Alice',
   role: 'user' as const,
