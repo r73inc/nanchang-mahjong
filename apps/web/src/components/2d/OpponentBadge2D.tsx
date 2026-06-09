@@ -18,10 +18,12 @@
  */
 
 import { useGameStore } from '../../stores/game.store';
+import { useI18n } from '../../i18n';
 import { OpenMelds2D } from './OpenMelds2D';
-import type { SeatWind } from '@nanchang/shared';
 
 // ── Wind display tables ───────────────────────────────────────────────────────
+
+type SeatWind = 'east' | 'south' | 'west' | 'north';
 
 const WIND_CHAR: Record<SeatWind, string> = {
   east: '東',
@@ -54,6 +56,7 @@ export interface OpponentBadge2DProps {
 
 export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
+  const { t } = useI18n();
 
   if (!snapshot) return null;
 
@@ -147,35 +150,54 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
           {seat.handCount}
         </span>
 
-        {/* Status indicators */}
-        {(seat.afk || !seat.connected) && (
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            {seat.afk && (
-              <span
-                data-testid={`badge-afk-${seatIdx}`}
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: '50%',
-                  background: '#f59e0b',
-                  flexShrink: 0,
-                }}
-                aria-label="Away from keyboard"
-              />
+        {/* Bot chip — replaces AFK/disconnect indicators */}
+        {seat.isBot ? (
+          <span
+            aria-label={t(
+              seat.botDifficulty === 'normal' ? 'botDifficultyNormalFull' : 'botDifficultyEasyFull',
             )}
-            {!seat.connected && (
-              <span
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: '50%',
-                  background: '#ef5350',
-                  flexShrink: 0,
-                }}
-                aria-label="Disconnected"
-              />
-            )}
-          </div>
+            style={{
+              fontSize: 8,
+              fontWeight: 700,
+              padding: '1px 3px',
+              borderRadius: 3,
+              background: 'rgba(90,125,140,0.3)',
+              color: '#7ab5cc',
+            }}
+          >
+            {t('botBadge')}
+          </span>
+        ) : (
+          /* Human seat — show AFK / disconnect dots as before */
+          (seat.afk || !seat.connected) && (
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {seat.afk && (
+                <span
+                  data-testid={`badge-afk-${seatIdx}`}
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: '#f59e0b',
+                    flexShrink: 0,
+                  }}
+                  aria-label="Away from keyboard"
+                />
+              )}
+              {!seat.connected && (
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: '#ef5350',
+                    flexShrink: 0,
+                  }}
+                  aria-label="Disconnected"
+                />
+              )}
+            </div>
+          )
         )}
       </div>
 

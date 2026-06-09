@@ -120,6 +120,10 @@ export interface ClientSeatState {
   hand: TileType[] | null;
   /** Always present — equals the true hand length including private tiles. */
   handCount: number;
+  /** True when this seat is occupied by an AI bot (not a human player). */
+  isBot?: boolean;
+  /** Bot difficulty — only set when isBot is true. */
+  botDifficulty?: import('./room.schemas').BotDifficulty;
 }
 
 /**
