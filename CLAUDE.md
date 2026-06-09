@@ -21,7 +21,11 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 | Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                   |
 | CI       | GitHub Actions: lint + typecheck + test on every PR                                         |
 
-**Key files:** `PLAN.md` (phase roadmap), `PHASE-7-PLAN.md` (Phase 7 detailed brief), `docs/final-nanchang-mahjong-rules.md` (locked rules), `BUG-LOG.md` (bug history and learnings — read before touching infra, scripts, or socket events), `2dTo3d.md` (3D UI migration blueprint — phases A–I), `3D-BUG-LOG.md` (bugs found during 3D UI local testing — status/fixes tracked here).
+**Key files:**
+
+- **Current reference docs (project root):** `Open-issues.md` (all open bugs and improvements), `Closed-issues.md` (all fixed bugs with learnings), `Plan-and-roadmap.md` (complete development plan and roadmap)
+- **Locked rules:** `docs/final-nanchang-mahjong-rules.md` (never move — authoritative rules document)
+- **Legacy docs (archived in `docs/oldDocs/`):** `BUG-LOG.md`, `PHASE-7-PLAN.md`, `2dTo3d.md`, `3D-BUG-LOG.md`, `PLAN.md`, and others
 
 ---
 
@@ -35,7 +39,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 - **i18n: no literal strings in JSX.** All visible text goes through `t()`. EN and ZH keys must stay in parity.
 - **PR scope discipline.** Engine-only changes → engine branch. Schema/API/FE changes → separate PRs. Never mix.
 - **One PR at a time. Always.** Open one PR, push it, then stop and wait. Do not open a second PR, do not start a second branch, do not write any more code until the first PR has been reviewed, any requested changes changed, and it is confirmed merged into `main`. Never branch a PR off another unmerged PR — if the first PR changes then the second branch becomes wasted or broken work. The only exception is if the user explicitly asks for a stacked PR approach; even then, ask first before doing it.
-- **Always use texture tiles (`MahjongTile2D`).** Any code that renders a mahjong tile must use `MahjongTile2D` from `apps/web/src/components/2d/MahjongTile2D.tsx` — it renders SVG textures from `public/textures/Tiles/Regular/`. Never use the legacy text-glyph `MahjongTile` from `components/mahjong-tile.tsx` for new work; that component is only retained for the Learn/Replay/History pages that have not yet been migrated. When in doubt, use `MahjongTile2D`.
+- **ALWAYS use texture tiles (`MahjongTile2D`) for ANY new features or refactors.** Every mahjong tile rendered on screen — whether in new code, refactored code, or feature additions — MUST use `MahjongTile2D` from `apps/web/src/components/2d/MahjongTile2D.tsx`, which renders SVG textures from `public/textures/Tiles/Regular/`. **Never use the legacy text-glyph `MahjongTile` from `components/mahjong-tile.tsx` for any new work.** That component is ONLY retained for the existing Learn/Replay/History pages that were built before the texture migration and have not yet been refactored to use textures. The moment any of those pages are touched for a new feature or refactor, migrate them to `MahjongTile2D`. The text-based tile component is deprecated and should be completely removed from the project once those three pages are migrated. When in doubt, **always use `MahjongTile2D`.**
 
 ---
 
@@ -140,21 +144,35 @@ Replaced the DOM `GameTable` compass layout with a React Three Fiber 3D scene. A
 
 ---
 
-## 6. Bug Log
+## 6. Issues & Bug Management
 
-`BUG-LOG.md` (repo root) is the authoritative record of bugs discovered during development — including root causes, fixes, and the recurring patterns that caused them.
+### Open Issues
 
-**Read it before working on:**
+`Open-issues.md` (repo root) tracks all currently open bugs and improvements:
+
+- **Gameplay bugs:** BUG-022 (rejoin fails), BUG-023 (invalid phase on continue), BUG-024 (winning tile missing)
+- **3D UI bugs:** BUG-08 (viewer discards invisible), BUG-09 (TileWall redesign)
+- **2D UI bugs:** BUG-020 (last-discard pulse), BUG-021 (hand-reveal grouping)
+- **Improvements:** Settlement phase consolidation, end game animations, mobile UX
+
+### Closed Issues & Learnings
+
+`Closed-issues.md` (repo root) documents all fixed bugs with root causes and key learnings:
+
+- BUG-001 through BUG-021 with full analysis
+- 3D UI migration closed bugs
+- Cross-cutting learnings (monorepo resolution, socket data flow, material transparency, etc.)
+
+**Read closed issues before working on:**
 
 - PowerShell scripts or dev tooling (BUG-001, BUG-002)
 - DynamoDB seed scripts or schema keys (BUG-003)
 - NestJS config / environment loading (BUG-004)
 - Workspace package resolution (`exports` field, Jest, Vite) (BUG-006, BUG-007, BUG-011)
-- Socket event handling or game phase logic (BUG-009, BUG-010)
+- Socket event handling or game phase logic (BUG-009, BUG-010, BUG-022, BUG-023)
+- Game state and replay (BUG-017, BUG-019)
 
-**`3D-BUG-LOG.md`** (repo root) tracks 3D UI bugs. BUG-08 (viewer discards invisible) and BUG-09 (TileWall redesign) remain open and deferred. Append new entries here for any further 3D-specific bugs.
-
-**Append a new entry whenever a non-trivial bug is found and fixed.** Use the template at the bottom of `BUG-LOG.md`. Include: symptom, root cause, fix, and the learning/rule to prevent recurrence.
+**When you find a non-trivial bug:** Document it immediately in `Open-issues.md` with symptom, suspected cause, and investigation paths. Once fixed, move it to `Closed-issues.md` with root cause, fix, and key learnings to prevent recurrence.
 
 ---
 
