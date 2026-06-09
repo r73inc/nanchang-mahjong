@@ -4,6 +4,9 @@ import { z } from 'zod';
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
+/** AI opponent difficulty level. */
+export type BotDifficulty = 'easy' | 'normal';
+
 export const RoomSettingsSchema = z.object({
   /**
    * Which rounds to play.
@@ -58,6 +61,10 @@ export interface RoomSeat {
   displayName: string | null;
   ready: boolean;
   isHost: boolean;
+  /** True when this seat is occupied by a bot rather than a human player. */
+  isBot?: boolean;
+  /** Difficulty of the bot occupying this seat (only set when isBot is true). */
+  botDifficulty?: BotDifficulty;
 }
 
 export interface RoomState {
@@ -73,8 +80,19 @@ export interface RoomState {
 
 // ── REST DTOs ─────────────────────────────────────────────────────────────────
 
+export const BotConfigSchema = z.object({
+  /** Number of bot seats to fill (0–3). */
+  count: z.number().int().min(0).max(3),
+  /** Difficulty applied to all bots in this room. */
+  difficulty: z.enum(['easy', 'normal']),
+});
+export type BotConfig = z.infer<typeof BotConfigSchema>;
+
 export const CreateRoomSchema = z.object({
   settings: RoomSettingsSchema.optional(),
+  /** Optional bot configuration. When provided, the host's room will be pre-filled
+   *  with the requested number of bot seats at the chosen difficulty. */
+  bots: BotConfigSchema.optional(),
 });
 export type CreateRoomInput = z.infer<typeof CreateRoomSchema>;
 
