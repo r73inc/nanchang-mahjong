@@ -42,6 +42,7 @@ export function useGame(gameId: string, spectate = false) {
     setRematchRoomCode,
     setConnection,
     setClaimWindow,
+    setViewerClaimSubmitted,
     selectTile,
     setPendingMove,
     setToast,
@@ -78,13 +79,14 @@ export function useGame(gameId: string, spectate = false) {
       setClaimWindow({ actions: payload.actions, deadline: payload.deadline });
     };
 
-    const handleContested = (payload: {
+    const handleContested = (_payload: {
       kind: 'win' | 'pung' | 'kong' | 'chow';
       seat: 0 | 1 | 2 | 3;
     }) => {
-      // Short flash (600ms) showing the losing seat — mostly a FYI indicator.
-      setToast({ kind: 'contested', seat: payload.seat });
-      setTimeout(() => setToast(null), 600);
+      // The game:event that follows immediately carries richer information
+      // (winning seat, action kind, and whether the viewer was outbid).
+      // No separate toast here — that 600ms flash would race with and cancel
+      // the 2500ms game:event toast.
     };
 
     // game:event — every successful public action is broadcast here.
@@ -114,8 +116,26 @@ export function useGame(gameId: string, spectate = false) {
       ) {
         const seat = 'seat' in event ? event.seat : null;
         if (seat !== null) {
-          setToast({ kind: event.kind, seat });
-          setTimeout(() => setToast(null), 2500);
+          // Detect when the viewer submitted a claim but lost to a higher-priority
+          // claim from another seat (e.g. viewer tried to Pung, someone else won).
+          const { viewerClaimSubmitted, snapshot: snap } = useGameStore.getState();
+          const viewerSeat = snap?.viewerSeat ?? null;
+          const isClaimEvent =
+            event.kind === 'pung' ||
+            event.kind === 'chow' ||
+            event.kind === 'kong_open' ||
+            event.kind === 'win';
+          const outbidBy =
+            isClaimEvent &&
+            viewerClaimSubmitted !== null &&
+            viewerSeat !== null &&
+            seat !== viewerSeat
+              ? viewerClaimSubmitted
+              : undefined;
+          // Always clear the pending claim — window is resolved either way.
+          if (viewerClaimSubmitted !== null) setViewerClaimSubmitted(null);
+          setToast({ kind: event.kind, seat, ...(outbidBy ? { outbidBy } : {}) });
+          setTimeout(() => setToast(null), outbidBy ? 3500 : 2500);
         }
       }
     };
@@ -236,13 +256,14 @@ export function useGame(gameId: string, spectate = false) {
   const claim = useCallback(
     (kind: 'win' | 'pung' | 'kong' | 'chow', sequence?: [TileType, TileType, TileType]) => {
       setClaimWindow(null); // optimistically close the window
+      setViewerClaimSubmitted(kind); // track so we can detect if outbid later
       try {
         getSocket().emit('game:claim', { kind, sequence });
       } catch {
         /* ignore — server will time out */
       }
     },
-    [setClaimWindow],
+    [setClaimWindow, setViewerClaimSubmitted],
   );
 
   const pass = useCallback(() => {

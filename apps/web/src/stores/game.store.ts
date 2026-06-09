@@ -48,6 +48,12 @@ export interface GameToast {
   settlementTile?: TileType;
   /** Present for opening_settlement toasts: viewer's score delta. */
   settlementDelta?: number;
+  /**
+   * Set when the viewer submitted a claim during this window but lost to a
+   * higher-priority claim from another seat. Drives the "Another player claimed
+   * it first" subtitle in ActionToast.
+   */
+  outbidBy?: 'win' | 'pung' | 'kong' | 'chow';
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -78,6 +84,14 @@ interface GameStore {
   /** Active claim window sent by the server (null between turns). */
   claimWindow: ClaimWindowState | null;
 
+  /**
+   * Tracks the claim kind the viewer submitted during the current claim window.
+   * Used to detect when a higher-priority claim from another seat wins so the
+   * ActionToast can display a "Another player claimed it first" subtitle.
+   * Cleared when the snapshot arrives (window resolved) or on pass.
+   */
+  viewerClaimSubmitted: 'win' | 'pung' | 'kong' | 'chow' | null;
+
   /** Short-lived toast from game:contested (auto-cleared after 600ms). */
   toast: GameToast | null;
 
@@ -98,6 +112,7 @@ interface GameStore {
   setRematchRoomCode: (code: string) => void;
   setConnection: (s: ConnectionStatus) => void;
   setClaimWindow: (w: ClaimWindowState | null) => void;
+  setViewerClaimSubmitted: (k: 'win' | 'pung' | 'kong' | 'chow' | null) => void;
   selectTile: (idx: number | null) => void;
   setPendingMove: (v: boolean) => void;
   setToast: (t: GameToast | null) => void;
@@ -114,6 +129,7 @@ const initialState = {
   selectedTileIdx: null,
   pendingMove: false,
   claimWindow: null,
+  viewerClaimSubmitted: null as 'win' | 'pung' | 'kong' | 'chow' | null,
   toast: null,
   connection: 'live' as ConnectionStatus,
   gameError: null,
@@ -128,8 +144,9 @@ export const useGameStore = create<GameStore>()(
         snapshot,
         // Server snapshot wins — clear any pending optimistic state
         pendingMove: false,
-        // Clear claim window once snapshot arrives (it carries the new phase)
+        // Clear claim window and pending claim once snapshot arrives
         claimWindow: null,
+        viewerClaimSubmitted: null,
       }),
 
     setEnded: (ended) => set({ ended }),
@@ -143,6 +160,8 @@ export const useGameStore = create<GameStore>()(
     setConnection: (connection) => set({ connection }),
 
     setClaimWindow: (claimWindow) => set({ claimWindow }),
+
+    setViewerClaimSubmitted: (viewerClaimSubmitted) => set({ viewerClaimSubmitted }),
 
     selectTile: (selectedTileIdx) => set({ selectedTileIdx }),
 

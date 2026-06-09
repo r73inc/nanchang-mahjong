@@ -308,6 +308,8 @@
   "lobbyRejoinDismiss": "Dismiss",
   "gameClaimWindow": "Claim Tile",
   "gameClaimWindowDesc": "Claim or pass — {{0}}s",
+  "gameWaitingClaim": "Someone is thinking...",
+  "gamePrecedenceLost": "Another player claimed it first",
   "gameSelectDiscard": "Tap a tile to select",
   "gameConfirmDiscard": "Tap again to discard",
   "gameDrawRound": "Draw — No Winner",

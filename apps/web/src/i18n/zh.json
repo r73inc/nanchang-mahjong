@@ -309,6 +309,8 @@
   "lobbyRejoinDismiss": "关闭",
   "gameClaimWindow": "吃碰杠胡",
   "gameClaimWindowDesc": "请操作 — 剩余 {{0}} 秒",
+  "gameWaitingClaim": "有人正在思考...",
+  "gamePrecedenceLost": "另一位玩家抢先了",
   "gameSelectDiscard": "点击一张牌选择出牌",
   "gameConfirmDiscard": "再次点击确认出牌",
   "gameDrawRound": "荒牌 — 无人胡牌",

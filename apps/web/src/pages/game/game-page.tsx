@@ -954,6 +954,28 @@ function AccessibleHand({
   );
 }
 
+/** Subtle indicator shown to non-eligible viewers while a claim window is open. */
+function WaitingForClaimIndicator({ isMobile = false }: { isMobile?: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute left-0 right-0 flex justify-center items-center px-4 py-3 max-w-viewport mx-auto animate-call-prompt-enter z-20"
+      style={{
+        bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
+        background: 'rgba(10,10,10,0.75)',
+        backdropFilter: 'blur(8px)',
+      }}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-mj-bone/40 animate-pulse" aria-hidden="true" />
+        <p className="text-[11px] text-mj-bone/60 font-medium">{t('gameWaitingClaim')}</p>
+      </div>
+    </div>
+  );
+}
+
 /** Floating action toast — pung, chow, kong, win, concede announcements. */
 function ActionToast({
   toast,
@@ -1046,19 +1068,24 @@ function ActionToast({
         >
           {label}
         </span>
+        {toast.outbidBy && (
+          <span className="text-[10px] text-mj-bone/50 mt-0.5">{t('gamePrecedenceLost')}</span>
+        )}
       </div>
     </div>
   );
 }
 
-/** Side rail claim-window overlay. */
+/** Side rail claim-window overlay — shows tile previews and the pending claimed tile. */
 function SideRail({
   claimWindow,
+  pendingDiscard,
   onClaim,
   onPass,
   isMobile = false,
 }: {
   claimWindow: ClaimWindowState;
+  pendingDiscard: TileType | null;
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
   isMobile?: boolean;
@@ -1066,23 +1093,50 @@ function SideRail({
   const { t } = useI18n();
   const secLeft = Math.max(0, Math.ceil((claimWindow.deadline - Date.now()) / 1000));
 
-  const CLAIM_LABELS: Record<string, string> = {
-    win: t('gameWin'),
-    pung: t('gamePung'),
-    kong: t('gameKong'),
-    chow: t('gameChow'),
-  };
+  type ExpandedAction =
+    | { kind: 'win' | 'pung' | 'kong' }
+    | { kind: 'chow'; sequence: [TileType, TileType, TileType] };
 
-  const CLAIM_COLORS: Record<string, string> = {
+  const expandedActions: ExpandedAction[] = claimWindow.actions.flatMap((action) => {
+    if (action.kind === 'chow') {
+      return (action.sequences ?? []).map(
+        (seq): ExpandedAction => ({ kind: 'chow', sequence: seq }),
+      );
+    }
+    return [{ kind: action.kind } as ExpandedAction];
+  });
+
+  function tilePreview(action: ExpandedAction): TileType[] {
+    if (!pendingDiscard) return [];
+    switch (action.kind) {
+      case 'win':
+        return [pendingDiscard];
+      case 'pung':
+        return [pendingDiscard, pendingDiscard, pendingDiscard];
+      case 'kong':
+        return [pendingDiscard, pendingDiscard, pendingDiscard, pendingDiscard];
+      case 'chow':
+        return [...action.sequence];
+    }
+  }
+
+  const CLAIM_COLORS = {
     win: '#7fc299',
     pung: '#c9a961',
     kong: '#a36d3e',
     chow: '#5a7d8c',
   };
 
+  const CLAIM_LABELS = {
+    win: t('gameWin'),
+    pung: t('gamePung'),
+    kong: t('gameKong'),
+    chow: t('gameChow'),
+  };
+
   return (
     <div
-      className="absolute left-0 right-0 flex flex-col items-center gap-3 p-4 max-w-viewport mx-auto animate-call-prompt-enter z-20"
+      className="absolute left-0 right-0 flex flex-col items-center gap-2 px-4 pt-3 pb-4 max-w-viewport mx-auto animate-call-prompt-enter z-20"
       style={{
         bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
         background: 'rgba(10,10,10,0.92)',
@@ -1091,29 +1145,61 @@ function SideRail({
       role="dialog"
       aria-label={t('gameClaimWindow')}
     >
-      <p className="text-[10px] text-mj-bone/40">{t('gameClaimWindowDesc', String(secLeft))}</p>
+      {/* Header: label + countdown */}
+      <div className="flex items-center justify-between w-full">
+        <p className="text-[11px] font-bold text-mj-bone/70">{t('gameClaimWindow')}</p>
+        <p className="text-[10px] text-mj-bone/40">{t('gameClaimWindowDesc', String(secLeft))}</p>
+      </div>
 
-      <div className="flex gap-3 w-full justify-center">
-        {claimWindow.actions.map((action) => (
-          <button
-            key={action.kind}
-            onClick={() => {
-              const seq = action.sequences?.[0];
-              onClaim(action.kind, seq);
-            }}
-            className="flex-1 max-w-[80px] py-3 rounded-xl font-bold text-sm text-mj-ink"
-            style={{
-              background: CLAIM_COLORS[action.kind],
-              boxShadow: `0 4px 12px ${CLAIM_COLORS[action.kind]}44`,
-            }}
-          >
-            {CLAIM_LABELS[action.kind]}
-          </button>
-        ))}
+      {/* Prominent claimed tile with gold ring */}
+      {pendingDiscard && (
+        <div className="relative flex items-center justify-center" aria-hidden="true">
+          <MahjongTile2D tile={pendingDiscard} size="lg" interactive={false} />
+          <div
+            className="absolute inset-[-3px] rounded-[6px] pointer-events-none"
+            style={{ border: '2px solid #c9a961', boxShadow: '0 0 10px rgba(201,169,97,0.5)' }}
+          />
+        </div>
+      )}
+
+      {/* Action buttons — one per expanded action + pass */}
+      <div className="flex gap-2 w-full justify-center flex-wrap">
+        {expandedActions.map((action, idx) => {
+          const preview = tilePreview(action);
+          const color = CLAIM_COLORS[action.kind];
+          return (
+            <button
+              key={`${action.kind}-${idx}`}
+              onClick={() => {
+                if (action.kind === 'chow') {
+                  onClaim('chow', action.sequence);
+                } else {
+                  onClaim(action.kind);
+                }
+              }}
+              className="flex flex-col items-center gap-1 px-2 py-2 rounded-xl font-bold text-sm text-mj-ink flex-1 min-w-[70px] max-w-[140px]"
+              style={{ background: color, boxShadow: `0 4px 12px ${color}44` }}
+            >
+              {preview.length > 0 && (
+                <div className="flex gap-[2px] justify-center" aria-hidden="true">
+                  {preview.map((tile, ti) => (
+                    <MahjongTile2D
+                      key={`${tile}-${ti}`}
+                      tile={tile}
+                      size="xs"
+                      interactive={false}
+                    />
+                  ))}
+                </div>
+              )}
+              <span>{CLAIM_LABELS[action.kind]}</span>
+            </button>
+          );
+        })}
 
         <button
           onClick={onPass}
-          className="flex-1 max-w-[80px] py-3 rounded-xl font-bold text-sm text-mj-bone/60"
+          className="flex flex-col items-center justify-center flex-1 min-w-[70px] max-w-[140px] px-2 py-2 rounded-xl font-bold text-sm text-mj-bone/60"
           style={{ border: '1px solid rgba(245,239,223,0.15)' }}
         >
           {t('gamePass')}
@@ -2192,9 +2278,21 @@ function GameTable({
         <ActionToast toast={toast} snapshot={snapshot} />
       )}
 
+      {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
+      {snapshot.phase === 'awaiting_claims' &&
+        !claimWindow &&
+        !showConcedeSheet &&
+        !jingDiscardPending && <WaitingForClaimIndicator isMobile={isMobile} />}
+
       {/* ── Claim window rail ──────────────────────────────────────────────── */}
       {claimWindow && !showConcedeSheet && !jingDiscardPending && (
-        <SideRail claimWindow={claimWindow} onClaim={onClaim} onPass={onPass} isMobile={isMobile} />
+        <SideRail
+          claimWindow={claimWindow}
+          pendingDiscard={snapshot.pendingDiscard}
+          onClaim={onClaim}
+          onPass={onPass}
+          isMobile={isMobile}
+        />
       )}
 
       {/* ── Concede sheet ──────────────────────────────────────────────────── */}
