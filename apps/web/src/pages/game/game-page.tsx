@@ -2382,51 +2382,62 @@ function WinAnnouncementOverlay({
   const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
 
   return (
+    // Backdrop — full-screen dark scrim. No onClick here intentionally: the
+    // announcement is not dismissible by tapping the backdrop; only the
+    // "View Results" button advances. Separating backdrop from content also
+    // means any future backdrop-click handler won't swallow inner interactions.
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center gap-6 text-center px-8"
-      style={{
-        zIndex: 60,
-        background: 'rgba(5,5,5,0.96)',
-        backdropFilter: 'blur(12px)',
-      }}
+      className="fixed inset-0 flex flex-col items-center justify-center"
+      style={{ zIndex: 60, background: 'rgba(5,5,5,0.96)', backdropFilter: 'blur(12px)' }}
     >
-      {hasWinner && winnerWind ? (
-        <>
-          {/* Large wind character for the winner */}
-          <div className="text-8xl font-serif font-bold" style={{ color: WIND_COLOR[winnerWind] }}>
-            {WIND_CHAR[winnerWind]}
-          </div>
-          <p
-            className="text-2xl font-bold tracking-wide"
-            style={{ color: isViewerWinner ? '#c9a961' : 'rgba(245,239,223,0.85)' }}
-          >
-            {isViewerWinner ? t('gameYouWin') : t('gameWinnerAnnounce')}
-          </p>
-        </>
-      ) : (
-        <h1 className="text-3xl font-serif font-bold text-mj-bone/90">{t('gameSessionEnd')}</h1>
-      )}
-
-      {myPlacement && (
-        <p
-          className="text-sm font-bold tracking-widest uppercase"
-          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
-        >
-          {t(PLACEMENT_KEY[myPlacement])}
-        </p>
-      )}
-
-      <button
-        onClick={onContinue}
-        className="mt-2 px-8 py-3 rounded-full text-sm font-bold"
-        style={{
-          background: 'linear-gradient(180deg, #c9a961 0%, #a88a45 100%)',
-          color: '#1a1108',
-          boxShadow: '0 4px 14px rgba(201,169,97,0.35)',
-        }}
+      {/* Content card — stopPropagation prevents any ancestor click handler
+          (including a hypothetical future backdrop dismiss) from firing when
+          the player scrolls or taps inside this panel. */}
+      <div
+        className="flex flex-col items-center gap-6 text-center px-8"
+        onClick={(e) => e.stopPropagation()}
       >
-        {t('gameViewResults')}
-      </button>
+        {hasWinner && winnerWind ? (
+          <>
+            {/* Large wind character for the winner */}
+            <div
+              className="text-8xl font-serif font-bold"
+              style={{ color: WIND_COLOR[winnerWind] }}
+            >
+              {WIND_CHAR[winnerWind]}
+            </div>
+            <p
+              className="text-2xl font-bold tracking-wide"
+              style={{ color: isViewerWinner ? '#c9a961' : 'rgba(245,239,223,0.85)' }}
+            >
+              {isViewerWinner ? t('gameYouWin') : t('gameWinnerAnnounce')}
+            </p>
+          </>
+        ) : (
+          <h1 className="text-3xl font-serif font-bold text-mj-bone/90">{t('gameSessionEnd')}</h1>
+        )}
+
+        {myPlacement && (
+          <p
+            className="text-sm font-bold tracking-widest uppercase"
+            style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
+          >
+            {t(PLACEMENT_KEY[myPlacement])}
+          </p>
+        )}
+
+        <button
+          onClick={onContinue}
+          className="mt-2 px-8 py-3 rounded-full text-sm font-bold"
+          style={{
+            background: 'linear-gradient(180deg, #c9a961 0%, #a88a45 100%)',
+            color: '#1a1108',
+            boxShadow: '0 4px 14px rgba(201,169,97,0.35)',
+          }}
+        >
+          {t('gameViewResults')}
+        </button>
+      </div>
     </div>
   );
 }
