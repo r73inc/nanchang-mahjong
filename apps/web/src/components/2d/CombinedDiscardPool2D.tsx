@@ -107,11 +107,7 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Exact coordinate match: seat + tile value. Index-based "isLast" checks
-          // are fragile because the discard array may have already advanced by the
-          // time the component renders. Matching on tile identity is unambiguous.
-          // The pulse overlay is rendered inside MahjongTile2D (isLastDiscard prop)
-          // — see module-level comment about the repeat:Infinity bleed bug.
+          // Exact coordinate match: seat + tile value.
           const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
@@ -120,10 +116,17 @@ export function CombinedDiscardPool2D() {
           const tileLayoutId =
             isViewerLastDiscard && lastDiscardId !== null ? `hand-${lastDiscardId}` : undefined;
 
+          // Encoding isPulse in the key forces React to unmount+remount this wrapper
+          // when the pulse state changes, giving Framer Motion a genuine new mount to
+          // attach the repeat:Infinity boxShadow animation to. Without this, React
+          // updates props in place and Framer Motion never sees a new element to
+          // animate. The initial value uses TILE_ANIMATE (fully visible) when the
+          // remount is triggered by a pulse-state flip so already-visible tiles don't
+          // flash; it uses TILE_INITIAL (fade+scale in) only for brand-new discards.
           return (
             <motion.div
-              key={`${seatIdx}-${posInSeat}`}
-              initial={TILE_INITIAL}
+              key={`${seatIdx}-${posInSeat}-${isPulse ? 'pulsing' : 'idle'}`}
+              initial={isPulse ? TILE_ANIMATE : TILE_INITIAL}
               animate={TILE_ANIMATE}
               transition={TILE_TRANSITION}
               style={{ borderRadius: 4 }}
