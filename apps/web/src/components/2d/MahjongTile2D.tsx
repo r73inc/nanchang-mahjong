@@ -31,6 +31,29 @@ const JING_CHAR = '节' as const;
 // as an HTML attribute value (aria-label), not a JSX text node.
 const ARIA_HIDDEN_TILE = 'Hidden tile' as const;
 
+// ── Last-discard overlay animation (isolated from entry animations) ───────────
+// These constants live here — not in the pool components — so the animation is
+// owned by the element that actually renders it. The overlay motion.div has no
+// `initial`, so repeat:Infinity only touches boxShadow and never bleeds into
+// the entry opacity/scale keyframes of the parent wrapper.
+
+// Keyframes for the pulsing glow on the last-discarded tile.
+// Using actual blur radius (not zero) so the glow is visible on any background.
+// The static border: '2px solid' on the overlay div provides an always-on fallback
+// so even if boxShadow rendering is clipped by a parent, a hard edge is visible.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const LAST_DISCARD_SHADOW: any[] = [
+  '0 0 4px 1px rgb(220, 38, 38)',
+  '0 0 10px 3px rgb(220, 38, 38)',
+  '0 0 4px 1px rgb(220, 38, 38)',
+];
+const LAST_DISCARD_ANIMATE = { boxShadow: LAST_DISCARD_SHADOW };
+const LAST_DISCARD_TRANSITION = {
+  duration: 0.85,
+  repeat: Infinity,
+  ease: 'easeInOut' as const,
+};
+
 // ── Size table ────────────────────────────────────────────────────────────────
 
 /** Pixel dimensions at 800px reference width; scale via CSS container queries. */
@@ -84,6 +107,13 @@ export interface MahjongTile2DProps {
    * Omit unless the parent orchestrates a discard-flight animation.
    */
   layoutId?: string;
+  /**
+   * When true, mounts a dedicated overlay motion.div that pulses a red ring
+   * around the tile. The overlay is absolutely positioned and isolated from
+   * the tile's own entry/exit animations so repeat:Infinity on the boxShadow
+   * keyframes never bleeds into opacity or scale interpolation.
+   */
+  isLastDiscard?: boolean;
   /** Fired when an interactive tile is clicked or activated via keyboard. */
   onSelect?: () => void;
 }
@@ -98,6 +128,7 @@ export function MahjongTile2D({
   isJing = false,
   interactive = false,
   layoutId,
+  isLastDiscard = false,
   onSelect,
 }: MahjongTile2DProps) {
   const { lang } = useI18n();
@@ -144,7 +175,14 @@ export function MahjongTile2D({
 
   return (
     <div
-      style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}
+      style={{
+        display: 'inline-flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        // position:relative is required so the absolutely-positioned pulse
+        // overlay is scoped to this tile and not the discard pool grid.
+        position: 'relative',
+      }}
       data-testid="mahjong-tile-2d"
     >
       <motion.div
@@ -194,6 +232,46 @@ export function MahjongTile2D({
           }}
         />
       </motion.div>
+
+      {/*
+       * Last-discard pulse overlay — mounted only when this tile is the most
+       * recently discarded tile awaiting a claim decision.
+       *
+       * Kept as a separate motion.div so its repeat:Infinity transition on
+       * boxShadow is completely isolated from the entry animation's opacity/
+       * scale keyframes in the parent pool wrapper. Without this separation,
+       * Framer Motion applies the repeat:Infinity transition to ALL properties
+       * animating from `initial`, looping the tile's opacity back to 0 and
+       * making the pulse invisible.
+       *
+       * No `initial` prop → Framer Motion starts from the element's natural
+       * CSS state (boxShadow: none) and immediately begins the keyframe loop.
+       * Unmounts cleanly when isLastDiscard becomes false.
+       */}
+      {isLastDiscard && (
+        <motion.div
+          aria-hidden="true"
+          animate={LAST_DISCARD_ANIMATE}
+          transition={LAST_DISCARD_TRANSITION}
+          style={{
+            position: 'absolute',
+            // Cover only the tile face, not the jing label below it.
+            top: 0,
+            left: 0,
+            width: dims.w,
+            height: dims.h,
+            borderRadius: dims.radius,
+            pointerEvents: 'none',
+            // zIndex ensures this overlay paints above the tile's motion.div even
+            // when Framer Motion's will-change:transform creates a new stacking
+            // context on the sibling. Without this, the overlay renders underneath.
+            zIndex: 20,
+            // Explicit border is an always-on fallback: even if boxShadow is clipped
+            // by an ancestor overflow:hidden, the hard red edge remains visible.
+            border: '2px solid rgb(220, 38, 38)',
+          }}
+        />
+      )}
 
       {isJing && (
         <span

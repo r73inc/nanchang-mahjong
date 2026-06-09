@@ -48,6 +48,7 @@ export function useGame(gameId: string, spectate = false) {
     setToast,
     setGameError,
     setYourTurnFlash,
+    setLastDiscard,
     reset,
   } = useGameStore();
 
@@ -92,8 +93,33 @@ export function useGame(gameId: string, spectate = false) {
 
     // game:event — every successful public action is broadcast here.
     // We show a prominent toast for claims and wins so all players are notified.
+    // We also maintain lastDiscard here (NOT from snapshot.pendingDiscard) to
+    // avoid the React 18 batching race where discard+pass snapshots collapse into
+    // one render with pendingDiscard already null. See game.store.ts for details.
     const handleGameEvent = (payload: { event: import('@nanchang/shared').PublicGameEvent }) => {
       const { event } = payload;
+
+      // ── Last-discard tracking ─────────────────────────────────────────────
+      if (event.kind === 'discard') {
+        // A tile has landed in the discard pool — start pulsing it.
+        // Kept until the next discard or a claim that removes it.
+        setLastDiscard({ seat: event.seat, tile: event.tile });
+      } else if (
+        event.kind === 'pung' ||
+        event.kind === 'chow' ||
+        event.kind === 'kong_open' ||
+        event.kind === 'win'
+      ) {
+        // The pending discard was claimed and removed from the discard pool.
+        setLastDiscard(null);
+      }
+      // Note: 'draw' intentionally does NOT clear lastDiscard. Both the discard
+      // and draw events fire in the same server tick for no-claim turns, so if
+      // we cleared on draw the pulse would never appear (same-batch problem).
+      // The pulse stays until the next seat discards (replacing lastDiscard) or
+      // a claim removes it.
+
+      // ── Toast handling ────────────────────────────────────────────────────
       if (event.kind === 'opening_jing_settlement') {
         // Compute the viewer's own score delta (null for spectators)
         const currentSnapshot = useGameStore.getState().snapshot;

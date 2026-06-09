@@ -23,6 +23,14 @@ const WIND_SYMBOLS = ['東', '南', '西', '北'];
 const VIEW_MODES = ['3D', '2D'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
 
+// API values for the rounds toggle
+const ROUNDS_OPTIONS = ['east', 'east+south'] as const;
+type RoundsOption = (typeof ROUNDS_OPTIONS)[number];
+
+// API values for the termination-type toggle
+const TERMINATION_OPTIONS = ['rounds', 'bust'] as const;
+type TerminationOption = (typeof TERMINATION_OPTIONS)[number];
+
 export function RoomPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -324,13 +332,6 @@ export function RoomPage() {
           >
             {[
               { label: t('settingStyleLabel'), value: t('settingStyle') },
-              {
-                label: t('settingRoundsLabel'),
-                value:
-                  room.settings.rounds === 'east+south'
-                    ? t('settingRoundsEastSouth')
-                    : t('settingRoundsEast'),
-              },
               { label: t('settingJingLabel'), value: t('settingJingValue') },
               {
                 label: t('settingTimerLabel'),
@@ -382,6 +383,94 @@ export function RoomPage() {
               ) : (
                 <span className="text-mj-gold font-semibold">
                   {t(room.settings.viewMode === '3D' ? 'settingViewMode3d' : 'settingViewMode2d')}
+                </span>
+              )}
+            </div>
+
+            {/* Rounds row — interactive toggle for host, read-only label for others */}
+            <div
+              className="flex justify-between items-center px-4 py-3 text-sm"
+              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+            >
+              <span className="text-mj-bone/70">{t('settingRoundsLabel')}</span>
+              {isHost && room.status === 'waiting' ? (
+                <div className="flex gap-1.5" role="group" aria-label={t('settingRoundsLabel')}>
+                  {ROUNDS_OPTIONS.map((opt: RoundsOption) => {
+                    const active = room.settings.rounds === opt;
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => updateSettings(room.roomId, { rounds: opt })}
+                        disabled={loading}
+                        className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                        style={{
+                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          border: active
+                            ? '1px solid rgba(201,169,97,0.6)'
+                            : '1px solid rgba(245,239,223,0.12)',
+                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                        }}
+                        aria-pressed={active}
+                      >
+                        {t(opt === 'east+south' ? 'settingRoundsEastSouth' : 'settingRoundsEast')}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-mj-gold font-semibold">
+                  {t(
+                    room.settings.rounds === 'east+south'
+                      ? 'settingRoundsEastSouth'
+                      : 'settingRoundsEast',
+                  )}
+                </span>
+              )}
+            </div>
+
+            {/* Termination type row — interactive toggle for host, read-only label for others */}
+            <div
+              className="flex justify-between items-center px-4 py-3 text-sm"
+              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+            >
+              <span className="text-mj-bone/70">{t('settingTerminationLabel')}</span>
+              {isHost && room.status === 'waiting' ? (
+                <div
+                  className="flex gap-1.5"
+                  role="group"
+                  aria-label={t('settingTerminationLabel')}
+                >
+                  {TERMINATION_OPTIONS.map((opt: TerminationOption) => {
+                    const active = room.settings.terminationType === opt;
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => updateSettings(room.roomId, { terminationType: opt })}
+                        disabled={loading}
+                        className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                        style={{
+                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          border: active
+                            ? '1px solid rgba(201,169,97,0.6)'
+                            : '1px solid rgba(245,239,223,0.12)',
+                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                        }}
+                        aria-pressed={active}
+                      >
+                        {t(opt === 'bust' ? 'settingTerminationBust' : 'settingTerminationRounds')}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-mj-gold font-semibold">
+                  {t(
+                    room.settings.terminationType === 'bust'
+                      ? 'settingTerminationBust'
+                      : 'settingTerminationRounds',
+                  )}
                 </span>
               )}
             </div>

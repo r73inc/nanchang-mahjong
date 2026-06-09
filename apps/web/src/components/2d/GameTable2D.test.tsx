@@ -74,7 +74,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
 function setupStore(snapshot: ClientGameState | null = makeSnapshot()) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   mockUseGameStore.mockImplementation((selector: (s: any) => any) =>
-    selector({ snapshot, claimWindow: null, pendingMove: false }),
+    selector({ snapshot, claimWindow: null, pendingMove: false, lastDiscard: null }),
   );
 }
 

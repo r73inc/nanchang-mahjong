@@ -9,7 +9,7 @@
  * per turn cycle, so the round-robin matches actual game flow).
  *
  * Special treatments preserved from the per-seat pools:
- *  - Gold pulse on the last discarded tile when a claim window is open.
+ *  - Red pulsing outline on the last discarded tile while pendingDiscard is set.
  *  - Shared-element layoutId on the viewer's most recently discarded tile
  *    (connects the discard-flight animation from PlayerHand2D).
  */
@@ -30,23 +30,13 @@ const TILE_SHADOW_ROLE: SeatRole = 'bottom';
 const TILE_SIZE = 'sm' as const;
 
 // ── Animation constants ───────────────────────────────────────────────────────
-// Framer Motion animate requires mutable arrays for keyframes — plain arrays
-// and objects are used intentionally (not `as const`).
-
-const EASE_IN_OUT = 'easeInOut' as const;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const SHADOW_PULSE: any[] = [
-  '0 0 0px rgba(201,169,97,0)',
-  '0 0 8px rgba(201,169,97,0.8)',
-  '0 0 0px rgba(201,169,97,0)',
-];
-const ANIMATE_PULSE = { boxShadow: SHADOW_PULSE };
-const TRANSITION_PULSE = { duration: 1.2, repeat: Infinity, ease: EASE_IN_OUT };
 
 const TILE_INITIAL = { opacity: 0, scale: 0.7 };
 const TILE_ANIMATE = { opacity: 1, scale: 1 };
 const TILE_TRANSITION = { duration: 0.2 };
+// NOTE: The last-discard red pulse lives inside MahjongTile2D (isLastDiscard prop),
+// not here. Keeping pulse logic in the pool's motion.div caused Framer Motion to
+// apply repeat:Infinity to opacity/scale from `initial`, making the tile invisible.
 
 // ── Interleave helper ─────────────────────────────────────────────────────────
 
@@ -83,18 +73,20 @@ function buildInterleavedDiscards(seats: readonly ClientSeatState[]): DiscardEnt
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CombinedDiscardPool2D() {
-  const snapshot = useGameStore((s) => s.snapshot);
-  const claimWindow = useGameStore((s) => s.claimWindow);
+  // Granular selectors — only the fields needed to decide which tile pulses.
+  const seats = useGameStore((s) => s.snapshot?.seats);
+  // lastDiscard is driven by game:event {kind:'discard'}, NOT snapshot.pendingDiscard.
+  // See game.store.ts for the full explanation of why pendingDiscard races.
+  const lastDiscard = useGameStore((s) => s.lastDiscard);
+  // viewerSeat can be null for spectators; default to 0 (same guard as GameTable2D).
+  const viewerSeat = (useGameStore((s) => s.snapshot?.viewerSeat) ?? 0) as 0 | 1 | 2 | 3;
   const { lastDiscardId } = useDiscardContext();
 
-  if (!snapshot) return null;
+  if (!seats) return null;
 
-  const entries = buildInterleavedDiscards(snapshot.seats);
+  const entries = buildInterleavedDiscards(seats);
   if (entries.length === 0) return null;
 
-  const { discardedBySeat, seats } = snapshot;
-  // viewerSeat can be null in the type; default to 0 (same guard as GameTable2D).
-  const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
   const viewerDiscardCount = seats[viewerSeat].discards.length;
 
   return (
@@ -115,10 +107,8 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Pulse the tile that was just discarded when a claim window is open.
-          const isThisTheLastDiscard =
-            discardedBySeat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
-          const isPulse = isThisTheLastDiscard && claimWindow !== null;
+          // Exact coordinate match: seat + tile value.
+          const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =
@@ -126,12 +116,19 @@ export function CombinedDiscardPool2D() {
           const tileLayoutId =
             isViewerLastDiscard && lastDiscardId !== null ? `hand-${lastDiscardId}` : undefined;
 
+          // Encoding isPulse in the key forces React to unmount+remount this wrapper
+          // when the pulse state changes, giving Framer Motion a genuine new mount to
+          // attach the repeat:Infinity boxShadow animation to. Without this, React
+          // updates props in place and Framer Motion never sees a new element to
+          // animate. The initial value uses TILE_ANIMATE (fully visible) when the
+          // remount is triggered by a pulse-state flip so already-visible tiles don't
+          // flash; it uses TILE_INITIAL (fade+scale in) only for brand-new discards.
           return (
             <motion.div
-              key={`${seatIdx}-${posInSeat}`}
-              initial={TILE_INITIAL}
-              animate={isPulse ? ANIMATE_PULSE : TILE_ANIMATE}
-              transition={isPulse ? TRANSITION_PULSE : TILE_TRANSITION}
+              key={`${seatIdx}-${posInSeat}-${isPulse ? 'pulsing' : 'idle'}`}
+              initial={isPulse ? TILE_ANIMATE : TILE_INITIAL}
+              animate={TILE_ANIMATE}
+              transition={TILE_TRANSITION}
               style={{ borderRadius: 4 }}
             >
               <MahjongTile2D
@@ -140,6 +137,7 @@ export function CombinedDiscardPool2D() {
                 role={TILE_SHADOW_ROLE}
                 interactive={false}
                 layoutId={tileLayoutId}
+                isLastDiscard={isPulse}
               />
             </motion.div>
           );

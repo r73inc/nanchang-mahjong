@@ -170,7 +170,7 @@ export class RoomsService {
       startingScore: dto?.settings?.startingScore ?? 0,
       timerSecs: dto?.settings?.timerSecs ?? 30,
       minFan: dto?.settings?.minFan ?? 1,
-      viewMode: dto?.settings?.viewMode ?? '3D',
+      viewMode: dto?.settings?.viewMode ?? '2D',
       ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? false,
     };
 
@@ -480,12 +480,17 @@ export class RoomsService {
   /**
    * Update mutable pre-game settings. Only the host may call this, and only
    * while the room is still in the 'waiting' state.
-   * Supports: viewMode, ruleTopBottomJing.
+   * Supports: viewMode, ruleTopBottomJing, rounds, terminationType.
    */
   async updateSettings(
     roomId: string,
     requestingUserId: string,
-    updates: { viewMode?: '2D' | '3D'; ruleTopBottomJing?: boolean },
+    updates: {
+      viewMode?: '2D' | '3D';
+      ruleTopBottomJing?: boolean;
+      rounds?: 'east' | 'east+south';
+      terminationType?: 'rounds' | 'bust';
+    },
   ): Promise<RoomState> {
     const room = await this.queryRoom(roomId);
     if (!room) throw new NotFoundException('Room not found');
@@ -508,6 +513,14 @@ export class RoomsService {
     if (updates.ruleTopBottomJing !== undefined) {
       setParts.push('settings.ruleTopBottomJing = :ruleTopBottomJing');
       values[':ruleTopBottomJing'] = updates.ruleTopBottomJing;
+    }
+    if (updates.rounds !== undefined) {
+      setParts.push('settings.rounds = :rounds');
+      values[':rounds'] = updates.rounds;
+    }
+    if (updates.terminationType !== undefined) {
+      setParts.push('settings.terminationType = :terminationType');
+      values[':terminationType'] = updates.terminationType;
     }
 
     await this.db.update({
