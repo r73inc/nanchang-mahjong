@@ -1983,6 +1983,12 @@ function GameTable({
   const nextHistoryId = useRef(0);
   const prevSnapshotRef = useRef<ClientGameState | null>(null);
 
+  // Auto-close history when a claim window opens — the rail covers the bottom
+  // half of the screen and the history panel would just be in the way.
+  useEffect(() => {
+    if (claimWindow) setHistoryOpen(false);
+  }, [claimWindow]);
+
   // ── Mobile landscape mode ───────────────────────────────────────────────────
   const { mode: landscapeMode, requestNativeLandscape } = useOrientation();
   /** True for any non-desktop mode (native-landscape OR css-landscape). */
@@ -2350,6 +2356,81 @@ function GameTable({
   );
 }
 
+// ── Winner announcement overlay ───────────────────────────────────────────────
+
+/**
+ * Full-screen overlay shown when the session ends, before the detailed end
+ * screen. Gives players a moment to register the result — who won, the viewer's
+ * placement — before tapping through to the score breakdown.
+ */
+function WinAnnouncementOverlay({
+  snapshot,
+  ended,
+  viewerSeat,
+  onContinue,
+}: {
+  snapshot: ClientGameState;
+  ended: GameEndedPayload | null;
+  viewerSeat: 0 | 1 | 2 | 3 | null;
+  onContinue: () => void;
+}) {
+  const { t } = useI18n();
+  const hasWinner = ended?.result === 'win' && ended.winnerSeat !== undefined;
+  const winnerSeat = hasWinner ? (ended!.winnerSeat as 0 | 1 | 2 | 3) : null;
+  const winnerWind = winnerSeat !== null ? snapshot.seats[winnerSeat].wind : null;
+  const isViewerWinner = viewerSeat !== null && winnerSeat === viewerSeat;
+  const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
+
+  return (
+    <div
+      className="fixed inset-0 flex flex-col items-center justify-center gap-6 text-center px-8"
+      style={{
+        zIndex: 60,
+        background: 'rgba(5,5,5,0.96)',
+        backdropFilter: 'blur(12px)',
+      }}
+    >
+      {hasWinner && winnerWind ? (
+        <>
+          {/* Large wind character for the winner */}
+          <div className="text-8xl font-serif font-bold" style={{ color: WIND_COLOR[winnerWind] }}>
+            {WIND_CHAR[winnerWind]}
+          </div>
+          <p
+            className="text-2xl font-bold tracking-wide"
+            style={{ color: isViewerWinner ? '#c9a961' : 'rgba(245,239,223,0.85)' }}
+          >
+            {isViewerWinner ? t('gameYouWin') : t('gameWinnerAnnounce')}
+          </p>
+        </>
+      ) : (
+        <h1 className="text-3xl font-serif font-bold text-mj-bone/90">{t('gameSessionEnd')}</h1>
+      )}
+
+      {myPlacement && (
+        <p
+          className="text-sm font-bold tracking-widest uppercase"
+          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
+        >
+          {t(PLACEMENT_KEY[myPlacement])}
+        </p>
+      )}
+
+      <button
+        onClick={onContinue}
+        className="mt-2 px-8 py-3 rounded-full text-sm font-bold"
+        style={{
+          background: 'linear-gradient(180deg, #c9a961 0%, #a88a45 100%)',
+          color: '#1a1108',
+          boxShadow: '0 4px 14px rgba(201,169,97,0.35)',
+        }}
+      >
+        {t('gameViewResults')}
+      </button>
+    </div>
+  );
+}
+
 // ── Main page component ───────────────────────────────────────────────────────
 
 /** localStorage key that persists the active gameId across page navigations. */
@@ -2399,6 +2480,9 @@ export function GamePage() {
     const id = setTimeout(() => setTimedOut(true), GAME_JOIN_TIMEOUT_MS);
     return () => clearTimeout(id);
   }, [snapshot, gameError, timedOut]);
+
+  // Gated by the winner announcement overlay — true once the player taps "View Results".
+  const [showEndScreen, setShowEndScreen] = useState(false);
 
   const handleHome = useCallback(() => navigate('/lobby'), [navigate]);
 
@@ -2508,16 +2592,34 @@ export function GamePage() {
           />
         )}
 
+      {/* ── Winner announcement overlay ────────────────────────────────────── */}
+      {/* Shown first when the session ends — players tap "View Results" to   */}
+      {/* proceed to the full score breakdown.                                */}
+      {!handReveal &&
+        snapshot.preGamePhase === null &&
+        snapshot.phase === 'finished' &&
+        !showEndScreen && (
+          <WinAnnouncementOverlay
+            snapshot={snapshot}
+            ended={ended}
+            viewerSeat={viewerSeat}
+            onContinue={() => setShowEndScreen(true)}
+          />
+        )}
+
       {/* ── Session end screen ────────────────────────────────────────────── */}
-      {!handReveal && snapshot.preGamePhase === null && snapshot.phase === 'finished' && (
-        <GameEndScreen
-          snapshot={snapshot}
-          ended={ended}
-          viewerSeat={viewerSeat}
-          onHome={handleHome}
-          onRematch={requestRematch}
-        />
-      )}
+      {!handReveal &&
+        snapshot.preGamePhase === null &&
+        snapshot.phase === 'finished' &&
+        showEndScreen && (
+          <GameEndScreen
+            snapshot={snapshot}
+            ended={ended}
+            viewerSeat={viewerSeat}
+            onHome={handleHome}
+            onRematch={requestRematch}
+          />
+        )}
 
       {/* ── Loading / dealing ─────────────────────────────────────────────── */}
       {!handReveal &&

@@ -330,6 +330,9 @@
   "gameErrorGeneric": "发生意外错误，请返回大厅后重试。",
   "gameErrorBackToLobby": "返回大厅",
 
+  "gameWinnerAnnounce": "赢了！",
+  "gameViewResults": "查看结果",
+
   "endGamePlacement1": "第一名",
   "endGamePlacement2": "第二名",
   "endGamePlacement3": "第三名",
