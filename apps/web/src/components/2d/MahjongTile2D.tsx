@@ -37,11 +37,15 @@ const ARIA_HIDDEN_TILE = 'Hidden tile' as const;
 // `initial`, so repeat:Infinity only touches boxShadow and never bleeds into
 // the entry opacity/scale keyframes of the parent wrapper.
 
+// Keyframes for the pulsing glow on the last-discarded tile.
+// Using actual blur radius (not zero) so the glow is visible on any background.
+// The static border: '2px solid' on the overlay div provides an always-on fallback
+// so even if boxShadow rendering is clipped by a parent, a hard edge is visible.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LAST_DISCARD_SHADOW: any[] = [
-  '0 0 0 2px rgba(220,38,38,0.95)',
-  '0 0 0 5px rgba(220,38,38,0.3)',
-  '0 0 0 2px rgba(220,38,38,0.95)',
+  '0 0 4px 1px rgb(220, 38, 38)',
+  '0 0 10px 3px rgb(220, 38, 38)',
+  '0 0 4px 1px rgb(220, 38, 38)',
 ];
 const LAST_DISCARD_ANIMATE = { boxShadow: LAST_DISCARD_SHADOW };
 const LAST_DISCARD_TRANSITION = {
@@ -258,6 +262,13 @@ export function MahjongTile2D({
             height: dims.h,
             borderRadius: dims.radius,
             pointerEvents: 'none',
+            // zIndex ensures this overlay paints above the tile's motion.div even
+            // when Framer Motion's will-change:transform creates a new stacking
+            // context on the sibling. Without this, the overlay renders underneath.
+            zIndex: 20,
+            // Explicit border is an always-on fallback: even if boxShadow is clipped
+            // by an ancestor overflow:hidden, the hard red edge remains visible.
+            border: '2px solid rgb(220, 38, 38)',
           }}
         />
       )}
