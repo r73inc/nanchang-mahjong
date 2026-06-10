@@ -1,21 +1,32 @@
 import { useEffect, useState } from 'react';
 import { useSound } from '../../hooks/use-sound';
-import { useI18n } from '../../i18n';
 
+/**
+ * Full-screen result announcement — shown for a few seconds when a hand or the
+ * session ends, BEFORE any reveal/score screens (BUG-025). Auto-dismisses after
+ * `duration` ms; tapping anywhere skips it immediately.
+ *
+ * The backdrop is near-opaque because the screens underneath unmount while the
+ * announcement is up — there is no game table to peek through.
+ */
 interface GameWinnerPopupProps {
-  winnerName: string;
-  isViewer: boolean;
+  /** Big serif headline, e.g. "Mom Wins!" or "Draw — No Winner". */
+  title: string;
+  /** Optional smaller line under the title, e.g. the last hand's result. */
+  subtitle?: string;
+  /** Green headline when the viewer is the winner; gold otherwise. */
+  isViewer?: boolean;
   duration?: number; // ms before auto-close
   onClose: () => void;
 }
 
 export function GameWinnerPopup({
-  winnerName,
-  isViewer,
-  duration = 3000,
+  title,
+  subtitle,
+  isViewer = false,
+  duration = 2800,
   onClose,
 }: GameWinnerPopupProps) {
-  const { t } = useI18n();
   const { playChime } = useSound();
   const [isVisible, setIsVisible] = useState(true);
 
@@ -40,10 +51,11 @@ export function GameWinnerPopup({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 bg-black/40"
+      className="fixed inset-0 flex items-center justify-center z-50"
+      style={{ background: 'rgba(8,8,8,0.94)', backdropFilter: 'blur(10px)' }}
       onClick={() => setIsVisible(false)}
     >
-      <div className="text-center px-8" onClick={(e) => e.stopPropagation()}>
+      <div className="text-center px-8">
         <h1
           className="text-5xl md:text-6xl font-serif font-bold mb-4 leading-tight animate-winner-pop"
           style={{
@@ -51,14 +63,16 @@ export function GameWinnerPopup({
             textShadow: '0 2px 8px rgba(0,0,0,0.5)',
           }}
         >
-          {isViewer ? t('gameWinnerPopupYou') : t('gameWinnerPopupOther', winnerName)}
+          {title}
         </h1>
-        <p
-          className="text-sm text-mj-bone/70 animate-winner-fade-in"
-          style={{ animationDelay: '0.3s', opacity: 0 }}
-        >
-          {t('gameWinnerPopupWaiting')}
-        </p>
+        {subtitle && (
+          <p
+            className="text-sm text-mj-bone/70 animate-winner-fade-in"
+            style={{ animationDelay: '0.3s', opacity: 0 }}
+          >
+            {subtitle}
+          </p>
+        )}
       </div>
     </div>
   );

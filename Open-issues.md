@@ -91,25 +91,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-025 · Game end page abrupt transition — no "X player wins" pause
-
-**Symptom:** The game transitions directly from active gameplay to the end-results table with no pause or announcement showing which player won. Players have no moment to see the win condition before the scores appear.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** After a hand ends, the UI should display an announcement (e.g., "East player wins!") for 2-3 seconds before transitioning to the end-results/hand-reveal screen. This gives players time to recognize the outcome.
-
-**Suspected cause:** The hand-reveal event may be flowing directly to the end screen without an intermediate "winner announcement" state/component.
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx` — hand-reveal event handling
-- `apps/web/src/components/game/HandRevealScreen.tsx` — transition timing
-
-**Next steps:** Check if `HandRevealScreen` includes a winner announcement overlay (similar to the existing `GameWinnerPopup` or the pause mechanism from IMP-006).
-
----
-
 ### BUG-026 · Settlement phase text format — "Received/Paid X points from/to" format
 
 **Symptom:** The settlement-phase dropdown tables show per-tile breakdowns but the text format is unclear. Players cannot immediately understand who received or paid what.

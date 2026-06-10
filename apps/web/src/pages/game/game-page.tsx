@@ -342,18 +342,27 @@ function PreGameFlow({
 
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
 // Full-screen post-hand reveal. Shows all hands, spirit settlement, and
-// payment breakdown. Host clicks "Continue" to start the next hand.
+// payment breakdown.
+//   mode 'pause'  — between hands: host clicks "Continue" to start the next
+//                   hand (or end the session as a fallback when game:ended is
+//                   delayed); everyone else waits.
+//   mode 'review' — after the session results (BUG-025): the final screen of
+//                   the end-of-game sequence, with a back-to-results button.
 
 function HandRevealScreen({
   handReveal,
   snapshot,
   isHost,
   onAdvance,
+  mode = 'pause',
+  onBack,
 }: {
   handReveal: HandRevealPayload;
   snapshot: ClientGameState;
   isHost: boolean;
-  onAdvance: () => void;
+  onAdvance?: () => void;
+  mode?: 'pause' | 'review';
+  onBack?: () => void;
 }) {
   const { t } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
@@ -609,10 +618,14 @@ function HandRevealScreen({
           </div>
         </div>
 
-        {/* ── Continue / waiting ───────────────────────────────────────────── */}
+        {/* ── Continue / waiting / back ────────────────────────────────────── */}
         <div className="pt-2 pb-4 flex flex-col items-center gap-3">
-          {isHost ? (
-            <GoldButton onClick={onAdvance}>
+          {mode === 'review' ? (
+            <GoldButton onClick={onBack ?? (() => undefined)}>
+              {t('endGameBackToResults')}
+            </GoldButton>
+          ) : isHost ? (
+            <GoldButton onClick={onAdvance ?? (() => undefined)}>
               {handReveal.isLastHand ? t('handRevealEndSession') : t('handRevealContinue')} →
             </GoldButton>
           ) : (
@@ -640,37 +653,25 @@ function GameEndScreen({
   viewerSeat,
   onHome,
   onRematch,
+  onViewDetails,
 }: {
   snapshot: ClientGameState;
   ended: GameEndedPayload | null;
   viewerSeat: 0 | 1 | 2 | 3 | null;
   onHome: () => void;
   onRematch: () => void;
+  onViewDetails?: () => void;
 }) {
   const { t } = useI18n();
-  const [showResults, setShowResults] = useState(false);
-  const scores = snapshot.seats.map((s) => s.score);
+  // Prefer the authoritative finalScores from game:ended — snapshot seat scores
+  // exclude the final hand's spirit settlement (no snapshot follows endSession).
+  const scores = ended ? ended.finalScores : snapshot.seats.map((s) => s.score);
   const sorted = [...scores].sort((a, b) => b - a);
   const myScore = viewerSeat !== null ? scores[viewerSeat] : null;
   const iWon = myScore !== null && myScore === sorted[0];
-  const maxScore = Math.max(...scores);
-  const winnerSeat = snapshot.seats.findIndex((s) => s.score === maxScore);
-  const winnerName = winnerSeat >= 0 ? snapshot.seats[winnerSeat].seatName : 'Player';
   const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
   const myRatingDelta =
     viewerSeat !== null && ended?.ratingDeltas ? ended.ratingDeltas[viewerSeat] : null;
-
-  // Show winner pop-up then transition to results
-  if (!showResults) {
-    return (
-      <GameWinnerPopup
-        winnerName={winnerName}
-        isViewer={iWon}
-        duration={3000}
-        onClose={() => setShowResults(true)}
-      />
-    );
-  }
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">
@@ -729,10 +730,10 @@ function GameEndScreen({
               </div>
               <span
                 className="font-bold font-mono"
-                style={{ color: seat.score >= 0 ? '#7fc299' : '#e88080' }}
+                style={{ color: scores[i] >= 0 ? '#7fc299' : '#e88080' }}
               >
-                {seat.score >= 0 ? '+' : ''}
-                {seat.score}
+                {scores[i] >= 0 ? '+' : ''}
+                {scores[i]}
               </span>
             </div>
           );
@@ -746,6 +747,15 @@ function GameEndScreen({
       )}
 
       <div className="flex flex-col gap-3 w-full max-w-[280px]">
+        {onViewDetails && (
+          <button
+            onClick={onViewDetails}
+            className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
+            style={{ border: '1px solid rgba(245,239,223,0.2)' }}
+          >
+            {t('endGameViewDetails')}
+          </button>
+        )}
         {viewerSeat === 0 && (
           <button
             onClick={onRematch}
@@ -2331,89 +2341,55 @@ function GameTable({
   );
 }
 
-// ── Winner announcement overlay ───────────────────────────────────────────────
+// ── Hand result announcement ──────────────────────────────────────────────────
 
 /**
- * Full-screen overlay shown when the session ends, before the detailed end
- * screen. Gives players a moment to register the result — who won, the viewer's
- * placement — before tapping through to the score breakdown.
+ * Builds the title/subtitle for the full-screen GameWinnerPopup announcement
+ * shown when game:hand-reveal arrives, BEFORE any reveal/score screens
+ * (BUG-025).
+ *
+ * Mid-session hands announce the hand result. The last hand announces the
+ * SESSION winner (snapshot scores + the reveal's spirit deltas equal the
+ * server's cumulative scores), with the hand result as the subtitle.
  */
-function WinAnnouncementOverlay({
-  snapshot,
-  ended,
-  viewerSeat,
-  onContinue,
-}: {
-  snapshot: ClientGameState;
-  ended: GameEndedPayload | null;
-  viewerSeat: 0 | 1 | 2 | 3 | null;
-  onContinue: () => void;
-}) {
-  const { t } = useI18n();
-  const hasWinner = ended?.result === 'win' && ended.winnerSeat !== undefined;
-  const winnerSeat = hasWinner ? (ended!.winnerSeat as 0 | 1 | 2 | 3) : null;
-  const isViewerWinner = viewerSeat !== null && winnerSeat === viewerSeat;
-  const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
+function buildHandAnnouncement(
+  reveal: HandRevealPayload,
+  snapshot: ClientGameState,
+  t: ReturnType<typeof useI18n>['t'],
+): { title: string; subtitle?: string; isViewer: boolean } {
+  const viewerSeat = snapshot.viewerSeat;
 
-  return (
-    // Backdrop — full-screen dark scrim. No onClick here intentionally: the
-    // announcement is not dismissible by tapping the backdrop; only the
-    // "View Results" button advances. Separating backdrop from content also
-    // means any future backdrop-click handler won't swallow inner interactions.
-    <div
-      className="fixed inset-0 flex flex-col items-center justify-center"
-      style={{ zIndex: 60, background: 'rgba(5,5,5,0.96)', backdropFilter: 'blur(12px)' }}
-    >
-      {/* Content card — stopPropagation prevents any ancestor click handler
-          (including a hypothetical future backdrop dismiss) from firing when
-          the player scrolls or taps inside this panel. */}
-      <div
-        className="flex flex-col items-center gap-6 text-center px-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {hasWinner && winnerSeat !== null ? (
-          <>
-            {/* Winner name */}
-            <div
-              className="text-4xl font-serif font-bold text-center break-words max-w-xs"
-              style={{ color: WIND_COLOR[snapshot.seats[winnerSeat].wind] }}
-            >
-              {snapshot.seats[winnerSeat].seatName}
-            </div>
-            <p
-              className="text-2xl font-bold tracking-wide"
-              style={{ color: isViewerWinner ? '#c9a961' : 'rgba(245,239,223,0.85)' }}
-            >
-              {isViewerWinner ? t('gameYouWin') : t('gameWinnerAnnounce')}
-            </p>
-          </>
-        ) : (
-          <h1 className="text-3xl font-serif font-bold text-mj-bone/90">{t('gameSessionEnd')}</h1>
-        )}
+  const handResultLine =
+    reveal.result === 'win' && reveal.winnerSeat !== undefined
+      ? t('handRevealWinner', snapshot.seats[reveal.winnerSeat].seatName)
+      : reveal.result === 'concede' && reveal.concedeSeat !== undefined
+        ? t('handRevealConcedeBy', snapshot.seats[reveal.concedeSeat].seatName)
+        : t('handRevealResultDraw');
 
-        {myPlacement && (
-          <p
-            className="text-sm font-bold tracking-widest uppercase"
-            style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
-          >
-            {t(PLACEMENT_KEY[myPlacement])}
-          </p>
-        )}
+  if (reveal.isLastHand) {
+    const finals = snapshot.seats.map((s, i) => s.score + reveal.spiritDeltas[i]);
+    const winnerSeat = finals.indexOf(Math.max(...finals));
+    const isViewer = viewerSeat !== null && winnerSeat === viewerSeat;
+    return {
+      title: isViewer
+        ? t('gameWinnerPopupYou')
+        : t('gameWinnerPopupOther', snapshot.seats[winnerSeat].seatName),
+      subtitle: handResultLine,
+      isViewer,
+    };
+  }
 
-        <button
-          onClick={onContinue}
-          className="mt-2 px-8 py-3 rounded-full text-sm font-bold"
-          style={{
-            background: 'linear-gradient(180deg, #c9a961 0%, #a88a45 100%)',
-            color: '#1a1108',
-            boxShadow: '0 4px 14px rgba(201,169,97,0.35)',
-          }}
-        >
-          {t('gameViewResults')}
-        </button>
-      </div>
-    </div>
-  );
+  if (reveal.result === 'win' && reveal.winnerSeat !== undefined) {
+    const isViewer = viewerSeat !== null && reveal.winnerSeat === viewerSeat;
+    return {
+      title: isViewer
+        ? t('gameWinnerPopupYou')
+        : t('gameWinnerPopupOther', snapshot.seats[reveal.winnerSeat].seatName),
+      isViewer,
+    };
+  }
+
+  return { title: handResultLine, isViewer: false };
 }
 
 // ── Main page component ───────────────────────────────────────────────────────
@@ -2428,6 +2404,7 @@ export function GamePage() {
   const { id: gameId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const spectate = searchParams.get('spectate') === '1';
 
@@ -2436,6 +2413,7 @@ export function GamePage() {
     ended,
     settlementPreview,
     handReveal,
+    finalHandReveal,
     rematchRoomCode,
     connection,
     selectedTileIdx,
@@ -2466,8 +2444,40 @@ export function GamePage() {
     return () => clearTimeout(id);
   }, [snapshot, gameError, timedOut]);
 
-  // Gated by the winner announcement overlay — true once the player taps "View Results".
-  const [showEndScreen, setShowEndScreen] = useState(false);
+  // ── BUG-025: end-of-hand screen order ───────────────────────────────────────
+  // 1. Winner announcement popup (first — fires when game:hand-reveal arrives)
+  // 2. HandRevealScreen between hands / GameEndScreen results at session end
+  // 3. Hand-detail review (last — reached from the results screen)
+
+  // The reveal currently being announced. Stashed separately from the store so
+  // the popup survives game:ended clearing `handReveal` mid-announcement.
+  const [announcingReveal, setAnnouncingReveal] = useState<HandRevealPayload | null>(null);
+  const announcedRevealRef = useRef<HandRevealPayload | null>(null);
+  useEffect(() => {
+    if (handReveal && announcedRevealRef.current !== handReveal) {
+      announcedRevealRef.current = handReveal;
+      setAnnouncingReveal(handReveal);
+    }
+  }, [handReveal]);
+
+  // On the last hand the host client ends the session immediately — the old
+  // "View Final Scores" click added nothing, and ending now lets game:ended
+  // (placement, ELO) arrive while the announcement is still on screen. If the
+  // emit is lost, HandRevealScreen renders after the announcement with the
+  // manual button as a fallback.
+  const autoAdvancedRef = useRef<HandRevealPayload | null>(null);
+  useEffect(() => {
+    if (!handReveal?.isLastHand || ended) return;
+    const vs = snapshot?.viewerSeat;
+    if (vs === null || vs === undefined || vs !== snapshot?.dealerSeat) return;
+    if (autoAdvancedRef.current === handReveal) return;
+    autoAdvancedRef.current = handReveal;
+    advanceHand();
+  }, [handReveal, ended, snapshot, advanceHand]);
+
+  // True while the player is reviewing the final hand's details from the
+  // results screen — the last screen of the end-of-game sequence.
+  const [showEndDetails, setShowEndDetails] = useState(false);
 
   const handleHome = useCallback(() => navigate('/lobby'), [navigate]);
 
@@ -2532,11 +2542,26 @@ export function GamePage() {
 
   const viewerSeat = snapshot.viewerSeat;
   const isDealer = viewerSeat !== null && viewerSeat === snapshot.dealerSeat;
+  const announcement = announcingReveal
+    ? buildHandAnnouncement(announcingReveal, snapshot, t)
+    : null;
 
   return (
     <>
+      {/* ── Winner announcement — always the FIRST screen after a hand ends ── */}
+      {announcement && (
+        <GameWinnerPopup
+          title={announcement.title}
+          subtitle={announcement.subtitle}
+          isViewer={announcement.isViewer}
+          onClose={() => setAnnouncingReveal(null)}
+        />
+      )}
+
       {/* ── Post-hand reveal (paused between hands) ──────────────────────── */}
-      {handReveal && (
+      {/* Also the last-hand fallback when game:ended hasn't arrived — the    */}
+      {/* host still has the manual "View Final Scores" button there.        */}
+      {handReveal && !announcingReveal && (
         <HandRevealScreen
           handReveal={handReveal}
           snapshot={snapshot}
@@ -2549,7 +2574,7 @@ export function GamePage() {
       {/* Shown whenever preGamePhase is not null — this covers both the         */}
       {/* jing_reveal engine phase (hands/settlement steps) AND the playing      */}
       {/* engine phase with preGamePhase='jing' (jing step after revealJing).   */}
-      {!handReveal && snapshot.preGamePhase !== null && (
+      {!handReveal && !announcingReveal && snapshot.preGamePhase !== null && (
         <PreGameFlow
           snapshot={snapshot}
           settlementPreview={settlementPreview}
@@ -2577,34 +2602,29 @@ export function GamePage() {
           />
         )}
 
-      {/* ── Winner announcement overlay ────────────────────────────────────── */}
-      {/* Shown first when the session ends — players tap "View Results" to   */}
-      {/* proceed to the full score breakdown.                                */}
+      {/* ── Session end — results screen, then hand-detail review (last) ──── */}
       {!handReveal &&
+        !announcingReveal &&
         snapshot.preGamePhase === null &&
         snapshot.phase === 'finished' &&
-        !showEndScreen && (
-          <WinAnnouncementOverlay
+        (showEndDetails && finalHandReveal ? (
+          <HandRevealScreen
+            handReveal={finalHandReveal}
             snapshot={snapshot}
-            ended={ended}
-            viewerSeat={viewerSeat}
-            onContinue={() => setShowEndScreen(true)}
+            isHost={false}
+            mode="review"
+            onBack={() => setShowEndDetails(false)}
           />
-        )}
-
-      {/* ── Session end screen ────────────────────────────────────────────── */}
-      {!handReveal &&
-        snapshot.preGamePhase === null &&
-        snapshot.phase === 'finished' &&
-        showEndScreen && (
+        ) : (
           <GameEndScreen
             snapshot={snapshot}
             ended={ended}
             viewerSeat={viewerSeat}
             onHome={handleHome}
             onRematch={requestRematch}
+            onViewDetails={finalHandReveal ? () => setShowEndDetails(true) : undefined}
           />
-        )}
+        ))}
 
       {/* ── Loading / dealing ─────────────────────────────────────────────── */}
       {!handReveal &&

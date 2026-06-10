@@ -289,7 +289,6 @@
   "gameYouWin": "你赢了！",
   "gameWinnerPopupYou": "🎉 你赢了！🎉",
   "gameWinnerPopupOther": "{{0}} 赢了！",
-  "gameWinnerPopupWaiting": "点击屏幕继续...",
   "gameFinalScores": "最终积分",
   "gamePlayAgain": "返回大厅",
   "lobbyRejoinBanner": "游戏进行中",
@@ -319,9 +318,6 @@
   "gameErrorGeneric": "发生意外错误，请返回大厅后重试。",
   "gameErrorBackToLobby": "返回大厅",
 
-  "gameWinnerAnnounce": "赢了！",
-  "gameViewResults": "查看结果",
-
   "endGamePlacement1": "第一名",
   "endGamePlacement2": "第二名",
   "endGamePlacement3": "第三名",
@@ -329,6 +325,8 @@
   "endGameHandsPlayed": "共 {{0}} 局",
   "endGameRatingDelta": "积分",
   "endGameRematch": "再来一局",
+  "endGameViewDetails": "查看手牌详情",
+  "endGameBackToResults": "← 返回结算",
 
   "historyTitle": "对局记录",
   "historyEmpty": "暂无对局记录，快开始第一局吧！",

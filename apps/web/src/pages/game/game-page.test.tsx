@@ -16,7 +16,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GamePage } from './game-page';
 import { MahjongTile } from '../../components/mahjong-tile';
-import type { ClientGameState } from '@nanchang/shared';
+import type { ClientGameState, HandRevealPayload, GameEndedPayload } from '@nanchang/shared';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -134,6 +134,40 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
         seatName: 'Player',
       },
     ],
+    ...overrides,
+  };
+}
+
+const ZERO_SPIRIT = { primary: 0, secondary: 0, spiritKongs: 0 };
+
+function makeHandReveal(overrides: Partial<HandRevealPayload> = {}): HandRevealPayload {
+  return {
+    hands: [['1m'], ['2m'], ['3m'], ['5m']],
+    openMelds: [[], [], [], []],
+    jingPrimary: '3m',
+    jingSecondary: '4m',
+    spiritCounts: [ZERO_SPIRIT, ZERO_SPIRIT, ZERO_SPIRIT, ZERO_SPIRIT],
+    spiritDeltas: [0, 0, 0, 0],
+    result: 'win',
+    winnerSeat: 1,
+    isLastHand: false,
+    nextDealerSeat: 1,
+    handNetDeltas: [0, 0, 0, 0],
+    ...overrides,
+  };
+}
+
+function makeEnded(overrides: Partial<GameEndedPayload> = {}): GameEndedPayload {
+  return {
+    result: 'win',
+    winnerSeat: 0,
+    finalScores: [8, -2, -3, -3],
+    placement: [1, 2, 3, 3],
+    handsPlayed: 2,
+    seatMap: ['u1', 'u2', 'u3', 'u4'],
+    startedAt: new Date().toISOString(),
+    endedAt: new Date().toISOString(),
+    ratingDeltas: [12, -2, -5, -5],
     ...overrides,
   };
 }
@@ -335,6 +369,87 @@ describe('GamePage', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /pass|过/i }));
     expect(mockEmit).toHaveBeenCalledWith('game:pass', {});
+  });
+
+  // ── BUG-025: end-of-hand screen order ────────────────────────────────────────
+
+  it('BUG-025: winner announcement shows before the hand-reveal detail screen', async () => {
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'finished' }));
+
+    await act(async () => {
+      registeredHandlers.get('game:hand-reveal')?.(makeHandReveal({ winnerSeat: 1 }));
+    });
+
+    // Announcement popup first — the detail screen must NOT be visible yet
+    expect(screen.getByText('Player Wins!')).toBeInTheDocument();
+    expect(screen.queryByText(/hand complete/i)).not.toBeInTheDocument();
+
+    // Tap anywhere to skip → detail screen (HandRevealScreen) appears
+    fireEvent.click(screen.getByText('Player Wins!'));
+    await waitFor(() => {
+      expect(screen.getByText(/hand complete/i)).toBeInTheDocument();
+    });
+  });
+
+  it('BUG-025: session end — announcement first, results second, hand details last', async () => {
+    renderGamePage();
+    // viewerSeat=0 === dealerSeat=0 → this client is the host
+    await pushSnapshot(makeSnapshot({ phase: 'finished' }));
+
+    await act(async () => {
+      registeredHandlers.get('game:hand-reveal')?.(
+        makeHandReveal({ isLastHand: true, winnerSeat: 0, nextDealerSeat: undefined }),
+      );
+    });
+
+    // Host auto-ends the session — no manual "View Final Scores" click needed
+    expect(mockEmit).toHaveBeenCalledWith('game:advance-hand', { gameId: 'game-test' });
+
+    // 1. Winner announcement is the FIRST screen (no results table behind it yet)
+    expect(screen.getByText(/you win/i)).toBeInTheDocument();
+    expect(screen.queryByText(/final scores/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      registeredHandlers.get('game:ended')?.(makeEnded());
+    });
+
+    // 2. Skip the announcement → results screen (placement, scores, rating)
+    fireEvent.click(screen.getByText(/you win/i));
+    await waitFor(() => {
+      expect(screen.getByText(/final scores/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/1st place/i)).toBeInTheDocument();
+
+    // 3. View Hand Details → the detailed reveal is the LAST screen
+    fireEvent.click(screen.getByRole('button', { name: /view hand details/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/all hands/i)).toBeInTheDocument();
+    });
+
+    // Back returns to the results screen
+    fireEvent.click(screen.getByRole('button', { name: /back to results/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/final scores/i)).toBeInTheDocument();
+    });
+  });
+
+  it('BUG-025: stale handReveal is cleared when the next hand starts', async () => {
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'finished' }));
+
+    await act(async () => {
+      registeredHandlers.get('game:hand-reveal')?.(makeHandReveal({ winnerSeat: 1 }));
+    });
+    fireEvent.click(screen.getByText('Player Wins!'));
+    await waitFor(() => expect(screen.getByText(/hand complete/i)).toBeInTheDocument());
+
+    // Next hand starts: snapshot with a pre-game phase must replace the reveal
+    await pushSnapshot(makeSnapshot({ phase: 'jing_reveal', preGamePhase: 'hands' }));
+    await waitFor(() => {
+      expect(screen.queryByText(/hand complete/i)).not.toBeInTheDocument();
+      expect(screen.getAllByText(/your hand/i).length).toBeGreaterThan(0);
+    });
   });
 
   // ── Phase 14A: mobile overscroll suppression ─────────────────────────────────
