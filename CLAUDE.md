@@ -168,7 +168,7 @@ Replaced the DOM `GameTable` compass layout with a React Three Fiber 3D scene. A
 
 - **Gameplay bugs:** BUG-022 (rejoin fails), BUG-023 (invalid phase on continue), BUG-024 (winning tile missing)
 - **3D UI bugs:** BUG-08 (viewer discards invisible), BUG-09 (TileWall redesign)
-- **2D UI bugs:** BUG-020 (last-discard pulse), BUG-021 (hand-reveal grouping)
+- **2D UI bugs:** BUG-021 (hand-reveal grouping)
 - **Improvements:** Settlement phase consolidation, end game animations, mobile UX
 
 ### Closed Issues & Learnings
