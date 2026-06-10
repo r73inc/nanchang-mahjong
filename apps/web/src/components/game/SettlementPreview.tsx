@@ -124,8 +124,11 @@ export function SettlementPreview({
                           : 'text-mj-bone/40'
                     }`}
                   >
-                    {totalDelta > 0 ? '+' : ''}
-                    {totalDelta}
+                    {totalDelta > 0
+                      ? t('settlementReceived', String(totalDelta))
+                      : totalDelta < 0
+                        ? t('settlementPaid', String(Math.abs(totalDelta)))
+                        : t('settlementEven')}
                   </span>
                   {(count2pt > 0 || count1pt > 0) && (
                     <svg

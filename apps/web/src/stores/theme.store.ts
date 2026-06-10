@@ -10,7 +10,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type FeltTheme = 'jade' | 'crimson' | 'slate' | 'navy';
+export type FeltTheme = 'jade' | 'crimson' | 'slate' | 'navy' | 'yellow';
 export type TilePalette = 'classic' | 'sepia' | 'dark';
 
 interface ThemeState {

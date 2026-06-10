@@ -58,6 +58,12 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,15,30,0.6)',
     swatch: '#0d1f3b',
   },
+  yellow: {
+    top: '#2e1f00',
+    bottom: '#130d00',
+    header: 'rgba(20,13,0,0.6)',
+    swatch: '#2e1f00',
+  },
 };
 
 // ── Tile palette configs ──────────────────────────────────────────────────────

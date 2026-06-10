@@ -14,19 +14,16 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-022    | Player rejoin blocks tile play       | Reconnected player cannot play tiles on their turn                         |
 | BUG-08     | Viewer discards invisible (3D)       | Viewer's own discard pile not visible on the 3D table                      |
 | BUG-09     | TileWall3D needs redesign (3D)       | TileWall removed due to red Back.svg background; needs neutral replacement |
-| BUG-026    | Settlement text unclear              | "Received/Paid X from/to" format is ambiguous in settlement breakdown      |
 | BUG-027    | Bust-mode end condition wrong        | Score check may fire mid-round; bust mode should start players at 20 pts   |
 | BUG-028    | INVALID_PHASE on game continue       | Non-host gets error continuing after game end; host game hangs             |
 | BUG-029    | Copy room code broken on mobile      | Room code copy button has no effect on mobile                              |
 | BUG-030    | Bonus points doubled in settlement   | Solo bonus-tile player charged/receives double the correct amount          |
 | BUG-031 ⚠️ | Host refresh locks config (CRITICAL) | After browser refresh, host cannot change config or start the game         |
 | BUG-032    | Kicked player not redirected         | Kicked player remains on config screen instead of returning to menu        |
-| BUG-033    | Meld labels in English for ZH UI     | Pung/Chow/Kong labels shown in English when UI language is Chinese         |
 | IMP-013    | Player names on hand details         | End-game detail screen shows directions only; should show player names     |
 | IMP-014    | Language change during game          | No way to switch EN/ZH once a game has started                             |
 | IMP-015    | Configurable claim window timeout    | Pung/Kong/Chow popup time limit is hardcoded; should be host-configurable  |
 | IMP-016    | Kong from existing pung              | Drawing 4th tile should allow converting a revealed pung to kong           |
-| IMP-017    | Yellow table color                   | Add yellow as a felt color option in customization settings                |
 
 ---
 
@@ -112,22 +109,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 **Current state:** `TileWall3D` component still exists and is fully functional — just not mounted in `GameCanvas.tsx`.
 
 **Reinstate in:** `apps/web/src/r3f/GameCanvas.tsx` — re-add import and `<TileWall3D wallCount={snapshot.wallCount} ... />`.
-
----
-
-### BUG-026 · Settlement phase text format — "Received/Paid X points from/to" format
-
-**Symptom:** The settlement-phase dropdown tables show per-tile breakdowns but the text format is unclear. Players cannot immediately understand who received or paid what.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** Each line should read: "Received X points from <PlayerName> for [tile]" or "Paid X points to <PlayerName> for [tile]" so the relationship is unambiguous.
-
-**Suspected cause:** Current format may be "X from <Player>" or similar shorthand that is visually compact but semantically unclear.
-
-**Where to look:**
-
-- `apps/web/src/components/game/SettlementPreview.tsx` — settlement item rendering
 
 ---
 
@@ -266,26 +247,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-033 · End-game hand details — pung/chow labels shown in English for Chinese UI
-
-**Symptom:** On the end-of-game screen that displays revealed hands and melds, a player viewing the UI in Chinese language sees the meld type labels ("pung", "chow", "kong") displayed in English instead of Chinese.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** All visible text should be translated via the `t()` i18n hook. Meld labels on the hand detail screen should respect the user's current language setting.
-
-**Suspected cause:** The meld labels are likely hardcoded strings or not being passed through the translation system. The component may not have access to the `useI18n()` hook or is using a pre-translated constant from the wrong context.
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx` — `HandRevealScreen` component rendering
-- `apps/web/src/components/game/HandRevealScreen.tsx` — meld group headers/labels
-- `apps/web/src/i18n/` — check if meld type keys exist in both `en.json` and `zh.json`
-
-**Next steps:** Grep for hardcoded "pung", "chow", "kong" strings in the reveal/detail screen components. Verify that all meld labels use `t('meldType.pung')` (or equivalent key) instead of literal strings.
-
----
-
 ## Open Improvements
 
 ### IMP-013 · Hand details should display player names instead of direction labels
@@ -355,24 +316,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 - `apps/api/src/game/game.service.ts` — turn phase logic, claim window
 
 **Mobile implementation:** On mobile, the player should select the tile and see the standard discard option plus a new "Kong" option.
-
----
-
-### IMP-017 · Add yellow table color to customization options
-
-**Symptom:** The table color customization (felt color) currently offers jade, crimson, slate, and navy. Yellow is not available as a color option.
-
-**Status:** NEW, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** Add yellow as a fifth felt color option in the customization settings, with an appropriate texture/hex value that fits the existing palette.
-
-**Where to look:**
-
-- `apps/web/src/stores/theme.store.ts` — `felt` color enum, `applyTheme()` logic
-- `apps/web/src/pages/customize/customize-page.tsx` — felt color swatch UI
-- `apps/web/src/index.css` — CSS custom properties for felt colors (e.g., `--felt-jade`, `--felt-yellow`, etc.)
-
-**Implementation note:** Will require choosing an appropriate yellow hex value (e.g., `#e8d96e` or `#d4af37`), adding it to the ThemeStore enum, creating a CSS var, and adding a swatch button to the customize page.
 
 ---
 

@@ -62,13 +62,6 @@ const ICON_CLOSE = '✕' as const;
 const JING_CHAR = '节' as const;
 const JING_ARROW = '→' as const;
 const MULT_CHAR = '×' as const;
-// Module-level meld kind label (no-literal-string safe).
-const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
-  pung: 'PUNG',
-  chow: 'CHOW',
-  kong: 'KONG',
-} as const;
-const PAIR_LABEL = 'PAIR' as const;
 
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
@@ -367,6 +360,13 @@ function HandRevealScreen({
   const { t } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
 
+  const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
+    pung: t('gamePung'),
+    chow: t('gameChow'),
+    kong: t('gameKong'),
+  };
+  const PAIR_LABEL = t('handPair');
+
   const resultLabel =
     handReveal.result === 'win'
       ? t('handRevealResultWin')
@@ -477,8 +477,11 @@ function HandRevealScreen({
                             : 'text-mj-bone/30'
                       }`}
                     >
-                      {delta > 0 ? '+' : ''}
-                      {delta}
+                      {delta > 0
+                        ? t('settlementReceived', String(delta))
+                        : delta < 0
+                          ? t('settlementPaid', String(Math.abs(delta)))
+                          : t('settlementEven')}
                     </span>
                   </div>
                 );
