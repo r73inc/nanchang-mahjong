@@ -25,7 +25,7 @@ import type { SeatRole } from './layout-2d';
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
 
 // Jing spirit marker — shown below a tile identified as the round's spirit tile.
-const JING_CHAR = '节' as const;
+const JING_CHAR = '精' as const;
 
 // Aria label for face-down tiles — not passed through t() because it is used
 // as an HTML attribute value (aria-label), not a JSX text node.

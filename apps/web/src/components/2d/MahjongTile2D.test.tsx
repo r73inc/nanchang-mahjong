@@ -247,9 +247,9 @@ describe('MahjongTile2D interaction · 2DTile·interaction', () => {
 // ── Jing ──────────────────────────────────────────────────────────────────────
 
 describe('MahjongTile2D jing · 2DTile·jing', () => {
-  it('shows 节 label when isJing=true', () => {
+  it('shows 精 label when isJing=true', () => {
     renderTile({ isJing: true });
-    expect(screen.getByText('节')).toBeInTheDocument();
+    expect(screen.getByText('精')).toBeInTheDocument();
   });
 
   it('does NOT show 节 label when isJing=false', () => {

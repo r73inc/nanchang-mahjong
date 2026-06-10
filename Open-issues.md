@@ -129,8 +129,227 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+### BUG-028 · End of game INVALID_PHASE error — host/non-host continue inconsistency
+
+**Symptom:** When a game ends (with two players and two bots tested), the host can click "continue" on the detail "Someone Won!" screen, but the non-host player gets an INVALID_PHASE error. The host's game then hangs waiting for the non-host to acknowledge. In some cases, the host can also get the INVALID_PHASE error. Neither player can proceed to the next game; the game is stuck permanently.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** All players should be able to proceed to the next game after the detail screen. Phase/state consistency should be enforced server-side, not client-side.
+
+**Suspected cause:** Likely related to:
+
+- `game:advance-hand` socket event sent when phase is not 'reveal' or state is inconsistent between host and non-host
+- Game state not being broadcast before the host advances, leaving non-host on a stale snapshot
+- Phase state on the server and client diverging during end-of-session flow
+
+**Where to look:**
+
+- `apps/api/src/game/game.service.ts` — `advanceHand()` method, phase validation
+- `apps/api/src/game/game.gateway.ts` — `game:advance-hand` handler, permission/phase checks
+- `apps/web/src/hooks/use-game.ts` — `advanceHand()` socket emit, pre-conditions
+
+**Next steps:** Add detailed logging for phase state at the moment `game:advance-hand` is emitted vs. received. Compare host and non-host snapshots before the error.
+
+---
+
+### BUG-029 · Copy room code button non-functional on mobile
+
+**Symptom:** On the mobile view (narrow viewport), the "copy room code" button in the game lobby does not work. Tapping it has no effect.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** The button should copy the room code to the device clipboard and show a brief confirmation message.
+
+**Suspected cause:** Likely related to:
+
+- Mobile-specific event handling (touch vs. click)
+- Clipboard API not available or not properly polyfilled on mobile
+- Button styling or z-index issues hiding the clickable area
+- Media query breakpoint not correctly targeting the mobile button
+
+**Where to look:**
+
+- `apps/web/src/pages/room/room-config-page.tsx` — room code copy button logic
+- `apps/web/src/components/room/` — any room-related UI components with copy functionality
+- CSS media queries in `index.css` or component-scoped styles
+
+---
+
+### BUG-030 · Settlement bonus points incorrectly doubled
+
+**Symptom:** When one player has bonus-point tiles (e.g., flowers, seasons) and no other players have any, that player's bonus points are doubled in the settlement, and the other players are charged double the amount.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** Bonus points should be calculated once per player and distributed/charged according to the rules (typically 1 point per tile, split equally among other players or winner takes all depending on the rule variant).
+
+**Suspected cause:** The settlement calculation may be iterating over bonus tiles and applying multipliers twice, or the distribution logic is summing bonus from the same player multiple times.
+
+**Where to look:**
+
+- `packages/engine/src/settlement.ts` — bonus tile settlement logic
+- `apps/api/src/game/game.service.ts` — how settlement payloads are built and broadcast
+
+**Next steps:** Add detailed logging for each bonus tile: tile type, player, and amount before and after settlement calculation. Verify the loop structure in settlement.ts.
+
+---
+
+### BUG-031 · Host browser close/refresh makes room config non-interactable (MAJOR)
+
+**Symptom:** If the host is setting up a game and closes the browser tab/app (or the page refreshes), and then returns to the browser or revisits the room, they can no longer change the game configuration or start the game. The config controls are unresponsive and the "Start Game" button does not function.
+
+**Status:** CRITICAL (as of 2026-06-09)
+
+**Expected behavior:** The host should be able to return to an active room and resume control of the game config, with all previous settings preserved.
+
+**Suspected cause:** Likely related to:
+
+- Host authority (hostUserId) not being re-established after reconnection
+- Socket connection missing a re-join or re-auth step for the room
+- Store state not re-hydrating correctly after page refresh
+- Server-side `RoomSession` state not recognizing the reconnected user as host
+
+**Where to look:**
+
+- `apps/api/src/room/room.service.ts` — host validation, reconnection flow
+- `apps/api/src/room/room.gateway.ts` — `room:join` handler after refresh
+- `apps/web/src/hooks/use-room.ts` — room state persistence and reconnection logic
+- `apps/web/src/stores/room.store.ts` — host flag and config state
+
+**Next steps:** Verify that the host flag is correctly restored after page refresh. Check if a fresh page load triggers a new `room:join` that updates host status correctly.
+
+---
+
+### BUG-032 · Kicked player not redirected — remains on config screen
+
+**Symptom:** When the host kicks a player out of the room using the kick button, that player's name is removed from the player list. However, the kicked player is not redirected back to the home menu. Instead, they remain on the room config screen, seeing a stale view of the room with themselves no longer in the player list.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** When a player is kicked, they should be immediately redirected to the home menu (or a "you were kicked" modal with a redirect button).
+
+**Suspected cause:** The `room:player-kicked` or similar socket event is not being broadcast to the kicked player, or the client is not handling the event with a redirect action.
+
+**Where to look:**
+
+- `apps/api/src/room/room.service.ts` — kick logic, event broadcasting
+- `apps/api/src/room/room.gateway.ts` — socket event emission for player kicks
+- `apps/web/src/hooks/use-room.ts` — listener for kick events, redirect logic
+- React Router or navigation state management in `apps/web/src/pages/`
+
+**Next steps:** Confirm that the kicked player receives a socket event when kicked, and that the handler triggers a router.push to home.
+
+---
+
+### BUG-033 · End-game hand details — pung/chow labels shown in English for Chinese UI
+
+**Symptom:** On the end-of-game screen that displays revealed hands and melds, a player viewing the UI in Chinese language sees the meld type labels ("pung", "chow", "kong") displayed in English instead of Chinese.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** All visible text should be translated via the `t()` i18n hook. Meld labels on the hand detail screen should respect the user's current language setting.
+
+**Suspected cause:** The meld labels are likely hardcoded strings or not being passed through the translation system. The component may not have access to the `useI18n()` hook or is using a pre-translated constant from the wrong context.
+
+**Where to look:**
+
+- `apps/web/src/pages/game/game-page.tsx` — `HandRevealScreen` component rendering
+- `apps/web/src/components/game/HandRevealScreen.tsx` — meld group headers/labels
+- `apps/web/src/i18n/` — check if meld type keys exist in both `en.json` and `zh.json`
+
+**Next steps:** Grep for hardcoded "pung", "chow", "kong" strings in the reveal/detail screen components. Verify that all meld labels use `t('meldType.pung')` (or equivalent key) instead of literal strings.
+
+---
+
 ## Open Improvements
 
-_(No open improvements at this time.)_
+### IMP-013 · Hand details should display player names instead of direction labels
+
+**Symptom:** On the end-of-game detail screen that shows all four players' hands and melds, the player names are not displayed. Instead, only the direction labels (East/South/West/North) appear, making it unclear which hand belongs to whom.
+
+**Status:** NEW, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** Each hand section should prominently display the player's name (e.g., "Alice (East)" or just "Alice") to make it immediately clear who owns each hand.
+
+**Where to look:**
+
+- `apps/web/src/pages/game/game-page.tsx` — `HandRevealScreen` component
+- `apps/web/src/components/game/HandRevealScreen.tsx` — player/seat rendering logic
+
+---
+
+### IMP-014 · Language change during active game
+
+**Symptom:** Once a game has started, the user cannot change the language between English and Chinese. The language setting is locked.
+
+**Status:** NEW, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** The language picker (or a settings menu during gameplay) should allow switching languages at any time. The UI should re-render with the new language instantly.
+
+**Possible limitation:** The game engine may have limitations around mid-game language changes, or the feature may be intentionally disabled for game stability. Investigate feasibility before committing to implementation.
+
+**Where to look:**
+
+- `apps/web/src/pages/game/game-page.tsx` — settings access during gameplay
+- `apps/web/src/components/` — language picker component and i18n hook usage
+
+---
+
+### IMP-015 · Kong/Pung/Chow popup configurable time limit
+
+**Symptom:** When a player has the option to form a kong, pung, or chow, a popup appears with a fixed time limit (typically 8 seconds on server). There is no way to customize this timeout, and some players may want a longer decision window or no time limit.
+
+**Status:** NEW, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** The room host should be able to configure the popup duration (e.g., 5s, 10s, 30s, infinite) during room setup, and all players should see the same timeout.
+
+**Where to look:**
+
+- `apps/api/src/game/game.service.ts` — claim window timeout (currently hardcoded 8s)
+- `apps/web/src/pages/room/room-config-page.tsx` — room settings UI
+- `apps/web/src/stores/room.store.ts` — room config schema
+
+**Implementation note:** Will require adding a new config field (e.g., `claimWindowDuration: number`) to `RoomConfig`, passing it through `game:started` payload, and using it in the `startTurn()` method to set the claim window.
+
+---
+
+### IMP-016 · Kong from existing revealed meld — "add the fourth tile" option
+
+**Symptom:** If a player already has a revealed meld of 3 of a kind (pung), and they draw the fourth tile of that suit/type, the game does not offer them the option to convert that pung into a kong by playing the fourth tile. Instead, they must discard.
+
+**Status:** NEW, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** When a player draws a tile that matches an existing revealed pung, they should have a button/option (in addition to the discard options) to "Kong" that pung, which triggers the same kong draw-replacement sequence as a normal kong but from the fourth tile (not from the wall directly).
+
+**Rules note:** In Nanchang Mahjong, adding the fourth tile to an existing pung to make a kong counts as playing a discarded tile (from the player's perspective), so they draw one replacement tile from the "end" of the wall.
+
+**Where to look:**
+
+- `packages/engine/src/game-engine.ts` — `playTile()` method, kong validation
+- `apps/web/src/components/game/` — hand UI, discard options button layout
+- `apps/api/src/game/game.service.ts` — turn phase logic, claim window
+
+**Mobile implementation:** On mobile, the player should select the tile and see the standard discard option plus a new "Kong" option.
+
+---
+
+### IMP-017 · Add yellow table color to customization options
+
+**Symptom:** The table color customization (felt color) currently offers jade, crimson, slate, and navy. Yellow is not available as a color option.
+
+**Status:** NEW, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** Add yellow as a fifth felt color option in the customization settings, with an appropriate texture/hex value that fits the existing palette.
+
+**Where to look:**
+
+- `apps/web/src/stores/theme.store.ts` — `felt` color enum, `applyTheme()` logic
+- `apps/web/src/pages/customize/customize-page.tsx` — felt color swatch UI
+- `apps/web/src/index.css` — CSS custom properties for felt colors (e.g., `--felt-jade`, `--felt-yellow`, etc.)
+
+**Implementation note:** Will require choosing an appropriate yellow hex value (e.g., `#e8d96e` or `#d4af37`), adding it to the ThemeStore enum, creating a CSS var, and adding a swatch button to the customize page.
+
+---
 
 ---

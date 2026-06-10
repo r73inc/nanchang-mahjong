@@ -490,6 +490,20 @@ This matched suspected cause #2 in the original report: "`CombinedDiscardPool2D`
 
 ---
 
+## Inline Fix · `chore/add-bugs-and-improvements` (2026-06-10)
+
+### BUG-034 · Spirit tile character incorrect — using 节 instead of 精
+
+**Symptom:** The spirit tiles (jing tiles) in the game UI displayed the wrong Chinese character: 节 (jié, "section/node") instead of 精 (jīng, "essence/spirit").
+
+**Root cause:** Hardcoded character in `JING_CHAR` constant in `MahjongTile2D.tsx`.
+
+**Fix:** Changed `const JING_CHAR = '节'` to `const JING_CHAR = '精'` in `apps/web/src/components/2d/MahjongTile2D.tsx`. Updated corresponding test in `MahjongTile2D.test.tsx` to expect the correct character.
+
+**Key learning:** Hardcoded non-English characters should be validated for semantic correctness with domain experts, not just tested for presence. A character that renders without errors can still be wrong.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
@@ -502,3 +516,4 @@ This matched suspected cause #2 in the original report: "`CombinedDiscardPool2D`
 8. **Database persistence:** Use volumes for persistent dev databases; reserve in-memory for CI only.
 9. **Engine vs. resolver:** Engine functions are general-purpose. Family-specific rule restrictions apply at the boundary layer (claim-resolver).
 10. **Testing edge cases:** Position-dependent mechanics need tests for all seat positions, including wrap-around.
+11. **Character localization:** Hardcoded characters in code must be validated for semantic correctness — they won't auto-translate and visual correctness alone doesn't guarantee the character is the right choice semantically.
