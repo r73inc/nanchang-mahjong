@@ -24,6 +24,7 @@ const FELT_OPTIONS: { id: FeltTheme; key: StringKey }[] = [
   { id: 'crimson', key: 'customizeFeltCrimson' },
   { id: 'slate', key: 'customizeFeltSlate' },
   { id: 'navy', key: 'customizeFeltNavy' },
+  { id: 'yellow', key: 'customizeFeltYellow' },
 ];
 
 const PALETTE_OPTIONS: { id: TilePalette; key: StringKey }[] = [
@@ -176,7 +177,7 @@ export function CustomizePage() {
         {/* ── Section 1: Table felt ─────────────────────────────────────────── */}
         <section aria-labelledby="felt-heading">
           <SectionLabel>{t('customizeFeltTitle')}</SectionLabel>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             {FELT_OPTIONS.map(({ id, key }) => (
               <FeltSwatch
                 key={id}

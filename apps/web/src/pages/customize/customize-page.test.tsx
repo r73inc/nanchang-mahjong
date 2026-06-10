@@ -70,12 +70,13 @@ describe('CustomizePage', () => {
     expect(screen.getAllByText(/sound effects/i).length).toBeGreaterThan(0);
   });
 
-  it('Customize·renders — shows all four felt options', () => {
+  it('Customize·renders — shows all five felt options', () => {
     renderPage();
     expect(screen.getByRole('button', { name: /jade/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /crimson/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /slate/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /navy/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /yellow/i })).toBeInTheDocument();
   });
 
   it('Customize·persistence — selecting crimson felt updates the store', () => {

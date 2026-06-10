@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { MahjongTile2D } from '../2d/MahjongTile2D';
 import { useI18n } from '../../i18n';
-import type { SettlementPreviewPayload, ClientGameState, SeatWind } from '@nanchang/shared';
+import type {
+  SettlementPreviewPayload,
+  ClientGameState,
+  SeatWind,
+  TileType,
+} from '@nanchang/shared';
 
 const WIND_CHAR: Record<SeatWind, string> = {
   east: '東',
@@ -17,7 +22,75 @@ const WIND_COLOR: Record<SeatWind, string> = {
   north: '#e89a9a',
 };
 
-const MULT_CHAR = '×' as const;
+interface TransferLine {
+  tile: TileType;
+  direction: 'received' | 'paid';
+  amount: number;
+  otherSeatName: string;
+}
+
+/** Compute every individual player-to-player transfer for seat `i`.
+ *
+ * Sort order: received (2pt, then 1pt) then paid (1pt, then 2pt),
+ * so the most valuable receipts lead and the most expensive payments close.
+ */
+function buildTransferLines(
+  seat: number,
+  settlementPreview: SettlementPreviewPayload,
+  seatNames: string[],
+): TransferLine[] {
+  const lines: TransferLine[] = [];
+  for (let j = 0; j < 4; j++) {
+    if (j === seat) continue;
+    const jName = seatNames[j];
+    if (settlementPreview.seatCounts[seat] > 0) {
+      lines.push({
+        tile: settlementPreview.settlementTile,
+        direction: 'received',
+        amount: settlementPreview.seatCounts[seat] * 2,
+        otherSeatName: jName,
+      });
+    }
+    if (settlementPreview.seatCounts[j] > 0) {
+      lines.push({
+        tile: settlementPreview.settlementTile,
+        direction: 'paid',
+        amount: settlementPreview.seatCounts[j] * 2,
+        otherSeatName: jName,
+      });
+    }
+    if (settlementPreview.nextTileSeatCounts[seat] > 0) {
+      lines.push({
+        tile: settlementPreview.nextTile,
+        direction: 'received',
+        amount: settlementPreview.nextTileSeatCounts[seat],
+        otherSeatName: jName,
+      });
+    }
+    if (settlementPreview.nextTileSeatCounts[j] > 0) {
+      lines.push({
+        tile: settlementPreview.nextTile,
+        direction: 'paid',
+        amount: settlementPreview.nextTileSeatCounts[j],
+        otherSeatName: jName,
+      });
+    }
+  }
+
+  lines.sort((a, b) => {
+    // received before paid
+    if (a.direction !== b.direction) return a.direction === 'received' ? -1 : 1;
+    const aIs2pt = a.tile === settlementPreview.settlementTile;
+    const bIs2pt = b.tile === settlementPreview.settlementTile;
+    if (aIs2pt !== bIs2pt) {
+      // received: 2pt first; paid: 1pt first
+      return a.direction === 'received' ? (aIs2pt ? -1 : 1) : aIs2pt ? 1 : -1;
+    }
+    return 0;
+  });
+
+  return lines;
+}
 
 interface SettlementPreviewProps {
   settlementPreview: SettlementPreviewPayload;
@@ -37,18 +110,13 @@ export function SettlementPreview({
     setExpandedSeat(expandedSeat === seat ? null : seat);
   };
 
-  const calculateTotalDeltas = () => {
-    return settlementPreview.delta.map((delta2pt, i) => ({
-      seat: i,
-      delta2pt,
-      count2pt: settlementPreview.seatCounts[i],
-      delta1pt: settlementPreview.nextTileDelta[i],
-      count1pt: settlementPreview.nextTileSeatCounts[i],
-      totalDelta: delta2pt + settlementPreview.nextTileDelta[i],
-    }));
-  };
+  const seatNames = snapshot.seats.map((s) => s.seatName);
 
-  const seatDeltas = calculateTotalDeltas();
+  const seatDeltas = settlementPreview.delta.map((delta2pt, i) => ({
+    seat: i,
+    totalDelta: delta2pt + settlementPreview.nextTileDelta[i],
+    transfers: buildTransferLines(i, settlementPreview, seatNames),
+  }));
 
   return (
     <div className="flex flex-col items-center gap-6 min-h-dvh px-6 py-8 text-center bg-mj-bg-page overflow-y-auto">
@@ -89,16 +157,17 @@ export function SettlementPreview({
         <p className="text-[10px] text-mj-bone/50 uppercase tracking-widest text-center mb-1">
           {t('preGameSettlementTitle')}
         </p>
-        {seatDeltas.map(({ seat, totalDelta, delta2pt, count2pt, delta1pt, count1pt }) => {
+        {seatDeltas.map(({ seat, totalDelta, transfers }) => {
           const wind = snapshot.seats[seat].wind;
           const isViewer = viewerSeat !== null && seat === viewerSeat;
           const isExpanded = expandedSeat === seat;
+          const hasTransfers = transfers.length > 0;
 
           return (
             <div key={seat}>
               {/* Main row */}
               <button
-                onClick={() => toggleExpand(seat)}
+                onClick={() => hasTransfers && toggleExpand(seat)}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${
                   isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
                 } ${isExpanded ? 'rounded-b-none' : ''}`}
@@ -124,10 +193,13 @@ export function SettlementPreview({
                           : 'text-mj-bone/40'
                     }`}
                   >
-                    {totalDelta > 0 ? '+' : ''}
-                    {totalDelta}
+                    {totalDelta > 0
+                      ? t('settlementReceived', String(totalDelta))
+                      : totalDelta < 0
+                        ? t('settlementPaid', String(Math.abs(totalDelta)))
+                        : t('settlementEven')}
                   </span>
-                  {(count2pt > 0 || count1pt > 0) && (
+                  {hasTransfers && (
                     <svg
                       className={`w-4 h-4 text-mj-bone/40 transition-transform ${
                         isExpanded ? 'rotate-180' : ''
@@ -147,66 +219,23 @@ export function SettlementPreview({
                 </div>
               </button>
 
-              {/* Expanded details */}
-              {isExpanded && (count2pt > 0 || count1pt > 0) && (
+              {/* Expanded per-player breakdown */}
+              {isExpanded && hasTransfers && (
                 <div
                   className={`flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl ${
                     isViewer ? 'bg-mj-gold/10 border-mj-gold/20' : 'bg-white/3 border-white/10'
                   }`}
                 >
-                  {/* 2pt settlement tile breakdown */}
-                  {count2pt > 0 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <MahjongTile2D
-                        tile={settlementPreview.settlementTile}
-                        size="xs"
-                        interactive={false}
-                      />
-                      <span className="text-mj-bone/60 flex-1">
-                        {MULT_CHAR}
-                        {count2pt} {t('preGameBonusTile2pt')}
-                      </span>
-                      <span
-                        className={`font-bold tabular-nums ${
-                          delta2pt > 0
-                            ? 'text-emerald-400'
-                            : delta2pt < 0
-                              ? 'text-red-400'
-                              : 'text-mj-bone/40'
-                        }`}
-                      >
-                        {delta2pt > 0 ? '+' : ''}
-                        {delta2pt * count2pt}
+                  {transfers.map((line, li) => (
+                    <div key={li} className="flex items-center gap-2 text-xs">
+                      <MahjongTile2D tile={line.tile} size="xs" interactive={false} />
+                      <span className="text-mj-bone/60 flex-1 text-left">
+                        {line.direction === 'received'
+                          ? t('settlementReceivedFrom', String(line.amount), line.otherSeatName)
+                          : t('settlementPaidTo', String(line.amount), line.otherSeatName)}
                       </span>
                     </div>
-                  )}
-
-                  {/* 1pt indicator tile breakdown */}
-                  {count1pt > 0 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <MahjongTile2D
-                        tile={settlementPreview.nextTile}
-                        size="xs"
-                        interactive={false}
-                      />
-                      <span className="text-mj-bone/60 flex-1">
-                        {MULT_CHAR}
-                        {count1pt} {t('preGameBonusTile1pt')}
-                      </span>
-                      <span
-                        className={`font-bold tabular-nums ${
-                          delta1pt > 0
-                            ? 'text-emerald-400'
-                            : delta1pt < 0
-                              ? 'text-red-400'
-                              : 'text-mj-bone/40'
-                        }`}
-                      >
-                        {delta1pt > 0 ? '+' : ''}
-                        {delta1pt * count1pt}
-                      </span>
-                    </div>
-                  )}
+                  ))}
                 </div>
               )}
             </div>

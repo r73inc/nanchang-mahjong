@@ -504,6 +504,34 @@ This matched suspected cause #2 in the original report: "`CombinedDiscardPool2D`
 
 ---
 
+## PR · `fix/bug-026-033-imp-017`
+
+### BUG-026 · Settlement text — "Received/Paid" clarity
+
+**Root cause:** Both `SettlementPreview.tsx` (pre-game bonus tile settlement) and the spirit settlement section in `HandRevealScreen` displayed deltas as bare `+X` / `-X` numbers with no semantic label. Players unfamiliar with accounting-style sign conventions couldn't immediately tell if the number was earned or owed.
+
+**Fix:** Replaced the bare `+X` / `−X` display with `t('settlementReceived', n)` ("Received X") for positive deltas and `t('settlementPaid', n)` ("Paid X") for negative, plus a neutral dash `t('settlementEven')` for zero. Added i18n keys `settlementReceived`, `settlementPaid`, `settlementEven` to both `en.json` and `zh.json`.
+
+**Key learning:** Use semantic labels ("received"/"paid") instead of sign-only arithmetic display in settlement UI — casual players don't share the intuition that `+` = earned and `−` = owed.
+
+---
+
+### BUG-033 · Meld labels English-only in ZH UI
+
+**Root cause:** `MELD_KIND_LABEL` was a module-level constant (`{ pung: 'PUNG', chow: 'CHOW', kong: 'KONG' }`) and `PAIR_LABEL = 'PAIR'` — both hardcoded strings defined outside any component, so they never went through the `t()` translation hook and were always displayed in English regardless of UI language.
+
+**Fix:** Deleted the module-level constants. Inside `HandRevealScreen`, defined `MELD_KIND_LABEL` and `PAIR_LABEL` as local variables using `t('gamePung')` / `t('gameChow')` / `t('gameKong')` (reusing existing keys) and the new `t('handPair')` key. Added `"handPair": "Pair"` (EN) / `"handPair": "对子"` (ZH) to the i18n files.
+
+**Key learning:** Module-level string constants bypass i18n. Any display string must be computed inside a component where `useI18n()` is in scope. The no-literal-string rule guards JSX text nodes but not object literals outside components.
+
+---
+
+### IMP-017 · Yellow felt color added
+
+**Fix:** Added `'yellow'` to the `FeltTheme` union type in `theme.store.ts`. Added dark amber config (`top: '#2e1f00'`, `bottom: '#130d00'`) to `FELT_CONFIGS` in `theme.utils.ts`. Added i18n keys `"customizeFeltYellow": "Yellow"` (EN) / `"customizeFeltYellow": "金黄"` (ZH). Added the yellow option to `FELT_OPTIONS` in `customize-page.tsx` and updated the felt swatch grid from `grid-cols-4` to `grid-cols-5`. Updated the customize page test to expect five felt options.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
