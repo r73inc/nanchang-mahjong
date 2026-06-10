@@ -28,50 +28,50 @@
   }
 }
 
-/* ── Yellow felt — dark ink overrides ───────────────────────────────────────── */
+/* ── Yellow felt — black ink overrides ──────────────────────────────────────── */
 /* When the yellow theme is active, bone-white text is unreadable on the light  */
-/* felt. Override every text-mj-bone opacity variant to the dark ink colour.    */
+/* felt. Override every text-mj-bone opacity variant to black.                  */
 :root[data-felt='yellow'] .text-mj-bone {
-  color: #1a1500;
+  color: #000000;
 }
 :root[data-felt='yellow'] .text-mj-bone\/20 {
-  color: rgba(26, 21, 0, 0.2);
+  color: rgba(0, 0, 0, 0.2);
 }
 :root[data-felt='yellow'] .text-mj-bone\/30 {
-  color: rgba(26, 21, 0, 0.3);
+  color: rgba(0, 0, 0, 0.3);
 }
 :root[data-felt='yellow'] .text-mj-bone\/35 {
-  color: rgba(26, 21, 0, 0.35);
+  color: rgba(0, 0, 0, 0.35);
 }
 :root[data-felt='yellow'] .text-mj-bone\/40 {
-  color: rgba(26, 21, 0, 0.4);
+  color: rgba(0, 0, 0, 0.4);
 }
 :root[data-felt='yellow'] .text-mj-bone\/45 {
-  color: rgba(26, 21, 0, 0.45);
+  color: rgba(0, 0, 0, 0.45);
 }
 :root[data-felt='yellow'] .text-mj-bone\/50 {
-  color: rgba(26, 21, 0, 0.5);
+  color: rgba(0, 0, 0, 0.5);
 }
 :root[data-felt='yellow'] .text-mj-bone\/55 {
-  color: rgba(26, 21, 0, 0.55);
+  color: rgba(0, 0, 0, 0.55);
 }
 :root[data-felt='yellow'] .text-mj-bone\/60 {
-  color: rgba(26, 21, 0, 0.6);
+  color: rgba(0, 0, 0, 0.6);
 }
 :root[data-felt='yellow'] .text-mj-bone\/65 {
-  color: rgba(26, 21, 0, 0.65);
+  color: rgba(0, 0, 0, 0.65);
 }
 :root[data-felt='yellow'] .text-mj-bone\/70 {
-  color: rgba(26, 21, 0, 0.7);
+  color: rgba(0, 0, 0, 0.7);
 }
 :root[data-felt='yellow'] .text-mj-bone\/75 {
-  color: rgba(26, 21, 0, 0.75);
+  color: rgba(0, 0, 0, 0.75);
 }
 :root[data-felt='yellow'] .text-mj-bone\/80 {
-  color: rgba(26, 21, 0, 0.8);
+  color: rgba(0, 0, 0, 0.8);
 }
 :root[data-felt='yellow'] .text-mj-bone\/90 {
-  color: rgba(26, 21, 0, 0.9);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 /* ── Reduced-motion accessibility ───────────────────────────────────────────── */
