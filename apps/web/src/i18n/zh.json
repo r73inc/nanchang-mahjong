@@ -287,6 +287,8 @@
   "settlementReceived": "收 {{0}}",
   "settlementPaid": "付 {{0}}",
   "settlementEven": "—",
+  "settlementReceivedFrom": "从{{1}}收 {{0}}",
+  "settlementPaidTo": "付 {{0}} 给{{1}}",
 
   "gameBeginRound": "开始本局",
   "gameHandEnd": "本手结束",
