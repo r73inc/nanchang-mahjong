@@ -466,6 +466,30 @@ This matched suspected cause #2 in the original report: "`CombinedDiscardPool2D`
 
 ---
 
+## PR #90 · `fix/bug-025-end-flow-order` (2026-06-09)
+
+### BUG-025 · Game end screens out of order — winner announcement last instead of first
+
+**Symptom:** Two related problems. (1) A hand ended with no pause or announcement of who won — the UI jumped straight to the detail screen. (2) At session end the screens ran in the wrong order: detail screen (`HandRevealScreen`) → "View Results" gate (`WinAnnouncementOverlay`) → "X player won" popup (`GameWinnerPopup`, buried inside `GameEndScreen`) → final scores. The winner announcement — the screen that should open the sequence — appeared last.
+
+**Root cause:** The winner announcement existed only as the _first frame of the final screen_ (`GameEndScreen` rendered `GameWinnerPopup` before its own results), and a second redundant announcement (`WinAnnouncementOverlay`) gated it. Nothing fired at the moment `game:hand-reveal` arrived, which is when the announcement belongs.
+
+**Fix (all client-side, `apps/web`):**
+
+1. **Announcement first:** when `game:hand-reveal` arrives, a full-screen `GameWinnerPopup` (now a generic title/subtitle announcement component, ~2.8s, tap to skip) shows before any other screen. Mid-session hands announce the hand result (win/draw/concede); the last hand announces the session winner (snapshot scores + the reveal's `spiritDeltas` = the server's cumulative scores) with the hand result as subtitle.
+2. **Auto-advance on the last hand:** the host client emits `game:advance-hand` as soon as the last hand's reveal arrives — the old "View Final Scores" click added nothing, and ending immediately lets `game:ended` (placement/ELO) arrive during the announcement. If the emit is lost, `HandRevealScreen` still renders afterwards with the manual button as a fallback.
+3. **Results second, details last:** `WinAnnouncementOverlay` and the popup inside `GameEndScreen` are gone; after the announcement the results screen shows directly, with a new "View Hand Details" button that opens `HandRevealScreen` in a new `review` mode (back button) as the final screen. The reveal payload is preserved in a new `finalHandReveal` store slice when `game:ended` clears `handReveal`.
+4. **Latent bug fixed:** nothing ever cleared `handReveal` when the _next hand_ started (only `game:ended` cleared it — BUG-023's fix covered just the session-end path). A stale `HandRevealScreen` would have blocked the next hand's pre-game flow. `setSnapshot` now drops `handReveal` whenever a snapshot arrives with a non-null `preGamePhase`.
+5. `GameEndScreen` now prefers `ended.finalScores` over snapshot seat scores — snapshot scores exclude the final hand's spirit settlement because `endSession` never broadcasts a snapshot.
+
+**Key learnings:**
+
+1. **Announce at the trigger, not inside the destination.** A "moment of ceremony" (winner popup) must key off the _event_ that creates it (`game:hand-reveal`), not be embedded as the first render state of a later screen — otherwise any gating screen in between pushes it to the end of the sequence.
+2. **Remove a manual step when reordering makes it meaningless.** Once results precede the detail screen, the host's "View Final Scores" click gated nothing; auto-emitting on the trigger event (with the old screen kept as a fallback path) is safer than leaving a button whose second click produces INVALID_PHASE.
+3. **When one event of a pair clears shared state, audit the other paths.** BUG-023 cleared `handReveal` on `game:ended` but the `startNextHand` path had the identical staleness bug, masked only because test sessions ended after one hand.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

@@ -28,6 +28,7 @@ export function useGame(gameId: string, spectate = false) {
     ended,
     settlementPreview,
     handReveal,
+    finalHandReveal,
     rematchRoomCode,
     selectedTileIdx,
     claimWindow,
@@ -39,6 +40,7 @@ export function useGame(gameId: string, spectate = false) {
     setEnded,
     setSettlementPreview,
     setHandReveal,
+    setFinalHandReveal,
     setRematchRoomCode,
     setConnection,
     setClaimWindow,
@@ -168,9 +170,13 @@ export function useGame(gameId: string, spectate = false) {
     };
 
     const handleEnded = (payload: Parameters<typeof setEnded>[0]) => {
-      // Clear hand-reveal screen so GameEndScreen can render unblocked.
-      // endSession emits game:ended without a subsequent snapshot, so handReveal
-      // would otherwise remain set and permanently hide the end screen.
+      // Preserve the last hand's reveal for the post-results "View Hand
+      // Details" screen (BUG-025), then clear the blocking slice so
+      // GameEndScreen can render unblocked. endSession emits game:ended
+      // without a subsequent snapshot, so handReveal would otherwise remain
+      // set and permanently hide the end screen.
+      const reveal = useGameStore.getState().handReveal;
+      if (reveal) setFinalHandReveal(reveal);
       setHandReveal(null);
       setEnded(payload);
     };
@@ -381,6 +387,7 @@ export function useGame(gameId: string, spectate = false) {
     ended,
     settlementPreview,
     handReveal,
+    finalHandReveal,
     rematchRoomCode,
     selectedTileIdx,
     claimWindow,

@@ -288,7 +288,6 @@
   "gameYouWin": "You Win!",
   "gameWinnerPopupYou": "🎉 You Win! 🎉",
   "gameWinnerPopupOther": "{{0}} Wins!",
-  "gameWinnerPopupWaiting": "Tapping the screen...",
   "gameFinalScores": "Final Scores",
   "gamePlayAgain": "Back to Lobby",
   "lobbyRejoinBanner": "Game in Progress",
@@ -318,9 +317,6 @@
   "gameErrorGeneric": "An unexpected error occurred. Please return to the lobby and try again.",
   "gameErrorBackToLobby": "Back to Lobby",
 
-  "gameWinnerAnnounce": "Wins!",
-  "gameViewResults": "View Results",
-
   "endGamePlacement1": "1st Place",
   "endGamePlacement2": "2nd Place",
   "endGamePlacement3": "3rd Place",
@@ -328,6 +324,8 @@
   "endGameHandsPlayed": "{{0}} hands played",
   "endGameRatingDelta": "Rating",
   "endGameRematch": "Play Again",
+  "endGameViewDetails": "View Hand Details",
+  "endGameBackToResults": "← Back to Results",
 
   "historyTitle": "History",
   "historyEmpty": "No games yet. Start your first match!",

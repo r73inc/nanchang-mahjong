@@ -83,6 +83,12 @@ interface GameStore {
   // ── Post-hand reveal (server pauses until host advances) ─────────────────
   handReveal: HandRevealPayload | null;
 
+  /**
+   * The final hand's reveal, preserved when game:ended clears `handReveal`.
+   * Drives the post-results "View Hand Details" screen (BUG-025).
+   */
+  finalHandReveal: HandRevealPayload | null;
+
   // ── Rematch: roomCode delivered by game:rematch-ready ─────────────────────
   rematchRoomCode: string | null;
 
@@ -136,6 +142,7 @@ interface GameStore {
   setEnded: (e: GameEndedPayload) => void;
   setSettlementPreview: (p: SettlementPreviewPayload | null) => void;
   setHandReveal: (r: HandRevealPayload | null) => void;
+  setFinalHandReveal: (r: HandRevealPayload | null) => void;
   setRematchRoomCode: (code: string) => void;
   setConnection: (s: ConnectionStatus) => void;
   setClaimWindow: (w: ClaimWindowState | null) => void;
@@ -154,6 +161,7 @@ const initialState = {
   ended: null,
   settlementPreview: null,
   handReveal: null,
+  finalHandReveal: null,
   rematchRoomCode: null,
   selectedTileIdx: null,
   pendingMove: false,
@@ -178,6 +186,11 @@ export const useGameStore = create<GameStore>()(
         // Clear claim window and pending claim once snapshot arrives
         claimWindow: null,
         viewerClaimSubmitted: null,
+        // A non-null preGamePhase means a new hand has started — drop the
+        // previous hand's reveal so HandRevealScreen can't block the pre-game
+        // flow. (game:ended clears it for the session-end path; nothing else
+        // cleared it between hands.)
+        handReveal: snapshot.preGamePhase !== null ? null : state.handReveal,
         // Reconnect guard: if we rejoin mid-claim-window, restore lastDiscard
         // from the snapshot so the pulse shows without needing game:event replay.
         // During normal play, game:event {kind:'discard'} has already set this
@@ -193,6 +206,8 @@ export const useGameStore = create<GameStore>()(
     setSettlementPreview: (settlementPreview) => set({ settlementPreview }),
 
     setHandReveal: (handReveal) => set({ handReveal }),
+
+    setFinalHandReveal: (finalHandReveal) => set({ finalHandReveal }),
 
     setRematchRoomCode: (rematchRoomCode) => set({ rematchRoomCode }),
 
