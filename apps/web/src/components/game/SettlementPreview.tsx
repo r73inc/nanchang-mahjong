@@ -29,7 +29,11 @@ interface TransferLine {
   otherSeatName: string;
 }
 
-/** Compute every individual player-to-player transfer for seat `i`. */
+/** Compute every individual player-to-player transfer for seat `i`.
+ *
+ * Sort order: received (2pt, then 1pt) then paid (1pt, then 2pt),
+ * so the most valuable receipts lead and the most expensive payments close.
+ */
 function buildTransferLines(
   seat: number,
   settlementPreview: SettlementPreviewPayload,
@@ -39,7 +43,6 @@ function buildTransferLines(
   for (let j = 0; j < 4; j++) {
     if (j === seat) continue;
     const jName = seatNames[j];
-    // 2pt tile — i receives from j because i holds the tile
     if (settlementPreview.seatCounts[seat] > 0) {
       lines.push({
         tile: settlementPreview.settlementTile,
@@ -48,7 +51,6 @@ function buildTransferLines(
         otherSeatName: jName,
       });
     }
-    // 2pt tile — i pays j because j holds the tile
     if (settlementPreview.seatCounts[j] > 0) {
       lines.push({
         tile: settlementPreview.settlementTile,
@@ -57,7 +59,6 @@ function buildTransferLines(
         otherSeatName: jName,
       });
     }
-    // 1pt tile — i receives from j
     if (settlementPreview.nextTileSeatCounts[seat] > 0) {
       lines.push({
         tile: settlementPreview.nextTile,
@@ -66,7 +67,6 @@ function buildTransferLines(
         otherSeatName: jName,
       });
     }
-    // 1pt tile — i pays j
     if (settlementPreview.nextTileSeatCounts[j] > 0) {
       lines.push({
         tile: settlementPreview.nextTile,
@@ -76,6 +76,19 @@ function buildTransferLines(
       });
     }
   }
+
+  lines.sort((a, b) => {
+    // received before paid
+    if (a.direction !== b.direction) return a.direction === 'received' ? -1 : 1;
+    const aIs2pt = a.tile === settlementPreview.settlementTile;
+    const bIs2pt = b.tile === settlementPreview.settlementTile;
+    if (aIs2pt !== bIs2pt) {
+      // received: 2pt first; paid: 1pt first
+      return a.direction === 'received' ? (aIs2pt ? -1 : 1) : aIs2pt ? 1 : -1;
+    }
+    return 0;
+  });
+
   return lines;
 }
 
