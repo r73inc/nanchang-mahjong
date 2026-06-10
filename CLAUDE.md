@@ -44,7 +44,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 
 ### Code Guidelines
 
-- **`main` is protected.** All changes via PR from a branch. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
+- **`main` is protected. NEVER commit directly to `main`.** All changes must go through a branch and a PR. This applies to every change without exception — including documentation, issue tracking, and single-line fixes. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
 - **Engine is immutable.** Every `GameEngine` method returns a new instance. Never mutate state directly.
 - **Scoring: locked rules only.** Base(1) × Multipliers system. No additive fan. Zero-sum invariant must hold on every hand.
 - **Server is authoritative.** `game:snapshot` always replaces client state wholesale. No client-side game logic.
