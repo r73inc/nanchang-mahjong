@@ -145,6 +145,117 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+### BUG-025 · Game end page abrupt transition — no "X player wins" pause
+
+**Symptom:** The game transitions directly from active gameplay to the end-results table with no pause or announcement showing which player won. Players have no moment to see the win condition before the scores appear.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** After a hand ends, the UI should display an announcement (e.g., "East player wins!") for 2-3 seconds before transitioning to the end-results/hand-reveal screen. This gives players time to recognize the outcome.
+
+**Suspected cause:** The hand-reveal event may be flowing directly to the end screen without an intermediate "winner announcement" state/component.
+
+**Where to look:**
+
+- `apps/web/src/pages/game/game-page.tsx` — hand-reveal event handling
+- `apps/web/src/components/game/HandRevealScreen.tsx` — transition timing
+
+**Next steps:** Check if `HandRevealScreen` includes a winner announcement overlay (similar to the existing `GameWinnerPopup` or the pause mechanism from IMP-006).
+
+---
+
+### BUG-026 · Settlement phase text format — "Received/Paid X points from/to" format
+
+**Symptom:** The settlement-phase dropdown tables show per-tile breakdowns but the text format is unclear. Players cannot immediately understand who received or paid what.
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:** Each line should read: "Received X points from <PlayerName> for [tile]" or "Paid X points to <PlayerName> for [tile]" so the relationship is unambiguous.
+
+**Suspected cause:** Current format may be "X from <Player>" or similar shorthand that is visually compact but semantically unclear.
+
+**Where to look:**
+
+- `apps/web/src/components/game/SettlementPreview.tsx` — settlement item rendering
+
+---
+
+### BUG-027 · Bust-mode end condition incorrect — should start at 20 points per player
+
+**Symptom:** Bust mode (elimination mode where the last player standing wins) may not be correctly implementing the rule: start with all players at 20 points, game ends when any player's score goes negative AFTER a round completes (settlement included).
+
+**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
+
+**Expected behavior:**
+
+- At session start (bust mode): all four players begin with exactly 20 points (not 0).
+- During a round: any payouts are applied, followed by spirit settlement.
+- After the round is fully resolved: check if any player has score < 0. If so, that player is eliminated and the session ends.
+- A player may temporarily go to 0 or negative during settlement; this is allowed. Only after all settlement is done (at the END of the round) should we check for elimination.
+
+**Suspected cause:** The end-condition check may be triggering mid-round (e.g., during settlement phase) rather than waiting until the hand-end is fully processed.
+
+**Where to look:**
+
+- `apps/api/src/game/game.service.ts` — `isSessionOver()` method, bust-mode logic
+- `apps/api/src/game/game-session.ts` — initial score setup for bust mode
+
+---
+
 ## Open Improvements
 
-_No open improvements at this time._
+### IMP-008 · Account settings page — move change password and delete account
+
+**Status:** NEW (as of 2026-06-09)
+
+**Description:** "Change password" and "Delete account" actions should be moved from the landing/home page to a dedicated account settings page (`/account` or similar), keeping the home page focused on game lobby and status.
+
+**Why:** Keeps destructive/security actions out of the main navigation and organizes settings hierarchically.
+
+---
+
+### IMP-009 · Mobile discard pile overlap — reduce limit by 2 before second row
+
+**Status:** NEW (as of 2026-06-09)
+
+**Description:** On mobile, the discard pile in the center is showing too many tiles in the first row before wrapping, causing it to overlap the left and right player info blocks. Reducing the tile count per row by 2 will prevent the overlap.
+
+**Where to look:**
+
+- `apps/web/src/components/game/DiscardPool3D.tsx` or `apps/web/src/r3f/components/DiscardPool3D.tsx` — row-wrapping logic
+- `apps/web/src/r3f/utils/table-layout.ts` — `discardPoses` calculation
+
+---
+
+### IMP-010 · Last-played tile indicator — corner box on mobile
+
+**Status:** NEW (as of 2026-06-09)
+
+**Description:** Add a small box in the top-left corner of the mobile game view showing the last tile that was played/discarded. This gives quick visual feedback on which tile is "in play" during the claim window.
+
+**Alternative to:** BUG-020 (last-discard pulse). If the red pulse proves too difficult, this corner box is a simpler visual indicator.
+
+---
+
+### IMP-011 · Spirit tiles visibility on mobile — small icons in top-left
+
+**Status:** NEW (as of 2026-06-09)
+
+**Description:** On mobile, spirit tiles (and their counts) must be visible at all times, even in compact form as small icons in the top-left corner of the game area. Tapping the icons should expand them the same way tapping the spirit-count character currently does. This replaces the "upper left character" with a more explicit spirit-tile display.
+
+**Where to look:**
+
+- `apps/web/src/components/game/SeatHUD.tsx` — spirit display
+- Mobile responsive CSS for game-page layout
+
+---
+
+### IMP-012 · Improve account security — password visibility and account page organization
+
+**Status:** NEW (as of 2026-06-09)
+
+**Related to:** IMP-008 (account settings consolidation)
+
+**Description:** Ensure the new account settings page includes all user-account actions (change password, delete account, profile settings) in one organized location. This improves UX by centralizing account management instead of scattering actions across the app.
+
+---
