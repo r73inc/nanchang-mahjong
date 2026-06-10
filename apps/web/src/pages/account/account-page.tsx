@@ -25,8 +25,8 @@ export function AccountPage() {
                 danger ? 'text-mj-loss-light' : 'text-mj-bone'
               }`}
               style={{
-                background: 'rgba(245,239,223,0.06)',
-                border: '1px solid rgba(245,239,223,0.08)',
+                background: 'rgba(var(--felt-ink-rgb),0.06)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
               }}
             >
               <span>{t(key)}</span>

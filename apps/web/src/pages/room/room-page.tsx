@@ -131,8 +131,8 @@ export function RoomPage() {
             onClick={() => navigate('/home')}
             className="mt-4 px-6 py-3 rounded-xl text-sm font-semibold text-mj-bone"
             style={{
-              background: 'rgba(245,239,223,0.08)',
-              border: '1px solid rgba(245,239,223,0.15)',
+              background: 'rgba(var(--felt-ink-rgb),0.08)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.15)',
             }}
           >
             {t('back')}
@@ -198,7 +198,7 @@ export function RoomPage() {
           <div
             className="flex items-center gap-3 px-4 py-3 rounded-[14px]"
             style={{
-              background: 'rgba(245,239,223,0.06)',
+              background: 'rgba(var(--felt-ink-rgb),0.06)',
               border: '1px dashed rgba(201,169,97,0.35)',
             }}
           >
@@ -225,19 +225,23 @@ export function RoomPage() {
                   key={seat.seatIdx}
                   className="flex items-center gap-3 px-3.5 py-3 rounded-[14px]"
                   style={{
-                    background: isEmpty ? 'rgba(245,239,223,0.02)' : 'rgba(245,239,223,0.06)',
+                    background: isEmpty
+                      ? 'rgba(var(--felt-ink-rgb),0.02)'
+                      : 'rgba(var(--felt-ink-rgb),0.06)',
                     border: isMe
                       ? '1px solid rgba(201,169,97,0.5)'
-                      : '1px solid rgba(245,239,223,0.1)',
+                      : '1px solid rgba(var(--felt-ink-rgb),0.1)',
                   }}
                 >
                   {/* Wind badge */}
                   <div
                     className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"
                     style={{
-                      background: isEmpty ? 'rgba(245,239,223,0.04)' : 'rgba(201,169,97,0.2)',
+                      background: isEmpty
+                        ? 'rgba(var(--felt-ink-rgb),0.04)'
+                        : 'rgba(201,169,97,0.2)',
                       border: isEmpty
-                        ? '1px dashed rgba(245,239,223,0.15)'
+                        ? '1px dashed rgba(var(--felt-ink-rgb),0.15)'
                         : '1px solid rgba(201,169,97,0.4)',
                       color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#c9a961',
                     }}
@@ -330,8 +334,8 @@ export function RoomPage() {
           <div
             className="rounded-[14px] overflow-hidden"
             style={{
-              background: 'rgba(245,239,223,0.04)',
-              border: '1px solid rgba(245,239,223,0.1)',
+              background: 'rgba(var(--felt-ink-rgb),0.04)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
             }}
           >
             {[
@@ -349,7 +353,7 @@ export function RoomPage() {
               <div
                 key={label}
                 className="flex justify-between items-center px-4 py-3 border-b last:border-b-0 text-sm"
-                style={{ borderColor: 'rgba(245,239,223,0.07)' }}
+                style={{ borderColor: 'rgba(var(--felt-ink-rgb),0.07)' }}
               >
                 <span className="text-mj-bone/70">{label}</span>
                 <span className="text-mj-gold font-semibold">{value}</span>
@@ -370,10 +374,12 @@ export function RoomPage() {
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{
-                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          background: active
+                            ? 'rgba(201,169,97,0.25)'
+                            : 'rgba(var(--felt-ink-rgb),0.06)',
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
-                            : '1px solid rgba(245,239,223,0.12)',
+                            : '1px solid rgba(var(--felt-ink-rgb),0.12)',
                           color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
@@ -394,7 +400,7 @@ export function RoomPage() {
             {/* Rounds row — interactive toggle for host, read-only label for others */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
-              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+              style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <span className="text-mj-bone/70">{t('settingRoundsLabel')}</span>
               {isHost && room.status === 'waiting' ? (
@@ -408,10 +414,12 @@ export function RoomPage() {
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{
-                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          background: active
+                            ? 'rgba(201,169,97,0.25)'
+                            : 'rgba(var(--felt-ink-rgb),0.06)',
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
-                            : '1px solid rgba(245,239,223,0.12)',
+                            : '1px solid rgba(var(--felt-ink-rgb),0.12)',
                           color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
@@ -436,7 +444,7 @@ export function RoomPage() {
             {/* Termination type row — interactive toggle for host, read-only label for others */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
-              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+              style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <span className="text-mj-bone/70">{t('settingTerminationLabel')}</span>
               {isHost && room.status === 'waiting' ? (
@@ -454,10 +462,12 @@ export function RoomPage() {
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{
-                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          background: active
+                            ? 'rgba(201,169,97,0.25)'
+                            : 'rgba(var(--felt-ink-rgb),0.06)',
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
-                            : '1px solid rgba(245,239,223,0.12)',
+                            : '1px solid rgba(var(--felt-ink-rgb),0.12)',
                           color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
@@ -482,7 +492,7 @@ export function RoomPage() {
             {/* Claim window row */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
-              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+              style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <span className="text-mj-bone/70">{t('settingClaimWindowLabel')}</span>
               {isHost && room.status === 'waiting' ? (
@@ -510,10 +520,12 @@ export function RoomPage() {
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{
-                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          background: active
+                            ? 'rgba(201,169,97,0.25)'
+                            : 'rgba(var(--felt-ink-rgb),0.06)',
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
-                            : '1px solid rgba(245,239,223,0.12)',
+                            : '1px solid rgba(var(--felt-ink-rgb),0.12)',
                           color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
@@ -544,7 +556,7 @@ export function RoomPage() {
             {/* Opening Spirit Flip toggle */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
-              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+              style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <span className="text-mj-bone/70">{t('settingTopBottomJingLabel')}</span>
               {isHost && room.status === 'waiting' ? (
@@ -560,10 +572,10 @@ export function RoomPage() {
                   style={{
                     background: room.settings.ruleTopBottomJing
                       ? 'rgba(201,169,97,0.25)'
-                      : 'rgba(245,239,223,0.06)',
+                      : 'rgba(var(--felt-ink-rgb),0.06)',
                     border: room.settings.ruleTopBottomJing
                       ? '1px solid rgba(201,169,97,0.6)'
-                      : '1px solid rgba(245,239,223,0.12)',
+                      : '1px solid rgba(var(--felt-ink-rgb),0.12)',
                     color: room.settings.ruleTopBottomJing
                       ? '#c9a961'
                       : 'rgba(var(--felt-ink-rgb),0.45)',
@@ -616,9 +628,9 @@ export function RoomPage() {
             style={{
               background: allReady
                 ? 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)'
-                : 'rgba(245,239,223,0.07)',
+                : 'rgba(var(--felt-ink-rgb),0.07)',
               color: allReady ? '#1f2937' : 'rgba(var(--felt-ink-rgb),0.4)',
-              border: allReady ? 'none' : '1px solid rgba(245,239,223,0.1)',
+              border: allReady ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.1)',
               boxShadow: allReady ? '0 6px 18px rgba(201,169,97,0.3)' : 'none',
               cursor: allReady ? 'pointer' : 'not-allowed',
             }}

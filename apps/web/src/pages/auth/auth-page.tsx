@@ -199,7 +199,7 @@ export function AuthPage() {
         {/* Mode toggle */}
         <div
           className="flex p-1 rounded-md mb-5"
-          style={{ background: 'rgba(245,239,223,0.06)' }}
+          style={{ background: 'rgba(var(--felt-ink-rgb),0.06)' }}
           role="tablist"
           aria-label="Auth mode"
         >

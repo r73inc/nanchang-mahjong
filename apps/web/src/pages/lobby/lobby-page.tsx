@@ -91,7 +91,7 @@ export function LobbyPage() {
               onClick={handleDismissRejoin}
               aria-label={t('lobbyRejoinDismiss')}
               className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-full text-mj-bone/40 hover:text-mj-bone/70"
-              style={{ background: 'rgba(245,239,223,0.07)' }}
+              style={{ background: 'rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <svg
                 aria-hidden="true"
@@ -157,12 +157,13 @@ export function LobbyPage() {
                 aria-label="Decrease bot count"
                 className="w-8 h-8 rounded-lg font-bold text-base flex items-center justify-center"
                 style={{
-                  background: botCount === 0 ? 'rgba(245,239,223,0.04)' : 'rgba(201,169,97,0.15)',
+                  background:
+                    botCount === 0 ? 'rgba(var(--felt-ink-rgb),0.04)' : 'rgba(201,169,97,0.15)',
                   border:
                     botCount === 0
-                      ? '1px solid rgba(245,239,223,0.1)'
+                      ? '1px solid rgba(var(--felt-ink-rgb),0.1)'
                       : '1px solid rgba(201,169,97,0.4)',
-                  color: botCount === 0 ? 'rgba(245,239,223,0.25)' : '#c9a961',
+                  color: botCount === 0 ? 'rgba(var(--felt-ink-rgb),0.25)' : '#c9a961',
                 }}
               >
                 {MINUS_GLYPH}
@@ -180,12 +181,13 @@ export function LobbyPage() {
                 aria-label="Increase bot count"
                 className="w-8 h-8 rounded-lg font-bold text-base flex items-center justify-center"
                 style={{
-                  background: botCount === 3 ? 'rgba(245,239,223,0.04)' : 'rgba(201,169,97,0.15)',
+                  background:
+                    botCount === 3 ? 'rgba(var(--felt-ink-rgb),0.04)' : 'rgba(201,169,97,0.15)',
                   border:
                     botCount === 3
-                      ? '1px solid rgba(245,239,223,0.1)'
+                      ? '1px solid rgba(var(--felt-ink-rgb),0.1)'
                       : '1px solid rgba(201,169,97,0.4)',
-                  color: botCount === 3 ? 'rgba(245,239,223,0.25)' : '#c9a961',
+                  color: botCount === 3 ? 'rgba(var(--felt-ink-rgb),0.25)' : '#c9a961',
                 }}
               >
                 {PLUS_GLYPH}
@@ -212,11 +214,13 @@ export function LobbyPage() {
                       aria-pressed={active}
                       className="px-3 py-1.5 rounded-full text-xs font-bold"
                       style={{
-                        background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                        background: active
+                          ? 'rgba(201,169,97,0.25)'
+                          : 'rgba(var(--felt-ink-rgb),0.06)',
                         border: active
                           ? '1px solid rgba(201,169,97,0.6)'
-                          : '1px solid rgba(245,239,223,0.12)',
-                        color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          : '1px solid rgba(var(--felt-ink-rgb),0.12)',
+                        color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                       }}
                     >
                       {diff === 'easy' ? t('botDifficultyEasy') : t('botDifficultyNormal')}
@@ -253,8 +257,8 @@ export function LobbyPage() {
         <div
           className="rounded-2xl p-5"
           style={{
-            background: 'rgba(245,239,223,0.04)',
-            border: '1px solid rgba(245,239,223,0.1)',
+            background: 'rgba(var(--felt-ink-rgb),0.04)',
+            border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
           }}
         >
           <h2 className="text-base font-bold text-mj-bone mb-1">{t('joinRoom')}</h2>
@@ -265,8 +269,8 @@ export function LobbyPage() {
               onClick={() => setMode('join')}
               className="w-full py-3.5 rounded-[14px] font-semibold text-sm text-mj-bone/80"
               style={{
-                background: 'rgba(245,239,223,0.06)',
-                border: '1px solid rgba(245,239,223,0.12)',
+                background: 'rgba(var(--felt-ink-rgb),0.06)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
               }}
             >
               {t('joinRoom')}
@@ -283,7 +287,7 @@ export function LobbyPage() {
                 autoFocus
                 className="w-full px-4 py-3 rounded-xl text-base font-bold text-center tracking-widest"
                 style={{
-                  background: 'rgba(245,239,223,0.07)',
+                  background: 'rgba(var(--felt-ink-rgb),0.07)',
                   border: '1px solid rgba(201,169,97,0.4)',
                   color: '#c9a961',
                   outline: 'none',
@@ -296,12 +300,14 @@ export function LobbyPage() {
                 className="w-full py-3.5 rounded-[14px] font-bold text-sm text-mj-bone"
                 style={{
                   background:
-                    loading || !code.trim() ? 'rgba(245,239,223,0.06)' : 'rgba(201,169,97,0.2)',
+                    loading || !code.trim()
+                      ? 'rgba(var(--felt-ink-rgb),0.06)'
+                      : 'rgba(201,169,97,0.2)',
                   border:
                     loading || !code.trim()
-                      ? '1px solid rgba(245,239,223,0.1)'
+                      ? '1px solid rgba(var(--felt-ink-rgb),0.1)'
                       : '1px solid rgba(201,169,97,0.5)',
-                  color: loading || !code.trim() ? 'rgba(245,239,223,0.4)' : '#c9a961',
+                  color: loading || !code.trim() ? 'rgba(var(--felt-ink-rgb),0.4)' : '#c9a961',
                 }}
               >
                 {loading ? t('joining') : t('joinRoom')}

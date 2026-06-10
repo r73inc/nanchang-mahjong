@@ -81,7 +81,7 @@ function FeltSwatch({
           background: `linear-gradient(160deg, ${cfg.top} 0%, ${cfg.bottom} 100%)`,
           boxShadow: selected
             ? '0 0 0 3px #c9a961, 0 0 0 5px rgba(201,169,97,0.3)'
-            : '0 0 0 1.5px rgba(245,239,223,0.15)',
+            : '0 0 0 1.5px rgba(var(--felt-ink-rgb),0.15)',
         }}
       >
         {selected && (
@@ -122,8 +122,8 @@ function PaletteCard({
       aria-label={label}
       className="flex-1 flex flex-col items-center gap-2 py-3 px-2 rounded-xl"
       style={{
-        background: selected ? 'rgba(201,169,97,0.12)' : 'rgba(245,239,223,0.04)',
-        border: selected ? '1.5px solid #c9a961' : '1.5px solid rgba(245,239,223,0.08)',
+        background: selected ? 'rgba(201,169,97,0.12)' : 'rgba(var(--felt-ink-rgb),0.04)',
+        border: selected ? '1.5px solid #c9a961' : '1.5px solid rgba(var(--felt-ink-rgb),0.08)',
       }}
     >
       {/* Mini tile preview strip */}
@@ -209,8 +209,8 @@ export function CustomizePage() {
           <div
             className="mt-3 rounded-xl p-3 flex gap-1.5 justify-center flex-wrap"
             style={{
-              background: 'rgba(245,239,223,0.04)',
-              border: '1px solid rgba(245,239,223,0.07)',
+              background: 'rgba(var(--felt-ink-rgb),0.04)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.07)',
             }}
           >
             {PREVIEW_TILES.map((tile) => (
@@ -225,8 +225,8 @@ export function CustomizePage() {
           <div
             className="rounded-xl p-4 flex items-center justify-between"
             style={{
-              background: 'rgba(245,239,223,0.04)',
-              border: '1px solid rgba(245,239,223,0.08)',
+              background: 'rgba(var(--felt-ink-rgb),0.04)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
             }}
           >
             <div>
@@ -241,8 +241,8 @@ export function CustomizePage() {
               onClick={() => setSoundEnabled(!soundEnabled)}
               className="relative w-12 h-6 rounded-full transition-colors shrink-0"
               style={{
-                background: soundEnabled ? '#c9a961' : 'rgba(245,239,223,0.12)',
-                border: soundEnabled ? 'none' : '1px solid rgba(245,239,223,0.2)',
+                background: soundEnabled ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.12)',
+                border: soundEnabled ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.2)',
               }}
             >
               <span

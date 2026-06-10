@@ -187,7 +187,7 @@ export function ReplayPage() {
     if (winningTile && !finalHand.includes(winningTile)) finalHand.push(winningTile);
   }
 
-  const resultColor = payload.result === 'win' ? '#7fc299' : 'rgba(245,239,223,0.6)';
+  const resultColor = payload.result === 'win' ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.6)';
 
   return (
     <ScreenShell title={t('replayTitle')} onBack={() => navigate(-1)}>
@@ -230,8 +230,8 @@ export function ReplayPage() {
             <div
               className="rounded-xl p-3 overflow-x-auto"
               style={{
-                background: 'rgba(245,239,223,0.04)',
-                border: '1px solid rgba(245,239,223,0.08)',
+                background: 'rgba(var(--felt-ink-rgb),0.04)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
               }}
             >
               <div className="flex gap-0.5 items-center min-w-fit">
@@ -270,8 +270,8 @@ export function ReplayPage() {
           <div
             className="rounded-xl p-3 space-y-3"
             style={{
-              background: 'rgba(245,239,223,0.04)',
-              border: '1px solid rgba(245,239,223,0.08)',
+              background: 'rgba(var(--felt-ink-rgb),0.04)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
             }}
           >
             {/* Current step callout */}
@@ -279,8 +279,8 @@ export function ReplayPage() {
               <div
                 className="rounded-xl px-3 py-2 flex items-center gap-3"
                 style={{
-                  background: `${ACTION_COLOR[step.event.kind] ?? 'rgba(245,239,223,0.1)'}18`,
-                  border: `1px solid ${ACTION_COLOR[step.event.kind] ?? 'rgba(245,239,223,0.15)'}55`,
+                  background: `${ACTION_COLOR[step.event.kind] ?? 'rgba(var(--felt-ink-rgb),0.1)'}18`,
+                  border: `1px solid ${ACTION_COLOR[step.event.kind] ?? 'rgba(var(--felt-ink-rgb),0.15)'}55`,
                 }}
               >
                 <span
@@ -342,8 +342,8 @@ export function ReplayPage() {
                 onClick={() => setSpeed((s) => (s >= 4 ? 1 : s * 2))}
                 className="px-3 h-9 rounded-[10px] text-[11px] font-bold font-mono text-mj-bone/80"
                 style={{
-                  background: 'rgba(245,239,223,0.06)',
-                  border: '1px solid rgba(245,239,223,0.12)',
+                  background: 'rgba(var(--felt-ink-rgb),0.06)',
+                  border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
                 }}
                 aria-label={`speed ${speed}x`}
               >
@@ -365,8 +365,8 @@ export function ReplayPage() {
                   key={seatN}
                   className="rounded-xl p-2"
                   style={{
-                    background: 'rgba(245,239,223,0.03)',
-                    border: '1px solid rgba(245,239,223,0.07)',
+                    background: 'rgba(var(--felt-ink-rgb),0.03)',
+                    border: '1px solid rgba(var(--felt-ink-rgb),0.07)',
                     minHeight: 76,
                   }}
                 >
@@ -423,8 +423,8 @@ export function ReplayPage() {
             className="rounded-xl overflow-y-auto"
             style={{
               maxHeight: 260,
-              border: '1px solid rgba(245,239,223,0.08)',
-              background: 'rgba(245,239,223,0.02)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
+              background: 'rgba(var(--felt-ink-rgb),0.02)',
             }}
           >
             {timeline.map((s, n) => {
@@ -432,7 +432,7 @@ export function ReplayPage() {
               const past = n <= stepIdx;
               const isCurrent = n === stepIdx;
               const seatWind = s.state.seats[getSeat(s.event)].wind;
-              const accentColor = ACTION_COLOR[s.event.kind] ?? 'rgba(245,239,223,0.7)';
+              const accentColor = ACTION_COLOR[s.event.kind] ?? 'rgba(var(--felt-ink-rgb),0.7)';
               return (
                 <button
                   key={n}
@@ -441,9 +441,9 @@ export function ReplayPage() {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-left"
                   style={{
                     background: isCurrent ? 'rgba(201,169,97,0.12)' : 'transparent',
-                    borderBottom: '1px solid rgba(245,239,223,0.04)',
+                    borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.04)',
                     borderLeft: isCurrent ? '3px solid #c9a961' : '3px solid transparent',
-                    color: past ? '#f5efdf' : 'rgba(245,239,223,0.35)',
+                    color: past ? '#f5efdf' : 'rgba(var(--felt-ink-rgb),0.35)',
                   }}
                 >
                   <span className="font-mono text-[9px] font-bold text-mj-bone/40 w-5 shrink-0">
@@ -507,7 +507,7 @@ function tickColor(kind: GameEvent['kind'], isPast: boolean): string {
     kind === 'chow'
   )
     return '#c9a961';
-  return isPast ? 'rgba(245,239,223,0.45)' : 'rgba(245,239,223,0.12)';
+  return isPast ? 'rgba(var(--felt-ink-rgb),0.45)' : 'rgba(var(--felt-ink-rgb),0.12)';
 }
 
 function TickBar({
@@ -572,8 +572,8 @@ function TransportBtn({
       className="h-9 rounded-[10px] flex items-center justify-center font-bold text-sm"
       style={{
         width: primary ? 48 : 40,
-        background: primary ? '#c9a961' : 'rgba(245,239,223,0.06)',
-        border: `1px solid ${primary ? '#c9a961' : 'rgba(245,239,223,0.12)'}`,
+        background: primary ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.06)',
+        border: `1px solid ${primary ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.12)'}`,
         color: primary ? '#1f2937' : '#f5efdf',
       }}
     >
@@ -644,7 +644,7 @@ function ShareSheet({ gameId, onClose }: { gameId: string; onClose: () => void }
           <button
             onClick={onClose}
             className="py-3 rounded-xl text-sm font-semibold text-mj-bone/70"
-            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
           >
             {t('replayClose')}
           </button>

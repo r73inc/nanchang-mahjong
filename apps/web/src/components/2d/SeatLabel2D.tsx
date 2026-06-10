@@ -52,8 +52,8 @@ export function SeatLabel2D({ seatIdx }: SeatLabel2DProps) {
         padding: '2px 6px',
         borderRadius: 6,
         fontSize: 10,
-        background: isActive ? 'rgba(201,169,97,0.18)' : 'rgba(245,239,223,0.05)',
-        border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(245,239,223,0.1)'}`,
+        background: isActive ? 'rgba(201,169,97,0.18)' : 'rgba(var(--felt-ink-rgb),0.05)',
+        border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
         boxShadow: isActive ? '0 0 8px rgba(201,169,97,0.2)' : 'none',
         whiteSpace: 'nowrap',
       }}

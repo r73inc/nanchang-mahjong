@@ -19,13 +19,13 @@ import { getApiErrorMessage } from '../../lib/api';
 // ── Shared style tokens ───────────────────────────────────────────────────────
 
 const cardStyle = {
-  background: 'rgba(245,239,223,0.05)',
+  background: 'rgba(var(--felt-ink-rgb),0.05)',
   border: '1px solid rgba(201,169,97,0.12)',
 } as const;
 
 const rowStyle = {
-  background: 'rgba(245,239,223,0.04)',
-  border: '1px solid rgba(245,239,223,0.07)',
+  background: 'rgba(var(--felt-ink-rgb),0.04)',
+  border: '1px solid rgba(var(--felt-ink-rgb),0.07)',
 } as const;
 
 const btnGhost =

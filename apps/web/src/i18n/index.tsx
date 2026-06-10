@@ -79,7 +79,7 @@ export function LangToggle() {
   return (
     <div
       className="flex p-[3px] rounded-pill border border-mj-gold/30"
-      style={{ background: 'rgba(245,239,223,0.06)' }}
+      style={{ background: 'rgba(var(--felt-ink-rgb),0.06)' }}
     >
       {LANGS.map(({ k, label }) => (
         <button

@@ -78,8 +78,8 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
           gap: 3,
           padding: '4px 6px',
           borderRadius: 8,
-          background: isActive ? 'rgba(201,169,97,0.15)' : 'rgba(245,239,223,0.05)',
-          border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(245,239,223,0.1)'}`,
+          background: isActive ? 'rgba(201,169,97,0.15)' : 'rgba(var(--felt-ink-rgb),0.05)',
+          border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
           boxShadow: isActive ? '0 0 0 2px #c9a961' : 'none',
           minWidth: 44,
         }}
