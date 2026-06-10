@@ -24,7 +24,13 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
 import { useI18n } from '../../i18n';
-import { tileAriaLabel, engineToDesignTile, decomposeHand } from '@nanchang/shared';
+import {
+  tileAriaLabel,
+  engineToDesignTile,
+  decomposeHand,
+  concealedKongOptions,
+  addToKongOptions,
+} from '@nanchang/shared';
 import type {
   ClientGameState,
   TileType,
@@ -509,6 +515,9 @@ function HandRevealScreen({
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
                       {WIND_CHAR[wind]}
+                    </span>
+                    <span className="text-xs text-mj-bone/70 font-medium">
+                      {snapshot.seats[i].seatName}
                     </span>
                     {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
                     {isWinner && (
@@ -1923,6 +1932,68 @@ function JingTileChip({ tile }: { tile: TileType }) {
   );
 }
 
+// ── Kong action sheet ─────────────────────────────────────────────────────────
+
+type KongActionOption =
+  | { type: 'concealed'; kongTile: TileType }
+  | { type: 'add'; pungTile: TileType };
+
+interface KongActionPending {
+  discardTile: TileType;
+  options: KongActionOption[];
+}
+
+function KongActionSheet({
+  pending,
+  onKong,
+  onDiscard,
+}: {
+  pending: KongActionPending;
+  onKong: (opt: KongActionOption) => void;
+  onDiscard: () => void;
+}) {
+  const { t } = useI18n();
+  const opt = pending.options[0];
+  const titleKey = opt.type === 'concealed' ? 'kongActionConcealedTitle' : 'kongActionAddTitle';
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-end justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)' }}
+    >
+      <div
+        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
+        role="dialog"
+        aria-label={t(titleKey)}
+      >
+        <div className="flex items-center gap-4">
+          <MahjongTile2D tile={pending.discardTile} size="lg" interactive={false} />
+          <h2 className="font-bold text-lg text-mj-bone">{t(titleKey)}</h2>
+        </div>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onDiscard}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+          >
+            {t('kongActionDiscard')}
+          </button>
+          {pending.options.map((o, i) => (
+            <button
+              key={i}
+              onClick={() => onKong(o)}
+              className="flex-1 py-3 rounded-xl font-bold text-sm"
+              style={{ background: '#c9a961', color: '#1a1a1a' }}
+            >
+              {t('kongActionKong')}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Game Table ────────────────────────────────────────────────────────────────
 
 /**
@@ -1947,6 +2018,8 @@ function GameTable({
   pendingMove,
   onSelect,
   onDiscard,
+  onKongConcealed,
+  onKongAdd,
   onClaim,
   onPass,
   onConcede,
@@ -1958,6 +2031,8 @@ function GameTable({
   pendingMove: boolean;
   onSelect: (idx: number | null) => void;
   onDiscard: (tile: TileType) => void;
+  onKongConcealed: (tile: TileType) => void;
+  onKongAdd: (tile: TileType) => void;
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
   onConcede: () => void;
@@ -1966,6 +2041,7 @@ function GameTable({
   const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
   const [jingDiscardPending, setJingDiscardPending] = useState<TileType | null>(null);
+  const [kongActionPending, setKongActionPending] = useState<KongActionPending | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const nextHistoryId = useRef(0);
@@ -2038,6 +2114,62 @@ function GameTable({
     onSelect(null); // deselect the tile
   };
 
+  // ── Kong detection ───────────────────────────────────────────────────────────
+  // On the player's draw turn, check if the tile being discarded can instead
+  // be used to declare a concealed kong or extend an open pung to a kong.
+  const handleDiscardOrKong = useCallback(
+    (tile: TileType) => {
+      if (!isMyTurn) {
+        handleDiscardWithConfirm(tile);
+        return;
+      }
+      const options: KongActionOption[] = [];
+      const jingTypesArr = Array.from(jingTypes) as TileType[];
+
+      // Concealed kong: all 4 of this tile type are in hand
+      const cKongTypes = concealedKongOptions(viewerHand, jingTypesArr);
+      if (cKongTypes.includes(tile)) {
+        options.push({ type: 'concealed', kongTile: tile });
+      }
+
+      // Add-to-kong: tile in hand matches what's needed to extend an open pung
+      const openPungs = snapshot.seats[viewerSeat].openMelds.filter((m) => m.kind === 'pung');
+      for (const pung of openPungs) {
+        const pungTile = pung.tiles[0] as TileType;
+        const removable = addToKongOptions(viewerHand, pungTile, jingTypesArr);
+        if (removable.includes(tile)) {
+          options.push({ type: 'add', pungTile });
+        }
+      }
+
+      if (options.length > 0) {
+        setKongActionPending({ discardTile: tile, options });
+      } else {
+        handleDiscardWithConfirm(tile);
+      }
+    },
+    [isMyTurn, viewerHand, jingTypes, snapshot.seats, viewerSeat, handleDiscardWithConfirm],
+  );
+
+  const handleKongAction = useCallback(
+    (opt: KongActionOption) => {
+      setKongActionPending(null);
+      if (opt.type === 'concealed') {
+        onKongConcealed(opt.kongTile);
+      } else {
+        onKongAdd(opt.pungTile);
+      }
+    },
+    [onKongConcealed, onKongAdd],
+  );
+
+  const handleKongActionDiscard = useCallback(() => {
+    if (!kongActionPending) return;
+    const tile = kongActionPending.discardTile;
+    setKongActionPending(null);
+    handleDiscardWithConfirm(tile);
+  }, [kongActionPending, handleDiscardWithConfirm]);
+
   // ── History tracking ────────────────────────────────────────────────────────
 
   const addHistory = useCallback((entry: Omit<HistoryEntry, 'id'>) => {
@@ -2101,7 +2233,7 @@ function GameTable({
           // regardless of the host's viewMode setting — the 3D canvas has no mobile handling).
           <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
             <GameTable2D
-              onDiscard={handleDiscardWithConfirm}
+              onDiscard={handleDiscardOrKong}
               isMobile={isMobile}
               isCssLandscape={landscapeMode === 'css-landscape'}
             />
@@ -2263,12 +2395,12 @@ function GameTable({
       {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
       {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
       {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
-      {!showConcedeSheet && snapshot.viewMode !== '2D' && (
+      {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
         <ViewerHandHUD
           hand={viewerHand}
           selectedTileIdx={selectedTileIdx}
           onSelect={onSelect}
-          onDiscard={handleDiscardWithConfirm}
+          onDiscard={handleDiscardOrKong}
           isMyTurn={isMyTurn}
           jingTypes={jingTypes}
           pendingMove={pendingMove}
@@ -2280,12 +2412,12 @@ function GameTable({
         hand={viewerHand}
         selectedTileIdx={pendingMove ? null : selectedTileIdx}
         onSelect={onSelect}
-        onDiscard={handleDiscardWithConfirm}
+        onDiscard={handleDiscardOrKong}
         isMyTurn={isMyTurn && !pendingMove}
       />
 
       {/* ── Collapsible history panel ──────────────────────────────────────── */}
-      {!showConcedeSheet && !jingDiscardPending && (
+      {!showConcedeSheet && !jingDiscardPending && !kongActionPending && (
         <GameHistoryPanel
           entries={historyEntries}
           isOpen={historyOpen}
@@ -2296,23 +2428,26 @@ function GameTable({
       )}
 
       {/* ── Action toast ───────────────────────────────────────────────────── */}
-      {toast && !showConcedeSheet && !jingDiscardPending && (
+      {toast && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
         <ActionToast toast={toast} snapshot={snapshot} />
       )}
 
       {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
-      {yourTurnFlash && !claimWindow && !showConcedeSheet && !jingDiscardPending && (
-        <YourTurnBanner />
-      )}
+      {yourTurnFlash &&
+        !claimWindow &&
+        !showConcedeSheet &&
+        !jingDiscardPending &&
+        !kongActionPending && <YourTurnBanner />}
 
       {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
       {snapshot.phase === 'awaiting_claims' &&
         !claimWindow &&
         !showConcedeSheet &&
-        !jingDiscardPending && <WaitingForClaimIndicator isMobile={isMobile} />}
+        !jingDiscardPending &&
+        !kongActionPending && <WaitingForClaimIndicator isMobile={isMobile} />}
 
       {/* ── Claim window rail ──────────────────────────────────────────────── */}
-      {claimWindow && !showConcedeSheet && !jingDiscardPending && (
+      {claimWindow && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
         <SideRail
           claimWindow={claimWindow}
           pendingDiscard={snapshot.pendingDiscard}
@@ -2333,6 +2468,15 @@ function GameTable({
           tile={jingDiscardPending}
           onConfirm={handleJingDiscardConfirm}
           onCancel={handleJingDiscardCancel}
+        />
+      )}
+
+      {/* ── Kong action sheet ──────────────────────────────────────────────── */}
+      {kongActionPending && !jingDiscardPending && (
+        <KongActionSheet
+          pending={kongActionPending}
+          onKong={handleKongAction}
+          onDiscard={handleKongActionDiscard}
         />
       )}
 
@@ -2426,6 +2570,8 @@ export function GamePage() {
     gameError,
     selectTile,
     discard,
+    kongConcealed,
+    kongAdd,
     claim,
     pass,
     concede,
@@ -2599,6 +2745,8 @@ export function GamePage() {
             pendingMove={pendingMove}
             onSelect={selectTile}
             onDiscard={discard}
+            onKongConcealed={kongConcealed}
+            onKongAdd={kongAdd}
             onClaim={claim}
             onPass={pass}
             onConcede={concede}

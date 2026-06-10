@@ -46,6 +46,7 @@ const SAMPLE_ROOM: RoomState = {
     minFan: 1,
     viewMode: '3D',
     ruleTopBottomJing: false,
+    claimWindowSecs: 8,
   },
   createdAt: '2024-01-01T00:00:00.000Z',
 };

@@ -58,8 +58,8 @@ import { PushService } from '../push/push.service';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-/** Claim window length in seconds. */
-const CLAIM_WINDOW_SECS = 8;
+/** Fallback claim window length in seconds (used when settings.claimWindowSecs is not set). */
+const CLAIM_WINDOW_SECS_DEFAULT = 8;
 
 /** Bot simulated think-time range (ms). */
 const BOT_THINK_MIN_MS = 1_000;
@@ -608,9 +608,13 @@ export class GameService {
     }
 
     const eligibleSeats = new Set(eligibilityMap.keys()) as Set<Seat4>;
-    const deadline = Date.now() + CLAIM_WINDOW_SECS * 1000;
+    const windowSecs = session.settings.claimWindowSecs ?? CLAIM_WINDOW_SECS_DEFAULT;
+    const isInfinite = windowSecs === 0;
+    const deadline = isInfinite ? Infinity : Date.now() + windowSecs * 1000;
 
-    session.openClaimWindow(eligibleSeats, eligibilityMap, CLAIM_WINDOW_SECS, { isRobKong: false });
+    session.openClaimWindow(eligibleSeats, eligibilityMap, isInfinite ? 9999 : windowSecs, {
+      isRobKong: false,
+    });
 
     // Send claim-window event only to eligible human seats
     for (const [claimSeat, actions] of eligibilityMap) {
@@ -620,11 +624,10 @@ export class GameService {
       }
     }
 
-    // Arm expiry timer
-    session.claimTimer = setTimeout(
-      () => this.resolveClaimWindow(session),
-      CLAIM_WINDOW_SECS * 1000,
-    );
+    // Arm expiry timer — skipped when window is infinite (resolves only when all seats respond)
+    if (!isInfinite) {
+      session.claimTimer = setTimeout(() => this.resolveClaimWindow(session), windowSecs * 1000);
+    }
 
     // Schedule async reactions for eligible bot seats — runs in parallel with human timer.
     for (const [claimSeat, actions] of eligibilityMap) {

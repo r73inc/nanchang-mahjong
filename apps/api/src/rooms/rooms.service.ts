@@ -172,6 +172,7 @@ export class RoomsService {
       minFan: dto?.settings?.minFan ?? 1,
       viewMode: dto?.settings?.viewMode ?? '2D',
       ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? false,
+      claimWindowSecs: dto?.settings?.claimWindowSecs ?? 8,
     };
 
     // Build bot seat items (seats filled from the high end: 3, 2, 1).
@@ -480,7 +481,7 @@ export class RoomsService {
   /**
    * Update mutable pre-game settings. Only the host may call this, and only
    * while the room is still in the 'waiting' state.
-   * Supports: viewMode, ruleTopBottomJing, rounds, terminationType.
+   * Supports: viewMode, ruleTopBottomJing, rounds, terminationType, claimWindowSecs.
    */
   async updateSettings(
     roomId: string,
@@ -490,6 +491,7 @@ export class RoomsService {
       ruleTopBottomJing?: boolean;
       rounds?: 'east' | 'east+south';
       terminationType?: 'rounds' | 'bust';
+      claimWindowSecs?: number;
     },
   ): Promise<RoomState> {
     const room = await this.queryRoom(roomId);
@@ -521,6 +523,10 @@ export class RoomsService {
     if (updates.terminationType !== undefined) {
       setParts.push('settings.terminationType = :terminationType');
       values[':terminationType'] = updates.terminationType;
+    }
+    if (updates.claimWindowSecs !== undefined) {
+      setParts.push('settings.claimWindowSecs = :claimWindowSecs');
+      values[':claimWindowSecs'] = updates.claimWindowSecs;
     }
 
     await this.db.update({

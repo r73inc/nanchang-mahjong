@@ -138,6 +138,7 @@ export function useRoomActions() {
         ruleTopBottomJing?: boolean;
         rounds?: 'east' | 'east+south';
         terminationType?: 'rounds' | 'bust';
+        claimWindowSecs?: number;
       },
     ) => {
       try {
