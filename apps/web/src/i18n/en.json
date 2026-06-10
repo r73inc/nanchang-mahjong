@@ -51,6 +51,7 @@
   "signOut": "Sign Out",
   "changePasswordLink": "Change Password",
   "deleteAccountLink": "Delete Account",
+  "accountLink": "Account",
   "comingSoon": "Game lobby coming in a later phase.",
   "role": "Role",
   "adminBadge": "Admin",
@@ -435,5 +436,7 @@
   "learnScoringSelfdraw": "Self-draw: all three other players each pay ×2.",
   "learnScoringDealer": "Dealer: every amount the dealer wins or loses is doubled (×2).",
   "learnScoringKong": "Exposed Kong: 1 pt from each player instantly. Concealed Kong: 2 pts from each.",
-  "learnScoringGerman": "German (德国): win without using any Spirit as a wildcard — earn (base ×2) + 5 pts bonus."
+  "learnScoringGerman": "German (德国): win without using any Spirit as a wildcard — earn (base ×2) + 5 pts bonus.",
+
+  "lastDiscardLabel": "Last"
 }

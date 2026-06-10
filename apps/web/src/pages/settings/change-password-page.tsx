@@ -49,7 +49,7 @@ export function ChangePasswordPage() {
 
   if (done) {
     return (
-      <ScreenShell title={t('changePassword')} onBack={() => navigate('/home')}>
+      <ScreenShell title={t('changePassword')} onBack={() => navigate('/account')}>
         <div className="px-5 py-8 text-center">
           <div
             className="w-16 h-16 mx-auto mb-5 rounded-[20px] flex items-center justify-center text-mj-win text-3xl"
@@ -63,7 +63,7 @@ export function ChangePasswordPage() {
           </div>
           <h2 className="text-lg font-bold text-mj-bone mb-2">{t('passwordChanged')}</h2>
           <button
-            onClick={() => navigate('/home')}
+            onClick={() => navigate('/account')}
             className="w-full mt-4 py-[14px] rounded-[14px] font-bold text-[14px] text-mj-slate
                        bg-gradient-to-b from-mj-gold to-mj-gold-2 shadow-cta"
           >
@@ -75,7 +75,7 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <ScreenShell title={t('changePassword')} onBack={() => navigate('/home')}>
+    <ScreenShell title={t('changePassword')} onBack={() => navigate('/account')}>
       <div className="px-5 py-6">
         <form onSubmit={onSubmit} noValidate>
           <FormField

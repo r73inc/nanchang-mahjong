@@ -1798,20 +1798,33 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
         onClick={() => setOpen(true)}
         aria-label={t('gameSpirit')}
         style={{
-          background: 'rgba(201,169,97,0.12)',
-          border: '1px solid rgba(201,169,97,0.3)',
-          borderRadius: 4,
-          padding: '1px 5px',
-          color: '#c9a961',
-          fontSize: 11,
-          fontFamily: 'serif',
-          fontWeight: 700,
+          background: 'none',
+          border: 'none',
+          padding: 0,
           cursor: 'pointer',
-          lineHeight: 1.4,
+          lineHeight: 0,
           flexShrink: 0,
+          display: 'flex',
+          gap: 2,
+          alignItems: 'center',
         }}
       >
-        {JING_CHAR}
+        <MahjongTile2D
+          tile={snapshot.jingPrimary}
+          size="xs"
+          role="bottom"
+          isJing
+          interactive={false}
+        />
+        {snapshot.jingSecondary && (
+          <MahjongTile2D
+            tile={snapshot.jingSecondary}
+            size="xs"
+            role="bottom"
+            isJing
+            interactive={false}
+          />
+        )}
       </button>
 
       {open && (

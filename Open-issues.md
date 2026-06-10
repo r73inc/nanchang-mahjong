@@ -204,58 +204,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Open Improvements
 
-### IMP-008 · Account settings page — move change password and delete account
-
-**Status:** NEW (as of 2026-06-09)
-
-**Description:** "Change password" and "Delete account" actions should be moved from the landing/home page to a dedicated account settings page (`/account` or similar), keeping the home page focused on game lobby and status.
-
-**Why:** Keeps destructive/security actions out of the main navigation and organizes settings hierarchically.
-
----
-
-### IMP-009 · Mobile discard pile overlap — reduce limit by 2 before second row
-
-**Status:** NEW (as of 2026-06-09)
-
-**Description:** On mobile, the discard pile in the center is showing too many tiles in the first row before wrapping, causing it to overlap the left and right player info blocks. Reducing the tile count per row by 2 will prevent the overlap.
-
-**Where to look:**
-
-- `apps/web/src/components/game/DiscardPool3D.tsx` or `apps/web/src/r3f/components/DiscardPool3D.tsx` — row-wrapping logic
-- `apps/web/src/r3f/utils/table-layout.ts` — `discardPoses` calculation
-
----
-
-### IMP-010 · Last-played tile indicator — corner box on mobile
-
-**Status:** NEW (as of 2026-06-09)
-
-**Description:** Add a small box in the top-left corner of the mobile game view showing the last tile that was played/discarded. This gives quick visual feedback on which tile is "in play" during the claim window.
-
-**Alternative to:** BUG-020 (last-discard pulse). If the red pulse proves too difficult, this corner box is a simpler visual indicator.
-
----
-
-### IMP-011 · Spirit tiles visibility on mobile — small icons in top-left
-
-**Status:** NEW (as of 2026-06-09)
-
-**Description:** On mobile, spirit tiles (and their counts) must be visible at all times, even in compact form as small icons in the top-left corner of the game area. Tapping the icons should expand them the same way tapping the spirit-count character currently does. This replaces the "upper left character" with a more explicit spirit-tile display.
-
-**Where to look:**
-
-- `apps/web/src/components/game/SeatHUD.tsx` — spirit display
-- Mobile responsive CSS for game-page layout
-
----
-
-### IMP-012 · Improve account security — password visibility and account page organization
-
-**Status:** NEW (as of 2026-06-09)
-
-**Related to:** IMP-008 (account settings consolidation)
-
-**Description:** Ensure the new account settings page includes all user-account actions (change password, delete account, profile settings) in one organized location. This improves UX by centralizing account management instead of scattering actions across the app.
+_(No open improvements at this time.)_
 
 ---

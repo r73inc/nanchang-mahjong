@@ -45,7 +45,7 @@ export function DeleteAccountPage() {
 
   if (step === 'warning') {
     return (
-      <ScreenShell title={t('deleteAccount')} onBack={() => navigate('/home')}>
+      <ScreenShell title={t('deleteAccount')} onBack={() => navigate('/account')}>
         <div className="px-5 py-6">
           {/* Danger card */}
           <div
@@ -90,7 +90,7 @@ export function DeleteAccountPage() {
           </button>
 
           <button
-            onClick={() => navigate('/home')}
+            onClick={() => navigate('/account')}
             className="w-full py-3 rounded-[14px] text-sm font-medium text-mj-bone/70
                        bg-transparent border border-mj-bone/15"
           >

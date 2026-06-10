@@ -43,6 +43,7 @@ import { useI18n } from '../../i18n';
 import { DiscardContext } from './DiscardContext';
 import { useState } from 'react';
 import { FeltSurface2D } from './FeltSurface2D';
+import { MahjongTile2D } from './MahjongTile2D';
 import { OpponentBadge2D } from './OpponentBadge2D';
 import { MobileDiscardPool2D } from './MobileDiscardPool2D';
 import { OpenMelds2D } from './OpenMelds2D';
@@ -74,6 +75,12 @@ const I18N_SCORE_STRIP = 'mobileScoreStrip' as const;
 
 /** Width reserved on each side for left/right opponent badges. */
 const BADGE_W = 52;
+
+/** Extra horizontal inset for the discard pool — reduces tiles per row by ~2 on each side. */
+const DISCARD_EXTRA_PAD = 30;
+
+/** i18n key for the last-discard corner label. */
+const LAST_DISCARD_LABEL = 'lastDiscardLabel' as const;
 
 /** Status bar height (managed by game-page.tsx overlay, z-10). */
 const STATUS_H = 32;
@@ -174,6 +181,7 @@ export interface MobileGameTable2DProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileGameTable2DProps) {
+  const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
 
   // ── Discard-flight context ────────────────────────────────────────────────
@@ -182,6 +190,12 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
   if (!snapshot) return null;
 
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
+
+  // Derive the most recently discarded tile for the corner indicator (IMP-010).
+  const lastDiscardTile =
+    snapshot.discardedBySeat !== null
+      ? (snapshot.seats[snapshot.discardedBySeat].discards.at(-1) ?? null)
+      : null;
   const { right: rightSeat, across: acrossSeat, left: leftSeat } = getCompassSeats(viewerSeat);
 
   return (
@@ -245,14 +259,15 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
           </div>
 
           {/* ── Combined discard pool — fills available centre felt ───────── */}
-          {/* Bounded away from opponent badges and the hand strip.           */}
+          {/* Extra horizontal inset (DISCARD_EXTRA_PAD) reduces the first     */}
+          {/* row tile count by ~2, preventing overlap with side badges.        */}
           <div
             style={{
               position: 'absolute',
               top: STATUS_H + 8,
               bottom: HAND_H_FALLBACK,
-              left: `calc(${BADGE_W}px + var(--mj-safe-left, 0px))`,
-              right: `calc(${BADGE_W}px + var(--mj-safe-right, 0px))`,
+              left: `calc(${BADGE_W + DISCARD_EXTRA_PAD}px + var(--mj-safe-left, 0px))`,
+              right: `calc(${BADGE_W + DISCARD_EXTRA_PAD}px + var(--mj-safe-right, 0px))`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -261,6 +276,38 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
           >
             <MobileDiscardPool2D />
           </div>
+
+          {/* ── Last-discard corner indicator (IMP-010) ───────────────────── */}
+          {/* Shows the most recently played tile in the top-left of the felt  */}
+          {/* for quick reference during claim windows and between turns.      */}
+          {lastDiscardTile && (
+            <div
+              style={{
+                position: 'absolute',
+                top: STATUS_H + 6,
+                left: `calc(${BADGE_W}px + var(--mj-safe-left, 0px) + 4px)`,
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 1,
+                pointerEvents: 'none',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 7,
+                  color: 'rgba(245,239,223,0.4)',
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1,
+                }}
+              >
+                {t(LAST_DISCARD_LABEL)}
+              </span>
+              <MahjongTile2D tile={lastDiscardTile} size="xs" role="bottom" interactive={false} />
+            </div>
+          )}
 
           {/* ── Viewer open melds — thin strip just above the hand ─────────── */}
           <div
