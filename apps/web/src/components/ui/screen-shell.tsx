@@ -21,7 +21,7 @@ export function ScreenShell({ children, title, onBack, headerRight }: ScreenShel
         style={{
           background:
             'linear-gradient(180deg, var(--felt-top, #0d3b2e) 0%, var(--felt-bottom, #051a13) 100%)',
-          color: '#f5efdf',
+          color: 'var(--felt-ink, #f5efdf)',
           fontFamily: '-apple-system, system-ui, sans-serif',
         }}
       >

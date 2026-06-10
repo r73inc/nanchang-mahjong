@@ -31,6 +31,8 @@ interface FeltConfig {
   header: string;
   /** Representative hex for swatches / UI display. */
   swatch: string;
+  /** Primary text colour for content rendered on this felt. Dark themes use bone-white; light themes use near-black. */
+  ink: string;
 }
 
 export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
@@ -39,30 +41,35 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     bottom: '#051a13',
     header: 'rgba(8,30,23,0.6)',
     swatch: '#0d3b2e',
+    ink: '#f5efdf',
   },
   crimson: {
     top: '#3b0d0d',
     bottom: '#1a0505',
     header: 'rgba(30,8,8,0.6)',
     swatch: '#3b0d0d',
+    ink: '#f5efdf',
   },
   slate: {
     top: '#0d1a2e',
     bottom: '#050a13',
     header: 'rgba(8,13,30,0.6)',
     swatch: '#0d1a2e',
+    ink: '#f5efdf',
   },
   navy: {
     top: '#0d1f3b',
     bottom: '#050d1a',
     header: 'rgba(8,15,30,0.6)',
     swatch: '#0d1f3b',
+    ink: '#f5efdf',
   },
   yellow: {
     top: '#e8d630',
     bottom: '#b8a714',
     header: 'rgba(180,160,0,0.3)',
     swatch: '#e8d630',
+    ink: '#1a1500',
   },
 };
 
@@ -135,6 +142,8 @@ export function applyTheme(felt: FeltTheme, palette: TilePalette): void {
   r.style.setProperty('--felt-top', f.top);
   r.style.setProperty('--felt-bottom', f.bottom);
   r.style.setProperty('--felt-header', f.header);
+  r.style.setProperty('--felt-ink', f.ink);
+  r.dataset.felt = felt;
 
   r.style.setProperty('--tile-face-top', t.faceTop);
   r.style.setProperty('--tile-face-bottom', t.faceBottom);
