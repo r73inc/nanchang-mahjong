@@ -6,6 +6,7 @@ import { AuthPage } from './pages/auth/auth-page';
 import { HomeStubPage } from './pages/home/home-stub-page';
 import { ChangePasswordPage } from './pages/settings/change-password-page';
 import { DeleteAccountPage } from './pages/settings/delete-account-page';
+import { AccountPage } from './pages/account/account-page';
 import { AdminPage } from './pages/admin/admin-page';
 import { ProfilePage } from './pages/profile/profile-page';
 import { FriendsPage } from './pages/friends/friends-page';
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/friends" element={<FriendsPage />} />
         <Route path="/customize" element={<CustomizePage />} />
+        <Route path="/account" element={<AccountPage />} />
         <Route path="/settings/change-password" element={<ChangePasswordPage />} />
         <Route path="/settings/delete-account" element={<DeleteAccountPage />} />
       </Route>

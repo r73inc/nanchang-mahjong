@@ -51,6 +51,7 @@
   "signOut": "退出登录",
   "changePasswordLink": "修改密码",
   "deleteAccountLink": "删除账号",
+  "accountLink": "账号",
   "comingSoon": "游戏大厅将在后续阶段推出。",
   "role": "角色",
   "adminBadge": "管理员",
@@ -436,5 +437,7 @@
   "learnScoringSelfdraw": "自摸：其他三名玩家各赔 ×2。",
   "learnScoringDealer": "庄家：庄家赢得或输掉的每笔金额均翻倍（×2）。",
   "learnScoringKong": "明杠/补杠：每人立即给 1 分。暗杠：每人立即给 2 分。",
-  "learnScoringGerman": "德国胡：胡牌时精牌未作为万能牌使用，获得（底分 ×2）+ 5 分额外奖励。"
+  "learnScoringGerman": "德国胡：胡牌时精牌未作为万能牌使用，获得（底分 ×2）+ 5 分额外奖励。",
+
+  "lastDiscardLabel": "最新"
 }

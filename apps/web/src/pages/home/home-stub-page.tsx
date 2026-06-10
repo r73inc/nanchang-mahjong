@@ -161,29 +161,15 @@ export function HomeStubPage() {
           )}
 
           <button
-            onClick={() => navigate('/settings/change-password')}
+            onClick={() => navigate('/account')}
             className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px] text-sm text-mj-bone"
             style={{
               background: 'rgba(245,239,223,0.06)',
               border: '1px solid rgba(245,239,223,0.08)',
             }}
           >
-            <span>{t('changePasswordLink')}</span>
+            <span>{t('accountLink')}</span>
             <span className="text-mj-bone/35" aria-hidden="true">
-              ›
-            </span>
-          </button>
-
-          <button
-            onClick={() => navigate('/settings/delete-account')}
-            className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px] text-sm text-mj-loss-light"
-            style={{
-              background: 'rgba(245,239,223,0.06)',
-              border: '1px solid rgba(245,239,223,0.08)',
-            }}
-          >
-            <span>{t('deleteAccountLink')}</span>
-            <span className="text-mj-loss-light/40" aria-hidden="true">
               ›
             </span>
           </button>

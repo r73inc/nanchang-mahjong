@@ -376,6 +376,58 @@ All 3D-specific bugs found and fixed during local testing. See `3D-BUG-LOG.md` f
 
 ---
 
+## PR #86 · `feat/imp-008-012` (2026-06-09)
+
+### IMP-008 · Account settings page — move change password and delete account
+
+**Previous state:** "Change Password" and "Delete Account" were listed as separate buttons directly on the home page, cluttering the main navigation with destructive/security actions.
+
+**Fix:** Created a dedicated `/account` page (`apps/web/src/pages/account/account-page.tsx`) that consolidates Profile, Change Password, and Delete Account links in one place. The home page now shows a single "Account" link. Back navigation in `change-password-page.tsx` and `delete-account-page.tsx` was updated to return to `/account` instead of `/home`. Route added to `App.tsx`.
+
+**Learning:** Destructive actions belong in a dedicated settings hierarchy, not scattered across the main navigation. Centralizing them keeps the home page focused on gameplay.
+
+---
+
+### IMP-009 · Mobile discard pile overlap — reduce first-row tile count by 2
+
+**Previous state:** On mobile landscape, the discard pool container extended to the full area between the left/right opponent badges, allowing the first row of tiles to crowd the badge edges and cause visual overlap.
+
+**Fix:** Added `DISCARD_EXTRA_PAD = 30` constant in `MobileGameTable2D.tsx` and applied it as additional horizontal inset on the discard pool container (`left/right: calc(BADGE_W + DISCARD_EXTRA_PAD + safe-area)`). This narrows the pool by 60 px total — exactly 2 xs-tile widths (28 px + 2 px gap = 30 px each side), preventing the overlap.
+
+**Learning:** When tiles use `flex-wrap` with `justifyContent: 'center'`, the first row fills the full container width. Adding explicit inset beyond the badge boundary gives a safe visual buffer.
+
+---
+
+### IMP-010 · Last-played tile indicator — corner box on mobile
+
+**Previous state:** During a claim window there was no persistent visual indicator of which tile was in play beyond the brief SideRail overlay.
+
+**Fix:** Added a last-discard corner indicator in `MobileGameTable2D.tsx` — an xs `MahjongTile2D` with a small "LAST" label, positioned in the top-left corner of the felt area just below the status bar. Derived from `snapshot.discardedBySeat` + the tail of that seat's discard array, so it persists between turns and during claim windows.
+
+**Learning:** Deriving last-discard from `snapshot.discardedBySeat` + `seats[x].discards.at(-1)` is more reliable than `snapshot.pendingDiscard`, which clears after a claim window closes.
+
+---
+
+### IMP-011 · Spirit tiles visibility on mobile — tile images instead of 节 character
+
+**Previous state:** On mobile, the `MobileJingButton` in the status bar showed only the Chinese character `节` — players had to tap it to see which actual tiles were spirit tiles.
+
+**Fix:** Updated `MobileJingButton` in `game-page.tsx` to render xs-sized `MahjongTile2D` components (with `isJing=true` gold treatment) instead of the text glyph. Both primary and secondary spirit tiles are shown inline. Tapping still opens the full-screen overlay. The button's style was simplified to a bare wrapper (`background: none, border: none`) since the tiles carry their own visual treatment.
+
+**Learning:** Always prefer showing the actual tile images over text glyphs when `MahjongTile2D` is available — the SVG textures are more recognizable at a glance than a character.
+
+---
+
+### IMP-012 · Improve account security — account page organization
+
+**Previous state:** Account management actions (change password, delete account, profile) were scattered across different entry points.
+
+**Fix:** Resolved together with IMP-008. All user-account actions now live on the `/account` page: Profile Settings, Change Password, and Delete Account. The home page entry point is a single "Account" link.
+
+**Learning:** Consolidating account actions in one place reduces cognitive load and makes the destructive "Delete Account" action appropriately separated from the main game lobby.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
