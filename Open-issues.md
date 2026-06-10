@@ -6,6 +6,30 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## Quick Reference
+
+| ID         | Name                                 | Summary                                                                    |
+| ---------- | ------------------------------------ | -------------------------------------------------------------------------- |
+| BUG-021    | Hand-reveal meld grouping            | Winner's hand shown as flat tile list; chow/pung/kong groups not rendered  |
+| BUG-022    | Player rejoin blocks tile play       | Reconnected player cannot play tiles on their turn                         |
+| BUG-08     | Viewer discards invisible (3D)       | Viewer's own discard pile not visible on the 3D table                      |
+| BUG-09     | TileWall3D needs redesign (3D)       | TileWall removed due to red Back.svg background; needs neutral replacement |
+| BUG-026    | Settlement text unclear              | "Received/Paid X from/to" format is ambiguous in settlement breakdown      |
+| BUG-027    | Bust-mode end condition wrong        | Score check may fire mid-round; bust mode should start players at 20 pts   |
+| BUG-028    | INVALID_PHASE on game continue       | Non-host gets error continuing after game end; host game hangs             |
+| BUG-029    | Copy room code broken on mobile      | Room code copy button has no effect on mobile                              |
+| BUG-030    | Bonus points doubled in settlement   | Solo bonus-tile player charged/receives double the correct amount          |
+| BUG-031 ⚠️ | Host refresh locks config (CRITICAL) | After browser refresh, host cannot change config or start the game         |
+| BUG-032    | Kicked player not redirected         | Kicked player remains on config screen instead of returning to menu        |
+| BUG-033    | Meld labels in English for ZH UI     | Pung/Chow/Kong labels shown in English when UI language is Chinese         |
+| IMP-013    | Player names on hand details         | End-game detail screen shows directions only; should show player names     |
+| IMP-014    | Language change during game          | No way to switch EN/ZH once a game has started                             |
+| IMP-015    | Configurable claim window timeout    | Pung/Kong/Chow popup time limit is hardcoded; should be host-configurable  |
+| IMP-016    | Kong from existing pung              | Drawing 4th tile should allow converting a revealed pung to kong           |
+| IMP-017    | Yellow table color                   | Add yellow as a felt color option in customization settings                |
+
+---
+
 ## Open Bugs
 
 ### BUG-021 · Hand-reveal meld grouping does not work
