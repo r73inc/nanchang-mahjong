@@ -59,10 +59,10 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     swatch: '#0d1f3b',
   },
   yellow: {
-    top: '#fff9c4',
-    bottom: '#fff176',
-    header: 'rgba(255,236,0,0.18)',
-    swatch: '#fff9c4',
+    top: '#b89500',
+    bottom: '#6b5500',
+    header: 'rgba(100,75,0,0.5)',
+    swatch: '#b89500',
   },
 };
 
