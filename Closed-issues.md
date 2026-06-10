@@ -428,6 +428,20 @@ All 3D-specific bugs found and fixed during local testing. See `3D-BUG-LOG.md` f
 
 ---
 
+## PR #87 · `fix/bug-023-rematch-invalid-phase` (2026-06-09)
+
+### BUG-023 · Invalid phase error on game completion — continue button fails
+
+**Symptom:** After the final hand of a session, the host sees the `HandRevealScreen` with an "End Session" button. After clicking it, an INVALID_PHASE error would appear (`GameErrorScreen`) instead of the session end screen. All players had to exit and create a new room.
+
+**Root cause:** `endSession` emits `game:ended` but never broadcasts a snapshot or clears `session.lastHandReveal`. On the client, `handleEnded` only called `setEnded(payload)` — it never called `setHandReveal(null)`. The `HandRevealScreen` persisted because `{handReveal && <HandRevealScreen>}` was evaluated first in the render tree, blocking `WinAnnouncementOverlay` and `GameEndScreen` from ever appearing. The user still saw the "End Session" button and clicked it a second time. By then `pendingHandEnd` was already `null` on the server → `INVALID_PHASE` error → `GameErrorScreen`.
+
+**Fix:** In `apps/web/src/hooks/use-game.ts`, updated `handleEnded` to call `setHandReveal(null)` before `setEnded(payload)`. This clears the hand-reveal screen the moment the session ends, allowing `WinAnnouncementOverlay` and then `GameEndScreen` to render without requiring any server-side changes.
+
+**Key learning:** When a server event terminates a multi-step flow (`game:ended` ending the `HandRevealScreen` → `GameEndScreen` sequence), the event handler must clear ALL intermediate UI state that the server no longer tracks. `endSession` deliberately skips `broadcastSnapshots` (the session is over), so the client must clean up after itself on `game:ended`.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

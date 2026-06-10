@@ -87,32 +87,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-023 · Invalid phase error on game completion — continue button fails
-
-**Symptom:** After a game completes and the final score screen is shown, if the host (or any player) clicks the "Continue" or "Play Again" button to start a new game, an error pops up saying "invalid phase." All players must exit and create a new room to play again.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** Players should be able to start a new game (rematch) without backing out to create a new room.
-
-**Suspected cause:** Likely related to:
-
-- Game session not being properly cleared or archived when `finished` phase is reached
-- Rematch handler not resetting the engine to a playable `jing_reveal` phase
-- Stale `snapshot.phase` value in store preventing new game start
-- Missing or incorrect phase transition logic in `game.service.ts`
-
-**Where to look:**
-
-- `apps/api/src/game/game.service.ts` — rematch initiation, phase reset, new game creation
-- `apps/api/src/game/game.gateway.ts` — rematch socket event handler
-- `apps/web/src/pages/game/game-page.tsx` — rematch button handler, phase checks
-- `packages/shared/src/game.events.ts` — rematch event schema/validation
-
-**Next steps:** Log the actual `snapshot.phase` value when rematch button is clicked. Verify that rematch handler properly initializes a new `GameSession` with `engine.deal()` → `jing_reveal` phase.
-
----
-
 ### BUG-08 · Viewer discard tiles not visible in the center of the table — 3D UI
 
 **Symptom:** The viewer's own discard tiles (pile in center-south zone) do not appear visible in the 3D scene.

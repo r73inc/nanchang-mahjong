@@ -168,6 +168,10 @@ export function useGame(gameId: string, spectate = false) {
     };
 
     const handleEnded = (payload: Parameters<typeof setEnded>[0]) => {
+      // Clear hand-reveal screen so GameEndScreen can render unblocked.
+      // endSession emits game:ended without a subsequent snapshot, so handReveal
+      // would otherwise remain set and permanently hide the end screen.
+      setHandReveal(null);
       setEnded(payload);
     };
 
