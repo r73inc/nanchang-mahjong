@@ -28,9 +28,21 @@
   }
 }
 
-/* ── Yellow felt — black ink overrides ──────────────────────────────────────── */
-/* When the yellow theme is active, bone-white text is unreadable on the light  */
-/* felt. Override every text-mj-bone opacity variant to black.                  */
+/* ── Per-theme text colour overrides ─────────────────────────────────────────── */
+/*                                                                                */
+/* Pattern: add a [data-felt='THEME'] block below for any theme that needs       */
+/* non-default text colours. The --felt-ink / --felt-ink-gold CSS variables are  */
+/* written by applyTheme() and drive the base ScreenShell colour; these blocks   */
+/* override the Tailwind utility classes that are applied directly on elements.  */
+/*                                                                                */
+/* ink     = primary text (Tailwind: text-mj-bone + opacity variants)            */
+/* inkGold = accent/gold text (Tailwind: text-mj-gold + opacity variants)        */
+/*                                                                                */
+/* To add a new light theme: copy the yellow block, change the selector,         */
+/* and set the rgba() channels to match that theme's ink / inkGold values.       */
+/* ─────────────────────────────────────────────────────────────────────────────── */
+
+/* Yellow felt — ink: #000000, inkGold: #6d454c */
 :root[data-felt='yellow'] .text-mj-bone {
   color: #000000;
 }
@@ -72,6 +84,21 @@
 }
 :root[data-felt='yellow'] .text-mj-bone\/90 {
   color: rgba(0, 0, 0, 0.9);
+}
+:root[data-felt='yellow'] .text-mj-gold {
+  color: #6d454c;
+}
+:root[data-felt='yellow'] .text-mj-gold\/50 {
+  color: rgba(109, 69, 76, 0.5);
+}
+:root[data-felt='yellow'] .text-mj-gold\/60 {
+  color: rgba(109, 69, 76, 0.6);
+}
+:root[data-felt='yellow'] .text-mj-gold\/70 {
+  color: rgba(109, 69, 76, 0.7);
+}
+:root[data-felt='yellow'] .text-mj-gold\/80 {
+  color: rgba(109, 69, 76, 0.8);
 }
 
 /* ── Reduced-motion accessibility ───────────────────────────────────────────── */

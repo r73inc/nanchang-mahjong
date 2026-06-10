@@ -31,8 +31,17 @@ interface FeltConfig {
   header: string;
   /** Representative hex for swatches / UI display. */
   swatch: string;
-  /** Primary text colour for content rendered on this felt. Dark themes use bone-white; light themes use near-black. */
+  /**
+   * Primary text colour (replaces bone-white on dark themes, near-black on light themes).
+   * Written as --felt-ink; CSS overrides in index.css map text-mj-bone to this value.
+   */
   ink: string;
+  /**
+   * Gold/accent text colour (replaces the standard mj-gold #c9a961 for this theme).
+   * Written as --felt-ink-gold; CSS overrides in index.css map text-mj-gold to this value.
+   * Use the standard gold on dark themes; remap on light themes for contrast.
+   */
+  inkGold: string;
 }
 
 export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
@@ -42,6 +51,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,30,23,0.6)',
     swatch: '#0d3b2e',
     ink: '#f5efdf',
+    inkGold: '#c9a961',
   },
   crimson: {
     top: '#3b0d0d',
@@ -49,6 +59,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(30,8,8,0.6)',
     swatch: '#3b0d0d',
     ink: '#f5efdf',
+    inkGold: '#c9a961',
   },
   slate: {
     top: '#0d1a2e',
@@ -56,6 +67,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,13,30,0.6)',
     swatch: '#0d1a2e',
     ink: '#f5efdf',
+    inkGold: '#c9a961',
   },
   navy: {
     top: '#0d1f3b',
@@ -63,6 +75,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,15,30,0.6)',
     swatch: '#0d1f3b',
     ink: '#f5efdf',
+    inkGold: '#c9a961',
   },
   yellow: {
     top: '#fff275',
@@ -70,6 +83,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(255,235,59,0.2)',
     swatch: '#fff275',
     ink: '#000000',
+    inkGold: '#6d454c',
   },
 };
 
@@ -143,6 +157,7 @@ export function applyTheme(felt: FeltTheme, palette: TilePalette): void {
   r.style.setProperty('--felt-bottom', f.bottom);
   r.style.setProperty('--felt-header', f.header);
   r.style.setProperty('--felt-ink', f.ink);
+  r.style.setProperty('--felt-ink-gold', f.inkGold);
   r.dataset.felt = felt;
 
   r.style.setProperty('--tile-face-top', t.faceTop);
