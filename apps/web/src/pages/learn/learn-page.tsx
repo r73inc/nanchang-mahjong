@@ -160,8 +160,8 @@ function Card({ children }: { children: React.ReactNode }) {
     <div
       className="rounded-xl p-3 mb-3"
       style={{
-        background: 'rgba(245,239,223,0.04)',
-        border: '1px solid rgba(245,239,223,0.08)',
+        background: 'rgba(var(--felt-ink-rgb),0.04)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
       }}
     >
       {children}
@@ -255,7 +255,9 @@ function SpiritSection() {
             <p className="text-[10px] font-bold tracking-widest uppercase text-mj-bone/40 mb-1.5">
               {t('learnSpiritSecondaryLabel')}
             </p>
-            <div style={{ boxShadow: '0 0 0 1.5px rgba(245,239,223,0.4)', borderRadius: 6 }}>
+            <div
+              style={{ boxShadow: '0 0 0 1.5px rgba(var(--felt-ink-rgb),0.4)', borderRadius: 6 }}
+            >
               <MahjongTile tile={SPIRIT_SECONDARY} size="sm" />
             </div>
           </div>
@@ -465,9 +467,9 @@ export function LearnPage() {
               onClick={() => setActiveTab(id)}
               className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-colors"
               style={{
-                background: isActive ? '#c9a961' : 'rgba(245,239,223,0.07)',
-                color: isActive ? '#1f2937' : 'rgba(245,239,223,0.55)',
-                border: isActive ? 'none' : '1px solid rgba(245,239,223,0.1)',
+                background: isActive ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.07)',
+                color: isActive ? '#1f2937' : 'rgba(var(--felt-ink-rgb),0.55)',
+                border: isActive ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.1)',
               }}
             >
               {t(key)}

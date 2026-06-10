@@ -25,7 +25,7 @@ const TILE_GLYPH = '牌'; // 牌
 
 const RESULT_COLOR: Record<GameHistoryItem['result'], string> = {
   win: '#7fc299',
-  draw: 'rgba(245,239,223,0.5)',
+  draw: 'rgba(var(--felt-ink-rgb),0.5)',
   concede: '#e88080',
   bust: '#e88080',
 };
@@ -36,15 +36,27 @@ function SkeletonCard() {
   return (
     <div
       className="rounded-xl px-4 py-3 animate-pulse"
-      style={{ background: 'rgba(245,239,223,0.04)', border: '1px solid rgba(245,239,223,0.06)' }}
+      style={{
+        background: 'rgba(var(--felt-ink-rgb),0.04)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.06)',
+      }}
       aria-hidden="true"
     >
       <div className="flex items-center justify-between">
         <div className="space-y-1.5">
-          <div className="h-3 w-20 rounded" style={{ background: 'rgba(245,239,223,0.08)' }} />
-          <div className="h-2.5 w-14 rounded" style={{ background: 'rgba(245,239,223,0.05)' }} />
+          <div
+            className="h-3 w-20 rounded"
+            style={{ background: 'rgba(var(--felt-ink-rgb),0.08)' }}
+          />
+          <div
+            className="h-2.5 w-14 rounded"
+            style={{ background: 'rgba(var(--felt-ink-rgb),0.05)' }}
+          />
         </div>
-        <div className="h-5 w-12 rounded" style={{ background: 'rgba(245,239,223,0.06)' }} />
+        <div
+          className="h-5 w-12 rounded"
+          style={{ background: 'rgba(var(--felt-ink-rgb),0.06)' }}
+        />
       </div>
     </div>
   );
@@ -64,7 +76,10 @@ function GameCard({ item, onReplay }: { item: GameHistoryItem; onReplay: () => v
     <button
       onClick={onReplay}
       className="w-full rounded-xl px-4 py-3 text-left"
-      style={{ background: 'rgba(245,239,223,0.04)', border: '1px solid rgba(245,239,223,0.06)' }}
+      style={{
+        background: 'rgba(var(--felt-ink-rgb),0.04)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.06)',
+      }}
     >
       <div className="flex items-center justify-between">
         <div>
@@ -76,7 +91,7 @@ function GameCard({ item, onReplay }: { item: GameHistoryItem; onReplay: () => v
               className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
               style={{
                 background: 'rgba(201,169,97,0.12)',
-                color: item.placement === 1 ? '#c9a961' : 'rgba(245,239,223,0.5)',
+                color: item.placement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.5)',
               }}
             >
               {t(PLACEMENT_KEY[item.placement])}

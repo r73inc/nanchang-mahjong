@@ -48,8 +48,8 @@ export function MobilePlayerBadge2D() {
         gap: 3,
         padding: '4px 6px',
         borderRadius: 8,
-        background: isMyTurn ? 'rgba(201,169,97,0.15)' : 'rgba(245,239,223,0.05)',
-        border: `1px solid ${isMyTurn ? 'rgba(201,169,97,0.5)' : 'rgba(245,239,223,0.1)'}`,
+        background: isMyTurn ? 'rgba(201,169,97,0.15)' : 'rgba(var(--felt-ink-rgb),0.05)',
+        border: `1px solid ${isMyTurn ? 'rgba(201,169,97,0.5)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
         boxShadow: isMyTurn ? '0 0 0 2px #c9a961' : 'none',
         minWidth: 44,
       }}
@@ -99,7 +99,7 @@ export function MobilePlayerBadge2D() {
       {/* Score */}
       <span
         style={{
-          color: 'rgba(245,239,223,0.7)',
+          color: 'rgba(var(--felt-ink-rgb),0.7)',
           fontSize: 10,
           fontVariantNumeric: 'tabular-nums',
         }}

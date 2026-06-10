@@ -64,8 +64,8 @@ export function HomeStubPage() {
           onClick={() => navigate('/learn')}
           className="w-full mb-6 px-4 py-3 rounded-xl flex items-center justify-between text-left"
           style={{
-            background: 'rgba(245,239,223,0.05)',
-            border: '1px solid rgba(245,239,223,0.1)',
+            background: 'rgba(var(--felt-ink-rgb),0.05)',
+            border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
           }}
         >
           <div>
@@ -85,8 +85,8 @@ export function HomeStubPage() {
               onClick={() => navigate(path)}
               className="flex flex-col items-center gap-1.5 py-4 rounded-[14px] text-sm text-mj-bone/80"
               style={{
-                background: 'rgba(245,239,223,0.06)',
-                border: '1px solid rgba(245,239,223,0.09)',
+                background: 'rgba(var(--felt-ink-rgb),0.06)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.09)',
               }}
             >
               <span className="text-xl" aria-hidden="true">
@@ -123,8 +123,8 @@ export function HomeStubPage() {
             <div
               className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px]"
               style={{
-                background: 'rgba(245,239,223,0.06)',
-                border: '1px solid rgba(245,239,223,0.08)',
+                background: 'rgba(var(--felt-ink-rgb),0.06)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
               }}
             >
               <div className="flex-1 min-w-0 mr-3">
@@ -144,8 +144,8 @@ export function HomeStubPage() {
                   aria-pressed={isSubscribed}
                   className="relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50"
                   style={{
-                    background: isSubscribed ? '#c9a961' : 'rgba(245,239,223,0.15)',
-                    border: isSubscribed ? 'none' : '1px solid rgba(245,239,223,0.2)',
+                    background: isSubscribed ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.15)',
+                    border: isSubscribed ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.2)',
                   }}
                 >
                   <span
@@ -164,8 +164,8 @@ export function HomeStubPage() {
             onClick={() => navigate('/account')}
             className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px] text-sm text-mj-bone"
             style={{
-              background: 'rgba(245,239,223,0.06)',
-              border: '1px solid rgba(245,239,223,0.08)',
+              background: 'rgba(var(--felt-ink-rgb),0.06)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
             }}
           >
             <span>{t('accountLink')}</span>

@@ -114,8 +114,8 @@ export function DeleteAccountPage() {
         <div
           className="rounded-md px-3 py-2 mb-4 text-center text-sm font-mono font-bold text-mj-bone"
           style={{
-            background: 'rgba(245,239,223,0.08)',
-            border: '1px solid rgba(245,239,223,0.15)',
+            background: 'rgba(var(--felt-ink-rgb),0.08)',
+            border: '1px solid rgba(var(--felt-ink-rgb),0.15)',
           }}
         >
           {confirmPhrase}

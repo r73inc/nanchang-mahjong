@@ -31,6 +31,23 @@ interface FeltConfig {
   header: string;
   /** Representative hex for swatches / UI display. */
   swatch: string;
+  /**
+   * Primary text colour (replaces bone-white on dark themes, near-black on light themes).
+   * Written as --felt-ink; CSS overrides in index.css map text-mj-bone to this value.
+   */
+  ink: string;
+  /**
+   * RGB channels of the primary ink colour as a comma-separated string, e.g. "245,239,223".
+   * Written as --felt-ink-rgb so inline styles can do rgba(var(--felt-ink-rgb), 0.5)
+   * without needing individual CSS class overrides for every opacity variant.
+   */
+  inkRgb: string;
+  /**
+   * Gold/accent text colour (replaces the standard mj-gold #c9a961 for this theme).
+   * Written as --felt-ink-gold; CSS overrides in index.css map text-mj-gold to this value.
+   * Use the standard gold on dark themes; remap on light themes for contrast.
+   */
+  inkGold: string;
 }
 
 export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
@@ -39,30 +56,45 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     bottom: '#051a13',
     header: 'rgba(8,30,23,0.6)',
     swatch: '#0d3b2e',
+    ink: '#f5efdf',
+    inkRgb: '245,239,223',
+    inkGold: '#c9a961',
   },
   crimson: {
     top: '#3b0d0d',
     bottom: '#1a0505',
     header: 'rgba(30,8,8,0.6)',
     swatch: '#3b0d0d',
+    ink: '#f5efdf',
+    inkRgb: '245,239,223',
+    inkGold: '#c9a961',
   },
   slate: {
     top: '#0d1a2e',
     bottom: '#050a13',
     header: 'rgba(8,13,30,0.6)',
     swatch: '#0d1a2e',
+    ink: '#f5efdf',
+    inkRgb: '245,239,223',
+    inkGold: '#c9a961',
   },
   navy: {
     top: '#0d1f3b',
     bottom: '#050d1a',
     header: 'rgba(8,15,30,0.6)',
     swatch: '#0d1f3b',
+    ink: '#f5efdf',
+    inkRgb: '245,239,223',
+    inkGold: '#c9a961',
   },
   yellow: {
-    top: '#2e1f00',
-    bottom: '#130d00',
-    header: 'rgba(20,13,0,0.6)',
-    swatch: '#2e1f00',
+    top: '#fff275',
+    bottom: '#ffeb3b',
+    header: 'rgba(255,235,59,0.2)',
+    swatch: '#fff275',
+    ink: '#000000',
+    inkRgb: '0,0,0',
+    inkGold: '#6d454c',
   },
 };
 
@@ -135,6 +167,10 @@ export function applyTheme(felt: FeltTheme, palette: TilePalette): void {
   r.style.setProperty('--felt-top', f.top);
   r.style.setProperty('--felt-bottom', f.bottom);
   r.style.setProperty('--felt-header', f.header);
+  r.style.setProperty('--felt-ink', f.ink);
+  r.style.setProperty('--felt-ink-rgb', f.inkRgb);
+  r.style.setProperty('--felt-ink-gold', f.inkGold);
+  r.dataset.felt = felt;
 
   r.style.setProperty('--tile-face-top', t.faceTop);
   r.style.setProperty('--tile-face-bottom', t.faceBottom);

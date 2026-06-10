@@ -12,7 +12,7 @@ export function CustomizeStubPage() {
         <div
           className="rounded-2xl px-5 py-12 text-center"
           style={{
-            background: 'rgba(245,239,223,0.04)',
+            background: 'rgba(var(--felt-ink-rgb),0.04)',
             border: '1px solid rgba(201,169,97,0.12)',
           }}
         >

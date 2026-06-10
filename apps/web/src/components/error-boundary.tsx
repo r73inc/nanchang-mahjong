@@ -110,7 +110,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
               {MSG_SOMETHING_WRONG}
             </h1>
-            <p style={{ fontSize: 13, color: 'rgba(245,239,223,0.5)', lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: 'rgba(var(--felt-ink-rgb),0.5)', lineHeight: 1.5 }}>
               {MSG_COMPONENT_CRASHED}
             </p>
           </div>
@@ -120,7 +120,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             style={{
               width: '100%',
               maxWidth: 560,
-              background: 'rgba(245,239,223,0.04)',
+              background: 'rgba(var(--felt-ink-rgb),0.04)',
               border: '1px solid rgba(201,169,97,0.3)',
               borderRadius: 10,
               padding: '14px 16px',
@@ -145,7 +145,7 @@ export class AppErrorBoundary extends Component<Props, State> {
               <pre
                 style={{
                   fontSize: 10,
-                  color: 'rgba(245,239,223,0.35)',
+                  color: 'rgba(var(--felt-ink-rgb),0.35)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                   margin: 0,
@@ -185,9 +185,9 @@ export class AppErrorBoundary extends Component<Props, State> {
                 borderRadius: 999,
                 fontWeight: 700,
                 fontSize: 13,
-                color: 'rgba(245,239,223,0.7)',
+                color: 'rgba(var(--felt-ink-rgb),0.7)',
                 background: 'transparent',
-                border: '1px solid rgba(245,239,223,0.2)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.2)',
                 cursor: 'pointer',
               }}
             >

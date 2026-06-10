@@ -690,13 +690,16 @@ function GameEndScreen({
       {myPlacement && (
         <p
           className="text-[13px] font-bold tracking-widest uppercase"
-          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
+          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)' }}
         >
           {t(PLACEMENT_KEY[myPlacement])}
         </p>
       )}
 
-      <h1 className="text-3xl font-serif font-bold" style={{ color: iWon ? '#7fc299' : '#f5efdf' }}>
+      <h1
+        className="text-3xl font-serif font-bold"
+        style={{ color: iWon ? '#7fc299' : 'var(--felt-ink,#f5efdf)' }}
+      >
         {iWon ? t('gameYouWin') : t('gameSessionEnd')}
       </h1>
 
@@ -713,7 +716,10 @@ function GameEndScreen({
 
       <div
         className="w-full max-w-[300px] rounded-xl p-4 space-y-2"
-        style={{ background: 'rgba(245,239,223,0.05)', border: '1px solid rgba(245,239,223,0.1)' }}
+        style={{
+          background: 'rgba(var(--felt-ink-rgb),0.05)',
+          border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+        }}
       >
         <p className="text-xs font-bold tracking-widest text-mj-gold/70 uppercase mb-3">
           {t('gameFinalScores')}
@@ -731,7 +737,9 @@ function GameEndScreen({
                 {seatPlacement && (
                   <span
                     className="text-[10px] font-bold"
-                    style={{ color: seatPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.3)' }}
+                    style={{
+                      color: seatPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.3)',
+                    }}
                   >
                     #{seatPlacement}
                   </span>
@@ -763,7 +771,7 @@ function GameEndScreen({
           <button
             onClick={onViewDetails}
             className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
-            style={{ border: '1px solid rgba(245,239,223,0.2)' }}
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
           >
             {t('endGameViewDetails')}
           </button>
@@ -783,7 +791,7 @@ function GameEndScreen({
         <button
           onClick={onHome}
           className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
-          style={{ border: '1px solid rgba(245,239,223,0.2)' }}
+          style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
         >
           {t('gamePlayAgain')}
         </button>
@@ -817,8 +825,8 @@ function Nameplate({
         compact ? 'text-[10px]' : 'text-xs',
       ].join(' ')}
       style={{
-        background: isActive ? 'rgba(201,169,97,0.18)' : 'rgba(245,239,223,0.05)',
-        border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(245,239,223,0.1)'}`,
+        background: isActive ? 'rgba(201,169,97,0.18)' : 'rgba(var(--felt-ink-rgb),0.05)',
+        border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
         boxShadow: isActive ? '0 0 8px rgba(201,169,97,0.2)' : 'none',
       }}
     >
@@ -1007,7 +1015,8 @@ function ActionToast({
         : delta < 0
           ? t('toastOpeningSettlementYouPay', String(Math.abs(delta)))
           : t('toastOpeningSettlementPush');
-    const deltaColor = delta > 0 ? '#7fc299' : delta < 0 ? '#e07070' : 'rgba(245,239,223,0.5)';
+    const deltaColor =
+      delta > 0 ? '#7fc299' : delta < 0 ? '#e07070' : 'rgba(var(--felt-ink-rgb),0.5)';
     return (
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
@@ -1060,7 +1069,7 @@ function ActionToast({
         className="flex flex-col items-center gap-1 px-6 py-3 rounded-2xl animate-call-prompt-enter"
         style={{
           background: isContested ? 'rgba(10,10,10,0.8)' : 'rgba(10,10,10,0.88)',
-          border: `1px solid ${isContested ? 'rgba(245,239,223,0.1)' : WIND_COLOR[seat.wind] + '66'}`,
+          border: `1px solid ${isContested ? 'rgba(var(--felt-ink-rgb),0.1)' : WIND_COLOR[seat.wind] + '66'}`,
           backdropFilter: 'blur(10px)',
           boxShadow: isContested ? 'none' : `0 8px 24px ${WIND_COLOR[seat.wind]}33`,
         }}
@@ -1075,7 +1084,9 @@ function ActionToast({
         )}
         <span
           className="font-bold text-lg"
-          style={{ color: isContested ? 'rgba(245,239,223,0.3)' : '#f5efdf' }}
+          style={{
+            color: isContested ? 'rgba(var(--felt-ink-rgb),0.3)' : 'var(--felt-ink,#f5efdf)',
+          }}
         >
           {label}
         </span>
@@ -1211,7 +1222,7 @@ function SideRail({
         <button
           onClick={onPass}
           className="flex flex-col items-center justify-center flex-1 min-w-[70px] max-w-[140px] px-2 py-2 rounded-xl font-bold text-sm text-mj-bone/60"
-          style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+          style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
         >
           {t('gamePass')}
         </button>
@@ -1255,7 +1266,7 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
     >
       <div
         className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
+        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
         role="dialog"
         aria-label={t('gameConcedeTitle')}
       >
@@ -1265,7 +1276,7 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
           <button
             onClick={onCancel}
             className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
           >
             {t('gameConcedeCancel')}
           </button>
@@ -1300,7 +1311,7 @@ function JingDiscardConfirmSheet({
     >
       <div
         className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
+        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
         role="dialog"
         aria-label={t('jingDiscardTitle')}
       >
@@ -1315,7 +1326,7 @@ function JingDiscardConfirmSheet({
           <button
             onClick={onCancel}
             className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
           >
             {t('jingDiscardCancel')}
           </button>
@@ -1604,7 +1615,7 @@ function GameHistoryPanel({
           height: '40%',
           zIndex: 16,
           background: 'rgba(8,8,8,0.95)',
-          borderTop: '1px solid rgba(245,239,223,0.1)',
+          borderTop: '1px solid rgba(var(--felt-ink-rgb),0.1)',
           backdropFilter: 'blur(12px)',
           transition: 'bottom 0.22s ease',
         }}
@@ -1612,7 +1623,7 @@ function GameHistoryPanel({
         {/* Header */}
         <div
           className="px-3 py-2 flex items-center justify-between shrink-0"
-          style={{ borderBottom: '1px solid rgba(245,239,223,0.07)' }}
+          style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
         >
           <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
             {t('gameHistoryTitle')}
@@ -1637,7 +1648,7 @@ function GameHistoryPanel({
                   <div
                     key={entry.id}
                     className="flex items-center gap-1 px-2 py-[5px]"
-                    style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
+                    style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.04)' }}
                   >
                     <span
                       className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -1692,10 +1703,10 @@ function GameHistoryPanel({
           width: 28,
           height: 56,
           background: 'rgba(14,14,14,0.92)',
-          border: '1px solid rgba(245,239,223,0.12)',
+          border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
           borderRight: 'none',
           borderRadius: '6px 0 0 6px',
-          color: 'rgba(245,239,223,0.5)',
+          color: 'rgba(var(--felt-ink-rgb),0.5)',
           fontSize: 14,
           transition: 'right 0.22s ease',
           cursor: 'pointer',
@@ -1713,7 +1724,7 @@ function GameHistoryPanel({
           width: PANEL_W,
           zIndex: 15,
           background: 'rgba(8,8,8,0.93)',
-          borderLeft: '1px solid rgba(245,239,223,0.07)',
+          borderLeft: '1px solid rgba(var(--felt-ink-rgb),0.07)',
           backdropFilter: 'blur(12px)',
           transition: 'right 0.22s ease',
         }}
@@ -1721,7 +1732,7 @@ function GameHistoryPanel({
         {/* Header */}
         <div
           className="px-3 py-2 flex items-center justify-between shrink-0"
-          style={{ borderBottom: '1px solid rgba(245,239,223,0.07)' }}
+          style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
         >
           <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
             {t('gameHistoryTitle')}
@@ -1747,7 +1758,7 @@ function GameHistoryPanel({
                   <div
                     key={entry.id}
                     className="flex items-center gap-1 px-2 py-[5px]"
-                    style={{ borderBottom: '1px solid rgba(245,239,223,0.04)' }}
+                    style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.04)' }}
                   >
                     {/* Wind dot */}
                     <span
@@ -1870,7 +1881,9 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
                 interactive={false}
               />
             )}
-            <span style={{ color: 'rgba(245,239,223,0.3)', fontSize: 20 }}>{JING_ARROW}</span>
+            <span style={{ color: 'rgba(var(--felt-ink-rgb),0.3)', fontSize: 20 }}>
+              {JING_ARROW}
+            </span>
             <MahjongTile2D
               tile={snapshot.jingPrimary}
               size="lg"
@@ -1888,7 +1901,7 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
               />
             )}
           </div>
-          <p className="text-[9px]" style={{ color: 'rgba(245,239,223,0.25)' }}>
+          <p className="text-[9px]" style={{ color: 'rgba(var(--felt-ink-rgb),0.25)' }}>
             {t('gameSpirit')}
           </p>
         </div>
@@ -1962,7 +1975,7 @@ function KongActionSheet({
     >
       <div
         className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(245,239,223,0.1)' }}
+        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
         role="dialog"
         aria-label={t(titleKey)}
       >
@@ -1974,7 +1987,7 @@ function KongActionSheet({
           <button
             onClick={onDiscard}
             className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(245,239,223,0.15)' }}
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
           >
             {t('kongActionDiscard')}
           </button>
@@ -2261,7 +2274,7 @@ function GameTable({
         className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between"
         style={{
           background: 'rgba(10,10,10,0.7)',
-          borderBottom: '1px solid rgba(245,239,223,0.08)',
+          borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.08)',
           height: isMobile ? 32 : undefined,
           padding: isMobile ? 'var(--mj-safe-top, 0px) 8px 0' : undefined,
           paddingLeft: isMobile ? 8 : undefined,
@@ -2312,8 +2325,8 @@ function GameTable({
                 width: 24,
                 height: 24,
                 borderRadius: 4,
-                border: '1px solid rgba(245,239,223,0.1)',
-                color: historyOpen ? '#c9a961' : 'rgba(245,239,223,0.4)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+                color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
                 fontSize: 12,
                 background: 'transparent',
               }}
@@ -2333,8 +2346,8 @@ function GameTable({
                 width: 24,
                 height: 24,
                 borderRadius: 4,
-                border: '1px solid rgba(245,239,223,0.1)',
-                color: 'rgba(245,239,223,0.4)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+                color: 'rgba(var(--felt-ink-rgb),0.4)',
                 fontSize: 12,
                 background: 'transparent',
               }}
@@ -2346,7 +2359,7 @@ function GameTable({
             <button
               onClick={() => setShowConcedeSheet(true)}
               className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
-              style={{ border: '1px solid rgba(245,239,223,0.1)' }}
+              style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
             >
               {t('gameConcede')}
             </button>
@@ -2373,11 +2386,11 @@ function GameTable({
           <span
             className={`text-[11px] font-bold px-3 py-1 rounded-full${isMyTurn ? ' mj-your-turn-pill' : ''}`}
             style={{
-              background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
-              color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
+              background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(var(--felt-ink-rgb),0.07)',
+              color: isMyTurn ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.6)',
               border: isMyTurn
                 ? '1px solid rgba(201,169,97,0.5)'
-                : '1px solid rgba(245,239,223,0.1)',
+                : '1px solid rgba(var(--felt-ink-rgb),0.1)',
             }}
           >
             {isMyTurn

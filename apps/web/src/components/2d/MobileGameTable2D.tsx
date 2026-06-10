@@ -152,7 +152,7 @@ function MobileScoreStrip2D() {
     <span
       data-testid="mobile-score-strip"
       style={{
-        color: 'rgba(245,239,223,0.6)',
+        color: 'rgba(var(--felt-ink-rgb),0.6)',
         fontSize: 10,
         fontVariantNumeric: 'tabular-nums',
         letterSpacing: '0.02em',
@@ -297,7 +297,7 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
               <span
                 style={{
                   fontSize: 7,
-                  color: 'rgba(245,239,223,0.4)',
+                  color: 'rgba(var(--felt-ink-rgb),0.4)',
                   letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                   lineHeight: 1,

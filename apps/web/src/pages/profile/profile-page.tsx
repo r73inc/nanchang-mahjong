@@ -9,7 +9,7 @@ import { getApiErrorMessage } from '../../lib/api';
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
 const cardStyle = {
-  background: 'rgba(245,239,223,0.05)',
+  background: 'rgba(var(--felt-ink-rgb),0.05)',
   border: '1px solid rgba(201,169,97,0.12)',
 } as const;
 
