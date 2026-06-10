@@ -8,34 +8,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Open Bugs
 
-### BUG-020 · Last-discard red pulse never visible to end user
-
-**Symptom:** The most recently discarded tile should display a pulsing red outline during the claim window so players can see which tile is "in play." No red pulse is ever visible during live gameplay regardless of the fix applied.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Root cause:** Unknown. Every plausible rendering, data-flow, and animation layer has been addressed without success.
-
-**Fixes attempted (none worked):**
-
-1. Framer Motion bleed isolation — moved pulse into dedicated overlay div
-2. Increased contrast — red outline instead of gold shimmer
-3. React 18 batching race fix — added `lastDiscard` to Zustand store
-4. Exact tile+seat coordinate match — unambiguous value matching
-5. zIndex + shadow visibility fix — added z-index and border fallback
-6. Key-based remount to force Framer Motion new mount — key remounts based on pulse state
-
-**Suspected remaining causes:**
-
-- `lastDiscard` in the Zustand store may never be getting set (socket event not received or hook not wired)
-- `CombinedDiscardPool2D` may not be the component actually rendered
-- Exact tile value mismatch between `lastDiscard.tile` and `discards` array
-- `Table2DContext`'s `tileScale` causing overlay to render at 0×0
-
-**Next steps:** Add `console.log` to verify data pipeline before continuing with rendering fixes.
-
----
-
 ### BUG-021 · Hand-reveal meld grouping does not work
 
 **Symptom:** On the post-hand reveal screen, the winner's concealed hand should be displayed decomposed into constituent melds (chow/pung/kong groups) and pair with labeled headers. Instead the hand appears as a flat row of individual tiles with no grouping.

@@ -251,6 +251,7 @@ export function MahjongTile2D({
       {isLastDiscard && (
         <motion.div
           aria-hidden="true"
+          data-testid="last-discard-pulse"
           animate={LAST_DISCARD_ANIMATE}
           transition={LAST_DISCARD_TRANSITION}
           style={{

@@ -442,6 +442,30 @@ All 3D-specific bugs found and fixed during local testing. See `3D-BUG-LOG.md` f
 
 ---
 
+## PR #89 · `fix/bug-020-last-discard-pulse` (2026-06-09)
+
+### BUG-020 · Last-discard red pulse never visible to end user
+
+**Symptom:** The most recently discarded tile should display a pulsing red outline so players can see which tile is "in play." No red pulse was ever visible during live gameplay, despite six successive fixes.
+
+**Root cause:** All six fixes were applied to `CombinedDiscardPool2D` — the **desktop** discard pool. Live gameplay happens on phones, and `game-page.tsx` routes any touch device with a dimension < 600px to `MobileGameTable2D` → `MobileDiscardPool2D`, which never received any of the fixes. The mobile pool was broken three ways:
+
+1. **Wrong gate:** pulse required `claimWindow !== null`, but the server only sends `game:claim-window` to seats with an eligible claim — the discarder and non-claiming viewers never qualify, so the pulse condition was almost never true.
+2. **Framer Motion repeat:Infinity bleed:** when the pulse condition _was_ true at tile mount, `initial={opacity:0, scale:0.7}` combined with `animate={boxShadow keyframes only}` meant opacity never animated to 1 — the tile itself stayed **invisible** for the whole claim window (the exact failure mode already documented in `CombinedDiscardPool2D`'s comments).
+3. **Stale styling:** still used the original gold shimmer instead of the red outline.
+
+This matched suspected cause #2 in the original report: "`CombinedDiscardPool2D` may not be the component actually rendered." It wasn't — on every phone.
+
+**Fix:** Ported the working mechanism from `CombinedDiscardPool2D` to `MobileDiscardPool2D`: pulse driven by the store's `lastDiscard` (set by `game:event {kind:'discard'}`), exact seat+tile match, `isLastDiscard` prop on `MahjongTile2D` (isolated overlay with red border fallback), and the pulse-state-in-key remount. Added `data-testid="last-discard-pulse"` to the overlay and a new `last-discard-pulse.test.tsx` suite that uses the **real** Zustand store (every prior test mocked it) covering both mobile and desktop pools plus the store's `lastDiscard` lifecycle.
+
+**Key learnings:**
+
+1. **When a fix "has no effect" repeatedly, verify the component under repair is the one actually rendered on the affected device class.** Desktop/mobile component forks mean a fix can be correct yet land in dead code for the reporting user. Check the dispatch logic (`GameTable2D`, `isMobile`) first.
+2. **Mocked-store tests can't catch wiring bugs.** All discard-pool tests mocked `useGameStore`, so no test ever exercised the real `lastDiscard` selector path. Keep at least one integration test on the real store for state-driven visual features.
+3. **Forked components drift.** `MobileDiscardPool2D` was copied from `CombinedDiscardPool2D` and silently kept the pre-fix pulse implementation through six rounds of fixes. When fixing a bug in a component that has a device-specific sibling, grep for the sibling and apply the fix to both (or extract the shared logic).
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
