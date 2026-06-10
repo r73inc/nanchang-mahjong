@@ -37,6 +37,12 @@ interface FeltConfig {
    */
   ink: string;
   /**
+   * RGB channels of the primary ink colour as a comma-separated string, e.g. "245,239,223".
+   * Written as --felt-ink-rgb so inline styles can do rgba(var(--felt-ink-rgb), 0.5)
+   * without needing individual CSS class overrides for every opacity variant.
+   */
+  inkRgb: string;
+  /**
    * Gold/accent text colour (replaces the standard mj-gold #c9a961 for this theme).
    * Written as --felt-ink-gold; CSS overrides in index.css map text-mj-gold to this value.
    * Use the standard gold on dark themes; remap on light themes for contrast.
@@ -51,6 +57,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,30,23,0.6)',
     swatch: '#0d3b2e',
     ink: '#f5efdf',
+    inkRgb: '245,239,223',
     inkGold: '#c9a961',
   },
   crimson: {
@@ -59,6 +66,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(30,8,8,0.6)',
     swatch: '#3b0d0d',
     ink: '#f5efdf',
+    inkRgb: '245,239,223',
     inkGold: '#c9a961',
   },
   slate: {
@@ -67,6 +75,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,13,30,0.6)',
     swatch: '#0d1a2e',
     ink: '#f5efdf',
+    inkRgb: '245,239,223',
     inkGold: '#c9a961',
   },
   navy: {
@@ -75,6 +84,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(8,15,30,0.6)',
     swatch: '#0d1f3b',
     ink: '#f5efdf',
+    inkRgb: '245,239,223',
     inkGold: '#c9a961',
   },
   yellow: {
@@ -83,6 +93,7 @@ export const FELT_CONFIGS: Record<FeltTheme, FeltConfig> = {
     header: 'rgba(255,235,59,0.2)',
     swatch: '#fff275',
     ink: '#000000',
+    inkRgb: '0,0,0',
     inkGold: '#6d454c',
   },
 };
@@ -157,6 +168,7 @@ export function applyTheme(felt: FeltTheme, palette: TilePalette): void {
   r.style.setProperty('--felt-bottom', f.bottom);
   r.style.setProperty('--felt-header', f.header);
   r.style.setProperty('--felt-ink', f.ink);
+  r.style.setProperty('--felt-ink-rgb', f.inkRgb);
   r.style.setProperty('--felt-ink-gold', f.inkGold);
   r.dataset.felt = felt;
 

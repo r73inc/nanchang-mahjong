@@ -99,7 +99,7 @@ export function MobilePlayerBadge2D() {
       {/* Score */}
       <span
         style={{
-          color: 'rgba(245,239,223,0.7)',
+          color: 'rgba(var(--felt-ink-rgb),0.7)',
           fontSize: 10,
           fontVariantNumeric: 'tabular-nums',
         }}

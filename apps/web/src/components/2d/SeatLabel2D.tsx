@@ -102,7 +102,7 @@ export function SeatLabel2D({ seatIdx }: SeatLabel2DProps) {
       )}
 
       {/* Score */}
-      <span style={{ color: 'rgba(245,239,223,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ color: 'rgba(var(--felt-ink-rgb),0.6)', fontVariantNumeric: 'tabular-nums' }}>
         {seat.score}
       </span>
 

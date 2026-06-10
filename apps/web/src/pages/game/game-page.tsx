@@ -690,13 +690,16 @@ function GameEndScreen({
       {myPlacement && (
         <p
           className="text-[13px] font-bold tracking-widest uppercase"
-          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.4)' }}
+          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)' }}
         >
           {t(PLACEMENT_KEY[myPlacement])}
         </p>
       )}
 
-      <h1 className="text-3xl font-serif font-bold" style={{ color: iWon ? '#7fc299' : '#f5efdf' }}>
+      <h1
+        className="text-3xl font-serif font-bold"
+        style={{ color: iWon ? '#7fc299' : 'var(--felt-ink,#f5efdf)' }}
+      >
         {iWon ? t('gameYouWin') : t('gameSessionEnd')}
       </h1>
 
@@ -731,7 +734,9 @@ function GameEndScreen({
                 {seatPlacement && (
                   <span
                     className="text-[10px] font-bold"
-                    style={{ color: seatPlacement === 1 ? '#c9a961' : 'rgba(245,239,223,0.3)' }}
+                    style={{
+                      color: seatPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.3)',
+                    }}
                   >
                     #{seatPlacement}
                   </span>
@@ -1007,7 +1012,8 @@ function ActionToast({
         : delta < 0
           ? t('toastOpeningSettlementYouPay', String(Math.abs(delta)))
           : t('toastOpeningSettlementPush');
-    const deltaColor = delta > 0 ? '#7fc299' : delta < 0 ? '#e07070' : 'rgba(245,239,223,0.5)';
+    const deltaColor =
+      delta > 0 ? '#7fc299' : delta < 0 ? '#e07070' : 'rgba(var(--felt-ink-rgb),0.5)';
     return (
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
@@ -1075,7 +1081,9 @@ function ActionToast({
         )}
         <span
           className="font-bold text-lg"
-          style={{ color: isContested ? 'rgba(245,239,223,0.3)' : '#f5efdf' }}
+          style={{
+            color: isContested ? 'rgba(var(--felt-ink-rgb),0.3)' : 'var(--felt-ink,#f5efdf)',
+          }}
         >
           {label}
         </span>
@@ -1695,7 +1703,7 @@ function GameHistoryPanel({
           border: '1px solid rgba(245,239,223,0.12)',
           borderRight: 'none',
           borderRadius: '6px 0 0 6px',
-          color: 'rgba(245,239,223,0.5)',
+          color: 'rgba(var(--felt-ink-rgb),0.5)',
           fontSize: 14,
           transition: 'right 0.22s ease',
           cursor: 'pointer',
@@ -1870,7 +1878,9 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
                 interactive={false}
               />
             )}
-            <span style={{ color: 'rgba(245,239,223,0.3)', fontSize: 20 }}>{JING_ARROW}</span>
+            <span style={{ color: 'rgba(var(--felt-ink-rgb),0.3)', fontSize: 20 }}>
+              {JING_ARROW}
+            </span>
             <MahjongTile2D
               tile={snapshot.jingPrimary}
               size="lg"
@@ -1888,7 +1898,7 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
               />
             )}
           </div>
-          <p className="text-[9px]" style={{ color: 'rgba(245,239,223,0.25)' }}>
+          <p className="text-[9px]" style={{ color: 'rgba(var(--felt-ink-rgb),0.25)' }}>
             {t('gameSpirit')}
           </p>
         </div>
@@ -2313,7 +2323,7 @@ function GameTable({
                 height: 24,
                 borderRadius: 4,
                 border: '1px solid rgba(245,239,223,0.1)',
-                color: historyOpen ? '#c9a961' : 'rgba(245,239,223,0.4)',
+                color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
                 fontSize: 12,
                 background: 'transparent',
               }}
@@ -2334,7 +2344,7 @@ function GameTable({
                 height: 24,
                 borderRadius: 4,
                 border: '1px solid rgba(245,239,223,0.1)',
-                color: 'rgba(245,239,223,0.4)',
+                color: 'rgba(var(--felt-ink-rgb),0.4)',
                 fontSize: 12,
                 background: 'transparent',
               }}
@@ -2374,7 +2384,7 @@ function GameTable({
             className={`text-[11px] font-bold px-3 py-1 rounded-full${isMyTurn ? ' mj-your-turn-pill' : ''}`}
             style={{
               background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.07)',
-              color: isMyTurn ? '#c9a961' : 'rgba(245,239,223,0.6)',
+              color: isMyTurn ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.6)',
               border: isMyTurn
                 ? '1px solid rgba(201,169,97,0.5)'
                 : '1px solid rgba(245,239,223,0.1)',

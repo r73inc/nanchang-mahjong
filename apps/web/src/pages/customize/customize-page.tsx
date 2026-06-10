@@ -93,7 +93,7 @@ function FeltSwatch({
       {/* Label */}
       <span
         className="text-[11px] font-semibold"
-        style={{ color: selected ? '#c9a961' : 'rgba(245,239,223,0.55)' }}
+        style={{ color: selected ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.55)' }}
       >
         {label}
       </span>
@@ -155,7 +155,7 @@ function PaletteCard({
       </div>
       <span
         className="text-[11px] font-semibold"
-        style={{ color: selected ? '#c9a961' : 'rgba(245,239,223,0.55)' }}
+        style={{ color: selected ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.55)' }}
       >
         {label}
       </span>
@@ -256,7 +256,7 @@ export function CustomizePage() {
           </div>
           <p
             className="mt-2 text-[11px] text-center"
-            style={{ color: soundEnabled ? '#c9a961' : 'rgba(245,239,223,0.3)' }}
+            style={{ color: soundEnabled ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.3)' }}
           >
             {soundEnabled ? t('customizeSoundOn') : t('customizeSoundOff')}
           </p>

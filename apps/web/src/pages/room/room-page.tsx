@@ -239,7 +239,7 @@ export function RoomPage() {
                       border: isEmpty
                         ? '1px dashed rgba(245,239,223,0.15)'
                         : '1px solid rgba(201,169,97,0.4)',
-                      color: isEmpty ? 'rgba(245,239,223,0.3)' : '#c9a961',
+                      color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#c9a961',
                     }}
                     aria-hidden="true"
                   >
@@ -374,7 +374,7 @@ export function RoomPage() {
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
                             : '1px solid rgba(245,239,223,0.12)',
-                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
                         aria-pressed={active}
@@ -412,7 +412,7 @@ export function RoomPage() {
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
                             : '1px solid rgba(245,239,223,0.12)',
-                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
                         aria-pressed={active}
@@ -458,7 +458,7 @@ export function RoomPage() {
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
                             : '1px solid rgba(245,239,223,0.12)',
-                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
                         aria-pressed={active}
@@ -514,7 +514,7 @@ export function RoomPage() {
                           border: active
                             ? '1px solid rgba(201,169,97,0.6)'
                             : '1px solid rgba(245,239,223,0.12)',
-                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
                           cursor: loading ? 'not-allowed' : 'pointer',
                         }}
                         aria-pressed={active}
@@ -564,7 +564,9 @@ export function RoomPage() {
                     border: room.settings.ruleTopBottomJing
                       ? '1px solid rgba(201,169,97,0.6)'
                       : '1px solid rgba(245,239,223,0.12)',
-                    color: room.settings.ruleTopBottomJing ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                    color: room.settings.ruleTopBottomJing
+                      ? '#c9a961'
+                      : 'rgba(var(--felt-ink-rgb),0.45)',
                     cursor: loading ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -615,7 +617,7 @@ export function RoomPage() {
               background: allReady
                 ? 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)'
                 : 'rgba(245,239,223,0.07)',
-              color: allReady ? '#1f2937' : 'rgba(245,239,223,0.4)',
+              color: allReady ? '#1f2937' : 'rgba(var(--felt-ink-rgb),0.4)',
               border: allReady ? 'none' : '1px solid rgba(245,239,223,0.1)',
               boxShadow: allReady ? '0 6px 18px rgba(201,169,97,0.3)' : 'none',
               cursor: allReady ? 'pointer' : 'not-allowed',
