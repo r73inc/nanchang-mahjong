@@ -112,11 +112,13 @@ export class GameService {
     const seed = (Math.random() * 0x7fff_ffff) >>> 0; // non-negative 31-bit int
     const now = new Date().toISOString();
 
+    // Bust mode always starts at 20 regardless of the room's startingScore setting.
+    const initialScore = settings.terminationType === 'bust' ? 20 : settings.startingScore;
     const startingScores: [number, number, number, number] = [
-      settings.startingScore,
-      settings.startingScore,
-      settings.startingScore,
-      settings.startingScore,
+      initialScore,
+      initialScore,
+      initialScore,
+      initialScore,
     ];
 
     const engine = GameEngine.create(seed, {
@@ -1136,8 +1138,10 @@ export class GameService {
     const { settings, cumulativeScores, engine } = session;
 
     if (settings.terminationType === 'bust') {
-      // Bust: session ends if any player's score goes below 0 after this hand
-      if (cumulativeScores.some((s) => s < 0)) return true;
+      // Bust: only eliminate after a full round completes (roundComplete = true).
+      // A player may go negative mid-round from spirit settlement and recover;
+      // the check must not fire until all hands in that rotation are done.
+      if (nextDealerInfo.roundComplete && cumulativeScores.some((s) => s < 0)) return true;
     }
 
     if (settings.terminationType === 'rounds') {
