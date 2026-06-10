@@ -20,10 +20,7 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-030    | Bonus points doubled in settlement   | Solo bonus-tile player charged/receives double the correct amount          |
 | BUG-031 ⚠️ | Host refresh locks config (CRITICAL) | After browser refresh, host cannot change config or start the game         |
 | BUG-032    | Kicked player not redirected         | Kicked player remains on config screen instead of returning to menu        |
-| IMP-013    | Player names on hand details         | End-game detail screen shows directions only; should show player names     |
 | IMP-014    | Language change during game          | No way to switch EN/ZH once a game has started                             |
-| IMP-015    | Configurable claim window timeout    | Pung/Kong/Chow popup time limit is hardcoded; should be host-configurable  |
-| IMP-016    | Kong from existing pung              | Drawing 4th tile should allow converting a revealed pung to kong           |
 
 ---
 
@@ -249,21 +246,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Open Improvements
 
-### IMP-013 · Hand details should display player names instead of direction labels
-
-**Symptom:** On the end-of-game detail screen that shows all four players' hands and melds, the player names are not displayed. Instead, only the direction labels (East/South/West/North) appear, making it unclear which hand belongs to whom.
-
-**Status:** NEW, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** Each hand section should prominently display the player's name (e.g., "Alice (East)" or just "Alice") to make it immediately clear who owns each hand.
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx` — `HandRevealScreen` component
-- `apps/web/src/components/game/HandRevealScreen.tsx` — player/seat rendering logic
-
----
-
 ### IMP-014 · Language change during active game
 
 **Symptom:** Once a game has started, the user cannot change the language between English and Chinese. The language setting is locked.
@@ -278,44 +260,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 - `apps/web/src/pages/game/game-page.tsx` — settings access during gameplay
 - `apps/web/src/components/` — language picker component and i18n hook usage
-
----
-
-### IMP-015 · Kong/Pung/Chow popup configurable time limit
-
-**Symptom:** When a player has the option to form a kong, pung, or chow, a popup appears with a fixed time limit (typically 8 seconds on server). There is no way to customize this timeout, and some players may want a longer decision window or no time limit.
-
-**Status:** NEW, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** The room host should be able to configure the popup duration (e.g., 5s, 10s, 30s, infinite) during room setup, and all players should see the same timeout.
-
-**Where to look:**
-
-- `apps/api/src/game/game.service.ts` — claim window timeout (currently hardcoded 8s)
-- `apps/web/src/pages/room/room-config-page.tsx` — room settings UI
-- `apps/web/src/stores/room.store.ts` — room config schema
-
-**Implementation note:** Will require adding a new config field (e.g., `claimWindowDuration: number`) to `RoomConfig`, passing it through `game:started` payload, and using it in the `startTurn()` method to set the claim window.
-
----
-
-### IMP-016 · Kong from existing revealed meld — "add the fourth tile" option
-
-**Symptom:** If a player already has a revealed meld of 3 of a kind (pung), and they draw the fourth tile of that suit/type, the game does not offer them the option to convert that pung into a kong by playing the fourth tile. Instead, they must discard.
-
-**Status:** NEW, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** When a player draws a tile that matches an existing revealed pung, they should have a button/option (in addition to the discard options) to "Kong" that pung, which triggers the same kong draw-replacement sequence as a normal kong but from the fourth tile (not from the wall directly).
-
-**Rules note:** In Nanchang Mahjong, adding the fourth tile to an existing pung to make a kong counts as playing a discarded tile (from the player's perspective), so they draw one replacement tile from the "end" of the wall.
-
-**Where to look:**
-
-- `packages/engine/src/game-engine.ts` — `playTile()` method, kong validation
-- `apps/web/src/components/game/` — hand UI, discard options button layout
-- `apps/api/src/game/game.service.ts` — turn phase logic, claim window
-
-**Mobile implementation:** On mobile, the player should select the tile and see the standard discard option plus a new "Kong" option.
 
 ---
 

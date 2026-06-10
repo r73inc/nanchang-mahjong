@@ -31,6 +31,10 @@ type RoundsOption = (typeof ROUNDS_OPTIONS)[number];
 const TERMINATION_OPTIONS = ['rounds', 'bust'] as const;
 type TerminationOption = (typeof TERMINATION_OPTIONS)[number];
 
+// Claim window options in seconds (0 = unlimited)
+const CLAIM_WINDOW_OPTIONS = [5, 8, 15, 30, 0] as const;
+type ClaimWindowOption = (typeof CLAIM_WINDOW_OPTIONS)[number];
+
 export function RoomPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -470,6 +474,68 @@ export function RoomPage() {
                     room.settings.terminationType === 'bust'
                       ? 'settingTerminationBust'
                       : 'settingTerminationRounds',
+                  )}
+                </span>
+              )}
+            </div>
+
+            {/* Claim window row */}
+            <div
+              className="flex justify-between items-center px-4 py-3 text-sm"
+              style={{ borderTop: '1px solid rgba(245,239,223,0.07)' }}
+            >
+              <span className="text-mj-bone/70">{t('settingClaimWindowLabel')}</span>
+              {isHost && room.status === 'waiting' ? (
+                <div
+                  className="flex gap-1.5"
+                  role="group"
+                  aria-label={t('settingClaimWindowLabel')}
+                >
+                  {CLAIM_WINDOW_OPTIONS.map((opt: ClaimWindowOption) => {
+                    const active = (room.settings.claimWindowSecs ?? 8) === opt;
+                    const labelKey =
+                      opt === 0
+                        ? 'settingClaimWindowInfinite'
+                        : opt === 5
+                          ? 'settingClaimWindow5'
+                          : opt === 8
+                            ? 'settingClaimWindow8'
+                            : opt === 15
+                              ? 'settingClaimWindow15'
+                              : 'settingClaimWindow30';
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => updateSettings(room.roomId, { claimWindowSecs: opt })}
+                        disabled={loading}
+                        className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                        style={{
+                          background: active ? 'rgba(201,169,97,0.25)' : 'rgba(245,239,223,0.06)',
+                          border: active
+                            ? '1px solid rgba(201,169,97,0.6)'
+                            : '1px solid rgba(245,239,223,0.12)',
+                          color: active ? '#c9a961' : 'rgba(245,239,223,0.45)',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                        }}
+                        aria-pressed={active}
+                      >
+                        {t(labelKey)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-mj-gold font-semibold">
+                  {t(
+                    (room.settings.claimWindowSecs ?? 8) === 0
+                      ? 'settingClaimWindowInfinite'
+                      : (room.settings.claimWindowSecs ?? 8) === 5
+                        ? 'settingClaimWindow5'
+                        : (room.settings.claimWindowSecs ?? 8) === 15
+                          ? 'settingClaimWindow15'
+                          : (room.settings.claimWindowSecs ?? 8) === 30
+                            ? 'settingClaimWindow30'
+                            : 'settingClaimWindow8',
                   )}
                 </span>
               )}

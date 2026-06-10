@@ -532,6 +532,35 @@ This matched suspected cause #2 in the original report: "`CombinedDiscardPool2D`
 
 ---
 
+## PR · `feat/imp-013-015-016`
+
+### IMP-013 · Hand detail screen now shows player names
+
+**Fix:** In `HandRevealScreen` (`game-page.tsx`), added `snapshot.seats[i].seatName` as a `<span>` beside the wind character in each hand section header. Players now see e.g. "東 Alice" in the all-hands review.
+
+---
+
+### IMP-015 · Configurable claim window timeout
+
+**Fix:** Added `claimWindowSecs: z.number().int().min(0).max(60).default(8)` to `RoomSettingsSchema` in `packages/shared/src/room.schemas.ts`. 0 = unlimited (no timer fired; window closes only when all eligible seats respond). Updated `openClaimWindowAfterDiscard` in `apps/api/src/game/game.service.ts` to read `session.settings.claimWindowSecs` instead of a hardcoded constant. Added a 5-option row (5s / 8s / 15s / 30s / ∞) to the room config screen (`room-page.tsx`), wired through `updateSettings`. Added `claimWindowSecs` to the `RoomSettingsDto`, rooms controller and service `updateSettings` method. Rob-kong window remains a fixed 5s.
+
+**Key learning:** `claimWindowSecs = 0` as the infinite sentinel keeps the type as `number` and avoids a nullable union. The server-side branch `isInfinite = windowSecs === 0` skips the `setTimeout` entirely; the window resolves when `claimWindowComplete` fires (all eligible seats responded).
+
+---
+
+### IMP-016 · Kong from existing pung + concealed kong during draw turn
+
+**Fix:** Added a `KongActionSheet` bottom sheet that intercepts discard attempts during the player's turn (`isMyTurn`). When the player taps to discard a tile, `handleDiscardOrKong` checks:
+
+1. **Concealed kong:** `concealedKongOptions(hand, jingTypes)` — if the tile type is in the result, offer "Declare Concealed Kong?".
+2. **Add-to-kong:** for each open pung, `addToKongOptions(hand, pungTile, jingTypes)` — if the tile to remove matches the selected tile, offer "Extend Kong?".
+
+If options exist, the `KongActionSheet` (z-40, matches existing sheet style) shows two buttons — "Kong" and "Discard". "Kong" fires `onKongConcealed(tile)` or `onKongAdd(pungTile)` from `useGame`. "Discard" falls through to the existing jing-confirmation / plain-discard flow. `concealedKongOptions` and `addToKongOptions` were re-exported from `@nanchang/shared` so the web layer can use them without a direct engine dependency. The engine's `addToKong` and `kongConcealed` calls were already wired on the backend; this PR adds the UI entry point.
+
+**Key learning:** The engine's `addToKongOptions(hand, pungTile, jingTypes)` returns the tile to _remove_ from hand (which may be a jing, not the pung tile type itself). Match the _returned_ tile against the selected tile, not the pung tile type. `concealedKongOptions` and `addToKongOptions` both accept `TileType[]` for jingTypes, not `Set<string>` — convert with `Array.from(jingTypes)` at the call site.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

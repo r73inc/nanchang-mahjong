@@ -113,7 +113,7 @@ export class RoomsController {
 
   // ── Settings ───────────────────────────────────────────────────────────────
 
-  /** Host updates mutable pre-game settings (viewMode, ruleTopBottomJing, rounds, terminationType). Broadcasts new room state. */
+  /** Host updates mutable pre-game settings (viewMode, ruleTopBottomJing, rounds, terminationType, claimWindowSecs). Broadcasts new room state. */
   @Patch(':roomId/settings')
   async updateSettings(
     @CurrentUser() user: AuthenticatedUser,
@@ -124,6 +124,7 @@ export class RoomsController {
       ruleTopBottomJing?: boolean;
       rounds?: 'east' | 'east+south';
       terminationType?: 'rounds' | 'bust';
+      claimWindowSecs?: number;
     },
   ) {
     const room = await this.service.updateSettings(roomId, user.sub, body);
