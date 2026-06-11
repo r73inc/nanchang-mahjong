@@ -1159,10 +1159,11 @@ describe('Engine·BUG-036-regression', () => {
 });
 
 // ── BUG-038 regression: win must be accepted when player has a kong in open melds ──
-// Before the fix: isWinningHand hard-rejects any hand != 14 tiles. After a kong the
-// flattened hand (open melds + concealed) is 15 tiles (14 + 1 per kong), so tsumo was
-// silently blocked and engine.declareWin() threw "Hand is not a winning hand".
+// Before the fix: isWinningHand hard-rejects any hand != 14 tiles. After k kongs the
+// flattened hand (open melds + concealed) is 14+k tiles, so tsumo was silently blocked
+// and engine.declareWin() threw "Hand is not a winning hand".
 // Fix: normalize each kong (4 tiles) → pung (3 tiles) before calling isWinningHand.
+// All k∈{1,2,3,4} cases are covered below (the flatMap iterates every meld uniformly).
 
 describe('Engine·BUG-038-regression', () => {
   it('tsumo accepted after concealed kong — 15-tile hand (4 kong + 11 hand)', () => {
@@ -1226,6 +1227,114 @@ describe('Engine·BUG-038-regression', () => {
 
     const patchedSeats = g.state.seats.map((s, i) =>
       i === 0 ? { ...s, hand: kongHand, openMelds: [kongMeld] } : s,
+    );
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        isKongDraw: true,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    expect(() => engine.declareWin(0)).not.toThrow();
+    const finished = engine.declareWin(0);
+    expect(finished.state.phase).toBe('finished');
+    expect(finished.events.some((e: GameEvent) => e.kind === 'win')).toBe(true);
+  });
+
+  it('tsumo accepted after two kongs — 16-tile hand (8 kong + 8 hand)', () => {
+    // 2 concealed kongs (east, north) + south pung + west pung + 1m pair
+    // Raw: 4+4 + 3+3+2 = 16 tiles → normalized: 3+3+3+3+2 = 14 ✓
+    const g = startedGame(102);
+
+    const hand: TileType[] = ['south', 'south', 'south', 'west', 'west', 'west', '1m', '1m'];
+    const melds: Meld[] = [
+      { kind: 'kong', tiles: ['east', 'east', 'east', 'east'], concealed: true },
+      { kind: 'kong', tiles: ['north', 'north', 'north', 'north'], concealed: true },
+    ];
+
+    const patchedSeats = g.state.seats.map((s, i) =>
+      i === 0 ? { ...s, hand, openMelds: melds } : s,
+    );
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        isKongDraw: true,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    expect(() => engine.declareWin(0)).not.toThrow();
+    const finished = engine.declareWin(0);
+    expect(finished.state.phase).toBe('finished');
+    expect(finished.events.some((e: GameEvent) => e.kind === 'win')).toBe(true);
+  });
+
+  it('tsumo accepted after three kongs — 17-tile hand (12 kong + 5 hand)', () => {
+    // 3 concealed kongs (east, north, west) + south pung + 1m pair
+    // Raw: 4+4+4 + 3+2 = 17 tiles → normalized: 3+3+3+3+2 = 14 ✓
+    const g = startedGame(103);
+
+    const hand: TileType[] = ['south', 'south', 'south', '1m', '1m'];
+    const melds: Meld[] = [
+      { kind: 'kong', tiles: ['east', 'east', 'east', 'east'], concealed: true },
+      { kind: 'kong', tiles: ['north', 'north', 'north', 'north'], concealed: true },
+      { kind: 'kong', tiles: ['west', 'west', 'west', 'west'], concealed: true },
+    ];
+
+    const patchedSeats = g.state.seats.map((s, i) =>
+      i === 0 ? { ...s, hand, openMelds: melds } : s,
+    );
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        isKongDraw: true,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    expect(() => engine.declareWin(0)).not.toThrow();
+    const finished = engine.declareWin(0);
+    expect(finished.state.phase).toBe('finished');
+    expect(finished.events.some((e: GameEvent) => e.kind === 'win')).toBe(true);
+  });
+
+  it('tsumo accepted after four kongs — 18-tile hand (16 kong + 2 hand)', () => {
+    // 4 concealed kongs (east, south, west, north) + 1m pair
+    // Raw: 4+4+4+4 + 2 = 18 tiles → normalized: 3+3+3+3+2 = 14 ✓
+    const g = startedGame(104);
+
+    const hand: TileType[] = ['1m', '1m'];
+    const melds: Meld[] = [
+      { kind: 'kong', tiles: ['east', 'east', 'east', 'east'], concealed: true },
+      { kind: 'kong', tiles: ['south', 'south', 'south', 'south'], concealed: true },
+      { kind: 'kong', tiles: ['west', 'west', 'west', 'west'], concealed: true },
+      { kind: 'kong', tiles: ['north', 'north', 'north', 'north'], concealed: true },
+    ];
+
+    const patchedSeats = g.state.seats.map((s, i) =>
+      i === 0 ? { ...s, hand, openMelds: melds } : s,
     );
 
     // @ts-expect-error — private constructor
