@@ -33,6 +33,8 @@ export function buildTimeline(payload: ReplayGamePayload): ReplayStep[] {
         startingScores: hand.startingScores,
         dealerSeat: hand.dealerSeat,
         roundWind: hand.roundWind,
+        // Rule variants change what revealJing() does — required for a faithful replay
+        config: { ruleTopBottomJing: payload.settings.ruleTopBottomJing },
       },
       hand.events,
     );
@@ -46,7 +48,14 @@ export function buildTimeline(payload: ReplayGamePayload): ReplayStep[] {
     let i = 0;
     while (i < hand.events.length) {
       const event = hand.events[i];
-      if (event.kind === 'deal') {
+      // Skip events that replayHand() consumes without pushing a state:
+      // dice rolls + deal are applied inside deal()/revealJing(), and the
+      // opening settlement state lands together with the jing_indicator step.
+      if (
+        event.kind === 'deal' ||
+        event.kind === 'dice_roll' ||
+        event.kind === 'opening_jing_settlement'
+      ) {
         i += 1;
         continue;
       }

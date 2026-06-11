@@ -1,5 +1,5 @@
-/**
- * OpponentBadge2D.test.tsx — unit tests for the compact mobile opponent badge.
+﻿/**
+ * OpponentBadge2D.test.tsx â€” unit tests for the compact mobile opponent badge.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -9,12 +9,12 @@ import { OpponentBadge2D } from './OpponentBadge2D';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState, ClientSeatState, Meld } from '@nanchang/shared';
 
-// ── Store mock ────────────────────────────────────────────────────────────────
+// â”€â”€ Store mock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 vi.mock('../../stores/game.store', () => ({ useGameStore: vi.fn() }));
 const mockUseGameStore = vi.mocked(useGameStore);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
   return {
@@ -42,7 +42,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 60,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
@@ -73,14 +73,14 @@ function renderBadge(seatIdx: 0 | 1 | 2 | 3 = 1) {
   );
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('OpponentBadge2D', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('OpponentBadge·tile-count: shows tile count from handCount', () => {
+  it('OpponentBadgeÂ·tile-count: shows tile count from handCount', () => {
     setupStore(
       makeSnapshot({ seats: [makeSeat(), makeSeat({ handCount: 13 }), makeSeat(), makeSeat()] }),
     );
@@ -88,7 +88,7 @@ describe('OpponentBadge2D', () => {
     expect(screen.getByTestId('badge-tile-count-1').textContent).toContain('13');
   });
 
-  it('OpponentBadge·active-glow: badge container has mj-opponent-badge-active class when it is the current seat', () => {
+  it('OpponentBadgeÂ·active-glow: badge container has mj-opponent-badge-active class when it is the current seat', () => {
     setupStore(makeSnapshot({ currentSeat: 1 }));
     renderBadge(1);
     const badge = screen.getByTestId('opponent-badge-1');
@@ -97,7 +97,7 @@ describe('OpponentBadge2D', () => {
     expect(pill?.className).toContain('mj-opponent-badge-active');
   });
 
-  it('OpponentBadge·no-active-glow: badge does NOT have active class when it is not the current seat', () => {
+  it('OpponentBadgeÂ·no-active-glow: badge does NOT have active class when it is not the current seat', () => {
     setupStore(makeSnapshot({ currentSeat: 0 }));
     renderBadge(1);
     const badge = screen.getByTestId('opponent-badge-1');
@@ -105,7 +105,7 @@ describe('OpponentBadge2D', () => {
     expect(pill?.className ?? '').not.toContain('mj-opponent-badge-active');
   });
 
-  it('OpponentBadge·afk: AFK indicator present when seat.afk is true', () => {
+  it('OpponentBadgeÂ·afk: AFK indicator present when seat.afk is true', () => {
     setupStore(
       makeSnapshot({
         seats: [makeSeat(), makeSeat({ afk: true }), makeSeat(), makeSeat()],
@@ -115,7 +115,7 @@ describe('OpponentBadge2D', () => {
     expect(screen.getByTestId('badge-afk-1')).toBeInTheDocument();
   });
 
-  it('OpponentBadge·open-melds: meld strip rendered when openMelds are present', () => {
+  it('OpponentBadgeÂ·open-melds: meld strip rendered when openMelds are present', () => {
     const meld: Meld = { kind: 'pung', tiles: ['1m', '1m', '1m'], concealed: false };
     setupStore(
       makeSnapshot({

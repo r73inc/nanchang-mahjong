@@ -6,6 +6,47 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/wall-model-rework` (2026-06-11)
+
+### BUG-037 · Wall model wrong — no dice rolls, no segmented walls, wrong settlement/spirit position (MAJOR)
+
+**Symptom:** The engine shuffled all 136 tiles into one flat pool and dealt from the front — no per-player walls, no 2-high stacks, no dice. The settlement tile and jing indicator were taken from `wall[0]`/`wall[1]`, the indicator was consumed, and the settlement tile was relocated to the bottom of the pool. Kong replacements came from a separate 4-tile `deadWall`. None of this matched the physical table, making a future spectator view impossible to animate from engine state.
+
+**Fix (full engine rework — no patching):** Replaced the flat-pool model with the physical **ring-of-stacks** wall:
+
+- **`packages/engine/src/dice.ts` (new):** `rollDice(rand, count)` — pure, PRNG-injected. Every dice moment derives an independent stream from `mulberry32(seed ^ DICE_SALT.<purpose>)` and emits a `dice_roll` GameEvent with individual die faces (`purpose: 'wall_selection' | 'deal_start' | 'jing_reveal'`, `roller`, `dice`).
+- **`packages/engine/src/wall.ts` (new):** `WallState` — 4 walls × 17 stacks × 2 tiles = 136 modeled as a ring. `drawOrder[136]` is fixed at build (top-then-bottom per stack, walking forward from the dice-resolved start stack); `drawPtr` advances for normal draws, `kongDraws` counts back draws (kong replacement = the current **last** tile of the wall, index `135 − kongDraws`). Exhaustion when the pointers meet (no reserved dead wall — every tile is drawable, 83 live tiles after the deal).
+- **`deal()` rewritten as the real procedure:** roll #1 (dealer) counts seats CCW inclusively to select a wall; roll #2 (selected player) counts stacks inclusively from the left of that wall; the dealer takes the counted stack first, then CCW one stack per seat per round for 6 rounds (12 each), then one single tile each (13), then the dealer's 14th. Live drawing continues exactly where the deal stopped.
+- **`revealJing()` rewritten:** dealer rolls the jing dice (per rules doc §3.1); the sum counts stacks backwards from the back of the wall, inclusive. Top-bottom mode: top tile = settlement (2 pts/copy + 1 pt/copy `stepAbove`, math unchanged), swap with the tile below, bottom = jing indicator — **both stay in the wall in their swapped positions and are drawn normally**. Standard mode: top tile = indicator, no swap, nothing consumed. New pure `previewJingReveal(state)` lets the service build the settlement preview before the reveal with guaranteed agreement.
+- **`GameState.wall`** is now `WallState | null` (`deadWall` removed; `draw` event field renamed `fromDeadWall` → `fromBack`).
+- **Shared:** `ClientGameState.wall: ClientWallState | null` (all dice values + positions public; `drawOrder` tile identities never leave the server), `deadWallCount` removed, `PublicGameEvent` gained `dice_roll`, `SettlementPreviewPayload` gained `dice` + `stackGlobal`.
+- **API:** `toClientSnapshot` redacts `WallState` → `ClientWallState`; settlement preview built via `previewJingReveal`; jing `dice_roll` broadcast to clients.
+- **Web:** settlement preview shows the rolled dice; `replayHand` now receives `config` (see below); test mocks updated.
+
+**Two latent bugs fixed in the same rework:**
+
+1. **`getNewEvents` dropped all hand-2+ events from the replay log.** It sliced `engine.events` by the cross-hand `moveLog.length`, but `engine.events` resets per hand. Fixed by offsetting with the current hand's `eventStartIdx`.
+2. **`replayHand` ignored rule variants.** `ReplayHandConfig` had no `config`, so top-bottom-jing games replayed down the standard branch (wrong indicator, no settlement). `config` is now part of `ReplayHandConfig` and `buildTimeline` passes `settings.ruleTopBottomJing`.
+
+**Documented conventions (decided during implementation, tested in `wall.test.ts`):**
+
+- Roll #2 uses **two dice** (matching roll #1 and the locked rules doc's jing roll; the family example "a 6" is compatible).
+- The skipped stacks before the deal-start stack form the **tail of the draw ring** — kong replacements consume them first, then the left-neighbour's wall, which matches the family's "kong from the wall left of the deal start" description.
+- Kong replacement = the current **last tile of the wall in draw order** (bottom of the back-most stack first).
+- The dice procedure applies to **both** jing modes (standard and top-bottom).
+- No reserved dead wall: the hand is drawn only when every tile has been taken. (Old model reserved 3–4 tiles; per the family procedure nothing is held back.)
+
+**Tests:** 331 engine (22 new in `wall.test.ts`: ring math, wraparound, dice determinism from seed, stack-taking deal sequence per the worked family example, front/back draws never overlap, swap-in-place, zero-sum settlement), 222 API, 352 web — all passing.
+
+**Key learnings:**
+
+- **Model the physical table, not the abstraction.** A flat array was "equivalent" for game logic but made dice, positions, and animations impossible to derive. The ring + two pointers is barely more code and every future feature (spectator view, deal animation) reads straight from state.
+- **Derive everything from the seed.** Dice use salted PRNG streams (`seed ^ 'WALL'/'DEAL'/'JING'`), so replays reproduce the entire physical setup with zero extra stored state.
+- **`engine.events` resets per hand but session logs span hands** — any "what's new" comparison between them must be offset by the hand's start index. Symmetric-looking lengths from hand 1 hid this for months.
+- **Replay needs the full game config, not just the seed.** Any rule flag that changes an engine transition must travel with the replay payload.
+
+---
+
 ## `fix/mobile-ux-hand-reveal-polish` (2026-06-11)
 
 ### BUG-039 · Unmatched tiles unsorted in hand-reveal screen
