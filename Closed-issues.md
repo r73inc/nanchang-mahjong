@@ -645,6 +645,25 @@ A secondary risk is any future runtime path where an invalid tile type is passed
 
 ---
 
+### IMP-019 · Manual tsumo — winning must be a conscious player action
+
+**Request:** When a player draws a tile that completes their hand, the game previously auto-declared a self-draw win (tsumo) immediately with no player input. Players should instead be offered a choice: declare the win or continue playing (e.g., to chase a higher-scoring hand).
+
+**Fix:**
+
+1. `packages/shared/src/game.events.ts` — Added `CanTsumoPayload { seat }` interface for the new `game:can-tsumo` socket event.
+2. `apps/api/src/game/game.service.ts` — Removed the auto-tsumo block from `startTurn()`. Replaced with a `game:can-tsumo` private emit to the active player's socket when their 14-tile hand is a winning hand. Added `handleTsumo(socket, userId, gameId)` method which validates seat/phase and calls `applyWinClaim(..., 'tsumo', ...)`. Moved bot auto-tsumo into `handleBotTurn()` (bots still auto-win — they have no UI to interact with).
+3. `apps/api/src/game/game.gateway.ts` — Added `game:tsumo` to the throttle map (limit 2/s) and a `@SubscribeMessage('game:tsumo')` handler that delegates to `gameService.handleTsumo`.
+4. `apps/web/src/stores/game.store.ts` — Added `canTsumo: boolean` state and `setCanTsumo` action. Cleared in `setSnapshot` (turn moved on) and on discard.
+5. `apps/web/src/hooks/use-game.ts` — Added `handleCanTsumo` listener for `game:can-tsumo` (sets `canTsumo = true` for the viewer's seat only). Added `declareTsumo` action (emits `game:tsumo`, clears `canTsumo`). `discard` action now also clears `canTsumo` (player chose to keep playing). Exports `canTsumo` and `declareTsumo`.
+6. `apps/web/src/pages/game/game-page.tsx` — Added `TsumoSheet` component (same bottom-sheet pattern as `KongActionSheet`): gold title "You can win!", subtitle, "Declare Win" primary button and "Keep Playing" dismiss button. Wired into `GameTable` via `canTsumo` + `onDeclareTsumo` + `onDismissTsumo` props. Tiles are non-interactive while the sheet is visible (`ViewerHandHUD` and `AccessibleHand` gated on `!canTsumo`).
+7. `apps/web/src/components/2d/PlayerHand2D.tsx` — Added `canTsumo` store read; added to `interactive` guard so 2D tiles are also non-interactive while the tsumo offer is showing.
+8. i18n: 4 new keys in EN+ZH (`tsumoTitle`, `tsumoSubtitle`, `tsumoDeclare`, `tsumoContinue`).
+
+**Key learning:** Server-emitted private events (targeted to one socket) are the right pattern for turn-private information like "you can declare a win". The event is not broadcast — other players do not learn that the active player has a winning hand until they actually declare it.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

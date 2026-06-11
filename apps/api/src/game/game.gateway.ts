@@ -52,6 +52,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     'game:pass': { limit: 4, windowMs: 1_000 },
     'game:kong-concealed': { limit: 2, windowMs: 1_000 },
     'game:kong-add': { limit: 2, windowMs: 1_000 },
+    'game:tsumo': { limit: 2, windowMs: 1_000 },
     'game:concede': { limit: 2, windowMs: 1_000 },
     'game:reveal-jing': { limit: 2, windowMs: 1_000 },
     'game:advance-pre-game': { limit: 3, windowMs: 2_000 },
@@ -181,6 +182,18 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
 
     this.gameService.handleKongAdd(socket, user.sub, gameId, parsed.data.tile);
+  }
+
+  @SubscribeMessage('game:tsumo')
+  handleTsumo(socket: Socket): void {
+    if (!this.checkRate(socket, 'game:tsumo')) return;
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = socket.data.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
+
+    this.gameService.handleTsumo(socket, user.sub, gameId);
   }
 
   @SubscribeMessage('game:concede')

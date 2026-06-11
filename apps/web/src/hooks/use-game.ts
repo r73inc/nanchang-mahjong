@@ -49,7 +49,9 @@ export function useGame(gameId: string, spectate = false) {
     setPendingMove,
     setToast,
     setGameError,
+    canTsumo,
     setYourTurnFlash,
+    setCanTsumo,
     setLastDiscard,
     reset,
   } = useGameStore();
@@ -215,12 +217,23 @@ export function useGame(gameId: string, spectate = false) {
       }
     };
 
+    // game:can-tsumo — server notifies the active player that their 14-tile hand
+    // is a winning hand. The UI shows a "Declare Win" button; the player may also
+    // choose to discard normally and continue playing.
+    const handleCanTsumo = (payload: { seat: 0 | 1 | 2 | 3 }) => {
+      const viewerSeat = useGameStore.getState().snapshot?.viewerSeat ?? null;
+      if (viewerSeat === payload.seat) {
+        setCanTsumo(true);
+      }
+    };
+
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
     // on the FE we just need a toast/alert if it's us.
     // We rely on game:snapshot reflecting the afk flag; no extra state needed here.
 
     s.on('game:snapshot', handleSnapshot);
     s.on('game:your-turn', handleYourTurn);
+    s.on('game:can-tsumo', handleCanTsumo);
     s.on('game:claim-window', handleClaimWindow);
     s.on('game:rob-kong-window', handleClaimWindow); // same UI
     s.on('game:contested', handleContested);
@@ -268,6 +281,7 @@ export function useGame(gameId: string, spectate = false) {
     return () => {
       s.off('game:snapshot', handleSnapshot);
       s.off('game:your-turn', handleYourTurn);
+      s.off('game:can-tsumo', handleCanTsumo);
       s.off('game:claim-window', handleClaimWindow);
       s.off('game:rob-kong-window', handleClaimWindow);
       s.off('game:contested', handleContested);
@@ -293,13 +307,14 @@ export function useGame(gameId: string, spectate = false) {
     (tile: TileType) => {
       setPendingMove(true);
       selectTile(null);
+      setCanTsumo(false); // player chose to discard instead of declaring win
       try {
         getSocket().emit('game:discard', { tile });
       } catch {
         setPendingMove(false);
       }
     },
-    [setPendingMove, selectTile],
+    [setPendingMove, selectTile, setCanTsumo],
   );
 
   const claim = useCallback(
@@ -366,6 +381,15 @@ export function useGame(gameId: string, spectate = false) {
     }
   }, []);
 
+  const declareTsumo = useCallback(() => {
+    setCanTsumo(false);
+    try {
+      getSocket().emit('game:tsumo', {});
+    } catch {
+      /* ignore */
+    }
+  }, [setCanTsumo]);
+
   const kongConcealed = useCallback((tile: TileType) => {
     try {
       getSocket().emit('game:kong-concealed', { tile });
@@ -395,6 +419,7 @@ export function useGame(gameId: string, spectate = false) {
     pendingMove,
     toast,
     gameError,
+    canTsumo,
     // Actions
     selectTile,
     discard,
@@ -404,6 +429,7 @@ export function useGame(gameId: string, spectate = false) {
     revealJing,
     advancePreGame,
     advanceHand,
+    declareTsumo,
     kongConcealed,
     kongAdd,
     requestRematch,
