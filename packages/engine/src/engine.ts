@@ -23,12 +23,7 @@ import {
   addToKongOptions,
   chowOptions,
 } from './calls';
-import {
-  calculateWinPayout,
-  instantKongPayment,
-  calculateSpiritSettlement,
-  calculateOpeningJingSettlement,
-} from './scoring';
+import { calculateWinPayout, instantKongPayment, calculateOpeningJingSettlement } from './scoring';
 import type {
   GameState,
   GameEvent,
@@ -610,13 +605,6 @@ export class GameEngine {
       decomposition: decompositions[0],
     });
 
-    // Spirit settlement (§6.2) — applies to ALL players at hand end
-    const spiritDelta = calculateSpiritSettlement(
-      this.state.seats,
-      this.state.jingPrimary!,
-      this.state.jingSecondary!,
-    );
-
     // Winner's concealed hand for the hand-reveal — include the winning tile so
     // all four hands in the finished state have their full 14 tiles visible.
     const winnerFinalHand = sortTypes([
@@ -625,12 +613,15 @@ export class GameEngine {
       ...(isRobKong && robTile ? [robTile] : []),
     ]);
 
-    // Apply win payment + spirit settlement to all seat scores
+    // Apply win payment to all seat scores.
+    // Spirit settlement is intentionally NOT applied here — the service layer
+    // (handleHandEnd) owns spirit settlement uniformly for all end types
+    // (win / draw / concede) to avoid double-counting.
     const seats = [...this.state.seats] as GameState['seats'];
     for (let i = 0; i < 4; i++) {
       seats[i] = {
         ...seats[i],
-        score: seats[i].score + paymentResult.scoreDelta[i] + spiritDelta[i],
+        score: seats[i].score + paymentResult.scoreDelta[i],
         ...(i === seatIdx ? { hand: winnerFinalHand } : {}),
       };
     }

@@ -664,6 +664,42 @@ A secondary risk is any future runtime path where an invalid tile type is passed
 
 ---
 
+## PR · `fix/bug-036-spirit-double-settlement` (2026-06-11)
+
+### BUG-036 · End-of-hand spirit settlement double-counted on won hands
+
+**Symptom:** After any hand that ended in a win, players holding spirit (jing) tiles received — and others paid — exactly double the correct spirit settlement amount. Draw and concede hands settled correctly. The error compounded across the session because each hand's `startingScores` seeded from the inflated cumulative totals, and `isSessionOver()` read those same inflated figures so bust-mode termination could trigger at the wrong time.
+
+**Root cause:** Two layers both applied the spirit settlement on the win path:
+
+1. `packages/engine/src/engine.ts` `win()` computed `calculateSpiritSettlement(...)` and baked it into `seats[i].score` alongside the win payment.
+2. `apps/api/src/game/game.service.ts` `handleHandEnd()` called `calculateSpiritSettlement(state.seats, ...)` again on those same finished-state seats (hands/openMelds unchanged → identical deltas) and added the result a second time: `cumulativeScores[i] = state.seats[i].score + spiritDeltas[i]`.
+
+Draw and concede paths were correct because the engine never touched scores there — `handleHandEnd`'s single application was the only one.
+
+**Fix:** Removed `calculateSpiritSettlement` from the engine's `win()` entirely. The engine now applies only the win payment (`paymentResult.scoreDelta`). The service's `handleHandEnd()` remains the single, uniform place that applies spirit settlement for all three hand-end types (win / draw / concede). The `calculateSpiritSettlement` import was also removed from `engine.ts` since it is no longer called there.
+
+**Files changed:**
+
+- `packages/engine/src/engine.ts` — removed spirit delta from `win()` score application; removed `calculateSpiritSettlement` import
+- `packages/engine/src/__tests__/engine.test.ts` — added `Engine·BUG-036-regression` describe block: injects state with a winning hand that holds spirit tiles, confirms post-win seat score equals starting + win payment only, and confirms `calculateSpiritSettlement` on the finished state returns a non-zero delta (proving spirit would have changed the score if the engine had applied it)
+
+**Key learning:** When two layers each hold partial responsibility for a calculation, the invariant is fragile. For settlements that must apply once regardless of how the hand ended, own the logic in exactly one place (here: the service layer). The engine's `win()` should only apply the win payment — it has no business knowing about the service-side cumulative score model.
+
+---
+
+### BUG-030 · Settlement bonus points incorrectly doubled (closed as duplicate of BUG-036)
+
+**Symptom:** When one player held spirit (jing) tiles and no other player had any (the Indomitable Spirit case), the bonus was reported as double the correct amount and the other players were charged double. The symptom was most visible with the Indomitable Spirit rule (sole spirit holder, intentionally ×2), where that ×2 was applied by the formula and then the entire settlement was doubled again.
+
+**Root cause:** Same as BUG-036 — the spirit settlement was computed and applied twice on the win path (once in the engine, once in the service). For normal multi-player spirit cases this produces an incorrect but less-obvious doubled figure. For the Indomitable Spirit case (only one player has spirits) the effective score is `raw × 2` (Indomitable) × 2 (double-count) = 4× the correct value, which made it immediately visible. BUG-030 was filed with "flowers/seasons" framing but the app uses spirit tiles (jing) for all end-of-hand bonus settlement — same code path.
+
+**Fix:** Closed by the BUG-036 fix. No additional changes needed.
+
+**Key learning:** The most extreme edge case (Indomitable Spirit — sole holder) surfaces the bug most clearly because the intentional ×2 amplifies the accidental ×2 into a visually obvious ×4. Always test the "only one player qualifies" edge case for any settlement rule that includes a multiplier for that condition.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

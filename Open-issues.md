@@ -15,10 +15,8 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-08     | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                               |
 | BUG-09     | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                          |
 | BUG-029    | Copy room code broken on mobile        | Room code copy button has no effect on mobile                                                                       |
-| BUG-030    | Bonus points doubled in settlement     | Solo bonus-tile player charged/receives double the correct amount                                                   |
 | BUG-031 ⚠️ | Host refresh locks config (CRITICAL)   | After browser refresh, host cannot change config or start the game                                                  |
 | BUG-032    | Kicked player not redirected           | Kicked player remains on config screen instead of returning to menu                                                 |
-| BUG-036 ⚠️ | Spirit settlement double-counted       | End-of-hand spirit payout applied twice on won hands (engine + service)                                             |
 | BUG-037    | Settlement/spirit tiles wrong position | No dice roll; tiles flipped from wall front instead of dice-counted stack from the back; indicator wrongly consumed |
 
 ---
@@ -131,25 +129,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-030 · Settlement bonus points incorrectly doubled
-
-**Symptom:** When one player has bonus-point tiles (e.g., flowers, seasons) and no other players have any, that player's bonus points are doubled in the settlement, and the other players are charged double the amount.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** Bonus points should be calculated once per player and distributed/charged according to the rules (typically 1 point per tile, split equally among other players or winner takes all depending on the rule variant).
-
-**Suspected cause:** The settlement calculation may be iterating over bonus tiles and applying multipliers twice, or the distribution logic is summing bonus from the same player multiple times.
-
-**Where to look:**
-
-- `packages/engine/src/settlement.ts` — bonus tile settlement logic
-- `apps/api/src/game/game.service.ts` — how settlement payloads are built and broadcast
-
-**Next steps:** Add detailed logging for each bonus tile: tile type, player, and amount before and after settlement calculation. Verify the loop structure in settlement.ts.
-
----
-
 ### BUG-031 · Host browser close/refresh makes room config non-interactable (MAJOR)
 
 **Symptom:** If the host is setting up a game and closes the browser tab/app (or the page refreshes), and then returns to the browser or revisits the room, they can no longer change the game configuration or start the game. The config controls are unresponsive and the "Start Game" button does not function.
@@ -194,38 +173,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 - React Router or navigation state management in `apps/web/src/pages/`
 
 **Next steps:** Confirm that the kicked player receives a socket event when kicked, and that the handler triggers a router.push to home.
-
----
-
-### BUG-036 · End-of-hand spirit settlement double-counted on won hands (MAJOR)
-
-**Symptom:** Cumulative scores drift away from what the hand-reveal screen shows. On any hand that ends in a win, players holding spirit (jing) tiles receive — and the others pay — exactly **double** the correct spirit settlement. Hands ending in a draw or concede settle correctly. The error compounds across the session because each hand's starting scores seed from the inflated cumulative totals.
-
-**Status:** ACTIVE, UNRESOLVED (found 2026-06-10 during scoring audit)
-
-**Root cause (confirmed by code reading, not yet fixed):** Both the engine and the session service apply the end-of-hand spirit settlement, and on the win path both run:
-
-1. `packages/engine/src/engine.ts` — `win()` (≈ lines 613–636) writes final seat scores as `score + paymentResult.scoreDelta[i] + spiritDelta[i]`. Spirit settlement is already included.
-2. `apps/api/src/game/game.service.ts` — `handleHandEnd()` (≈ lines 1034–1042) recomputes `calculateSpiritSettlement(state.seats, ...)` from those same final seats (hands unchanged → identical deltas) and adds it again: `cumulativeScores[i] = state.seats[i].score + spiritDeltas[i]`.
-
-Draw (`draw_game`) and concede paths are unaffected because the engine never touches scores there — the service's single application is the only one.
-
-**Impact:**
-
-- Cumulative scores wrong after every won hand; error compounds via `startNextHand` `startingScores`.
-- Bust-mode termination (`isSessionOver` checks `cumulativeScores.some(s => s < 0)`) runs on inflated numbers — players can be eliminated or survive incorrectly.
-- Hand-reveal screen shows `spiritDeltas` (single-counted) while the scoreboard moves by twice that — visible inconsistency.
-- **Likely the true root cause of BUG-030** ("settlement bonus points incorrectly doubled"). The Indomitable Spirit case (sole spirit holder, intentionally ×2) is the most visible: the doubled value gets doubled again. BUG-030 describes "flowers/seasons bonus tiles" but the app's only end-of-hand bonus settlement is the spirit settlement — same code path. Verify BUG-030 reproduces only on won hands; if so, close both with the same fix.
-
-**Not to be confused with:** the Opening Top & Bottom Spirit Flip settlement (`ruleTopBottomJing`). That is a _separate_, start-of-hand payout on the flipped settlement tile (`wall[0]`, 2 pts/copy + 1 pt/copy for the next tile in sequence) applied once in `revealJing()` — it is correct. The double-count affects only the _end-of-hand_ settlement on the spirit tiles derived from the indicator (`wall[1]`).
-
-**Recommended fix:** Make exactly one layer own the settlement. Preferred: remove `spiritDelta` from the engine's `win()` and let `handleHandEnd()` apply it uniformly for all three end types (win / draw / concede) — one code path, one invariant. Smaller-diff alternative: skip the service-side addition when `result === 'win'`. Either way, extend the zero-sum tests to assert cumulative scores across a full won hand (engine → service), not just within each function.
-
-**Where to look:**
-
-- `packages/engine/src/engine.ts` — `win()` score application
-- `apps/api/src/game/game.service.ts` — `handleHandEnd()` cumulative score update
-- `packages/engine/src/scoring.ts` — `calculateSpiritSettlement` (formula itself is correct; do not change)
 
 ---
 
