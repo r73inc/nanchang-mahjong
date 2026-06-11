@@ -76,6 +76,7 @@ function makeSnapshot(overrides: {
     viewMode: '3D' as const,
     ruleTopBottomJing: false,
     preGamePhase: null,
+    pendingRoll: null,
   };
 }
 

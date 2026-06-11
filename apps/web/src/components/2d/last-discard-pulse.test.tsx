@@ -61,6 +61,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     viewMode: '2D',
     ruleTopBottomJing: false,
     preGamePhase: null,
+    pendingRoll: null,
     seats: [
       makeSeat({ wind: 'east', discards: ['1m', '9p'] as TileType[] }),
       makeSeat({ wind: 'south', discards: ['5s'] as TileType[] }),

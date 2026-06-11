@@ -279,6 +279,15 @@
   "preGamePrimary": "主精",
   "preGameSecondary": "次精",
 
+  "diceRollTitle": "掷骰子",
+  "diceRollDealing": "正在准备牌局…",
+  "diceRollDeal1": "掷骰子选择起始墙",
+  "diceRollDeal2": "掷骰子选择起始码",
+  "diceRollJing": "掷骰子翻出精牌",
+  "diceRollButton": "掷骰子",
+  "diceRollWaiting": "等待 {{0}} 掷骰子…",
+  "diceRollResult": "{{0}} + {{1}} = {{2}}",
+
   "handRevealTitle": "本局结束",
   "handRevealResultWin": "有人赢了！",
   "handRevealResultDraw": "流局 — 无人获胜",

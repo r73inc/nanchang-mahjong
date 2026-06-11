@@ -279,6 +279,15 @@
   "preGamePrimary": "Primary Spirit",
   "preGameSecondary": "Secondary Spirit",
 
+  "diceRollTitle": "Dice Roll",
+  "diceRollDealing": "Setting up the table…",
+  "diceRollDeal1": "Roll to select the starting wall",
+  "diceRollDeal2": "Roll to select the starting stack",
+  "diceRollJing": "Roll to reveal the Spirit tile",
+  "diceRollButton": "Roll Dice",
+  "diceRollWaiting": "Waiting for {{0}} to roll…",
+  "diceRollResult": "{{0}} + {{1}} = {{2}}",
+
   "handRevealTitle": "Hand Complete",
   "handRevealResultWin": "Someone Won!",
   "handRevealResultDraw": "Draw — No Winner",

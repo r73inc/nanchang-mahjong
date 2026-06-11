@@ -156,13 +156,23 @@ export class GameSession {
 
   /**
    * Pre-game reveal sub-phase for the current hand.
-   * Advances via game:advance-pre-game (host-only).
-   *   'hands'      — initial: hands dealt, awaiting host to start reveals
+   *   'dealing'    — awaiting manual dice rolls before deal() is called
+   *   'hands'      — hands dealt, awaiting host to start reveals
    *   'settlement' — settlement tile preview shown (ruleTopBottomJing only)
    *   'jing'       — revealJing() called; wildcards visible; awaiting host to start game
    *   null         — game is in play (startTurn() has been called)
    */
-  preGamePhase: 'hands' | 'settlement' | 'jing' | null = 'hands';
+  preGamePhase: 'dealing' | 'hands' | 'settlement' | 'jing' | null = 'dealing';
+
+  /**
+   * Set while a specific player must emit game:roll-dice to advance.
+   * seed is stored server-side only (not sent to clients) for PRNG pre-computation.
+   */
+  pendingRoll: {
+    purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
+    roller: Seat4;
+    seed: number;
+  } | null = null;
 
   /**
    * Pending hand-end state: set when a hand finishes, cleared when the host

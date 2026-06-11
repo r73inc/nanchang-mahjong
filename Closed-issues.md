@@ -47,6 +47,36 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/dice-roll-animation` (2026-06-11)
+
+### IMP-019 · Manual dice-roll UI with 2D animation
+
+**Summary:** Three dice rolls that previously resolved instantly on the server now pause and wait for the designated player to press a "Roll Dice" button. A 2D Framer Motion die animation shows the exact faces, and the updated `ClientGameState` snapshot is buffered until the animation completes.
+
+**Scope of changes:**
+
+- **Shared (`packages/shared/src/game.events.ts`):** `ClientGameState` gains `preGamePhase: 'dealing'` (new value) and `pendingRoll: { purpose, roller } | null`. New `RollDicePayloadSchema` (empty C→S schema).
+- **API session (`apps/api/src/game/game-session.ts`):** `preGamePhase` default changed from `'hands'` to `'dealing'`; new `pendingRoll` field (includes server-only `seed`).
+- **API snapshot (`apps/api/src/game/snapshot.ts`):** Passes `pendingRoll` (without seed) to `ClientGameState`.
+- **API service (`apps/api/src/game/game.service.ts`):** `createGame` and `startNextHand` no longer call `.deal()` — they set `pendingRoll = { purpose: 'deal_1', roller: dealerSeat }` and `preGamePhase = 'dealing'`. New `handleRollDice`, `handleRollDiceInternal`, and `doBotRollIfNeeded` methods. `handleAdvancePreGame` no longer calls `doRevealJing` directly; sets `pendingRoll` for `jing_reveal` and bots auto-chain. `setJingRevealPendingRoll` extracted as a helper.
+- **API gateway (`apps/api/src/game/game.gateway.ts`):** `game:roll-dice` handler added with 2/s throttle.
+- **Web store (`apps/web/src/stores/game.store.ts`):** `diceAnimation` state + `setDiceAnimation` action.
+- **Web hook (`apps/web/src/hooks/use-game.ts`):** `snapshotQueueRef` + `isDiceAnimatingRef` buffer snapshots during animation. `handleSnapshot` queues while animating; `handleGameEvent` intercepts `dice_roll` events; new `rollDice` action and `onDiceAnimationComplete` callback.
+- **Web component (`apps/web/src/components/2d/DiceRollOverlay.tsx`):** Full-screen overlay. Shows animated Framer Motion dice (spin → settle on final value), "Roll Dice" gold button for the active roller, "Waiting for X to roll…" for others. Calls `onAnimationComplete` after the result text animates in.
+- **Web page (`apps/web/src/pages/game/game-page.tsx`):** `DiceRollOverlay` rendered at z-[60] whenever `pendingRoll !== null || diceAnimation !== null`. `PreGameFlow` handles `'dealing'` phase with a simple loading screen (hidden behind the overlay).
+- **i18n:** 8 new keys in `en.json` and `zh.json` (`diceRollTitle`, `diceRollDealing`, `diceRollDeal1`, `diceRollDeal2`, `diceRollJing`, `diceRollButton`, `diceRollWaiting`, `diceRollResult`).
+
+**Tests:** 331 engine (unchanged), 228 API (+6: gateway `handleRollDice`, snapshot `pendingRoll`), 360 web (+8: `DiceRollOverlay` interactive/waiting/purpose/animation states) — all passing.
+
+**Key learnings:**
+
+- **Stage reveals via service-layer PRNG re-computation, not engine splitting.** The engine's `deal()` computes all 3 dice atomically; we pre-compute each roll using the same `mulberry32(seed ^ DICE_SALT.<purpose>)` formula and broadcast staged events. When `engine.deal()` is finally called, its internal computation produces identical dice because the PRNG is deterministic from the seed.
+- **Queue snapshots during animation, don't block.** The server sends `game:event` + `game:snapshot` in the same Node.js tick. The client must buffer snapshots while `isDiceAnimatingRef.current === true` and flush after `onAnimationComplete` — otherwise the wall/hand state updates instantly, racing the dice animation.
+- **Bot chaining: synchronous recursion is safe here.** `doBotRollIfNeeded` calls `handleRollDiceInternal` which calls `doBotRollIfNeeded` again — at most 3 levels deep (deal_1 → deal_2 → jing_reveal), all synchronous, no stack overflow risk.
+- **`preGamePhase: 'dealing'` is needed to gate the frontend.** Without it, `PreGameFlow` has no phase to render before `deal()` is called (the engine's `phase` is `'dealing'` but that's the engine-internal phase, not the pre-game UI phase). The new value keeps the UI logic consistent with the other pre-game phases.
+
+---
+
 ## `fix/mobile-ux-hand-reveal-polish` (2026-06-11)
 
 ### BUG-039 · Unmatched tiles unsorted in hand-reveal screen

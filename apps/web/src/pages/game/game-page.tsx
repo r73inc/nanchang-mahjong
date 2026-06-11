@@ -48,6 +48,7 @@ import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
+import { DiceRollOverlay } from '../../components/2d/DiceRollOverlay';
 import { SettlementPreview } from '../../components/game/SettlementPreview';
 import { GameWinnerPopup } from '../../components/game/GameWinnerPopup';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
@@ -187,6 +188,24 @@ function PreGameFlow({
   const phase = snapshot.preGamePhase;
   const viewerSeat = snapshot.viewerSeat;
   const myHand: TileType[] = viewerSeat !== null ? (snapshot.seats[viewerSeat].hand ?? []) : [];
+
+  // ── Step 0: Dealing — DiceRollOverlay covers this; just show a loading screen
+  if (phase === 'dealing') {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 min-h-dvh bg-mj-bg-page">
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="w-2 h-2 rounded-full bg-mj-gold/60 animate-pulse"
+              style={{ animationDelay: `${i * 200}ms` }}
+            />
+          ))}
+        </div>
+        <p className="text-mj-bone/80 text-sm">{t('diceRollDealing')}</p>
+      </div>
+    );
+  }
 
   // ── Step 1: Hands ─────────────────────────────────────────────────────────
   if (phase === 'hands') {
@@ -2789,6 +2808,9 @@ export function GamePage() {
     advancePreGame,
     advanceHand,
     requestRematch,
+    rollDice,
+    onDiceAnimationComplete,
+    diceAnimation,
   } = useGame(gameId ?? '', spectate);
 
   const setCanTsumo = useGameStore((s) => s.setCanTsumo);
@@ -2945,15 +2967,24 @@ export function GamePage() {
       )}
 
       {/* ── Pre-game reveal flow ──────────────────────────────────────────── */}
-      {/* Shown whenever preGamePhase is not null — this covers both the         */}
-      {/* jing_reveal engine phase (hands/settlement steps) AND the playing      */}
-      {/* engine phase with preGamePhase='jing' (jing step after revealJing).   */}
+      {/* Shown whenever preGamePhase is not null (and not 'dealing' — that     */}
+      {/* phase only shows a loading state since DiceRollOverlay covers it).    */}
       {!handReveal && !announcingReveal && snapshot.preGamePhase !== null && (
         <PreGameFlow
           snapshot={snapshot}
           settlementPreview={settlementPreview}
           isHost={canAdvanceHand}
           onAdvance={advancePreGame}
+        />
+      )}
+
+      {/* ── Dice roll overlay — always on top, shown during roll pauses ────── */}
+      {(snapshot.pendingRoll !== null || diceAnimation !== null) && (
+        <DiceRollOverlay
+          snapshot={snapshot}
+          diceAnimation={diceAnimation}
+          onRoll={rollDice}
+          onAnimationComplete={onDiceAnimationComplete}
         />
       )}
 

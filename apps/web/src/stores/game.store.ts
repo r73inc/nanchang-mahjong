@@ -144,8 +144,25 @@ interface GameStore {
    */
   lastDiscard: LastDiscard | null;
 
+  /**
+   * Dice animation state — set when a dice_roll event arrives and cleared after
+   * the animation completes. The snapshot queue is flushed on clear.
+   */
+  diceAnimation: {
+    dice: [number, number];
+    purpose: 'wall_selection' | 'deal_start' | 'jing_reveal';
+    roller: 0 | 1 | 2 | 3;
+  } | null;
+
   // ── Actions ────────────────────────────────────────────────────────────────
   setSnapshot: (s: ClientGameState) => void;
+  setDiceAnimation: (
+    a: {
+      dice: [number, number];
+      purpose: 'wall_selection' | 'deal_start' | 'jing_reveal';
+      roller: 0 | 1 | 2 | 3;
+    } | null,
+  ) => void;
   setEnded: (e: GameEndedPayload) => void;
   setSettlementPreview: (p: SettlementPreviewPayload | null) => void;
   setHandReveal: (r: HandRevealPayload | null) => void;
@@ -181,6 +198,11 @@ const initialState = {
   yourTurnFlash: false,
   canTsumo: false,
   lastDiscard: null as LastDiscard | null,
+  diceAnimation: null as {
+    dice: [number, number];
+    purpose: 'wall_selection' | 'deal_start' | 'jing_reveal';
+    roller: 0 | 1 | 2 | 3;
+  } | null,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -241,6 +263,8 @@ export const useGameStore = create<GameStore>()(
     setCanTsumo: (canTsumo) => set({ canTsumo }),
 
     setLastDiscard: (lastDiscard) => set({ lastDiscard }),
+
+    setDiceAnimation: (diceAnimation) => set({ diceAnimation }),
 
     reset: () => set(initialState),
   })),

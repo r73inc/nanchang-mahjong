@@ -52,9 +52,13 @@ export function toClientSnapshot(
   connState: readonly [ConnState, ConnState, ConnState, ConnState],
   viewMode: '2D' | '3D' = '3D',
   ruleTopBottomJing = false,
-  preGamePhase: 'hands' | 'settlement' | 'jing' | null = null,
+  preGamePhase: 'dealing' | 'hands' | 'settlement' | 'jing' | null = null,
   botMeta?: readonly [SeatBotMeta, SeatBotMeta, SeatBotMeta, SeatBotMeta],
   seatNames?: readonly [string, string, string, string],
+  pendingRoll: {
+    purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
+    roller: 0 | 1 | 2 | 3;
+  } | null = null,
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
@@ -91,5 +95,6 @@ export function toClientSnapshot(
     viewMode,
     ruleTopBottomJing,
     preGamePhase,
+    pendingRoll,
   };
 }
