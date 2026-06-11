@@ -30,6 +30,10 @@ export type SeatBotMeta = { isBot: boolean; botDifficulty?: BotDifficulty } | un
  * Strip the wall down to its public positional state. Dice values, pointers,
  * and stack positions are public table state — only tile identities
  * (drawOrder) are secret and never leave the server.
+ *
+ * TODO (Spectator Mode): Expose a 'revealedWallTiles' array in ClientWallState
+ * so late-joining spectators can accurately render the faces of swapped Jing
+ * settlement tiles on the 2D table.
  */
 function toClientWallState(wall: GameState['wall']): ClientWallState | null {
   if (!wall) return null;
