@@ -497,12 +497,18 @@ export class GameService {
     if (st.jingPrimary && st.jingSecondary && st.phase === 'playing') {
       const jingTypes: TileType[] = [st.jingPrimary, st.jingSecondary];
       const seatState = st.seats[activeSeat];
-      const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles] as TileType[]);
+      // Normalize kongs (4 tiles) → pungs (3 tiles): isWinningHand requires exactly 14 tiles,
+      // but a hand with k kongs has 14+k total. See BUG-038.
+      const openMeldTiles = seatState.openMelds.flatMap((m) =>
+        m.kind === 'kong'
+          ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
+          : ([...m.tiles] as TileType[]),
+      );
       const fullHand = [...openMeldTiles, ...seatState.hand];
 
       if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
         this.logger.log(
-          `Can-tsumo: seat ${activeSeat} has a complete 14-tile hand (game ${session.gameId})`,
+          `Can-tsumo: seat ${activeSeat} has a complete hand after kong (game ${session.gameId})`,
         );
         if (socketId && this.server) {
           this.server.to(socketId).emit('game:can-tsumo', { seat: activeSeat });
@@ -560,7 +566,11 @@ export class GameService {
     // Bots auto-declare tsumo when their hand is complete — no button needed.
     if (jingTypes.length === 2) {
       const seatState = state.seats[seat];
-      const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles] as TileType[]);
+      const openMeldTiles = seatState.openMelds.flatMap((m) =>
+        m.kind === 'kong'
+          ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
+          : ([...m.tiles] as TileType[]),
+      );
       const fullHand = [...openMeldTiles, ...seatState.hand];
       if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
         this.logger.log(`Bot auto-tsumo: seat ${seat} (game ${session.gameId})`);
