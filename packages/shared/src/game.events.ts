@@ -343,3 +343,7 @@ export interface GameErrorPayload {
 export interface AfkWarningPayload {
   seat: 0 | 1 | 2 | 3;
 }
+/** Sent privately to the active player's socket when their drawn hand is a winning hand. */
+export interface CanTsumoPayload {
+  seat: 0 | 1 | 2 | 3;
+}

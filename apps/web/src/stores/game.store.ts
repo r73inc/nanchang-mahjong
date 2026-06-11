@@ -129,6 +129,13 @@ interface GameStore {
   yourTurnFlash: boolean;
 
   /**
+   * Set when the server emits game:can-tsumo for the viewer's seat.
+   * The player's 14-tile hand is a winning hand; the "Declare Win" button is shown.
+   * Cleared on setSnapshot (turn changes), on discard, and when the player acts.
+   */
+  canTsumo: boolean;
+
+  /**
    * The most recently discarded tile, identified by seat + tile type.
    * Set by game:event {kind:'discard'}, cleared by the next claim event
    * (pung/chow/kong_open/win) or replaced by the next discard.
@@ -152,6 +159,7 @@ interface GameStore {
   setToast: (t: GameToast | null) => void;
   setGameError: (err: string | null) => void;
   setYourTurnFlash: (v: boolean) => void;
+  setCanTsumo: (v: boolean) => void;
   setLastDiscard: (d: LastDiscard | null) => void;
   reset: () => void;
 }
@@ -171,6 +179,7 @@ const initialState = {
   connection: 'live' as ConnectionStatus,
   gameError: null,
   yourTurnFlash: false,
+  canTsumo: false,
   lastDiscard: null as LastDiscard | null,
 };
 
@@ -186,6 +195,8 @@ export const useGameStore = create<GameStore>()(
         // Clear claim window and pending claim once snapshot arrives
         claimWindow: null,
         viewerClaimSubmitted: null,
+        // Clear tsumo offer when a new snapshot arrives (turn moved on)
+        canTsumo: false,
         // A non-null preGamePhase means a new hand has started — drop the
         // previous hand's reveal so HandRevealScreen can't block the pre-game
         // flow. (game:ended clears it for the session-end path; nothing else
@@ -226,6 +237,8 @@ export const useGameStore = create<GameStore>()(
     setGameError: (gameError) => set({ gameError }),
 
     setYourTurnFlash: (yourTurnFlash) => set({ yourTurnFlash }),
+
+    setCanTsumo: (canTsumo) => set({ canTsumo }),
 
     setLastDiscard: (lastDiscard) => set({ lastDiscard }),
 

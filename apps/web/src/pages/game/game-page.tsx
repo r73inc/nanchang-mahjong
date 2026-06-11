@@ -2007,6 +2007,46 @@ function KongActionSheet({
   );
 }
 
+function TsumoSheet({ onDeclare, onContinue }: { onDeclare: () => void; onContinue: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-end justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)' }}
+    >
+      <div
+        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(201,169,97,0.4)' }}
+        role="dialog"
+        aria-label={t('tsumoTitle')}
+      >
+        <div className="flex flex-col gap-1">
+          <h2 className="font-bold text-lg" style={{ color: '#c9a961' }}>
+            {t('tsumoTitle')}
+          </h2>
+          <p className="text-sm text-mj-bone/60">{t('tsumoSubtitle')}</p>
+        </div>
+        <div className="flex gap-3 mt-1">
+          <button
+            onClick={onContinue}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
+          >
+            {t('tsumoContinue')}
+          </button>
+          <button
+            onClick={onDeclare}
+            className="flex-1 py-3 rounded-xl font-bold text-sm"
+            style={{ background: '#c9a961', color: '#1a1a1a' }}
+          >
+            {t('tsumoDeclare')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Game Table ────────────────────────────────────────────────────────────────
 
 /**
@@ -2027,6 +2067,7 @@ function GameTable({
   snapshot,
   selectedTileIdx,
   claimWindow,
+  canTsumo,
   toast,
   pendingMove,
   onSelect,
@@ -2036,10 +2077,13 @@ function GameTable({
   onClaim,
   onPass,
   onConcede,
+  onDeclareTsumo,
+  onDismissTsumo,
 }: {
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
   claimWindow: ClaimWindowState | null;
+  canTsumo: boolean;
   toast: GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number | null) => void;
@@ -2049,6 +2093,8 @@ function GameTable({
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
   onConcede: () => void;
+  onDeclareTsumo: () => void;
+  onDismissTsumo: () => void;
 }) {
   const { t } = useI18n();
   const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
@@ -2411,7 +2457,7 @@ function GameTable({
       {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
       {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
       {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
-      {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
+      {!showConcedeSheet && !kongActionPending && !canTsumo && snapshot.viewMode !== '2D' && (
         <ViewerHandHUD
           hand={viewerHand}
           selectedTileIdx={selectedTileIdx}
@@ -2429,7 +2475,7 @@ function GameTable({
         selectedTileIdx={pendingMove ? null : selectedTileIdx}
         onSelect={onSelect}
         onDiscard={handleDiscardOrKong}
-        isMyTurn={isMyTurn && !pendingMove}
+        isMyTurn={isMyTurn && !pendingMove && !canTsumo}
       />
 
       {/* ── Collapsible history panel ──────────────────────────────────────── */}
@@ -2494,6 +2540,11 @@ function GameTable({
           onKong={handleKongAction}
           onDiscard={handleKongActionDiscard}
         />
+      )}
+
+      {/* ── Tsumo declaration sheet ─────────────────────────────────────────── */}
+      {canTsumo && isMyTurn && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
+        <TsumoSheet onDeclare={onDeclareTsumo} onContinue={onDismissTsumo} />
       )}
 
       {/* ── A11y live region ───────────────────────────────────────────────── */}
@@ -2585,7 +2636,9 @@ export function GamePage() {
     pendingMove,
     gameError,
     selectTile,
+    canTsumo,
     discard,
+    declareTsumo,
     kongConcealed,
     kongAdd,
     claim,
@@ -2595,6 +2648,8 @@ export function GamePage() {
     advanceHand,
     requestRematch,
   } = useGame(gameId ?? '', spectate);
+
+  const setCanTsumo = useGameStore((s) => s.setCanTsumo);
 
   // ── Loading timeout ───────────────────────────────────────────────────────────
   // If we haven't received a game:snapshot within GAME_JOIN_TIMEOUT_MS, the
@@ -2769,6 +2824,7 @@ export function GamePage() {
             snapshot={snapshot}
             selectedTileIdx={selectedTileIdx}
             claimWindow={claimWindow}
+            canTsumo={canTsumo}
             toast={toast}
             pendingMove={pendingMove}
             onSelect={selectTile}
@@ -2778,6 +2834,8 @@ export function GamePage() {
             onClaim={claim}
             onPass={pass}
             onConcede={concede}
+            onDeclareTsumo={declareTsumo}
+            onDismissTsumo={() => setCanTsumo(false)}
           />
         )}
 
