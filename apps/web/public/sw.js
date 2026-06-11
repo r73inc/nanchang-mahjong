@@ -2,12 +2,19 @@
  * Nanchang Mahjong — Service Worker
  *
  * Handles:
+ *   fetch             → pass-through (required for PWA installability)
  *   push              → show a notification
  *   notificationclick → focus the matching game tab or open the app
  *   pushsubscriptionchange → re-subscribe when the push endpoint expires
  */
 
 /* eslint-disable no-restricted-globals */
+
+// Pass-through fetch handler — required for Chrome to consider the PWA installable.
+// No caching strategy yet; offline support can be layered on top in Phase 12B.
+self.addEventListener('fetch', (event) => {
+  event.respondWith(fetch(event.request));
+});
 
 self.addEventListener('push', (event) => {
   /** @type {{ title?: string; body?: string; gameId?: string }} */
