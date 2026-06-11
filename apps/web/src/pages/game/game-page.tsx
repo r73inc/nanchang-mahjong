@@ -23,7 +23,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { MahjongTile } from '../../components/mahjong-tile';
-import { useI18n } from '../../i18n';
+import { LangToggle, useI18n } from '../../i18n';
 import {
   tileAriaLabel,
   engineToDesignTile,
@@ -2315,7 +2315,10 @@ function GameTable({
         </span>
 
         {/* Right-side controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Language toggle — available at all times during gameplay */}
+          <LangToggle />
+
           {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
           {isMobile && (
             <button

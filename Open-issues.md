@@ -18,7 +18,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-030    | Bonus points doubled in settlement   | Solo bonus-tile player charged/receives double the correct amount          |
 | BUG-031 ⚠️ | Host refresh locks config (CRITICAL) | After browser refresh, host cannot change config or start the game         |
 | BUG-032    | Kicked player not redirected         | Kicked player remains on config screen instead of returning to menu        |
-| IMP-014    | Language change during game          | No way to switch EN/ZH once a game has started                             |
 
 ---
 
@@ -197,22 +196,5 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 ---
 
 ## Open Improvements
-
-### IMP-014 · Language change during active game
-
-**Symptom:** Once a game has started, the user cannot change the language between English and Chinese. The language setting is locked.
-
-**Status:** NEW, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** The language picker (or a settings menu during gameplay) should allow switching languages at any time. The UI should re-render with the new language instantly.
-
-**Possible limitation:** The game engine may have limitations around mid-game language changes, or the feature may be intentionally disabled for game stability. Investigate feasibility before committing to implementation.
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx` — settings access during gameplay
-- `apps/web/src/components/` — language picker component and i18n hook usage
-
----
 
 ---

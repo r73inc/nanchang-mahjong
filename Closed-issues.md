@@ -596,6 +596,16 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 
 ---
 
+### IMP-014 · Language change during active game
+
+**Root cause:** `LangToggle` was only rendered inside `ScreenShell`, which is not used by `GamePage` (the game has its own full-screen layout with a status bar). There was no path for a player to switch language once gameplay started.
+
+**Fix:** Added `LangToggle` to the right-side controls in `GamePage`'s status bar (the `absolute top-0` bar that also shows round wind, wall count, history, and concede). A single import change (`LangToggle` added alongside `useI18n`) and one JSX addition. The underlying `changeLanguage` from react-i18next re-renders all `t()` calls globally and instantly — no engine involvement needed, purely a UI concern.
+
+**Key learning:** Language switching is stateless in react-i18next — calling `instance.changeLanguage()` triggers a re-render of every component using `useTranslation()`. There are no mid-game stability concerns; the engine and server are language-agnostic. The only blocker was surface area: the game page never mounted the toggle.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
