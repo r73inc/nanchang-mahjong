@@ -6,7 +6,7 @@
  * made through `useRoomActions`.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
@@ -14,7 +14,7 @@ import { useRoomStore } from '../../stores/room.store';
 import { useRoomActions, useRoomSubscription } from '../../hooks/use-room';
 import { useAuthStore } from '../../stores/auth.store';
 import { Spinner } from '../../components/ui/spinner';
-import type { WsRoomStartedPayload } from '@nanchang/shared';
+import type { BotDifficulty, WsRoomStartedPayload } from '@nanchang/shared';
 
 // Wind symbols in seat-index order (East/South/West/North)
 const WIND_SYMBOLS = ['東', '南', '西', '北'];
@@ -45,7 +45,7 @@ export function RoomPage() {
   const error = useRoomStore((s) => s.error);
   const { clearRoom } = useRoomStore();
 
-  const { getRoomByCode, leaveRoom, setReady, kickSeat, startGame, updateSettings } =
+  const { getRoomByCode, leaveRoom, setReady, kickSeat, addBotToSeat, startGame, updateSettings } =
     useRoomActions();
   const user = useAuthStore((s) => s.user);
 
@@ -101,6 +101,15 @@ export function RoomPage() {
   async function handleKick(seatIdx: number) {
     if (!room) return;
     await kickSeat(room.roomId, seatIdx);
+  }
+
+  // Which empty seat is showing the bot difficulty picker (null = none open)
+  const [addingBotToSeat, setAddingBotToSeat] = useState<number | null>(null);
+
+  async function handleAddBot(seatIdx: number, difficulty: BotDifficulty) {
+    if (!room) return;
+    setAddingBotToSeat(null);
+    await addBotToSeat(room.roomId, seatIdx, difficulty);
   }
 
   async function handleCopy() {
@@ -291,6 +300,53 @@ export function RoomPage() {
                             ? t('ready')
                             : t('notReady')}
                     </p>
+
+                    {/* ── Bot picker — host only, empty seats only ──────── */}
+                    {isHost && isEmpty && room.status === 'waiting' && (
+                      <div className="mt-2">
+                        {addingBotToSeat === seat.seatIdx ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {(['easy', 'normal'] as BotDifficulty[]).map((diff) => (
+                              <button
+                                key={diff}
+                                onClick={() => void handleAddBot(seat.seatIdx, diff)}
+                                className="px-2.5 py-1 rounded-full text-[10px] font-bold"
+                                style={{
+                                  background: 'rgba(90,125,140,0.2)',
+                                  border: '1px solid rgba(90,125,140,0.5)',
+                                  color: '#7ab5cc',
+                                }}
+                              >
+                                {t(
+                                  diff === 'easy'
+                                    ? 'botDifficultyEasyFull'
+                                    : 'botDifficultyNormalFull',
+                                )}
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => setAddingBotToSeat(null)}
+                              className="text-[10px] text-mj-bone/40 px-1.5 py-1"
+                              aria-label={t('kickPlayerBtn')}
+                            >
+                              {t('kickPlayerBtn')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setAddingBotToSeat(seat.seatIdx)}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                            style={{
+                              background: 'rgba(90,125,140,0.12)',
+                              border: '1px solid rgba(90,125,140,0.3)',
+                              color: '#7ab5cc',
+                            }}
+                          >
+                            {t('roomAddBot')}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Ready badge — host and bots are always shown as ready */}
