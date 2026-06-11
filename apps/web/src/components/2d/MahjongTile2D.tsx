@@ -15,6 +15,7 @@
  */
 
 import { motion } from 'framer-motion';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { tileAriaLabel } from '@nanchang/shared';
 import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
@@ -154,8 +155,31 @@ export function MahjongTile2D({
   const liftY = Math.round(-6 * tileScale);
 
   const isBack = tile === 'back';
-  const imgSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
+  const baseSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
   const ariaLabel = isBack ? ARIA_HIDDEN_TILE : tileAriaLabel(tile as TileType, lang);
+
+  // ── Image error recovery ──────────────────────────────────────────────────
+  // When the browser caches a 404 (e.g. Vite dev-server hiccup during hot-reload),
+  // React never updates the <img> src, so the broken-image icon sticks.
+  // retryCount 0 = normal, 1 = first retry with cache-bust, 2 = give up (hide img).
+  const [retryCount, setRetryCount] = useState(0);
+  const prevBaseSrcRef = useRef(baseSrc);
+
+  // Reset retry state whenever the tile changes so a new tile always gets a
+  // fresh attempt (prevents a stale failure state from hiding a valid texture).
+  useEffect(() => {
+    if (prevBaseSrcRef.current !== baseSrc) {
+      prevBaseSrcRef.current = baseSrc;
+      setRetryCount(0);
+    }
+  }, [baseSrc]);
+
+  const handleImgError = useCallback(() => {
+    setRetryCount((c) => Math.min(c + 1, 2));
+  }, []);
+
+  // Derive the actual src: normal → cache-bust retry → null (hide img).
+  const imgSrc = retryCount === 0 ? baseSrc : retryCount === 1 ? `${baseSrc}?r=1` : null;
 
   // Build box-shadow: directional thickness + optional selected ring + optional jing glow.
   // Ring width and glow radius also scale so they remain proportional to tile size.
@@ -217,20 +241,23 @@ export function MahjongTile2D({
           userSelect: 'none',
         }}
       >
-        <img
-          src={imgSrc}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          data-testid="tile-img"
-          style={{
-            width: '85%',
-            height: '85%',
-            objectFit: 'contain',
-            pointerEvents: 'none',
-            userSelect: 'none',
-          }}
-        />
+        {imgSrc !== null && (
+          <img
+            src={imgSrc}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            data-testid="tile-img"
+            onError={handleImgError}
+            style={{
+              width: '85%',
+              height: '85%',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          />
+        )}
       </motion.div>
 
       {/*

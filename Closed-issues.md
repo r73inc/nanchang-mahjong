@@ -624,6 +624,27 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 
 ---
 
+### BUG-035 · Tile textures show broken-image placeholder during active game
+
+**Symptom:** Some tiles in the player's hand, open bot melds, and the discard pool showed the browser's native broken-image (mountain/landscape) icon instead of their SVG textures. The specific tiles affected were inconsistent across sessions.
+
+**Root cause:** When the Vite dev server restarts or hot-reloads, in-flight HTTP requests for static SVG texture files may return transient 404 responses. The browser caches these 404s. Because React does not update `<img>` `src` attributes unless the prop value changes — and the prop value (`/textures/Tiles/Regular/Man5.svg`) stays the same — the browser never retries the request. The result is a permanently broken image for the rest of that session, even after the server is healthy.
+
+A secondary risk is any future runtime path where an invalid tile type is passed to `tileTexturePath` (e.g., an incorrect cast, a future engine type mismatch). `TILE_TO_FLUFFY[unknownType]` returns `undefined`, producing a path of `/textures/Tiles/Regular/undefined.svg` — a guaranteed 404.
+
+**Fix:**
+
+1. `apps/web/src/components/2d/MahjongTile2D.tsx` — Added `retryCount` state and `handleImgError` callback to the component.
+   - `retryCount = 0`: normal load from `baseSrc`.
+   - `retryCount = 1`: first error → retry with `baseSrc?r=1` (cache-busting query string bypasses the browser's cached 404; if the dev server is now healthy the tile loads correctly).
+   - `retryCount = 2`: retry also failed → `imgSrc = null` → `<img>` is not rendered. The tile body (ivory background + gold border) remains visible as a plain blank-face tile — no broken-image icon.
+   - A `useEffect` resets `retryCount` to 0 whenever `baseSrc` changes so a newly-drawn tile always gets a fresh load attempt.
+2. `apps/web/src/r3f/utils/tile-texture-map.ts` — `tileTexturePath` now casts the lookup to `Record<string, string | undefined>` before reading, enabling a runtime-safe null check. If the name is `undefined` (unknown tile type), logs `console.warn` and returns `Blank.svg` as a fallback instead of producing an `undefined.svg` path.
+
+**Key learning:** React's diffing algorithm does not remount `<img>` elements when only the browser-side load state changes — only when the `src` prop changes in the VDOM. To recover from a browser-cached 404, you must supply a new `src` value (e.g., by appending a cache-busting query string). An `onError` handler that updates React state is the correct mechanism; direct DOM mutation via `e.currentTarget.src = ...` gets overwritten on the next React render.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
@@ -637,3 +658,4 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 9. **Engine vs. resolver:** Engine functions are general-purpose. Family-specific rule restrictions apply at the boundary layer (claim-resolver).
 10. **Testing edge cases:** Position-dependent mechanics need tests for all seat positions, including wrap-around.
 11. **Character localization:** Hardcoded characters in code must be validated for semantic correctness — they won't auto-translate and visual correctness alone doesn't guarantee the character is the right choice semantically.
+12. **Image retry on 404:** React does not re-request an `<img>` whose `src` prop hasn't changed, even if the browser cached a transient 404. The only way to force a retry is to change the `src` value (e.g., append a cache-busting query string). Use `onError` state to drive this; avoid direct DOM mutation (`e.currentTarget.src = ...`) which React will overwrite on the next render.
