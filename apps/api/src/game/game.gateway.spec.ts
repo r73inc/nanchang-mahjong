@@ -67,6 +67,7 @@ describe('GameGateway', () => {
       handleKongConcealed: jest.fn(),
       handleKongAdd: jest.fn(),
       handleConcede: jest.fn(),
+      handleRollDice: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -246,6 +247,42 @@ describe('GameGateway', () => {
         'g1',
         '1m',
       );
+    });
+  });
+
+  // ── game:roll-dice ──────────────────────────────────────────────────────────
+
+  describe('handleRollDice', () => {
+    it('Gameplay·dice-roll: delegates to gameService.handleRollDice when socket has gameId', () => {
+      const socket = makeSocket({ gameId: 'g1' });
+      gateway.handleRollDice(socket as never, {});
+      expect(mockGameService.handleRollDice).toHaveBeenCalledWith(expect.anything(), 'u1', 'g1');
+    });
+
+    it('emits NOT_IN_GAME when socket has no gameId', () => {
+      const socket = makeSocket(); // no gameId
+      gateway.handleRollDice(socket as never, {});
+      expect(socket.emit).toHaveBeenCalledWith(
+        'game:error',
+        expect.objectContaining({ code: 'NOT_IN_GAME' }),
+      );
+      expect(mockGameService.handleRollDice).not.toHaveBeenCalled();
+    });
+
+    it('Gameplay·dice-roll-rate: TOO_FAST after exceeding limit', () => {
+      const socket = makeSocket({ gameId: 'g1' });
+      // Limit is 2/s
+      gateway.handleRollDice(socket as never, {});
+      gateway.handleRollDice(socket as never, {});
+      expect(mockGameService.handleRollDice).toHaveBeenCalledTimes(2);
+
+      // Third within window → throttled
+      gateway.handleRollDice(socket as never, {});
+      expect(socket.emit).toHaveBeenCalledWith(
+        'game:error',
+        expect.objectContaining({ code: 'TOO_FAST' }),
+      );
+      expect(mockGameService.handleRollDice).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -116,6 +116,37 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
     });
   });
 
+  describe('pendingRoll', () => {
+    it('passes pendingRoll through to the snapshot', () => {
+      const engine = dealedEngine();
+      const snap = toClientSnapshot(
+        engine.state,
+        GAME_ID,
+        0,
+        connState,
+        '2D',
+        false,
+        'hands',
+        undefined,
+        undefined,
+        { purpose: 'jing_reveal', roller: 0 },
+      );
+      expect(snap.pendingRoll).toEqual({ purpose: 'jing_reveal', roller: 0 });
+    });
+
+    it('defaults pendingRoll to null when not provided', () => {
+      const engine = dealedEngine();
+      const snap = toClientSnapshot(engine.state, GAME_ID, 0, connState);
+      expect(snap.pendingRoll).toBeNull();
+    });
+
+    it('Gameplay·dice-roll-pause: dealing preGamePhase is included in snapshot', () => {
+      const engine = GameEngine.create(42); // not dealt yet
+      const snap = toClientSnapshot(engine.state, GAME_ID, 0, connState, '2D', false, 'dealing');
+      expect(snap.preGamePhase).toBe('dealing');
+    });
+  });
+
   describe('connection state', () => {
     it('reflects per-seat connected / afk flags', () => {
       const engine = dealedEngine();

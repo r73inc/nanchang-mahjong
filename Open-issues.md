@@ -178,5 +178,3 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 ---
 
 ## Open Improvements
-
----

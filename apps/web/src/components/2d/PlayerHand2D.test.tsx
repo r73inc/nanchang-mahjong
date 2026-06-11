@@ -55,6 +55,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     viewMode: '2D',
     ruleTopBottomJing: false,
     preGamePhase: null,
+    pendingRoll: null,
     seats: [
       {
         wind: 'east',

@@ -15,7 +15,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getSocket } from '../lib/socket';
 import { useGameStore } from '../stores/game.store';
-import type { TileType } from '@nanchang/shared';
+import type { TileType, ClientGameState } from '@nanchang/shared';
 
 // Delay before showing the reconnecting overlay (PLAN §7.5: 1.5s)
 const RECONNECT_OVERLAY_DELAY_MS = 1500;
@@ -36,6 +36,7 @@ export function useGame(gameId: string, spectate = false) {
     pendingMove,
     toast,
     gameError,
+    diceAnimation,
     setSnapshot,
     setEnded,
     setSettlementPreview,
@@ -49,6 +50,7 @@ export function useGame(gameId: string, spectate = false) {
     setPendingMove,
     setToast,
     setGameError,
+    setDiceAnimation,
     canTsumo,
     setYourTurnFlash,
     setCanTsumo,
@@ -57,6 +59,11 @@ export function useGame(gameId: string, spectate = false) {
   } = useGameStore();
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Snapshot queue: snapshots received during dice animation are held here and
+  // flushed after onDiceAnimationComplete fires to prevent the wall updating
+  // before the animation finishes.
+  const snapshotQueueRef = useRef<ClientGameState[]>([]);
+  const isDiceAnimatingRef = useRef(false);
 
   useEffect(() => {
     let socket: ReturnType<typeof getSocket> | null = null;
@@ -74,8 +81,13 @@ export function useGame(gameId: string, spectate = false) {
     // Although network latency makes the race essentially impossible in practice,
     // registering first is the correct pattern and eliminates any theoretical risk
     // of missing the game:snapshot response in low-latency (localhost) environments.
-    const handleSnapshot = (payload: { state: Parameters<typeof setSnapshot>[0] }) => {
-      setSnapshot(payload.state);
+    const handleSnapshot = (payload: { state: ClientGameState }) => {
+      if (isDiceAnimatingRef.current) {
+        // Queue snapshot until dice animation completes
+        snapshotQueueRef.current.push(payload.state);
+      } else {
+        setSnapshot(payload.state);
+      }
     };
 
     const handleClaimWindow = (payload: {
@@ -102,6 +114,18 @@ export function useGame(gameId: string, spectate = false) {
     // one render with pendingDiscard already null. See game.store.ts for details.
     const handleGameEvent = (payload: { event: import('@nanchang/shared').PublicGameEvent }) => {
       const { event } = payload;
+
+      // ── Dice roll animation ───────────────────────────────────────────────
+      if (event.kind === 'dice_roll') {
+        isDiceAnimatingRef.current = true;
+        setDiceAnimation({
+          dice: event.dice as [number, number],
+          purpose: event.purpose,
+          roller: event.roller,
+        });
+        // Return early — dice roll events don't affect the discard/toast logic below
+        return;
+      }
 
       // ── Last-discard tracking ─────────────────────────────────────────────
       if (event.kind === 'discard') {
@@ -381,6 +405,29 @@ export function useGame(gameId: string, spectate = false) {
     }
   }, []);
 
+  /** Emit game:roll-dice — the active roller triggers their dice roll. */
+  const rollDice = useCallback(() => {
+    try {
+      getSocket().emit('game:roll-dice', {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  /**
+   * Called by DiceRollOverlay when the Framer Motion animation completes.
+   * Flushes any queued snapshots and clears the animation state.
+   */
+  const onDiceAnimationComplete = useCallback(() => {
+    isDiceAnimatingRef.current = false;
+    // Flush queued snapshots in order
+    const queue = snapshotQueueRef.current.splice(0);
+    for (const state of queue) {
+      setSnapshot(state);
+    }
+    setDiceAnimation(null);
+  }, [setSnapshot, setDiceAnimation]);
+
   const declareTsumo = useCallback(() => {
     setCanTsumo(false);
     try {
@@ -420,6 +467,7 @@ export function useGame(gameId: string, spectate = false) {
     toast,
     gameError,
     canTsumo,
+    diceAnimation,
     // Actions
     selectTile,
     discard,
@@ -433,5 +481,7 @@ export function useGame(gameId: string, spectate = false) {
     kongConcealed,
     kongAdd,
     requestRematch,
+    rollDice,
+    onDiceAnimationComplete,
   };
 }

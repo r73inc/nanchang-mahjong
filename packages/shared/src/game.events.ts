@@ -76,6 +76,10 @@ export type ClaimPayload = z.infer<typeof ClaimPayloadSchema>;
 
 /** Player explicitly passes on the current claim window. */
 export const PassPayloadSchema = z.object({});
+
+/** Active roller triggers their dice roll — server computes from PRNG seed. */
+export const RollDicePayloadSchema = z.object({});
+export type RollDicePayload = z.infer<typeof RollDicePayloadSchema>;
 export type PassPayload = z.infer<typeof PassPayloadSchema>;
 
 /** Declare a concealed kong on the active player's turn. */
@@ -184,11 +188,21 @@ export interface ClientGameState {
   ruleTopBottomJing: boolean;
   /**
    * Pre-game reveal sub-phase (null once the game is actually in play).
+   *   'dealing'    — waiting for dice rolls before deal(); pendingRoll will be set
    *   'hands'      — hands dealt, waiting for host to advance
    *   'settlement' — settlement tile preview shown (ruleTopBottomJing only)
    *   'jing'       — jing indicator/primary/secondary revealed; waiting for host to start
    */
-  preGamePhase: 'hands' | 'settlement' | 'jing' | null;
+  preGamePhase: 'dealing' | 'hands' | 'settlement' | 'jing' | null;
+  /**
+   * Set while awaiting a manual dice roll from a specific player.
+   * The roller must emit game:roll-dice to advance.
+   * null during normal play.
+   */
+  pendingRoll: {
+    purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
+    roller: 0 | 1 | 2 | 3;
+  } | null;
 }
 
 // ── Pre-game & hand-reveal payloads ──────────────────────────────────────────
