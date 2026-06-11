@@ -6,6 +6,33 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-038-win-after-kong` (2026-06-11)
+
+### BUG-038 · Win button absent after declaring a kong
+
+**Symptom:** After performing any kong (concealed, open from discard, or add-to-kong) and drawing the replacement tile, the player was never offered a win option — neither the tsumo button nor a RON offer on opponents' discards. The bug affected all three kong types and both win paths (tsumo and ron).
+
+**Root cause:** `isWinningHand` in `packages/engine/src/hand.ts` has a hard `if (hand.length !== 14) return false` guard. After a kong, the full hand (open melds flattened + concealed tiles) is 14+k tiles where k = number of kongs (each kong is 4 tiles; a pung is 3). With 1 kong the flattened hand is 15 tiles — `isWinningHand` returned false, so:
+
+- `game.service.ts` `startTurn()` never emitted `game:can-tsumo` → no win button shown
+- `game.service.ts` `handleBotTurn()` never triggered bot auto-tsumo
+- `claim-resolver.ts` `computeEligibleClaims()` never added the player to the RON offer set
+- `claim-resolver.ts` `computeRobKongEligible()` same
+- `engine.ts` `win()` would have thrown "Hand is not a winning hand" if the player forced a tsumo
+
+**Fix:** Normalize each open kong (4 tiles) → pung (3 tiles) in the flattened tile list before calling `isWinningHand`. This restores the 14-tile invariant without changing any win logic. Scoring is unaffected — scoring always uses `openMelds` directly and correctly distinguishes kongs from pungs for payment calculation.
+
+**Files changed:**
+
+- `packages/engine/src/engine.ts` — `win()` reconstructed `winningHand` now normalizes kongs
+- `apps/api/src/game/game.service.ts` — `startTurn()` and `handleBotTurn()` tsumo checks normalized
+- `apps/api/src/game/claim-resolver.ts` — `computeEligibleClaims()` and `computeRobKongEligible()` normalized
+- `packages/engine/src/__tests__/engine.test.ts` — 2 BUG-038 regression tests added
+
+**Key learning:** Any function that receives a flattened `openMelds.flatMap(m => [...m.tiles])` list must account for the fact that kongs produce 4 tiles instead of 3. The safe pattern is `openMelds.flatMap(m => m.kind === 'kong' ? [m.tiles[0], m.tiles[0], m.tiles[0]] : [...m.tiles])`. The 14-tile hard guard in `isWinningHand` is intentional (Seven Pairs and Thirteen Misfits are 14-tile-only hands) — the fix is in the callers, not the function itself.
+
+---
+
 ## PR #29 · `chore/local-dev-setup` (2026-06-04)
 
 First full end-to-end local run. All bugs below discovered during initial testing.

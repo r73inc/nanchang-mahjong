@@ -552,8 +552,13 @@ export class GameEngine {
       : null;
     const robTile = robKongEvent?.tile ?? null;
 
-    // Reconstruct full 14-tile hand: open melds + concealed + (ron) discard + (rob-kong) tile
-    const openMeldTiles = winnerSeat.openMelds.flatMap((m) => [...m.tiles]);
+    // Reconstruct 14-tile hand for win validation.
+    // isWinningHand requires exactly 14 tiles, but a hand with k kongs has 14+k total
+    // (each kong is 4 tiles rather than 3). Normalize each kong to 3 tiles so the invariant
+    // holds. Scoring uses openMelds directly and still sees the full 4-tile kong structure.
+    const openMeldTiles = winnerSeat.openMelds.flatMap((m) =>
+      m.kind === 'kong' ? [m.tiles[0], m.tiles[0], m.tiles[0]] : [...m.tiles],
+    );
     const winningHand: TileType[] = [
       ...openMeldTiles,
       ...winnerSeat.hand,

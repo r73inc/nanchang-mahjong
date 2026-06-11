@@ -1157,3 +1157,92 @@ describe('Engine·BUG-036-regression', () => {
     expect(finished.state.seats[0].score).not.toBe(startingScore + winPayment + spiritDelta[0]);
   });
 });
+
+// ── BUG-038 regression: win must be accepted when player has a kong in open melds ──
+// Before the fix: isWinningHand hard-rejects any hand != 14 tiles. After a kong the
+// flattened hand (open melds + concealed) is 15 tiles (14 + 1 per kong), so tsumo was
+// silently blocked and engine.declareWin() threw "Hand is not a winning hand".
+// Fix: normalize each kong (4 tiles) → pung (3 tiles) before calling isWinningHand.
+
+describe('Engine·BUG-038-regression', () => {
+  it('tsumo accepted after concealed kong — 15-tile hand (4 kong + 11 hand)', () => {
+    const g = startedGame(99);
+
+    // Seat 0: concealed kong of east + 3 pungs + 1 pair in remaining tiles (11 tiles)
+    const kongHand: TileType[] = ['9p', '9p', '9p', '8p', '8p', '8p', '7p', '7p', '7p', '5p', '5p'];
+    const kongMeld: Meld = {
+      kind: 'kong',
+      tiles: ['east', 'east', 'east', 'east'],
+      concealed: true,
+    };
+
+    const patchedSeats = g.state.seats.map((s, i) =>
+      i === 0 ? { ...s, hand: kongHand, openMelds: [kongMeld] } : s,
+    );
+
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        isKongDraw: true,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    // Before fix: threw "Hand is not a winning hand" because flatMap produced 15 tiles
+    expect(() => engine.declareWin(0)).not.toThrow();
+    const finished = engine.declareWin(0);
+    expect(finished.state.phase).toBe('finished');
+    expect(finished.events.some((e: GameEvent) => e.kind === 'win')).toBe(true);
+  });
+
+  it('tsumo accepted after open kong (add-to-kong) — winning replacement tile', () => {
+    const g = startedGame(101);
+
+    // Seat 0: open kong of east (from add-to-kong) + 3 pungs + pair (11 tiles)
+    const kongHand: TileType[] = [
+      'south',
+      'south',
+      'south',
+      'west',
+      'west',
+      'west',
+      'north',
+      'north',
+      'north',
+      '1m',
+      '1m',
+    ];
+    const kongMeld: Meld = {
+      kind: 'kong',
+      tiles: ['east', 'east', 'east', 'east'],
+      concealed: false,
+    };
+
+    const patchedSeats = g.state.seats.map((s, i) =>
+      i === 0 ? { ...s, hand: kongHand, openMelds: [kongMeld] } : s,
+    );
+
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        isKongDraw: true,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    expect(() => engine.declareWin(0)).not.toThrow();
+    const finished = engine.declareWin(0);
+    expect(finished.state.phase).toBe('finished');
+    expect(finished.events.some((e: GameEvent) => e.kind === 'win')).toBe(true);
+  });
+});
