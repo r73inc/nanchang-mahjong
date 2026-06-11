@@ -194,14 +194,24 @@ Replaced the DOM `GameTable` compass layout with a React Three Fiber 3D scene. A
 
 ## 7. Command Self-Correction Rule
 
-When I need to run a command in a sub-directory, I must use **one of these patterns** — never `cd "absolute\path"; ...`:
+**⚠️ NEVER combine `cd` with another command in ANY shell or tool — no exceptions.**
+
+This means no `cd path && command`, no `cd path; command`, no `cd path | command`, in Bash, PowerShell, or any other tool. Every single time this is done it triggers a manual approval prompt that interrupts the user. It is banned absolutely.
+
+The working directory is already `D:\FamilyMahjongApp`. A bare `cd` to that root is never needed. For sub-directories, use pnpm workspace filters instead:
 
 ```powershell
-# ✅ Correct
+# ✅ Correct — filter runs in the right directory automatically
 pnpm --filter @nanchang/web run typecheck
 
-# ❌ Wrong — triggers hardcoded security block every time
+# ✅ Correct — git runs from the repo root without cd
+git status
+git log --oneline -5
+
+# ❌ BANNED — triggers manual approval prompt every time, no exceptions
+cd "D:\FamilyMahjongApp" && git log
 cd "D:\FamilyMahjongApp\apps\web"; npx tsc --noEmit
+cd path && any-command
 ```
 
 If a pnpm filter script doesn't exist for what I need, I add the script to the relevant `package.json` first, then run it via filter.
