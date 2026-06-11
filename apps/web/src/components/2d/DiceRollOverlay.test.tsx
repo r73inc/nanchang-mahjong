@@ -7,11 +7,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DiceRollOverlay } from './DiceRollOverlay';
-import type { ClientGameState } from '@nanchang/shared';
+import type { ClientGameState, ClientSeatState } from '@nanchang/shared';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeSeat(wind: 'east' | 'south' | 'west' | 'north', name: string) {
+function makeSeat(wind: 'east' | 'south' | 'west' | 'north', name: string): ClientSeatState {
   return {
     wind,
     score: 0,
@@ -22,7 +22,7 @@ function makeSeat(wind: 'east' | 'south' | 'west' | 'north', name: string) {
     hand: null,
     handCount: 13,
     seatName: name,
-  } as const;
+  };
 }
 
 function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState {
