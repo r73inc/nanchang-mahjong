@@ -245,19 +245,7 @@ function checkThirteenMisfits(naturals: TileType[], jingCount: number): boolean 
 
 // ── Primary decomposition ─────────────────────────────────────────────────────
 
-/**
- * Try to decompose a 14-tile hand into all valid winning configurations
- * (standard 4-meld + pair). Does NOT include Seven Pairs or Thirteen Misfits
- * (those are checked separately in `isWinningHand`).
- *
- * Wildcard constraints:
- *   - Pair must have ≥1 natural tile.
- *   - Each meld must have ≥1 natural tile.
- */
-export function decomposeHand(hand: TileType[], jingTypes: TileType[]): Decomposition[] {
-  const { naturals, jingCount } = separateJing(hand, jingTypes);
-  if (naturals.length + jingCount !== 14) return [];
-
+function decomposeCore(naturals: TileType[], jingCount: number): Decomposition[] {
   const sorted = sortTypes(naturals);
   const results: Decomposition[] = [];
   const seen = new Set<TileType>();
@@ -291,13 +279,41 @@ export function decomposeHand(hand: TileType[], jingTypes: TileType[]): Decompos
           pair: pairTile,
           melds: mr.melds,
           jingsUsed: mr.jingsUsed + 1,
-          jingPair: true, // one jing in the pair
+          jingPair: true,
         });
       }
     }
   }
 
   return results;
+}
+
+/**
+ * Try to decompose a 14-tile hand into all valid winning configurations
+ * (standard 4-meld + pair). Does NOT include Seven Pairs or Thirteen Misfits
+ * (those are checked separately in `isWinningHand`).
+ *
+ * Wildcard constraints:
+ *   - Pair must have ≥1 natural tile.
+ *   - Each meld must have ≥1 natural tile.
+ */
+export function decomposeHand(hand: TileType[], jingTypes: TileType[]): Decomposition[] {
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
+  if (naturals.length + jingCount !== 14) return [];
+  return decomposeCore(naturals, jingCount);
+}
+
+/**
+ * Decompose a concealed-portion hand (any 3k+2 tile count, 2–14) into meld+pair groups.
+ * Used for display when a player has open melds — their concealed tiles form fewer than
+ * 4 melds (e.g. 11 tiles = 3 melds + pair, 8 = 2+pair, 5 = 1+pair, 2 = pair only).
+ * Returns empty array for non-winning or non-(3k+2) hands.
+ */
+export function decomposeConcealed(hand: TileType[], jingTypes: TileType[]): Decomposition[] {
+  const { naturals, jingCount } = separateJing(hand, jingTypes);
+  const total = naturals.length + jingCount;
+  if (total % 3 !== 2 || total > 14 || total < 2) return [];
+  return decomposeCore(naturals, jingCount);
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isWinningHand, decomposeHand, shantenNumber } from '../hand';
+import { isWinningHand, decomposeHand, decomposeConcealed, shantenNumber } from '../hand';
 import type { TileType } from '../types';
 
 /** Empty jing array = no wildcards in play. */
@@ -596,6 +596,109 @@ describe('decomposeHand', () => {
       ),
     );
     expect(hasHonorChow).toBe(true);
+  });
+});
+
+// ── decomposeConcealed tests ──────────────────────────────────────────────────
+
+describe('decomposeConcealed', () => {
+  it('returns same result as decomposeHand for a full 14-tile hand', () => {
+    const hand: TileType[] = [
+      '1m',
+      '2m',
+      '3m',
+      '4p',
+      '5p',
+      '6p',
+      '7s',
+      '8s',
+      '9s',
+      'east',
+      'east',
+      'east',
+      '9p',
+      '9p',
+    ];
+    const full = decomposeHand(hand, NO_JINGS);
+    const partial = decomposeConcealed(hand, NO_JINGS);
+    expect(partial.length).toBeGreaterThan(0);
+    expect(partial.length).toBe(full.length);
+  });
+
+  it('decomposes 11-tile concealed portion (1 open meld) into 3 melds + pair', () => {
+    // Concealed hand when player has 1 open pung: 3 melds + pair = 11 tiles
+    const hand: TileType[] = [
+      '2m',
+      '3m',
+      '4m',
+      '5p',
+      '5p',
+      '5p',
+      '6s',
+      '7s',
+      '8s',
+      'north',
+      'north',
+    ];
+    const decomps = decomposeConcealed(hand, NO_JINGS);
+    expect(decomps.length).toBeGreaterThan(0);
+    for (const d of decomps) {
+      expect(d.melds).toHaveLength(3);
+      expect(d.pair).toBeDefined();
+    }
+  });
+
+  it('decomposes 8-tile concealed portion (2 open melds) into 2 melds + pair', () => {
+    const hand: TileType[] = ['1s', '1s', '1s', '9m', '9m', '9m', 'fa', 'fa'];
+    const decomps = decomposeConcealed(hand, NO_JINGS);
+    expect(decomps.length).toBeGreaterThan(0);
+    for (const d of decomps) {
+      expect(d.melds).toHaveLength(2);
+      expect(d.pair).toBe('fa');
+    }
+  });
+
+  it('decomposes 5-tile concealed portion (3 open melds) into 1 meld + pair', () => {
+    const hand: TileType[] = ['7p', '8p', '9p', 'zhong', 'zhong'];
+    const decomps = decomposeConcealed(hand, NO_JINGS);
+    expect(decomps.length).toBeGreaterThan(0);
+    expect(decomps[0].melds).toHaveLength(1);
+    expect(decomps[0].pair).toBe('zhong');
+  });
+
+  it('decomposes 2-tile concealed portion (4 open melds) — pair only', () => {
+    // Only a pair left after all 4 melds are open
+    const hand: TileType[] = ['bai', 'bai'];
+    const decomps = decomposeConcealed(hand, NO_JINGS);
+    expect(decomps.length).toBeGreaterThan(0);
+    expect(decomps[0].melds).toHaveLength(0);
+    expect(decomps[0].pair).toBe('bai');
+  });
+
+  it('returns empty for a non-(3k+2) tile count', () => {
+    // 13 tiles — not a valid concealed winning portion
+    const hand: TileType[] = [
+      '1m',
+      '2m',
+      '3m',
+      '4p',
+      '5p',
+      '6p',
+      '7s',
+      '8s',
+      '9s',
+      'east',
+      'east',
+      'east',
+      '9p',
+    ];
+    expect(decomposeConcealed(hand, NO_JINGS)).toHaveLength(0);
+  });
+
+  it('returns empty for a non-winning 5-tile hand', () => {
+    // 5 tiles that cannot form 1 meld + 1 pair
+    const hand: TileType[] = ['1m', '3m', '5m', '7m', '9m'];
+    expect(decomposeConcealed(hand, NO_JINGS)).toHaveLength(0);
   });
 });
 

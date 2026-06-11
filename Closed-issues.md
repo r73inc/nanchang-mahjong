@@ -6,6 +6,136 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/mobile-ux-hand-reveal-polish` (2026-06-11)
+
+### BUG-039 · Unmatched tiles unsorted in hand-reveal screen
+
+**Symptom:** In the end-of-hand reveal screen the "unmatched" tile section appeared in non-standard (lexicographic) order — e.g. a man tile, then two dots, then a bamboo — instead of standard suit/rank order.
+
+**Root cause:** `greedyGroupHand` initialised `bag` with `[...tiles].sort()` (JS default string sort). Tile IDs like `'1m'`, `'2p'`, `'east'` sort alphabetically, not in mahjong order. The returned `ungrouped` array was also an un-sorted slice of `bag`.
+
+**Fix:** Replaced `[...tiles].sort()` with `sortTypes([...tiles])` for the initial bag, and wrapped the `ungrouped` return value in `sortTypes([...bag])`. `sortTypes` is imported from `@nanchang/shared` (re-exported from engine).
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx` — `greedyGroupHand`.
+
+**Key learning:** Always use `sortTypes` (not `Array.sort`) for mahjong tile collections — it applies the canonical man → pin → sou → winds → dragons ordering.
+
+---
+
+### BUG-040 · Wind / dragon chow sequences not grouped in hand-reveal
+
+**Symptom:** When a concealed hand contained a valid Nanchang honor chow (e.g. East + South + West, or Zhong + Fa + Bai), those tiles appeared in the unmatched section instead of being labelled CHOW.
+
+**Root cause:** The chow-detection pass in `greedyGroupHand` only matched suit tiles via `/^(\d)([mps])$/`. Honor tile IDs (`east`, `south`, etc.) do not match this regex, so the pass silently skipped them. Per rules §4.3, three non-repeating wind tiles or the three dragon tiles form a valid chow.
+
+**Fix:** Added an honor-chow pass (using `WIND_CHOWS` + `DRAGON_CHOW` from `@nanchang/engine`) between the pung pass and the suit-chow pass. Also exported `WIND_CHOWS` and `DRAGON_CHOW` from `@nanchang/shared`.
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx` — `greedyGroupHand`; `packages/shared/src/index.ts` — added re-exports.
+
+**Key learning:** Honor chow support is a Nanchang-specific rule. Any hand-grouping utility must explicitly handle `WIND_CHOWS` and `DRAGON_CHOW` — the generic suit-regex pass will never reach honor tiles.
+
+---
+
+### IMP-018 · Spirit tiles cut off on mobile status bar
+
+**Symptom:** The two spirit tiles shown in the top-left of the mobile status bar were clipped at the top of the viewport. The `xs` size (28×38 px) overflowed the 32 px fixed bar height.
+
+**Fix:** Added an `xxs` size entry (`{ w: 20, h: 27, shadow: 2 }`) to `TILE_DIMS` in `MahjongTile2D.tsx`, and switched `MobileJingButton` to use `size="xxs"`. All existing size names remain unchanged.
+
+**Files changed:** `apps/web/src/components/2d/MahjongTile2D.tsx`; `apps/web/src/pages/game/game-page.tsx` — `MobileJingButton`.
+
+---
+
+### IMP-019 · Mobile history panel → full-screen overlay
+
+**Symptom:** On mobile the game-history panel opened as a bottom sheet with no backdrop. Closing it required tapping the icon again; it did not support tap-outside-to-close.
+
+**Fix:** Replaced the mobile branch of `GameHistoryPanel` with a `position: fixed; inset: 0` overlay (matching `MobileJingButton` style). The dark backdrop occupies the full viewport and calls `onToggle` on click; the content panel stops propagation so tapping the list doesn't close it.
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx` — `GameHistoryPanel`.
+
+---
+
+### IMP-020 · Settlement received rows consolidated
+
+**Symptom:** In the pre-round settlement breakdown, a player holding N spirit tile copies saw one "Received X from [player]" row per other player (up to 3 rows per tile type). The desired UX was a single "Received [total]" row.
+
+**Fix:** Rewrote `buildTransferLines` so received rows are consolidated: one row per tile type, `amount = count × rate × otherCount`. Paid rows remain per-player. Made `otherSeatName` optional in `TransferLine` since consolidated received rows have no specific payer.
+
+**Files changed:** `apps/web/src/components/game/SettlementPreview.tsx`.
+
+---
+
+### IMP-021 · Sort-hand button during player's turn
+
+**Symptom:** After manually dragging tiles into a custom order there was no way to quickly restore standard suit/rank order.
+
+**Fix:** Added a "Sort" button (absolute-positioned above-left of the tile row, rendered last in DOM for correct tab order) in both `PlayerHand2D` (2D/mobile) and `ViewerHandHUD` (3D). In `PlayerHand2D` the button calls `handleSortHand` which re-sorts `localOrder` via `sortTypes` while preserving entry IDs (so Framer Motion re-uses layoutIds). In `ViewerHandHUD` it rebuilds `displayOrder`. Button is hidden when a tile is selected (to avoid overlap with the discard confirm button) and when not the player's turn. Added `"gameSortHand": "Sort"` / `"整理"` i18n keys.
+
+**Files changed:** `apps/web/src/components/2d/PlayerHand2D.tsx`; `apps/web/src/pages/game/game-page.tsx` — `ViewerHandHUD`; `apps/web/src/i18n/en.json`; `apps/web/src/i18n/zh.json`.
+
+**Key learning:** Place absolutely-positioned buttons _after_ the tile list in DOM order. `getAllByRole('button')` traverses DOM order, and tests that grab `buttons[0]` expecting the first tile will break if a visually-above button appears first in the DOM.
+
+---
+
+## `fix/bug-021-hand-reveal-grouping` (2026-06-11)
+
+### BUG-021 · Hand-reveal screen concealed tiles not grouped into winning melds
+
+**Symptom:** On the post-hand reveal screen, all concealed tiles (row 2) appeared as a flat unsorted row with no visual grouping. The winning structure (chow/pung/pair groups) was not shown. Loser hands were similarly flat with no recognisable group patterns.
+
+**Root cause (two problems):**
+
+1. **`decomposeHand` requires exactly 14 tiles** (`if (naturals.length + jingCount !== 14) return []`). A winner with open melds has a concealed portion smaller than 14 tiles (11 for 1 open meld, 8 for 2, 5 for 3, 2 for 4), so the decomposition always returned empty and the code fell through to the flat fallback.
+
+2. **Losers' hands were never attempted for grouping** — there was no logic to greedily find recognisable patterns (pungs/chows/pairs) in non-winning hands.
+
+**Fix:**
+
+- Added `decomposeConcealed(hand, jingTypes)` to `packages/engine/src/hand.ts`: accepts any hand of size `3k+2` (2, 5, 8, 11, 14) and decomposes it into the correct number of melds + pair. Shares the inner `decomposeCore` function with `decomposeHand` to avoid duplication.
+- Exported `decomposeConcealed` from the engine and re-exported through shared.
+- Added `greedyGroupHand` utility in game-page.tsx: greedily finds pungs → chows → pairs in any tile set, returning labeled groups and a remainder. Used for losers and as a winner fallback (seven pairs, thirteen misfits).
+- Updated `HandRevealScreen` to use `decomposeConcealed` for all winner concealed hands regardless of open-meld count. Losers' hands use `greedyGroupHand`. Ungrouped remainder tiles appear after a visual separator with no label.
+
+**Files changed:**
+
+- `packages/engine/src/hand.ts` — refactored to `decomposeCore` + `decomposeHand` + new `decomposeConcealed`
+- `packages/engine/src/index.ts` — export `decomposeConcealed`
+- `packages/shared/src/index.ts` — re-export `decomposeConcealed`
+- `apps/web/src/pages/game/game-page.tsx` — `greedyGroupHand` utility + rewritten concealed hand rendering in `HandRevealScreen`
+- `packages/engine/src/__tests__/hand.test.ts` — 7 new `decomposeConcealed` tests
+
+**Key learning:** `decomposeHand` has an intentional 14-tile guard because it was designed as a win validator. Any display context that needs to decompose a partial hand (one with open melds) must use `decomposeConcealed`. The two functions share the same core logic — the only difference is the size validation.
+
+---
+
+## `fix/bug-038-win-after-kong` (2026-06-11)
+
+### BUG-038 · Win button absent after declaring a kong
+
+**Symptom:** After performing any kong (concealed, open from discard, or add-to-kong) and drawing the replacement tile, the player was never offered a win option — neither the tsumo button nor a RON offer on opponents' discards. The bug affected all three kong types and both win paths (tsumo and ron).
+
+**Root cause:** `isWinningHand` in `packages/engine/src/hand.ts` has a hard `if (hand.length !== 14) return false` guard. After a kong, the full hand (open melds flattened + concealed tiles) is 14+k tiles where k = number of kongs (each kong is 4 tiles; a pung is 3). With 1 kong the flattened hand is 15 tiles — `isWinningHand` returned false, so:
+
+- `game.service.ts` `startTurn()` never emitted `game:can-tsumo` → no win button shown
+- `game.service.ts` `handleBotTurn()` never triggered bot auto-tsumo
+- `claim-resolver.ts` `computeEligibleClaims()` never added the player to the RON offer set
+- `claim-resolver.ts` `computeRobKongEligible()` same
+- `engine.ts` `win()` would have thrown "Hand is not a winning hand" if the player forced a tsumo
+
+**Fix:** Normalize each open kong (4 tiles) → pung (3 tiles) in the flattened tile list before calling `isWinningHand`. This restores the 14-tile invariant without changing any win logic. Scoring is unaffected — scoring always uses `openMelds` directly and correctly distinguishes kongs from pungs for payment calculation.
+
+**Files changed:**
+
+- `packages/engine/src/engine.ts` — `win()` reconstructed `winningHand` now normalizes kongs
+- `apps/api/src/game/game.service.ts` — `startTurn()` and `handleBotTurn()` tsumo checks normalized
+- `apps/api/src/game/claim-resolver.ts` — `computeEligibleClaims()` and `computeRobKongEligible()` normalized
+- `packages/engine/src/__tests__/engine.test.ts` — 2 BUG-038 regression tests added
+
+**Key learning:** Any function that receives a flattened `openMelds.flatMap(m => [...m.tiles])` list must account for the fact that kongs produce 4 tiles instead of 3. The safe pattern is `openMelds.flatMap(m => m.kind === 'kong' ? [m.tiles[0], m.tiles[0], m.tiles[0]] : [...m.tiles])`. The 14-tile hard guard in `isWinningHand` is intentional (Seven Pairs and Thirteen Misfits are 14-tile-only hands) — the fix is in the callers, not the function itself.
+
+---
+
 ## PR #29 · `chore/local-dev-setup` (2026-06-04)
 
 First full end-to-end local run. All bugs below discovered during initial testing.

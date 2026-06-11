@@ -26,12 +26,19 @@ interface TransferLine {
   tile: TileType;
   direction: 'received' | 'paid';
   amount: number;
-  otherSeatName: string;
+  /** Player name for paid rows; undefined for consolidated received rows. */
+  otherSeatName?: string;
 }
 
-/** Compute every individual player-to-player transfer for seat `i`.
+/**
+ * Build transfer lines for seat `i`.
  *
- * Sort order: received (2pt, then 1pt) then paid (1pt, then 2pt),
+ * Received rows are consolidated: one row per tile type showing the total
+ * received from all other players (count × rate × 3).
+ * Paid rows remain per-player (showing how much was paid to each player based
+ * on that player's tile count).
+ *
+ * Sort order: received (2pt, then 1pt) then paid (1pt first, then 2pt),
  * so the most valuable receipts lead and the most expensive payments close.
  */
 function buildTransferLines(
@@ -40,30 +47,33 @@ function buildTransferLines(
   seatNames: string[],
 ): TransferLine[] {
   const lines: TransferLine[] = [];
-  for (let j = 0; j < 4; j++) {
+  const otherCount = settlementPreview.seatCounts.length - 1;
+
+  // Consolidated received rows (one per tile type, total from all other players)
+  if (settlementPreview.seatCounts[seat] > 0) {
+    lines.push({
+      tile: settlementPreview.settlementTile,
+      direction: 'received',
+      amount: settlementPreview.seatCounts[seat] * 2 * otherCount,
+    });
+  }
+  if (settlementPreview.nextTileSeatCounts[seat] > 0) {
+    lines.push({
+      tile: settlementPreview.nextTile,
+      direction: 'received',
+      amount: settlementPreview.nextTileSeatCounts[seat] * otherCount,
+    });
+  }
+
+  // Per-player paid rows (unchanged)
+  for (let j = 0; j < settlementPreview.seatCounts.length; j++) {
     if (j === seat) continue;
     const jName = seatNames[j];
-    if (settlementPreview.seatCounts[seat] > 0) {
-      lines.push({
-        tile: settlementPreview.settlementTile,
-        direction: 'received',
-        amount: settlementPreview.seatCounts[seat] * 2,
-        otherSeatName: jName,
-      });
-    }
     if (settlementPreview.seatCounts[j] > 0) {
       lines.push({
         tile: settlementPreview.settlementTile,
         direction: 'paid',
         amount: settlementPreview.seatCounts[j] * 2,
-        otherSeatName: jName,
-      });
-    }
-    if (settlementPreview.nextTileSeatCounts[seat] > 0) {
-      lines.push({
-        tile: settlementPreview.nextTile,
-        direction: 'received',
-        amount: settlementPreview.nextTileSeatCounts[seat],
         otherSeatName: jName,
       });
     }
@@ -231,8 +241,8 @@ export function SettlementPreview({
                       <MahjongTile2D tile={line.tile} size="xs" interactive={false} />
                       <span className="text-mj-bone/60 flex-1 text-left">
                         {line.direction === 'received'
-                          ? t('settlementReceivedFrom', String(line.amount), line.otherSeatName)
-                          : t('settlementPaidTo', String(line.amount), line.otherSeatName)}
+                          ? t('settlementReceived', String(line.amount))
+                          : t('settlementPaidTo', String(line.amount), line.otherSeatName ?? '')}
                       </span>
                     </div>
                   ))}

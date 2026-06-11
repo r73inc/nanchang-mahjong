@@ -5,7 +5,15 @@ export * from './replay.types';
 export * from './tile-map';
 
 // Re-export engine helpers useful in frontend without adding engine as a direct web dep
-export { decomposeHand, concealedKongOptions, addToKongOptions } from '@nanchang/engine';
+export {
+  decomposeHand,
+  decomposeConcealed,
+  concealedKongOptions,
+  addToKongOptions,
+  sortTypes,
+  WIND_CHOWS,
+  DRAGON_CHOW,
+} from '@nanchang/engine';
 export type { Decomposition } from '@nanchang/engine';
 
 export const SHARED_VERSION = '0.0.1';

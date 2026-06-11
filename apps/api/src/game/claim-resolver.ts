@@ -63,8 +63,11 @@ export function computeEligibleClaims(state: GameState): Map<Seat4, ClaimAction[
     const seatState = state.seats[seat];
     const hand = seatState.hand; // concealed tiles (fewer than 13 if the player has open melds)
     // Flat tile list of all already-played open meld tiles for this seat.
-    // Needed so canWin can verify the claimed tile completes a full 14-tile hand.
-    const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles]);
+    // Kongs are normalized to 3 tiles (pung) so canWin's 14-tile invariant holds —
+    // a hand with k kongs has 14+k tiles total, but win detection treats kongs as melds of 3.
+    const openMeldTiles = seatState.openMelds.flatMap((m) =>
+      m.kind === 'kong' ? [m.tiles[0], m.tiles[0], m.tiles[0]] : [...m.tiles],
+    );
     const actions: ClaimAction[] = [];
 
     if (canWin(hand, pendingDiscard, jingTypes, openMeldTiles)) actions.push({ kind: 'win' });
@@ -126,7 +129,9 @@ export function computeRobKongEligible(state: GameState, kongTile: TileType): Se
 
     // A rob-kong win is treated like a ron win on the kong tile.
     const seatState = state.seats[seat];
-    const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles]);
+    const openMeldTiles = seatState.openMelds.flatMap((m) =>
+      m.kind === 'kong' ? [m.tiles[0], m.tiles[0], m.tiles[0]] : [...m.tiles],
+    );
     if (canWin(seatState.hand, kongTile, jingTypes, openMeldTiles)) {
       eligible.add(seat);
     }
