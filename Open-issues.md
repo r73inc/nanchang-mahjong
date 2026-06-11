@@ -8,15 +8,16 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID         | Name                                   | Summary                                                                                                             |
-| ---------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| BUG-022    | Player rejoin blocks tile play         | Reconnected player cannot play tiles on their turn                                                                  |
-| BUG-08     | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                               |
-| BUG-09     | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                          |
-| BUG-029    | Copy room code broken on mobile        | Room code copy button has no effect on mobile                                                                       |
-| BUG-031 ⚠️ | Host refresh locks config (CRITICAL)   | After browser refresh, host cannot change config or start the game                                                  |
-| BUG-032    | Kicked player not redirected           | Kicked player remains on config screen instead of returning to menu                                                 |
-| BUG-037    | Settlement/spirit tiles wrong position | No dice roll; tiles flipped from wall front instead of dice-counted stack from the back; indicator wrongly consumed |
+| ID         | Name                                                   | Summary                                                                                                                                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BUG-022    | Player rejoin blocks tile play                         | Reconnected player cannot play tiles on their turn                                                                                                                                                                                                                                               |
+| BUG-08     | Viewer discards invisible (3D)                         | Viewer's own discard pile not visible on the 3D table                                                                                                                                                                                                                                            |
+| BUG-09     | TileWall3D needs redesign (3D)                         | TileWall removed due to red Back.svg background; needs neutral replacement                                                                                                                                                                                                                       |
+| BUG-029    | Copy room code broken on mobile                        | Room code copy button has no effect on mobile                                                                                                                                                                                                                                                    |
+| BUG-031 ⚠️ | Host refresh locks config (CRITICAL)                   | After browser refresh, host cannot change config or start the game                                                                                                                                                                                                                               |
+| BUG-032    | Kicked player not redirected                           | Kicked player remains on config screen instead of returning to menu                                                                                                                                                                                                                              |
+| BUG-037 ⚠️ | Wall model wrong — no dice, no segmented walls (MAJOR) | Engine uses one flat tile pool; real game has 4 per-player walls of 17 two-tile stacks, two dice rolls selecting the deal start, stack-based dealing, and kong draws from the opposite wall end. Settlement/spirit tiles also derived from wrong position. Full engine wall rework — no patching |
+| BUG-041    | Spirit tile popup shows too many tiles                 | Spirit tiles still cut off in top-left during gameplay; popup shows current→arrow→next→next-sequence instead of just current+next                                                                                                                                                                |
 
 ---
 
@@ -150,82 +151,129 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-037 · Settlement & spirit tiles derived from the wrong wall position — no dice roll
+### BUG-037 · Wall model wrong — no dice rolls, no segmented walls, wrong settlement/spirit position (MAJOR)
 
-**Symptom:** The opening settlement tile and the spirit (jing) indicator are taken from the **front** of the live wall (`wall[0]` and `wall[1]`) with no dice roll. In real Nanchang Mahjong the position is determined by a roll of two dice counted backwards from the **back** of the wall in 2-high stacks, and the two tiles are the **top and bottom of the same stack** — not two adjacent tiles in draw order. The current implementation also removes the indicator from play entirely, which is wrong: both tiles stay in the wall.
+**Severity: MAJOR — core engine rework.** This is not a patch. The engine's flat-pool wall model must be replaced with the real physical wall model described below. Do **not** bolt dice/segment bookkeeping onto the existing flat `wall: TileId[]` if that creates tech debt — redo the wall representation, dealing, drawing, and kong-replacement mechanics properly so the future spectator view can animate the real table directly from engine state and events. Good and right beats easy and short-term.
 
-**Status:** ACTIVE, UNRESOLVED (logged 2026-06-11)
+**Symptom (current wrong behavior):**
 
-**Correct real-life procedure (target behavior):**
+- The engine shuffles all tiles into **one flat pool** and deals from the front — there are no per-player walls, no 2-high stacks, no dice.
+- The opening settlement tile and spirit (jing) indicator are taken from `wall[0]` / `wall[1]` with no dice roll; the indicator is consumed (removed from play) and the settlement tile is moved to the bottom of the whole wall. In the real game both tiles stay in the wall in their (swapped) stack positions.
+- Kong replacement draws come from the same linear pool rather than from the correct physical wall end.
 
-1. Walls are built; tiles are stacked **2 high** (each "group" in the wall is a stack of 2 tiles: top + bottom).
-2. Players take turns drawing until everyone has 13 tiles; the dealer (host) then draws one more for 14. _(Already correct — `deal()` gives the dealer 14.)_
-3. **Two six-sided dice are rolled** (values 1–6 each, sum 2–12).
-4. Count backwards from the **back of the wall** in **groups/stacks**, the dice sum being the count. Example: a roll summing to 7 → the 7th stack from the back, which is 14 tiles from the back in flat-tile terms.
-5. The **top tile of that stack** is flipped: this is the **settlement tile**. Its opening payout is distributed (2 pts/copy held, plus the 1 pt/copy next-in-sequence payout — existing `calculateOpeningJingSettlement` math is correct, don't change it).
-6. After the payout, the settlement tile is **swapped with the tile directly below it** in the same stack. The bottom tile is revealed: this is the **spirit tile** (the wild card — the indicator from which `jingPrimary`/`jingSecondary` are derived via the existing `jingTypesFromIndicator`).
-7. **Both tiles remain in play in their (now swapped) positions in the wall.** Neither is consumed or relocated elsewhere. They will be drawn normally when the draw reaches that part of the wall.
+**Status:** ACTIVE, UNRESOLVED (logged 2026-06-11; expanded with full real-world wall/deal procedure 2026-06-11)
 
-**Current (wrong) behavior — `packages/engine/src/engine.ts` `revealJing()` (≈ lines 355–419):**
+---
 
-- No dice roll exists anywhere in the codebase.
-- Settlement tile = `wall[0]` (front of wall / next draw), indicator = `wall[1]`.
-- Indicator is **consumed** (removed from the wall entirely).
-- Settlement tile is moved to the **bottom of the whole wall** (last-draw position) instead of swapping with its stackmate.
-- The two tiles are linear neighbours in draw order rather than a vertical top/bottom stack pair.
+**Real-world setup and deal procedure (target behavior, from the family's table practice):**
 
-**Required changes:**
+1. **Wall build.** The full tile set is divided into **4 equal walls, one in front of each player**. Tiles are stacked **2 high**, so each player has **17 stacks of 2 tiles** (17 × 2 × 4 = 136 ✓ matches the Nanchang set). Convention for one wall: from that player's perspective, left-most top tile = flat tile 1, left-most bottom = 2, second stack top = 3, second stack bottom = 4, … 17th stack = tiles 33–34.
 
-_Engine (`packages/engine`):_
+2. **Dice roll #1 — wall selection (rolled by the dealer).** Two six-sided dice. The sum counts around the players **counter-clockwise, inclusively, starting with the dealer as 1**. Example: roll of 3 → dealer = 1, player to dealer's right = 2, player across = 3 → the player **across** is selected. The selected player rolls next.
 
-1. **New `packages/engine/src/dice.ts` — reusable dice module.** Nanchang has several moments where dice are rolled; all of them will eventually be animated on the frontend, so the module must return the **individual die faces, not just the sum**:
-   - `rollDice(rand: () => number, count = 2): number[]` — pure helper drawing from a supplied PRNG function (composes with the existing `mulberry32` in `prng.ts`); each die uniform 1–6.
-   - Export from `packages/engine/src/index.ts` so shared/api can reuse it for every future dice moment (seating draw, etc.).
-2. **Wall stack model.** The wall is a flat `TileId[]`. Define the stack mapping once as a documented convention, e.g. the back of the wall is the **end** of the array, and stack _k_ from the back (1-based) occupies flat indices `[len − 2k]` (top) and `[len − 2k + 1]` (bottom). Add pure helpers (`stackFromBack(wall, k)`) with unit tests so the convention can't drift.
-3. **`GameState` additions:** store `diceRoll: [number, number] | null` (the jing-reveal roll) and the resolved flat wall indices of the settlement/spirit tiles, so clients and replay can render the position.
-4. **New `GameEvent`:** `{ kind: 'dice_roll'; purpose: 'jing_reveal' | ...; dice: number[] }` appended before `opening_jing_settlement`. This makes the roll **replayable** (`replayHand()` replays events deterministically) and gives the frontend a discrete event to hang the future dice animation on.
-5. **Rewrite `revealJing()` (ruleTopBottomJing path):**
-   - Roll dice via `rollDice` using a deterministic PRNG derived from the hand seed (e.g. `mulberry32(seed ^ DICE_SALT)`) — must be reproducible from the seed alone, like the shuffle.
-   - Resolve the stack: settlement tile = top of stack _sum_ from the back; spirit indicator = bottom of the same stack.
-   - Apply the existing opening settlement payout (unchanged math).
-   - **Swap the two tiles in place** in the wall array — do not remove either, do not move either to the wall ends.
-   - Derive `jingPrimary`/`jingSecondary` from the revealed spirit tile via `jingTypesFromIndicator` as today.
-   - Append events: `dice_roll`, `opening_jing_settlement`, `jing_indicator`.
-6. **Wall-exhaustion accounting:** today the indicator consumption shrinks the wall by 1; after the fix the wall length is unchanged at reveal. Verify draw-count / `draw_game` thresholds and any `wallCount` assumptions still hold.
+3. **Dice roll #2 — starting stack (rolled by the selected player).** The result is the number of 2-tile stacks counted **from the left side of the selected player's own wall** (left from that player's perspective), counting **inclusively**, each stack = 1. Example: a 6 → the **6th stack** (flat tiles 11 + 12 of that wall) is where taking begins — the dealer takes that 6th stack first.
 
-_Shared (`packages/shared`):_
+4. **Taking order.** The **dealer always takes first** (one full stack = 2 tiles), then the player to the dealer's right (counter-clockwise), then the next, and so on — each player takes the next stack along the wall in sequence. Example continued: dealer takes the stack with tiles 11+12; the player to the dealer's right takes the stack with tiles 13+14; etc.
 
-7. `SettlementPreviewPayload` — add the dice values and stack position so the preview screen can show/animate the roll. Revisit `nextTile` semantics: the 1 pt payout tile is currently `stepAbove(settlement)` (derived, never removed) — confirm against the locked rules doc whether that stays, since the spirit tile is now the physical stackmate rather than the next wall tile.
-8. `ClientGameState` — add `diceRoll` (and optionally the revealed stack position) for rendering.
-9. `PublicGameEvent` — add a public `dice_roll` variant (dice faces are public information) for the future animation hook.
+5. **Wall wraparound.** When someone takes the **17th (last) stack** of a wall, taking transitions to the wall of the player **to the right (counter-clockwise)** of the player whose wall was being taken from.
 
-_API (`apps/api`):_
+6. **Hand sizes.** Stack-taking rounds continue until **every player has 12 tiles** (3 stacks each). Then **each player takes 1 single tile** (13 each). Then **the dealer alone takes a 14th tile**. Dealer starts the hand with 14, everyone else with 13. _(Final counts match the current `deal()`; the taking pattern and physical source do not.)_
 
-10. `game.service.ts` pre-game flow (`advancePreGame` / settlement preview build) — preview must use the dice-resolved tiles, not `wall[0]`/`wall[1]`. Broadcast the `dice_roll` public event.
-11. `toClientSnapshot` — pass through the new fields (dice faces and revealed positions are public; no redaction concern).
+7. **Settlement & spirit tile reveal happens after dealing** (the existing dice-counted stack procedure below), then normal gameplay begins.
 
-_Web (`apps/web`):_
+8. **Live draw continuation.** Normal gameplay drawing **continues from exactly where the deal taking stopped** — same direction, same wall progression.
 
-12. Minimal for now: settlement preview screen reads the tiles from the payload (no positional assumption). Display the rolled dice values as static text/icons on the settlement preview step — the full dice-roll animation is a future improvement, but the data path (event + payload fields) must land with this fix so the animation can be added without another schema change.
+9. **Kong replacement draws** come from the **back of the wall**: the tiles in front of the player **to the left of the player whose wall the taking started from** (i.e. the opposite end of the draw ring from the live draw direction).
 
-_Tests:_
+**Settlement & spirit tile procedure (unchanged requirement from the original log, now expressed in the segmented model):**
 
-13. Engine: dice determinism from seed; stack-from-back index math (including sums 2 and 12 at the edges); swap-in-place leaves wall length unchanged and both tiles drawable; zero-sum settlement unchanged; replay reproduces the same roll and reveal.
+- After dealing, **two dice are rolled**; count that many **stacks backwards from the back of the wall** (the kong-replacement end). The **top tile** of the resolved stack is flipped — this is the **settlement tile**; its opening payout is distributed (existing `calculateOpeningJingSettlement` math is correct — 2 pts/copy + 1 pt/copy next-in-sequence — don't change it).
+- After the payout, the settlement tile is **swapped with the tile directly below it** in the same stack; the revealed bottom tile is the **spirit tile** (indicator for `jingPrimary`/`jingSecondary` via the existing `jingTypesFromIndicator`).
+- **Both tiles remain in the wall in their swapped positions** and are drawn normally when the draw reaches them. Neither is consumed or relocated.
 
-**Dice reusability note (explicit requirement):** every future dice moment (e.g. seating/deal-position rolls) must go through `rollDice` + a `dice_roll` event with a distinct `purpose`, so the backend simulates them now and the frontend can animate each one later from the same event stream. Do not inline `Math.random`-style rolls anywhere.
+---
 
-**Open questions to resolve during implementation (check `docs/final-nanchang-mahjong-rules.md`):**
+**Target engine model (design recommendation — refine during implementation):**
 
-- Does the dice count from the back overlap the dead-wall region (`deadWall` = last 4 shuffled tiles)? Decide whether the count is over the live wall only or the full wall including kong-replacement tiles, and what happens if the resolved stack falls inside the dead wall.
-- Standard (non-ruleTopBottomJing) mode currently takes the indicator from `deadWall[0]` — confirm whether the dice procedure applies to both modes or only the top-bottom variant.
+- **Ring-of-stacks representation.** Model the wall as a ring of **68 stacks** (4 segments × 17), each stack `{ top: TileId; bottom: TileId }`, with each segment tagged by owner seat. The deterministic shuffle (existing seeded `mulberry32`) lays tiles into the ring; dice rolls (also seed-derived) resolve the starting stack.
+- **Two pointers moving toward each other:** a `drawPtr` advancing in the deal/draw direction and a `kongPtr` at the opposite end (the left-neighbour wall of the deal-start player) retreating for replacement draws. A hand is wall-exhausted when the pointers meet (reconcile with the existing `deadWall` count — see open questions).
+- **Within-stack draw order** for normal draws (top then bottom, matching how a physical stack is picked up) must be defined once and tested.
+- **Dealing as stack-taking.** Reimplement `deal()` as the real procedure: dealer takes stack at `drawPtr`, then counter-clockwise seat order (engine seat order East→South→West→North already matches counter-clockwise play), 3 stack rounds (12 each), then 4 single tiles (13 each), then the dealer's 14th. Identical resulting hands **per seat** could be preserved or not — replays of old games must still work (see migration note).
+- **Everything derives from the seed.** Shuffle, dice roll #1, dice roll #2, and the jing-reveal roll must all be reproducible from the hand seed alone (e.g. `mulberry32(seed ^ SALT_N)` per roll) so `replayHand()` reproduces the entire physical setup with no extra stored state beyond the events.
+- **Events for every visual moment.** New `GameEvent` kinds so the future spectator view can animate the whole sequence from the event stream:
+  - `{ kind: 'dice_roll'; purpose: 'wall_selection' | 'deal_start' | 'jing_reveal'; roller: SeatWind; dice: number[] }` — individual die faces, never just the sum.
+  - Optionally `deal_taken` events (or derivable from state) marking which stack went to which seat, for the deal animation.
+- **Dice module:** `packages/engine/src/dice.ts` with `rollDice(rand: () => number, count = 2): number[]` — pure, PRNG-injected, exported from the engine index. **Every future dice moment must go through this + a `dice_roll` event with a distinct `purpose`. No inline `Math.random`-style rolls anywhere.**
+- **`GameState` additions:** dice results, deal-start seat + stack index, current `drawPtr`/`kongPtr` (or equivalent), and resolved settlement/spirit stack position — enough that a renderer can draw the physical table at any point in the hand.
+
+**Required changes by package:**
+
+_Engine (`packages/engine`):_ new `dice.ts`; new wall/stack module (ring construction, pointer math, `stackFromBack`-style helpers with unit tests so conventions can't drift); rewrite `deal()` (≈ line 296) as stack-taking; rewrite `revealJing()` (≈ lines 355–437) to dice-resolve the stack, swap in place, never consume; route normal draws and kong-replacement draws through the two pointers; update wall-exhaustion accounting.
+
+_Shared (`packages/shared`):_ `SettlementPreviewPayload` gains dice values + stack position; `ClientGameState` gains dice/wall-position fields (all public — no redaction concern; only tile **identities** in concealed hands are secret, wall positions/counts are public table state); `PublicGameEvent` gains the `dice_roll` variant. Revisit `nextTile` semantics (currently `stepAbove(settlement)`, derived) against the locked rules doc.
+
+_API (`apps/api`):_ `game.service.ts` pre-game flow builds the settlement preview from the dice-resolved tiles; broadcast `dice_roll` public events; `toClientSnapshot` passes the new public fields through.
+
+_Web (`apps/web`):_ minimal for now — settlement preview reads tiles from the payload and shows the rolled dice values as static text/icons. Full dice/deal animations are future work, but the **data path (events + payload fields) must land with this fix** so animation needs no schema change.
+
+_Tests:_ dice determinism from seed; ring/stack index math including wraparound at the 17th stack and at segment boundaries; deal produces 14/13/13/13 with the correct stack-taking sequence from both dice rolls; kong replacement comes from the correct opposite end; swap-in-place leaves wall length unchanged and both tiles drawable; zero-sum settlement unchanged; `replayHand()` reproduces the full setup and all rolls; wall-exhaustion threshold unchanged in tile count.
+
+**Migration / compatibility notes:**
+
+- **Replays:** existing stored replays were generated under the flat-pool model. `replayHand()` replays events against engine calls — verify old replays still resolve (version-gate the wall model by a flag in `handLog` seed/config if needed) rather than silently producing different hands.
+- **Bots and claim logic** consume hands and discards, not wall internals — they should be unaffected, but the wall-count fields they may read (`wallCount`) must keep meaning "tiles remaining to draw".
+
+**Research pointers for implementation:**
+
+- Standard mahjong dealing conventions (for cross-checking the mechanics, not the rules): the two-roll "break the wall" procedure is near-universal; the second count traditionally starts from the **right** edge in many variants — **here the family rule is explicit: count from the LEFT of the selected player's wall, inclusive, and the dealer takes the counted stack itself.** Implement the family rule; don't copy a generic variant.
+- The math invariant to test first: 4 walls × 17 stacks × 2 tiles = 136 = full Nanchang set (108 suits + 16 winds + 12 dragons). Any wall-model code should assert this at construction.
+- `packages/engine/src/prng.ts` (`mulberry32`) is the existing seeded-determinism pattern; follow it for all rolls.
+- `packages/engine/src/jing.ts` `jingTypesFromIndicator` is unchanged by all of this.
+- `docs/final-nanchang-mahjong-rules.md` is the locked rules authority — reconcile any conflict between this log and that doc before coding, and update the doc if the family confirms these table procedures.
+
+**Open questions to resolve during implementation (ask the user / check the locked rules doc):**
+
+- **Second dice roll:** confirmed two dice (sum 2–12) like the first roll, or a single die? The worked example used "a 6", which is possible either way.
+- **Dead wall / kong-replacement tail:** strictly, the stacks **before** the deal-start stack (stacks 1 … N−1 of the deal-start player's wall) sit at the very tail of the draw ring. The user states kong tiles come from the wall of the player **to the left** of the deal-start player. Confirm whether the skipped stacks 1…N−1 are part of the kong tail (drawn before reaching the left-neighbour wall), are dead tiles, or whether the family convention simply approximates "the back". This also determines what "count backwards from the back" means for the settlement/spirit dice count.
+- Does the settlement/spirit dice count overlap the kong-replacement region, and what happens if the resolved stack has already been drawn from?
+- Standard (non-`ruleTopBottomJing`) mode currently takes the indicator from `deadWall[0]` — confirm whether the dice procedure applies to both modes or only the top-bottom variant.
+- Should `wallCount` shown to clients remain a single number, or become per-wall counts for the spectator view? (Per-wall is derivable from pointers — prefer deriving over storing.)
 
 **Where to look:**
 
-- `packages/engine/src/engine.ts` — `deal()` (≈ line 296), `revealJing()` (≈ lines 355–437)
+- `packages/engine/src/engine.ts` — `deal()` (≈ line 296), `revealJing()` (≈ lines 355–437), draw + kong-replacement paths
 - `packages/engine/src/prng.ts` — `mulberry32`, pattern for seeded determinism
 - `packages/engine/src/jing.ts` — `jingTypesFromIndicator` (unchanged)
 - `packages/shared/src/game.events.ts` — `SettlementPreviewPayload`, `PublicGameEvent`, `ClientGameState`
 - `apps/api/src/game/game.service.ts` — pre-game advance / settlement preview emission
+- `packages/engine/src/replay.ts` (or equivalent) — `replayHand()` compatibility with the new events
+
+---
+
+### BUG-041 · Spirit tile display clipped and shows too many tiles
+
+**Symptom:** During gameplay, the spirit tile indicator buttons in the top-left status bar are clipped (cut off at the top edge of the viewport). When tapped, the popup shows four items: current spirit tile → arrow → next spirit tile → next-sequence spirit tile. The user expects the popup to show only the current and next spirit tiles (two tiles total).
+
+**Status:** ACTIVE, UNRESOLVED (logged 2026-06-11)
+
+**Root cause (two problems):**
+
+1. **Clipping:** The spirit tile buttons (`MobileJingButton`) were already using the older `xs` size (28×38 px) before the `xxs` addition. The 32 px fixed status bar height is too small for two stacked `xs` tiles. IMP-018 switched the button to `xxs` (20×27 px) and resolved the visual clipping, but the spirit tiles may still be overflowing depending on viewport layout or padding.
+
+2. **Popup content:** The popup currently renders the full spirit tile sequence:
+   - Current tile (the active spirit tile for this turn)
+   - Arrow icon
+   - Next spirit tile (the one that will come into play after the next bonus round)
+   - Next-sequence spirit tile (one step further ahead)
+
+   This is visually cluttered. The user wants only the current and next spirit tiles shown.
+
+**Fix:**
+
+- Verify that the `xxs` size (from IMP-018) fully resolves the clipping — if not, further reduce `MobileJingButton` padding or container height.
+- Rewrite `MobileJingButton` popup to show only two tiles: current (large) and next (smaller, perhaps with an arrow or "next round" label). Remove the next-sequence tile from the display.
+
+**Where to look:** `apps/web/src/pages/game/game-page.tsx` — `MobileJingButton` component.
 
 ---
 
