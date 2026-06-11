@@ -15,7 +15,7 @@
  */
 
 import { motion } from 'framer-motion';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { tileAriaLabel } from '@nanchang/shared';
 import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
@@ -161,25 +161,25 @@ export function MahjongTile2D({
   // ── Image error recovery ──────────────────────────────────────────────────
   // When the browser caches a 404 (e.g. Vite dev-server hiccup during hot-reload),
   // React never updates the <img> src, so the broken-image icon sticks.
-  // retryCount 0 = normal, 1 = first retry with cache-bust, 2 = give up (hide img).
-  const [retryCount, setRetryCount] = useState(0);
-  const prevBaseSrcRef = useRef(baseSrc);
+  // State is keyed to the specific asset URL so the count resets synchronously
+  // during the render pass — no useEffect race that could flush one extra cycle
+  // at retryCount=1 against the new src and needlessly invalidate the browser cache.
+  const [errorTracking, setErrorTracking] = useState({ src: baseSrc, count: 0 });
 
-  // Reset retry state whenever the tile changes so a new tile always gets a
-  // fresh attempt (prevents a stale failure state from hiding a valid texture).
-  useEffect(() => {
-    if (prevBaseSrcRef.current !== baseSrc) {
-      prevBaseSrcRef.current = baseSrc;
-      setRetryCount(0);
-    }
-  }, [baseSrc]);
+  // Synchronous reset: if baseSrc changed this render, reset immediately.
+  // React detects the setState-during-render pattern and re-renders before
+  // committing, so the browser never sees the stale count against the new URL.
+  if (errorTracking.src !== baseSrc) {
+    setErrorTracking({ src: baseSrc, count: 0 });
+  }
 
   const handleImgError = useCallback(() => {
-    setRetryCount((c) => Math.min(c + 1, 2));
+    setErrorTracking((prev) => ({ ...prev, count: Math.min(prev.count + 1, 2) }));
   }, []);
 
   // Derive the actual src: normal → cache-bust retry → null (hide img).
-  const imgSrc = retryCount === 0 ? baseSrc : retryCount === 1 ? `${baseSrc}?r=1` : null;
+  const imgSrc =
+    errorTracking.count === 0 ? baseSrc : errorTracking.count === 1 ? `${baseSrc}?r=1` : null;
 
   // Build box-shadow: directional thickness + optional selected ring + optional jing glow.
   // Ring width and glow radius also scale so they remain proportional to tile size.
