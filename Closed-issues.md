@@ -579,6 +579,23 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 
 ---
 
+### BUG-028 · End of game INVALID_PHASE error — host/non-host continue inconsistency
+
+**Root cause (INVALID_PHASE):** `handleAdvanceHand` returned `INVALID_PHASE` when `session.pendingHandEnd` was null. This could be hit legitimately when: (a) the dealer's auto-advance already fired and cleared `pendingHandEnd`, but `game:ended` was briefly delayed and the player clicked the manual fallback Continue button; or (b) the dealer is a bot seat and the server allows any human to advance — two humans clicking in quick succession would have the second one hit the null check.
+
+**Root cause (bot-dealer freeze):** When the current hand's dealer seat is occupied by a bot, `isDealer = viewerSeat === snapshot.dealerSeat` is false for all human players. Both `HandRevealScreen` and `PreGameFlow` received `isHost={false}`, showing WaitingDots to everyone. The auto-advance effect also checked `vs === snapshot.dealerSeat` before firing, so it never triggered. Result: the game was permanently frozen whenever the dealer rotated to a bot seat.
+
+**Fix:**
+
+1. `apps/api/src/game/game.service.ts` — `handleAdvanceHand()`: changed `return this.emitError(socket, 'INVALID_PHASE')` to a silent `return` when `!pending`. The caller will shortly receive `game:ended` or the next hand's `game:snapshot`; emitting an error served no purpose and caused visible UX problems.
+2. `apps/web/src/pages/game/game-page.tsx` — Added `canAdvanceHand` computed value: `isDealer || (dealerIsBot && viewerSeat === firstHumanSeat)`. When the dealer is a bot, the first non-bot seat index acts as the advance proxy — matching the server's "any human may advance when dealer is bot" permission.
+3. `HandRevealScreen` and `PreGameFlow` now receive `isHost={canAdvanceHand}` so the Continue button appears for the correct player even with a bot dealer.
+4. Auto-advance effect updated with the same bot-dealer logic: fires for the first human seat when `isLastHand=true` and the dealer is a bot.
+
+**Key learning:** "Dealer" and "room host" are distinct concepts (see Key Learning #2). When bot seats can hold the dealer role, advance-hand permissions need to fall back to a designated human rather than silently showing WaitingDots to everyone. `pendingHandEnd === null` in `handleAdvanceHand` is always a race/duplicate — never a client bug worth surfacing as an error.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

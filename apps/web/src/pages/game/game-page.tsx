@@ -2631,7 +2631,12 @@ export function GamePage() {
   useEffect(() => {
     if (!handReveal?.isLastHand || ended) return;
     const vs = snapshot?.viewerSeat;
-    if (vs === null || vs === undefined || vs !== snapshot?.dealerSeat) return;
+    if (vs === null || vs === undefined) return;
+    // Advance if: I am the dealer, OR the dealer is a bot and I'm the first human seat.
+    const botDealer = snapshot?.seats[snapshot.dealerSeat]?.isBot === true;
+    const firstHuman = snapshot?.seats.findIndex((s) => !s.isBot);
+    const shouldAdvance = vs === snapshot?.dealerSeat || (botDealer && vs === firstHuman);
+    if (!shouldAdvance) return;
     if (autoAdvancedRef.current === handReveal) return;
     autoAdvancedRef.current = handReveal;
     advanceHand();
@@ -2704,6 +2709,13 @@ export function GamePage() {
 
   const viewerSeat = snapshot.viewerSeat;
   const isDealer = viewerSeat !== null && viewerSeat === snapshot.dealerSeat;
+  // When the dealer seat is occupied by a bot, the server allows any human to advance.
+  // Client-side we assign that role to the first non-bot seat so only one human shows
+  // the Continue button and emits game:advance-hand.
+  const dealerIsBot = snapshot.seats[snapshot.dealerSeat]?.isBot === true;
+  const firstHumanSeat = snapshot.seats.findIndex((s) => !s.isBot) as 0 | 1 | 2 | 3 | -1;
+  const canAdvanceHand =
+    isDealer || (dealerIsBot && viewerSeat !== null && viewerSeat === firstHumanSeat);
   const announcement = announcingReveal
     ? buildHandAnnouncement(announcingReveal, snapshot, t)
     : null;
@@ -2727,7 +2739,7 @@ export function GamePage() {
         <HandRevealScreen
           handReveal={handReveal}
           snapshot={snapshot}
-          isHost={isDealer}
+          isHost={canAdvanceHand}
           onAdvance={advanceHand}
         />
       )}
@@ -2740,7 +2752,7 @@ export function GamePage() {
         <PreGameFlow
           snapshot={snapshot}
           settlementPreview={settlementPreview}
-          isHost={isDealer}
+          isHost={canAdvanceHand}
           onAdvance={advancePreGame}
         />
       )}
