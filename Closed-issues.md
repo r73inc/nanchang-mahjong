@@ -6,6 +6,78 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/mobile-ux-hand-reveal-polish` (2026-06-11)
+
+### BUG-039 · Unmatched tiles unsorted in hand-reveal screen
+
+**Symptom:** In the end-of-hand reveal screen the "unmatched" tile section appeared in non-standard (lexicographic) order — e.g. a man tile, then two dots, then a bamboo — instead of standard suit/rank order.
+
+**Root cause:** `greedyGroupHand` initialised `bag` with `[...tiles].sort()` (JS default string sort). Tile IDs like `'1m'`, `'2p'`, `'east'` sort alphabetically, not in mahjong order. The returned `ungrouped` array was also an un-sorted slice of `bag`.
+
+**Fix:** Replaced `[...tiles].sort()` with `sortTypes([...tiles])` for the initial bag, and wrapped the `ungrouped` return value in `sortTypes([...bag])`. `sortTypes` is imported from `@nanchang/shared` (re-exported from engine).
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx` — `greedyGroupHand`.
+
+**Key learning:** Always use `sortTypes` (not `Array.sort`) for mahjong tile collections — it applies the canonical man → pin → sou → winds → dragons ordering.
+
+---
+
+### BUG-040 · Wind / dragon chow sequences not grouped in hand-reveal
+
+**Symptom:** When a concealed hand contained a valid Nanchang honor chow (e.g. East + South + West, or Zhong + Fa + Bai), those tiles appeared in the unmatched section instead of being labelled CHOW.
+
+**Root cause:** The chow-detection pass in `greedyGroupHand` only matched suit tiles via `/^(\d)([mps])$/`. Honor tile IDs (`east`, `south`, etc.) do not match this regex, so the pass silently skipped them. Per rules §4.3, three non-repeating wind tiles or the three dragon tiles form a valid chow.
+
+**Fix:** Added an honor-chow pass (using `WIND_CHOWS` + `DRAGON_CHOW` from `@nanchang/engine`) between the pung pass and the suit-chow pass. Also exported `WIND_CHOWS` and `DRAGON_CHOW` from `@nanchang/shared`.
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx` — `greedyGroupHand`; `packages/shared/src/index.ts` — added re-exports.
+
+**Key learning:** Honor chow support is a Nanchang-specific rule. Any hand-grouping utility must explicitly handle `WIND_CHOWS` and `DRAGON_CHOW` — the generic suit-regex pass will never reach honor tiles.
+
+---
+
+### IMP-018 · Spirit tiles cut off on mobile status bar
+
+**Symptom:** The two spirit tiles shown in the top-left of the mobile status bar were clipped at the top of the viewport. The `xs` size (28×38 px) overflowed the 32 px fixed bar height.
+
+**Fix:** Added an `xxs` size entry (`{ w: 20, h: 27, shadow: 2 }`) to `TILE_DIMS` in `MahjongTile2D.tsx`, and switched `MobileJingButton` to use `size="xxs"`. All existing size names remain unchanged.
+
+**Files changed:** `apps/web/src/components/2d/MahjongTile2D.tsx`; `apps/web/src/pages/game/game-page.tsx` — `MobileJingButton`.
+
+---
+
+### IMP-019 · Mobile history panel → full-screen overlay
+
+**Symptom:** On mobile the game-history panel opened as a bottom sheet with no backdrop. Closing it required tapping the icon again; it did not support tap-outside-to-close.
+
+**Fix:** Replaced the mobile branch of `GameHistoryPanel` with a `position: fixed; inset: 0` overlay (matching `MobileJingButton` style). The dark backdrop occupies the full viewport and calls `onToggle` on click; the content panel stops propagation so tapping the list doesn't close it.
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx` — `GameHistoryPanel`.
+
+---
+
+### IMP-020 · Settlement received rows consolidated
+
+**Symptom:** In the pre-round settlement breakdown, a player holding N spirit tile copies saw one "Received X from [player]" row per other player (up to 3 rows per tile type). The desired UX was a single "Received [total]" row.
+
+**Fix:** Rewrote `buildTransferLines` so received rows are consolidated: one row per tile type, `amount = count × rate × otherCount`. Paid rows remain per-player. Made `otherSeatName` optional in `TransferLine` since consolidated received rows have no specific payer.
+
+**Files changed:** `apps/web/src/components/game/SettlementPreview.tsx`.
+
+---
+
+### IMP-021 · Sort-hand button during player's turn
+
+**Symptom:** After manually dragging tiles into a custom order there was no way to quickly restore standard suit/rank order.
+
+**Fix:** Added a "Sort" button (absolute-positioned above-left of the tile row, rendered last in DOM for correct tab order) in both `PlayerHand2D` (2D/mobile) and `ViewerHandHUD` (3D). In `PlayerHand2D` the button calls `handleSortHand` which re-sorts `localOrder` via `sortTypes` while preserving entry IDs (so Framer Motion re-uses layoutIds). In `ViewerHandHUD` it rebuilds `displayOrder`. Button is hidden when a tile is selected (to avoid overlap with the discard confirm button) and when not the player's turn. Added `"gameSortHand": "Sort"` / `"整理"` i18n keys.
+
+**Files changed:** `apps/web/src/components/2d/PlayerHand2D.tsx`; `apps/web/src/pages/game/game-page.tsx` — `ViewerHandHUD`; `apps/web/src/i18n/en.json`; `apps/web/src/i18n/zh.json`.
+
+**Key learning:** Place absolutely-positioned buttons _after_ the tile list in DOM order. `getAllByRole('button')` traverses DOM order, and tests that grab `buttons[0]` expecting the first tile will break if a visually-above button appears first in the DOM.
+
+---
+
 ## `fix/bug-021-hand-reveal-grouping` (2026-06-11)
 
 ### BUG-021 · Hand-reveal screen concealed tiles not grouped into winning melds

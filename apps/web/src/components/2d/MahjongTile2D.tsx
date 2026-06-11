@@ -59,6 +59,7 @@ const LAST_DISCARD_TRANSITION = {
 
 /** Pixel dimensions at 800px reference width; scale via CSS container queries. */
 export const TILE_DIMS = {
+  xxs: { w: 20, h: 27, shadow: 2 },
   xs: { w: 28, h: 38, shadow: 4 },
   sm: { w: 36, h: 48, shadow: 5 },
   md: { w: 44, h: 60, shadow: 6 },
@@ -91,7 +92,7 @@ export interface MahjongTile2DProps {
   /** TileType for a face-up tile; 'back' for a hidden / face-down tile. */
   tile: TileType | 'back';
   /** Visual size category. Defaults to 'md'. */
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: keyof typeof TILE_DIMS;
   /**
    * Seat role — controls the directional box-shadow offset so the simulated
    * light source is uniform across the board. Defaults to 'bottom' (viewer).

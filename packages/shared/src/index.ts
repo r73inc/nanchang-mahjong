@@ -10,6 +10,9 @@ export {
   decomposeConcealed,
   concealedKongOptions,
   addToKongOptions,
+  sortTypes,
+  WIND_CHOWS,
+  DRAGON_CHOW,
 } from '@nanchang/engine';
 export type { Decomposition } from '@nanchang/engine';
 

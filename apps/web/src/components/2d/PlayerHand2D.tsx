@@ -20,6 +20,7 @@
 import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { Reorder, AnimatePresence } from 'framer-motion';
 import type { TileType } from '@nanchang/shared';
+import { sortTypes } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { useDiscardContext } from './DiscardContext';
 import { useI18n } from '../../i18n';
@@ -35,6 +36,8 @@ const HORIZONTAL_AXIS = 'x' as const;
 
 // i18n key for the floating discard confirmation button (mobile confirmMode).
 const I18N_MOBILE_DISCARD_CONFIRM = 'mobileDiscardConfirm' as const;
+// i18n key for the sort-hand button.
+const I18N_SORT_HAND = 'gameSortHand' as const;
 
 // ── Draw-tile animation variants (module-level for i18next/no-literal-string) ─
 
@@ -228,6 +231,20 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
    */
   const draggable = confirmMode ? !claimWindow && !pendingMove : interactive;
 
+  // ── Sort hand ─────────────────────────────────────────────────────────────
+  const handleSortHand = useCallback(() => {
+    setLocalOrder((prev) => {
+      const sortedTiles = sortTypes(prev.map((e) => e.tile));
+      const pool = [...prev];
+      return sortedTiles.map((tile) => {
+        const idx = pool.findIndex((e) => e.tile === tile);
+        const entry = pool.splice(idx, 1)[0];
+        return entry;
+      });
+    });
+    setSelectedId(null);
+  }, []);
+
   // ── Floating discard confirmation (confirmMode only) ─────────────────────
   const handleConfirmDiscard = useCallback(() => {
     if (selectedId === null) return;
@@ -412,6 +429,39 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
       <span id="hand-drag-hint" className="sr-only">
         {DRAG_HINT}
       </span>
+
+      {/* ── Sort button — rendered last in DOM so tile buttons come first for a11y/tests ─ */}
+      {interactive && selectedId === null && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -36,
+            left: 8,
+            pointerEvents: 'auto',
+            zIndex: 19,
+          }}
+        >
+          <button
+            data-testid="sort-hand-btn"
+            onClick={handleSortHand}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 10,
+              border: '1px solid rgba(201,169,97,0.35)',
+              background: 'rgba(201,169,97,0.08)',
+              color: '#c9a961',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              WebkitTouchCallout: 'none' as React.CSSProperties['WebkitTouchCallout'],
+              userSelect: 'none',
+            }}
+          >
+            {t(I18N_SORT_HAND)}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

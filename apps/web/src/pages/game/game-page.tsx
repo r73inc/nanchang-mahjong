@@ -30,6 +30,9 @@ import {
   decomposeConcealed,
   concealedKongOptions,
   addToKongOptions,
+  sortTypes,
+  WIND_CHOWS,
+  DRAGON_CHOW,
 } from '@nanchang/shared';
 import type {
   ClientGameState,
@@ -347,7 +350,8 @@ function PreGameFlow({
 type TileGroup = { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] };
 
 function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: TileType[] } {
-  const bag: TileType[] = [...tiles].sort();
+  // sortTypes gives standard mahjong order (man → pin → sou → winds → dragons)
+  const bag: TileType[] = sortTypes([...tiles]);
   const groups: TileGroup[] = [];
 
   const takeOne = (tile: TileType): boolean => {
@@ -367,15 +371,30 @@ function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: T
     }
   }
 
-  // Pass 2: Chows (3 consecutive suit tiles — scan sorted snapshot)
-  const snapshot = [...bag].sort();
+  // Pass 2: Honor chows — Nanchang §4.3: three non-repeating winds or all
+  // three dragons form a valid chow sequence.
+  const honorChows: readonly (readonly [TileType, TileType, TileType])[] = [
+    ...WIND_CHOWS,
+    DRAGON_CHOW,
+  ];
+  for (const chow of honorChows) {
+    while (bag.includes(chow[0]) && bag.includes(chow[1]) && bag.includes(chow[2])) {
+      takeOne(chow[0]);
+      takeOne(chow[1]);
+      takeOne(chow[2]);
+      groups.push({ kind: 'chow', tiles: [chow[0], chow[1], chow[2]] });
+    }
+  }
+
+  // Pass 3: Suit chows (3 consecutive same-suit tiles — scan sorted snapshot)
+  const snapshot = sortTypes([...bag]);
   for (const tile of snapshot) {
     if (!bag.includes(tile)) continue;
     const m = tile.match(/^(\d)([mps])$/);
     if (!m) continue;
     const rank = parseInt(m[1], 10);
     const suit = m[2];
-    if (rank > 7) continue; // can't start a chow at 8 or 9
+    if (rank > 7) continue;
     const t2 = `${rank + 1}${suit}` as TileType;
     const t3 = `${rank + 2}${suit}` as TileType;
     if (bag.includes(t2) && bag.includes(t3)) {
@@ -386,7 +405,7 @@ function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: T
     }
   }
 
-  // Pass 3: Pairs (2 of same tile)
+  // Pass 4: Pairs (2 of same tile)
   for (const tile of [...new Set(bag)]) {
     while (bag.filter((t) => t === tile).length >= 2) {
       takeOne(tile);
@@ -395,7 +414,7 @@ function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: T
     }
   }
 
-  return { groups, ungrouped: [...bag] };
+  return { groups, ungrouped: sortTypes([...bag]) };
 }
 
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
@@ -1520,6 +1539,7 @@ function ViewerHandHUD({
   jingTypes: Set<string>;
   pendingMove: boolean;
 }) {
+  const { t } = useI18n();
   // displayOrder[displayIdx] = handIdx
   const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -1572,6 +1592,21 @@ function ViewerHandHUD({
     }
   };
 
+  const handleReorganize = () => {
+    const sortedTiles = sortTypes([...hand]);
+    const pool = hand.map((_, i) => i);
+    const newOrder: number[] = [];
+    const used = new Set<number>();
+    for (const tile of sortedTiles) {
+      const idx = pool.find((i) => hand[i] === tile && !used.has(i));
+      if (idx !== undefined) {
+        newOrder.push(idx);
+        used.add(idx);
+      }
+    }
+    setDisplayOrder(newOrder);
+  };
+
   const drawnHandIdx = hand.length > 1 ? hand.length - 1 : -1;
 
   return (
@@ -1587,42 +1622,65 @@ function ViewerHandHUD({
           background: 'linear-gradient(to top, rgba(0,0,0,0.88) 60%, transparent 100%)',
         }}
       >
-        <div
-          className="flex gap-[3px] items-end"
-          style={{ overflowX: 'auto', scrollbarWidth: 'none', maxWidth: '100%' }}
-        >
-          {displayOrder.map((handIdx, displayIdx) => {
-            const tile = hand[handIdx];
-            if (tile === undefined) return null;
-            const isSelected = !pendingMove && selectedTileIdx === handIdx;
-            const isDrawn = handIdx === drawnHandIdx;
-            const isDragging = dragFrom === displayIdx;
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, maxWidth: '100%' }}>
+          {/* Sort button — left of tile row, only on player's turn */}
+          {isMyTurn && !pendingMove && (
+            <button
+              onClick={handleReorganize}
+              style={{
+                flexShrink: 0,
+                padding: '4px 8px',
+                borderRadius: 8,
+                border: '1px solid rgba(201,169,97,0.35)',
+                background: 'rgba(201,169,97,0.08)',
+                color: '#c9a961',
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                alignSelf: 'center',
+              }}
+            >
+              {t('gameSortHand')}
+            </button>
+          )}
+          <div
+            className="flex gap-[3px] items-end"
+            style={{ overflowX: 'auto', scrollbarWidth: 'none', maxWidth: '100%' }}
+          >
+            {displayOrder.map((handIdx, displayIdx) => {
+              const tile = hand[handIdx];
+              if (tile === undefined) return null;
+              const isSelected = !pendingMove && selectedTileIdx === handIdx;
+              const isDrawn = handIdx === drawnHandIdx;
+              const isDragging = dragFrom === displayIdx;
 
-            return (
-              <div
-                key={`hud-${handIdx}`}
-                draggable
-                onDragStart={() => handleDragStart(displayIdx)}
-                onDragOver={(e) => handleDragOver(e, displayIdx)}
-                onDragEnd={handleDragEnd}
-                onClick={() => handleTileClick(displayIdx)}
-                style={{
-                  transition: 'transform 0.12s ease, opacity 0.12s ease',
-                  transform: isSelected ? 'translateY(-10px) scale(1.08)' : 'none',
-                  opacity: isDragging ? 0.45 : 1,
-                  cursor: isMyTurn && !pendingMove ? 'pointer' : 'default',
-                  flexShrink: 0,
-                }}
-              >
-                <SvgHandTile
-                  tile={tile}
-                  isJing={jingTypes.has(tile)}
-                  isSelected={isSelected}
-                  isDrawn={isDrawn}
-                />
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={`hud-${handIdx}`}
+                  draggable
+                  onDragStart={() => handleDragStart(displayIdx)}
+                  onDragOver={(e) => handleDragOver(e, displayIdx)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => handleTileClick(displayIdx)}
+                  style={{
+                    transition: 'transform 0.12s ease, opacity 0.12s ease',
+                    transform: isSelected ? 'translateY(-10px) scale(1.08)' : 'none',
+                    opacity: isDragging ? 0.45 : 1,
+                    cursor: isMyTurn && !pendingMove ? 'pointer' : 'default',
+                    flexShrink: 0,
+                  }}
+                >
+                  <SvgHandTile
+                    tile={tile}
+                    isJing={jingTypes.has(tile)}
+                    isSelected={isSelected}
+                    isDrawn={isDrawn}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -1683,87 +1741,93 @@ function GameHistoryPanel({
   ];
 
   if (isMobile) {
-    // ── Mobile: full-width bottom sheet, toggle is in the status bar ──────────
+    // ── Mobile: full-screen overlay, tap backdrop to close ────────────────────
+    if (!isOpen) return null;
     return (
       <div
         data-testid="history-bottom-sheet"
-        className="absolute left-0 right-0 overflow-hidden"
-        style={{
-          bottom: isOpen ? 'var(--mj-hand-height, 90px)' : '-40%',
-          height: '40%',
-          zIndex: 16,
-          background: 'rgba(8,8,8,0.95)',
-          borderTop: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-          backdropFilter: 'blur(12px)',
-          transition: 'bottom 0.22s ease',
-        }}
+        className="fixed inset-0 flex flex-col justify-end"
+        style={{ zIndex: 60, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)' }}
+        onClick={onToggle}
       >
-        {/* Header */}
+        {/* Content panel — tap inside does NOT close */}
         <div
-          className="px-3 py-2 flex items-center justify-between shrink-0"
-          style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
+          className="flex flex-col overflow-hidden"
+          style={{
+            height: '55%',
+            background: 'rgba(8,8,8,0.98)',
+            borderTop: '1px solid rgba(var(--felt-ink-rgb),0.15)',
+            borderRadius: '16px 16px 0 0',
+          }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
-            {t('gameHistoryTitle')}
-          </span>
-          <span className="text-[10px] text-mj-bone/30">{entries.length}</span>
-        </div>
+          {/* Header */}
+          <div
+            className="px-3 py-2 flex items-center justify-between shrink-0"
+            style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
+          >
+            <span className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase">
+              {t('gameHistoryTitle')}
+            </span>
+            <span className="text-[10px] text-mj-bone/30">{entries.length}</span>
+          </div>
 
-        {/* Scrollable event list */}
-        <div
-          ref={scrollRef}
-          className="overflow-y-auto h-full pb-4"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {entries.length === 0 ? (
-            <p className="text-[10px] text-mj-bone/20 text-center mt-6 px-3">—</p>
-          ) : (
-            <div className="flex flex-col py-1">
-              {entries.map((entry) => {
-                const offset = (entry.seatIdx - viewerSeat + 4) % 4;
-                const posLabel = POSITION_LABEL[offset];
-                return (
-                  <div
-                    key={entry.id}
-                    className="flex items-center gap-1 px-2 py-[5px]"
-                    style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.04)' }}
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ background: WIND_COLOR[entry.seatWind] }}
-                    />
-                    <span
-                      className="text-[10px] font-bold shrink-0"
-                      style={{ color: WIND_COLOR[entry.seatWind] }}
+          {/* Scrollable event list */}
+          <div
+            ref={scrollRef}
+            className="overflow-y-auto flex-1 pb-4"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {entries.length === 0 ? (
+              <p className="text-[10px] text-mj-bone/20 text-center mt-6 px-3">—</p>
+            ) : (
+              <div className="flex flex-col py-1">
+                {entries.map((entry) => {
+                  const offset = (entry.seatIdx - viewerSeat + 4) % 4;
+                  const posLabel = POSITION_LABEL[offset];
+                  return (
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-1 px-2 py-[5px]"
+                      style={{ borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.04)' }}
                     >
-                      {posLabel}
-                    </span>
-                    <span
-                      className="text-[9px] shrink-0"
-                      style={{ color: WIND_COLOR[entry.seatWind], opacity: 0.7 }}
-                    >
-                      {WIND_CHAR[entry.seatWind]}
-                    </span>
-                    <span className="text-[10px] text-mj-bone/50 shrink-0">
-                      {entry.kind === 'discard'
-                        ? t('gameHistoryDiscard')
-                        : ACTION_LABEL[entry.kind]}
-                    </span>
-                    {entry.tile && (
-                      <MahjongTile
-                        tile={entry.tile}
-                        size="xs"
-                        isJing={
-                          entry.tile === snapshot.jingPrimary ||
-                          entry.tile === snapshot.jingSecondary
-                        }
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: WIND_COLOR[entry.seatWind] }}
                       />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <span
+                        className="text-[10px] font-bold shrink-0"
+                        style={{ color: WIND_COLOR[entry.seatWind] }}
+                      >
+                        {posLabel}
+                      </span>
+                      <span
+                        className="text-[9px] shrink-0"
+                        style={{ color: WIND_COLOR[entry.seatWind], opacity: 0.7 }}
+                      >
+                        {WIND_CHAR[entry.seatWind]}
+                      </span>
+                      <span className="text-[10px] text-mj-bone/50 shrink-0">
+                        {entry.kind === 'discard'
+                          ? t('gameHistoryDiscard')
+                          : ACTION_LABEL[entry.kind]}
+                      </span>
+                      {entry.tile && (
+                        <MahjongTile
+                          tile={entry.tile}
+                          size="xs"
+                          isJing={
+                            entry.tile === snapshot.jingPrimary ||
+                            entry.tile === snapshot.jingSecondary
+                          }
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1922,7 +1986,7 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
       >
         <MahjongTile2D
           tile={snapshot.jingPrimary}
-          size="xs"
+          size="xxs"
           role="bottom"
           isJing
           interactive={false}
@@ -1930,7 +1994,7 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
         {snapshot.jingSecondary && (
           <MahjongTile2D
             tile={snapshot.jingSecondary}
-            size="xs"
+            size="xxs"
             role="bottom"
             isJing
             interactive={false}
