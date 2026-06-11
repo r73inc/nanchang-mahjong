@@ -66,7 +66,7 @@ export { jingTypeFromIndicator, jingTypesFromIndicator, isJing, separateJing } f
 
 // ── Hand analysis ─────────────────────────────────────────────────────────────
 
-export { isWinningHand, decomposeHand, shantenNumber } from './hand';
+export { isWinningHand, decomposeHand, decomposeConcealed, shantenNumber } from './hand';
 
 // ── Call eligibility ──────────────────────────────────────────────────────────
 

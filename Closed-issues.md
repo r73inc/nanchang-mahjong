@@ -6,6 +6,37 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-021-hand-reveal-grouping` (2026-06-11)
+
+### BUG-021 · Hand-reveal screen concealed tiles not grouped into winning melds
+
+**Symptom:** On the post-hand reveal screen, all concealed tiles (row 2) appeared as a flat unsorted row with no visual grouping. The winning structure (chow/pung/pair groups) was not shown. Loser hands were similarly flat with no recognisable group patterns.
+
+**Root cause (two problems):**
+
+1. **`decomposeHand` requires exactly 14 tiles** (`if (naturals.length + jingCount !== 14) return []`). A winner with open melds has a concealed portion smaller than 14 tiles (11 for 1 open meld, 8 for 2, 5 for 3, 2 for 4), so the decomposition always returned empty and the code fell through to the flat fallback.
+
+2. **Losers' hands were never attempted for grouping** — there was no logic to greedily find recognisable patterns (pungs/chows/pairs) in non-winning hands.
+
+**Fix:**
+
+- Added `decomposeConcealed(hand, jingTypes)` to `packages/engine/src/hand.ts`: accepts any hand of size `3k+2` (2, 5, 8, 11, 14) and decomposes it into the correct number of melds + pair. Shares the inner `decomposeCore` function with `decomposeHand` to avoid duplication.
+- Exported `decomposeConcealed` from the engine and re-exported through shared.
+- Added `greedyGroupHand` utility in game-page.tsx: greedily finds pungs → chows → pairs in any tile set, returning labeled groups and a remainder. Used for losers and as a winner fallback (seven pairs, thirteen misfits).
+- Updated `HandRevealScreen` to use `decomposeConcealed` for all winner concealed hands regardless of open-meld count. Losers' hands use `greedyGroupHand`. Ungrouped remainder tiles appear after a visual separator with no label.
+
+**Files changed:**
+
+- `packages/engine/src/hand.ts` — refactored to `decomposeCore` + `decomposeHand` + new `decomposeConcealed`
+- `packages/engine/src/index.ts` — export `decomposeConcealed`
+- `packages/shared/src/index.ts` — re-export `decomposeConcealed`
+- `apps/web/src/pages/game/game-page.tsx` — `greedyGroupHand` utility + rewritten concealed hand rendering in `HandRevealScreen`
+- `packages/engine/src/__tests__/hand.test.ts` — 7 new `decomposeConcealed` tests
+
+**Key learning:** `decomposeHand` has an intentional 14-tile guard because it was designed as a win validator. Any display context that needs to decompose a partial hand (one with open melds) must use `decomposeConcealed`. The two functions share the same core logic — the only difference is the size validation.
+
+---
+
 ## `fix/bug-038-win-after-kong` (2026-06-11)
 
 ### BUG-038 · Win button absent after declaring a kong

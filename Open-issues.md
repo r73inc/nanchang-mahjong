@@ -10,7 +10,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 | ID         | Name                                   | Summary                                                                                                             |
 | ---------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| BUG-021    | Hand-reveal meld grouping              | Winner's hand shown as flat tile list; chow/pung/kong groups not rendered                                           |
 | BUG-022    | Player rejoin blocks tile play         | Reconnected player cannot play tiles on their turn                                                                  |
 | BUG-08     | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                               |
 | BUG-09     | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                          |
@@ -22,31 +21,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 ---
 
 ## Open Bugs
-
-### BUG-021 · Hand-reveal meld grouping does not work
-
-**Symptom:** On the post-hand reveal screen, the winner's concealed hand should be displayed decomposed into constituent melds (chow/pung/kong groups) and pair with labeled headers. Instead the hand appears as a flat row of individual tiles with no grouping.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Root cause:** Unknown. The decomposition logic was implemented but the visual result is unchanged.
-
-**Fix attempted:**
-
-1. Re-exported `decomposeHand` and `Decomposition` from `@nanchang/shared`
-2. In `HandRevealScreen`, winner's concealed hand section replaced with decomposition logic
-3. Falls back to flat tile list if conditions not met
-
-**Suspected remaining causes:**
-
-- Winner's hand at reveal time may have fewer than 14 tiles (open melds tracked separately)
-- Guard `hand.length === 14` may be too strict
-- `decomposeHand` may be returning empty array for valid winning hands
-- `handReveal.jingPrimary` / `jingSecondary` may be undefined
-
-**Next steps:** Log `hand.length`, decomposition result, and `jingTypes` to verify the data before continuing with rendering.
-
----
 
 ### BUG-022 · Player rejoin fails — tile play blocked after reconnection
 
