@@ -15,6 +15,7 @@
  */
 
 import { motion } from 'framer-motion';
+import { useState, useCallback } from 'react';
 import { tileAriaLabel } from '@nanchang/shared';
 import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
@@ -154,8 +155,31 @@ export function MahjongTile2D({
   const liftY = Math.round(-6 * tileScale);
 
   const isBack = tile === 'back';
-  const imgSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
+  const baseSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
   const ariaLabel = isBack ? ARIA_HIDDEN_TILE : tileAriaLabel(tile as TileType, lang);
+
+  // ── Image error recovery ──────────────────────────────────────────────────
+  // When the browser caches a 404 (e.g. Vite dev-server hiccup during hot-reload),
+  // React never updates the <img> src, so the broken-image icon sticks.
+  // State is keyed to the specific asset URL so the count resets synchronously
+  // during the render pass — no useEffect race that could flush one extra cycle
+  // at retryCount=1 against the new src and needlessly invalidate the browser cache.
+  const [errorTracking, setErrorTracking] = useState({ src: baseSrc, count: 0 });
+
+  // Synchronous reset: if baseSrc changed this render, reset immediately.
+  // React detects the setState-during-render pattern and re-renders before
+  // committing, so the browser never sees the stale count against the new URL.
+  if (errorTracking.src !== baseSrc) {
+    setErrorTracking({ src: baseSrc, count: 0 });
+  }
+
+  const handleImgError = useCallback(() => {
+    setErrorTracking((prev) => ({ ...prev, count: Math.min(prev.count + 1, 2) }));
+  }, []);
+
+  // Derive the actual src: normal → cache-bust retry → null (hide img).
+  const imgSrc =
+    errorTracking.count === 0 ? baseSrc : errorTracking.count === 1 ? `${baseSrc}?r=1` : null;
 
   // Build box-shadow: directional thickness + optional selected ring + optional jing glow.
   // Ring width and glow radius also scale so they remain proportional to tile size.
@@ -217,20 +241,23 @@ export function MahjongTile2D({
           userSelect: 'none',
         }}
       >
-        <img
-          src={imgSrc}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          data-testid="tile-img"
-          style={{
-            width: '85%',
-            height: '85%',
-            objectFit: 'contain',
-            pointerEvents: 'none',
-            userSelect: 'none',
-          }}
-        />
+        {imgSrc !== null && (
+          <img
+            src={imgSrc}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            data-testid="tile-img"
+            onError={handleImgError}
+            style={{
+              width: '85%',
+              height: '85%',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          />
+        )}
       </motion.div>
 
       {/*
