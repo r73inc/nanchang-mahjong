@@ -27,7 +27,7 @@ import { LangToggle, useI18n } from '../../i18n';
 import {
   tileAriaLabel,
   engineToDesignTile,
-  decomposeHand,
+  decomposeConcealed,
   concealedKongOptions,
   addToKongOptions,
 } from '@nanchang/shared';
@@ -339,6 +339,65 @@ function PreGameFlow({
   return <LoadingScreen />;
 }
 
+// ── greedyGroupHand ───────────────────────────────────────────────────────────
+// Best-effort grouping of any tile set into labeled groups + leftover tiles.
+// Used for loser hands and as a winner fallback (seven pairs, etc.).
+// Order: pungs first, then chows, then pairs, then remainder.
+
+type TileGroup = { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] };
+
+function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: TileType[] } {
+  const bag: TileType[] = [...tiles].sort();
+  const groups: TileGroup[] = [];
+
+  const takeOne = (tile: TileType): boolean => {
+    const idx = bag.indexOf(tile);
+    if (idx === -1) return false;
+    bag.splice(idx, 1);
+    return true;
+  };
+
+  // Pass 1: Pungs (3 of same tile)
+  for (const tile of [...new Set(bag)]) {
+    while (bag.filter((t) => t === tile).length >= 3) {
+      takeOne(tile);
+      takeOne(tile);
+      takeOne(tile);
+      groups.push({ kind: 'pung', tiles: [tile, tile, tile] });
+    }
+  }
+
+  // Pass 2: Chows (3 consecutive suit tiles — scan sorted snapshot)
+  const snapshot = [...bag].sort();
+  for (const tile of snapshot) {
+    if (!bag.includes(tile)) continue;
+    const m = tile.match(/^(\d)([mps])$/);
+    if (!m) continue;
+    const rank = parseInt(m[1], 10);
+    const suit = m[2];
+    if (rank > 7) continue; // can't start a chow at 8 or 9
+    const t2 = `${rank + 1}${suit}` as TileType;
+    const t3 = `${rank + 2}${suit}` as TileType;
+    if (bag.includes(t2) && bag.includes(t3)) {
+      takeOne(tile);
+      takeOne(t2);
+      takeOne(t3);
+      groups.push({ kind: 'chow', tiles: [tile, t2, t3] });
+    }
+  }
+
+  // Pass 3: Pairs (2 of same tile)
+  for (const tile of [...new Set(bag)]) {
+    while (bag.filter((t) => t === tile).length >= 2) {
+      takeOne(tile);
+      takeOne(tile);
+      groups.push({ kind: 'pair', tiles: [tile, tile] });
+    }
+  }
+
+  return { groups, ungrouped: [...bag] };
+}
+
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
 // Full-screen post-hand reveal. Shows all hands, spirit settlement, and
 // payment breakdown.
@@ -554,7 +613,7 @@ function HandRevealScreen({
                     </div>
                   )}
 
-                  {/* Concealed hand — grouped into melds+pair for winner with full 14-tile hand */}
+                  {/* Concealed hand — grouped into labeled meld/pair groups */}
                   {(() => {
                     const jingTypes: TileType[] = [
                       handReveal.jingPrimary,
@@ -563,64 +622,83 @@ function HandRevealScreen({
                     const isJing = (tile: TileType) =>
                       tile === handReveal.jingPrimary || tile === handReveal.jingSecondary;
 
-                    if (isWinner && hand.length === 14) {
-                      const decomps = decomposeHand(hand, jingTypes);
+                    // Build the groups to render: for winner use exact decomposition of the
+                    // concealed portion (works for 2/5/8/11/14 tiles = any number of open melds).
+                    // For losers (and winner fallback for seven-pairs etc.) use greedy grouping.
+                    let groups: { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] }[] = [];
+                    let ungrouped: TileType[] = [];
+
+                    if (isWinner) {
+                      const decomps = decomposeConcealed(hand, jingTypes);
                       if (decomps.length > 0) {
                         const decomp = decomps[0];
-                        return (
-                          <div className="flex flex-wrap gap-2">
-                            {decomp.melds.map((meld, mi) => (
-                              <div key={mi} className="flex flex-col items-center gap-0.5">
-                                <div className="flex gap-0.5">
-                                  {meld.tiles.map((tile, ti) => (
-                                    <MahjongTile2D
-                                      key={`d${i}-${mi}-${ti}`}
-                                      tile={tile}
-                                      size="xs"
-                                      interactive={false}
-                                      isJing={isJing(tile)}
-                                    />
-                                  ))}
-                                </div>
-                                <span className="text-[8px] text-mj-bone/30 uppercase tracking-wider">
-                                  {MELD_KIND_LABEL[meld.kind]}
-                                </span>
-                              </div>
-                            ))}
-                            {/* Pair */}
-                            <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex gap-0.5">
-                                {[decomp.pair, decomp.pair].map((tile, ti) => (
-                                  <MahjongTile2D
-                                    key={`dp${i}-${ti}`}
-                                    tile={tile}
-                                    size="xs"
-                                    interactive={false}
-                                    isJing={isJing(tile)}
-                                  />
-                                ))}
-                              </div>
-                              <span className="text-[8px] text-mj-bone/30 uppercase tracking-wider">
-                                {PAIR_LABEL}
-                              </span>
-                            </div>
-                          </div>
-                        );
+                        groups = [
+                          ...decomp.melds.map((m) => ({
+                            kind: m.kind as 'pung' | 'chow',
+                            tiles: [...m.tiles],
+                          })),
+                          { kind: 'pair' as const, tiles: [decomp.pair, decomp.pair] },
+                        ];
+                        ungrouped = [];
+                      } else {
+                        // Seven pairs, thirteen misfits, or edge cases — greedy fallback
+                        ({ groups, ungrouped } = greedyGroupHand(hand));
                       }
+                    } else {
+                      ({ groups, ungrouped } = greedyGroupHand(hand));
                     }
 
-                    // Fallback: flat tile list (non-winners, or winners with open melds)
+                    if (groups.length === 0 && ungrouped.length > 0) {
+                      // No recognisable groups — flat row
+                      return (
+                        <div className="flex flex-wrap gap-0.5">
+                          {ungrouped.map((tile, j) => (
+                            <MahjongTile2D
+                              key={`${i}-${tile}-${j}`}
+                              tile={tile}
+                              size="xs"
+                              interactive={false}
+                              isJing={isJing(tile)}
+                            />
+                          ))}
+                        </div>
+                      );
+                    }
+
                     return (
-                      <div className="flex flex-wrap gap-0.5">
-                        {hand.map((tile, j) => (
-                          <MahjongTile2D
-                            key={`${i}-${tile}-${j}`}
-                            tile={tile}
-                            size="xs"
-                            interactive={false}
-                            isJing={isJing(tile)}
-                          />
+                      <div className="flex flex-wrap gap-2">
+                        {groups.map((group, gi) => (
+                          <div key={gi} className="flex flex-col items-center gap-0.5">
+                            <div className="flex gap-0.5">
+                              {group.tiles.map((tile, ti) => (
+                                <MahjongTile2D
+                                  key={`g${i}-${gi}-${ti}`}
+                                  tile={tile}
+                                  size="xs"
+                                  interactive={false}
+                                  isJing={isJing(tile)}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-[8px] text-mj-bone/30 uppercase tracking-wider">
+                              {group.kind === 'pair' ? PAIR_LABEL : MELD_KIND_LABEL[group.kind]}
+                            </span>
+                          </div>
                         ))}
+                        {/* Ungrouped remainder — no label, slight separator */}
+                        {ungrouped.length > 0 && (
+                          <div className="flex items-end gap-0.5 ml-1 pl-1 border-l border-mj-bone/10">
+                            {ungrouped.map((tile, ui) => (
+                              <MahjongTile2D
+                                key={`u${i}-${ui}`}
+                                tile={tile}
+                                size="xs"
+                                interactive={false}
+                                isJing={isJing(tile)}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
