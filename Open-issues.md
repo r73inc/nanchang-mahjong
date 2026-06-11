@@ -8,15 +8,16 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID         | Name                                   | Summary                                                                                                             |
-| ---------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| BUG-022    | Player rejoin blocks tile play         | Reconnected player cannot play tiles on their turn                                                                  |
-| BUG-08     | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                               |
-| BUG-09     | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                          |
-| BUG-029    | Copy room code broken on mobile        | Room code copy button has no effect on mobile                                                                       |
-| BUG-031 ⚠️ | Host refresh locks config (CRITICAL)   | After browser refresh, host cannot change config or start the game                                                  |
-| BUG-032    | Kicked player not redirected           | Kicked player remains on config screen instead of returning to menu                                                 |
-| BUG-037    | Settlement/spirit tiles wrong position | No dice roll; tiles flipped from wall front instead of dice-counted stack from the back; indicator wrongly consumed |
+| ID         | Name                                   | Summary                                                                                                                           |
+| ---------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| BUG-022    | Player rejoin blocks tile play         | Reconnected player cannot play tiles on their turn                                                                                |
+| BUG-08     | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                                             |
+| BUG-09     | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                                        |
+| BUG-029    | Copy room code broken on mobile        | Room code copy button has no effect on mobile                                                                                     |
+| BUG-031 ⚠️ | Host refresh locks config (CRITICAL)   | After browser refresh, host cannot change config or start the game                                                                |
+| BUG-032    | Kicked player not redirected           | Kicked player remains on config screen instead of returning to menu                                                               |
+| BUG-037    | Settlement/spirit tiles wrong position | No dice roll; tiles flipped from wall front instead of dice-counted stack from the back; indicator wrongly consumed               |
+| BUG-041    | Spirit tile popup shows too many tiles | Spirit tiles still cut off in top-left during gameplay; popup shows current→arrow→next→next-sequence instead of just current+next |
 
 ---
 
@@ -226,6 +227,33 @@ _Tests:_
 - `packages/engine/src/jing.ts` — `jingTypesFromIndicator` (unchanged)
 - `packages/shared/src/game.events.ts` — `SettlementPreviewPayload`, `PublicGameEvent`, `ClientGameState`
 - `apps/api/src/game/game.service.ts` — pre-game advance / settlement preview emission
+
+---
+
+### BUG-041 · Spirit tile display clipped and shows too many tiles
+
+**Symptom:** During gameplay, the spirit tile indicator buttons in the top-left status bar are clipped (cut off at the top edge of the viewport). When tapped, the popup shows four items: current spirit tile → arrow → next spirit tile → next-sequence spirit tile. The user expects the popup to show only the current and next spirit tiles (two tiles total).
+
+**Status:** ACTIVE, UNRESOLVED (logged 2026-06-11)
+
+**Root cause (two problems):**
+
+1. **Clipping:** The spirit tile buttons (`MobileJingButton`) were already using the older `xs` size (28×38 px) before the `xxs` addition. The 32 px fixed status bar height is too small for two stacked `xs` tiles. IMP-018 switched the button to `xxs` (20×27 px) and resolved the visual clipping, but the spirit tiles may still be overflowing depending on viewport layout or padding.
+
+2. **Popup content:** The popup currently renders the full spirit tile sequence:
+   - Current tile (the active spirit tile for this turn)
+   - Arrow icon
+   - Next spirit tile (the one that will come into play after the next bonus round)
+   - Next-sequence spirit tile (one step further ahead)
+
+   This is visually cluttered. The user wants only the current and next spirit tiles shown.
+
+**Fix:**
+
+- Verify that the `xxs` size (from IMP-018) fully resolves the clipping — if not, further reduce `MobileJingButton` padding or container height.
+- Rewrite `MobileJingButton` popup to show only two tiles: current (large) and next (smaller, perhaps with an arrow or "next round" label). Remove the next-sequence tile from the display.
+
+**Where to look:** `apps/web/src/pages/game/game-page.tsx` — `MobileJingButton` component.
 
 ---
 
