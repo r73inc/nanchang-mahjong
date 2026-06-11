@@ -445,7 +445,11 @@ export class GameService {
     if (!dealerIsBot && userId !== dealerUserId) return this.emitError(socket, 'NOT_HOST');
 
     const pending = session.pendingHandEnd;
-    if (!pending) return this.emitError(socket, 'INVALID_PHASE');
+    // pendingHandEnd is null when advance was already processed (e.g. auto-advance fired
+    // and the client resent due to a network delay, or two humans both clicked when
+    // the dealer was a bot seat).  The correct response is a silent no-op — the caller
+    // will shortly receive game:ended or the next hand's game:snapshot.
+    if (!pending) return;
 
     session.pendingHandEnd = null;
     session.lastHandReveal = null;

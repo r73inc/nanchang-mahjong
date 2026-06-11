@@ -14,7 +14,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-022    | Player rejoin blocks tile play       | Reconnected player cannot play tiles on their turn                         |
 | BUG-08     | Viewer discards invisible (3D)       | Viewer's own discard pile not visible on the 3D table                      |
 | BUG-09     | TileWall3D needs redesign (3D)       | TileWall removed due to red Back.svg background; needs neutral replacement |
-| BUG-028    | INVALID_PHASE on game continue       | Non-host gets error continuing after game end; host game hangs             |
 | BUG-029    | Copy room code broken on mobile      | Room code copy button has no effect on mobile                              |
 | BUG-030    | Bonus points doubled in settlement   | Solo bonus-tile player charged/receives double the correct amount          |
 | BUG-031 ⚠️ | Host refresh locks config (CRITICAL) | After browser refresh, host cannot change config or start the game         |
@@ -105,30 +104,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 **Current state:** `TileWall3D` component still exists and is fully functional — just not mounted in `GameCanvas.tsx`.
 
 **Reinstate in:** `apps/web/src/r3f/GameCanvas.tsx` — re-add import and `<TileWall3D wallCount={snapshot.wallCount} ... />`.
-
----
-
-### BUG-028 · End of game INVALID_PHASE error — host/non-host continue inconsistency
-
-**Symptom:** When a game ends (with two players and two bots tested), the host can click "continue" on the detail "Someone Won!" screen, but the non-host player gets an INVALID_PHASE error. The host's game then hangs waiting for the non-host to acknowledge. In some cases, the host can also get the INVALID_PHASE error. Neither player can proceed to the next game; the game is stuck permanently.
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:** All players should be able to proceed to the next game after the detail screen. Phase/state consistency should be enforced server-side, not client-side.
-
-**Suspected cause:** Likely related to:
-
-- `game:advance-hand` socket event sent when phase is not 'reveal' or state is inconsistent between host and non-host
-- Game state not being broadcast before the host advances, leaving non-host on a stale snapshot
-- Phase state on the server and client diverging during end-of-session flow
-
-**Where to look:**
-
-- `apps/api/src/game/game.service.ts` — `advanceHand()` method, phase validation
-- `apps/api/src/game/game.gateway.ts` — `game:advance-hand` handler, permission/phase checks
-- `apps/web/src/hooks/use-game.ts` — `advanceHand()` socket emit, pre-conditions
-
-**Next steps:** Add detailed logging for phase state at the moment `game:advance-hand` is emitted vs. received. Compare host and non-host snapshots before the error.
 
 ---
 
