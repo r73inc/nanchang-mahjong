@@ -606,6 +606,24 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 
 ---
 
+### IMP-018 · Per-seat bot assignment in room config
+
+**Root cause:** Bots were configured only at room-creation time via a lobby-page stepper (count 0–3, uniform difficulty). There was no REST endpoint, no service method, and no UI to add a bot to a specific seat after the room existed.
+
+**Fix:**
+
+1. `apps/api/src/rooms/dto/add-bot.dto.ts` — new `AddBotDto` with `difficulty: 'easy' | 'normal'`.
+2. `apps/api/src/rooms/rooms.service.ts` — `addBotToSeat(roomId, seatIdx, difficulty, requestingUserId)`: validates host + empty seat, writes bot item via DynamoDB transact with `attribute_not_exists(PK)` guard.
+3. `apps/api/src/rooms/rooms.controller.ts` — `POST /rooms/:roomId/seats/:seatIdx/bot`: host-only, broadcasts `room:update` after success.
+4. `apps/web/src/hooks/use-room.ts` — removed `BotConfig` param from `createRoom`; added `addBotToSeat(roomId, seatIdx, difficulty)` action.
+5. `apps/web/src/pages/lobby/lobby-page.tsx` — removed bot count stepper and difficulty toggle; `handleCreate` now calls `createRoom()` with no args.
+6. `apps/web/src/pages/room/room-page.tsx` — empty seats (host-only) show an "Add Bot" button that expands to Easy Bot / Normal Bot pill buttons. Cancellable with ✕. Existing kick button removes bots (already supported by `kickSeat`).
+7. i18n: added `roomAddBot` key (EN: "Add Bot", ZH: "添加机器人").
+
+**Key learning:** Bot userId convention `bot-<difficulty>-<seatIdx>` is the only identifier used by the game engine — no schema migration needed. The DynamoDB `ConditionExpression: 'attribute_not_exists(PK)'` prevents a race where two clients both try to add a bot to the same seat.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

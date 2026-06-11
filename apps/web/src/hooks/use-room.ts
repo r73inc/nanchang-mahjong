@@ -14,7 +14,7 @@ import type {
   RoomState,
   WsRoomUpdatePayload,
   WsRoomStartedPayload,
-  BotConfig,
+  BotDifficulty,
 } from '@nanchang/shared';
 
 // ── REST action hooks ─────────────────────────────────────────────────────────
@@ -22,24 +22,20 @@ import type {
 export function useRoomActions() {
   const { setRoom, setLoading, setError } = useRoomStore();
 
-  const createRoom = useCallback(
-    async (bots?: BotConfig) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const body = bots && bots.count > 0 ? { bots } : {};
-        const { data } = await api.post<RoomState>('/rooms', body);
-        setRoom(data);
-        return data;
-      } catch (err) {
-        setError(getApiErrorMessage(err));
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [setRoom, setLoading, setError],
-  );
+  const createRoom = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await api.post<RoomState>('/rooms', {});
+      setRoom(data);
+      return data;
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [setRoom, setLoading, setError]);
 
   const joinRoom = useCallback(
     async (code: string) => {
@@ -85,6 +81,20 @@ export function useRoomActions() {
     async (roomId: string, seatIdx: number) => {
       try {
         const { data } = await api.delete<RoomState>(`/rooms/${roomId}/seats/${seatIdx}`);
+        setRoom(data);
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      }
+    },
+    [setRoom, setError],
+  );
+
+  const addBotToSeat = useCallback(
+    async (roomId: string, seatIdx: number, difficulty: BotDifficulty) => {
+      try {
+        const { data } = await api.post<RoomState>(`/rooms/${roomId}/seats/${seatIdx}/bot`, {
+          difficulty,
+        });
         setRoom(data);
       } catch (err) {
         setError(getApiErrorMessage(err));
@@ -159,6 +169,7 @@ export function useRoomActions() {
     leaveRoom,
     setReady,
     kickSeat,
+    addBotToSeat,
     startGame,
     getRoomByCode,
     updateSettings,

@@ -170,6 +170,7 @@
   "botSeatLabel": "机器人（{{0}}）",
   "botDifficultyEasyFull": "简单机器人",
   "botDifficultyNormalFull": "普通机器人",
+  "roomAddBot": "添加机器人",
 
   "settingStyleLabel": "玩法",
   "settingStyle": "南昌麻将",

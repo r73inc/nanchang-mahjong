@@ -26,6 +26,7 @@ import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.
 import { RoomsService } from './rooms.service';
 import { RoomsGateway } from './rooms.gateway';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { AddBotDto } from './dto/add-bot.dto';
 import { GameService } from '../game/game.service';
 
 @Controller('rooms')
@@ -108,6 +109,22 @@ export class RoomsController {
   ) {
     const room = await this.service.kickSeat(roomId, seatIdx, user.sub);
     this.gateway.broadcastRoomUpdate(roomId, room);
+    return room;
+  }
+
+  // ── Add bot to seat ────────────────────────────────────────────────────────
+
+  /** Host places a bot in a specific empty seat, choosing its difficulty. */
+  @Post(':roomId/seats/:seatIdx/bot')
+  @HttpCode(HttpStatus.OK)
+  async addBotToSeat(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('roomId') roomId: string,
+    @Param('seatIdx', ParseIntPipe) seatIdx: number,
+    @Body() dto: AddBotDto,
+  ) {
+    const room = await this.service.addBotToSeat(roomId, seatIdx, dto.difficulty, user.sub);
+    this.gateway.broadcastRoomUpdate(room.roomId, room);
     return room;
   }
 
