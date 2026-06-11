@@ -329,6 +329,7 @@
   "gameMobileEnterCta": "Enter Game",
   "gameLandscapeMode": "Game table rotated to landscape",
   "mobileDiscardConfirm": "Discard",
+  "gameSortHand": "Sort",
   "mobileTurnIndicator": "Your Turn",
   "mobileScoreStrip": "{{0}}: {{1}} pts",
 
