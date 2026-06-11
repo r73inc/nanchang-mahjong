@@ -1180,6 +1180,7 @@ describe('Engine·BUG-038-regression', () => {
       i === 0 ? { ...s, hand: kongHand, openMelds: [kongMeld] } : s,
     );
 
+    // @ts-expect-error — private constructor
     const engine = new GameEngine(
       {
         ...g.state,
@@ -1227,6 +1228,7 @@ describe('Engine·BUG-038-regression', () => {
       i === 0 ? { ...s, hand: kongHand, openMelds: [kongMeld] } : s,
     );
 
+    // @ts-expect-error — private constructor
     const engine = new GameEngine(
       {
         ...g.state,
