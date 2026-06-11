@@ -12,13 +12,38 @@
  */
 
 import type { GameState } from '@nanchang/engine';
-import type { ClientGameState, ClientSeatState, BotDifficulty } from '@nanchang/shared';
+import { tilesRemaining } from '@nanchang/engine';
+import type {
+  ClientGameState,
+  ClientSeatState,
+  ClientWallState,
+  BotDifficulty,
+} from '@nanchang/shared';
 import type { ConnState } from './game-session';
 
 export type ViewerSeat = 0 | 1 | 2 | 3 | null;
 
 /** Per-seat bot metadata to embed in the snapshot — undefined means human seat. */
 export type SeatBotMeta = { isBot: boolean; botDifficulty?: BotDifficulty } | undefined;
+
+/**
+ * Strip the wall down to its public positional state. Dice values, pointers,
+ * and stack positions are public table state — only tile identities
+ * (drawOrder) are secret and never leave the server.
+ */
+function toClientWallState(wall: GameState['wall']): ClientWallState | null {
+  if (!wall) return null;
+  return {
+    wallSelectionDice: wall.wallSelectionDice,
+    dealStartDice: wall.dealStartDice,
+    dealStartSeat: wall.dealStartSeat,
+    dealStartStack: wall.dealStartStack,
+    drawPtr: wall.drawPtr,
+    kongDraws: wall.kongDraws,
+    jingDice: wall.jingDice,
+    jingStackGlobal: wall.jingStackGlobal,
+  };
+}
 
 export function toClientSnapshot(
   state: GameState,
@@ -57,8 +82,8 @@ export function toClientSnapshot(
     currentSeat: state.currentSeat,
     dealerSeat: state.dealerSeat,
     roundWind: state.roundWind,
-    wallCount: state.wall.length,
-    deadWallCount: state.deadWall.length,
+    wallCount: state.wall ? tilesRemaining(state.wall) : 0,
+    wall: toClientWallState(state.wall),
     pendingDiscard: state.pendingDiscard,
     discardedBySeat: state.discardedBySeat,
     viewerSeat,

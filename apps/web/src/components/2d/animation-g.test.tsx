@@ -1,12 +1,12 @@
-/**
- * animation-g.test.tsx — Phase G animation infrastructure tests.
+﻿/**
+ * animation-g.test.tsx â€” Phase G animation infrastructure tests.
  *
  * Feature coverage:
- *  - 2DAnim·motion-config:  MotionConfig is in the GameTable2D tree
- *  - 2DAnim·discard-ctx:    DiscardContext default is null; updates on discard
- *  - 2DAnim·discard-ctx:    PlayerHand2D calls setLastDiscardId before onDiscard
- *  - 2DAnim·animate-tiles:  DiscardPool2D renders new discard tiles inside AnimatePresence
- *  - 2DAnim·animate-melds:  OpenMelds2D renders meld groups inside AnimatePresence
+ *  - 2DAnimÂ·motion-config:  MotionConfig is in the GameTable2D tree
+ *  - 2DAnimÂ·discard-ctx:    DiscardContext default is null; updates on discard
+ *  - 2DAnimÂ·discard-ctx:    PlayerHand2D calls setLastDiscardId before onDiscard
+ *  - 2DAnimÂ·animate-tiles:  DiscardPool2D renders new discard tiles inside AnimatePresence
+ *  - 2DAnimÂ·animate-melds:  OpenMelds2D renders meld groups inside AnimatePresence
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -21,12 +21,12 @@ import { DiscardContext, useDiscardContext } from './DiscardContext';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState, ClientSeatState, Meld, TileType } from '@nanchang/shared';
 
-// ── Store mock ────────────────────────────────────────────────────────────────
+// â”€â”€ Store mock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 vi.mock('../../stores/game.store', () => ({ useGameStore: vi.fn() }));
 const mockUseGameStore = vi.mocked(useGameStore);
 
-// ── Snapshot helpers ──────────────────────────────────────────────────────────
+// â”€â”€ Snapshot helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
   return {
@@ -54,7 +54,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 60,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
@@ -82,9 +82,9 @@ function setupStore(
   );
 }
 
-// ── 2DAnim·motion-config ──────────────────────────────────────────────────────
+// â”€â”€ 2DAnimÂ·motion-config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('GameTable2D · 2DAnim·motion-config', () => {
+describe('GameTable2D Â· 2DAnimÂ·motion-config', () => {
   beforeEach(() => setupStore());
 
   it('renders the table inside a MotionConfig provider (tree renders without errors)', () => {
@@ -113,9 +113,9 @@ describe('GameTable2D · 2DAnim·motion-config', () => {
   });
 });
 
-// ── 2DAnim·discard-ctx ────────────────────────────────────────────────────────
+// â”€â”€ 2DAnimÂ·discard-ctx â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('DiscardContext · 2DAnim·discard-ctx', () => {
+describe('DiscardContext Â· 2DAnimÂ·discard-ctx', () => {
   it('default context value has lastDiscardId === null', () => {
     const { result } = renderHook(() => useContext(DiscardContext));
     expect(result.current.lastDiscardId).toBeNull();
@@ -178,9 +178,9 @@ describe('DiscardContext · 2DAnim·discard-ctx', () => {
   });
 });
 
-// ── 2DAnim·discard-ctx — PlayerHand2D wiring ──────────────────────────────────
+// â”€â”€ 2DAnimÂ·discard-ctx â€” PlayerHand2D wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D · 2DAnim·discard-ctx', () => {
+describe('PlayerHand2D Â· 2DAnimÂ·discard-ctx', () => {
   it('calls setLastDiscardId before onDiscard fires', () => {
     const recordedId: (string | null)[] = [];
     const onDiscard = vi.fn();
@@ -213,9 +213,9 @@ describe('PlayerHand2D · 2DAnim·discard-ctx', () => {
   });
 });
 
-// ── 2DAnim·animate-tiles — DiscardPool2D ─────────────────────────────────────
+// â”€â”€ 2DAnimÂ·animate-tiles â€” DiscardPool2D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('DiscardPool2D · 2DAnim·animate-tiles', () => {
+describe('DiscardPool2D Â· 2DAnimÂ·animate-tiles', () => {
   it('renders discards for viewer seat with correct count', () => {
     setupStore(
       makeSnapshot({
@@ -273,7 +273,7 @@ describe('DiscardPool2D · 2DAnim·animate-tiles', () => {
     );
 
     // The last tile's motion.div should carry the layoutId via the MahjongTile2D
-    // motion.div's data-tile attribute indirectly — we verify the pool renders
+    // motion.div's data-tile attribute indirectly â€” we verify the pool renders
     // the correct tile count (both entries remain visible).
     const pool = screen.getByTestId('discard-pool-0');
     expect(pool.querySelectorAll('[data-testid="mahjong-tile-2d"]')).toHaveLength(2);
@@ -292,7 +292,7 @@ describe('DiscardPool2D · 2DAnim·animate-tiles', () => {
       }),
     );
 
-    // Even with a lastDiscardId set, seat 1 is not the viewer — no layoutId
+    // Even with a lastDiscardId set, seat 1 is not the viewer â€” no layoutId
     render(
       <I18nProvider>
         <DiscardContext.Provider value={{ lastDiscardId: 'some-id', setLastDiscardId: () => {} }}>
@@ -305,9 +305,9 @@ describe('DiscardPool2D · 2DAnim·animate-tiles', () => {
   });
 });
 
-// ── 2DAnim·animate-melds — OpenMelds2D ───────────────────────────────────────
+// â”€â”€ 2DAnimÂ·animate-melds â€” OpenMelds2D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('OpenMelds2D · 2DAnim·animate-melds', () => {
+describe('OpenMelds2D Â· 2DAnimÂ·animate-melds', () => {
   it('renders meld groups for a seat with open melds', () => {
     const pung: Meld = {
       kind: 'pung',
@@ -343,7 +343,7 @@ describe('OpenMelds2D · 2DAnim·animate-melds', () => {
     );
 
     const melds = screen.getByTestId('open-melds-0');
-    // 2 melds × 3 tiles each = 6 MahjongTile2D wrappers
+    // 2 melds Ã— 3 tiles each = 6 MahjongTile2D wrappers
     expect(melds.querySelectorAll('[data-testid="mahjong-tile-2d"]')).toHaveLength(6);
   });
 

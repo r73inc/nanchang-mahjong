@@ -31,8 +31,7 @@ function makeClaimsState(
     jingIndicator: null,
     jingPrimary: null,
     jingSecondary: null,
-    wall: [],
-    deadWall: [],
+    wall: null,
     seats: ([0, 1, 2, 3] as const).map((i) => ({
       wind: (['east', 'south', 'west', 'north'] as const)[i],
       hand: (hands[i] ?? emptyHand) as GameState['seats'][0]['hand'],
@@ -279,8 +278,7 @@ describe('claim-resolver · Gameplay·call-priority', () => {
         jingIndicator: null,
         jingPrimary: null,
         jingSecondary: null,
-        wall: [],
-        deadWall: [],
+        wall: null,
         seats: [
           // seat 0: discarder (13 tiles)
           {

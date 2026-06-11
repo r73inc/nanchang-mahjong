@@ -19,10 +19,10 @@ import type { Server, Socket } from 'socket.io';
 import {
   GameEngine,
   nextDealer,
+  previewJingReveal,
   calculateSpiritSettlement,
   calculateOpeningJingSettlement,
   isWinningHand,
-  typeOf,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -321,12 +321,15 @@ export class GameService {
       if (ruleTopBottomJing) {
         // Step 1 (ruleTopBottomJing): compute and broadcast settlement preview.
         // Scores are NOT updated yet — that happens when revealJing() is called.
+        // previewJingReveal derives the jing dice from the seed and resolves
+        // the stack WITHOUT mutating state, so preview and reveal always agree.
         const state = session.engine.state;
-        if (state.wall.length < 2) return this.emitError(socket, 'ENGINE_ERROR');
-        const settlementTile = typeOf(state.wall[0]);
-        // "Next in sequence" tile = stepAbove(wall[0]). It is NEVER physically removed from
-        // the wall — wall[1] stays as-is (jing indicator only). The 1pt bonus is purely
-        // derived from each player's initial hand count of this tile type.
+        if (!state.wall) return this.emitError(socket, 'ENGINE_ERROR');
+        const jingPreview = previewJingReveal(state);
+        const settlementTile = jingPreview.topTile;
+        // "Next in sequence" tile = stepAbove(settlement). Purely derived — no
+        // physical tile is flipped for it; the 1pt bonus counts each player's
+        // initial-hand copies of this tile type.
         const nextTile = stepAbove(settlementTile);
         const seatCounts = state.seats.map(
           (s) => s.hand.filter((t) => t === settlementTile).length,
@@ -339,6 +342,8 @@ export class GameService {
         const nextTileDelta = calculateOpeningJingSettlement(nextTile, state.seats, 1);
 
         const preview: SettlementPreviewPayload = {
+          dice: jingPreview.dice,
+          stackGlobal: jingPreview.stackGlobal,
           settlementTile,
           nextTile,
           seatCounts,
@@ -384,7 +389,7 @@ export class GameService {
 
     try {
       session.engine = session.engine.revealJing();
-      session.moveLog.push(...session.engine.events);
+      session.moveLog.push(...getNewEvents(session));
     } catch (err) {
       return this.emitError(socket, 'ENGINE_ERROR', String(err));
     }
@@ -393,6 +398,19 @@ export class GameService {
 
     // Snapshot first so scores reflect the settlement payout before the event toast.
     this.broadcastSnapshots(session);
+
+    // Broadcast the jing dice roll so clients can show/animate the dice.
+    const jingDiceEvent = session.engine.events.find(
+      (e) => e.kind === 'dice_roll' && e.purpose === 'jing_reveal',
+    );
+    if (jingDiceEvent && jingDiceEvent.kind === 'dice_roll') {
+      this.broadcastEvent(session, {
+        kind: 'dice_roll',
+        purpose: jingDiceEvent.purpose,
+        roller: jingDiceEvent.roller,
+        dice: jingDiceEvent.dice,
+      });
+    }
 
     // Broadcast the opening settlement event so the score-toast can fire.
     if (session.settings.ruleTopBottomJing) {
@@ -1512,8 +1530,14 @@ export class GameService {
 /**
  * After mutating session.engine, return the events appended since the last
  * call — i.e., the tail of engine.events not yet in session.moveLog.
+ *
+ * engine.events resets for every hand (new GameEngine per hand) while
+ * moveLog spans the whole session, so the comparison must be offset by the
+ * current hand's eventStartIdx. (Without the offset, every in-play event
+ * from hand 2 onward was silently dropped from the replay log.)
  */
 function getNewEvents(session: GameSession) {
-  const logged = session.moveLog.length;
-  return session.engine.events.slice(logged);
+  const handStart = session.handLog[session.handLog.length - 1]?.eventStartIdx ?? 0;
+  const loggedThisHand = session.moveLog.length - handStart;
+  return session.engine.events.slice(loggedThisHand);
 }

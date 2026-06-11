@@ -1,13 +1,13 @@
-/**
- * game-page.test.tsx — FE tests for the GamePage and game components.
+﻿/**
+ * game-page.test.tsx â€” FE tests for the GamePage and game components.
  *
  * Covers:
- *  - Gameplay·snapshot-redaction: spectator view hides hands, player sees own hand
- *  - Gameplay·reconnect: reconnecting overlay appears after 1.5s disconnect
- *  - Gameplay·discard-flow: tile selection and discard emit the right socket event
+ *  - GameplayÂ·snapshot-redaction: spectator view hides hands, player sees own hand
+ *  - GameplayÂ·reconnect: reconnecting overlay appears after 1.5s disconnect
+ *  - GameplayÂ·discard-flow: tile selection and discard emit the right socket event
  *  - MahjongTile aria-label from tile-map
  *  - GamePage renders jing_reveal screen for phase=jing_reveal
- *  - Mobile·body-overscroll-suppressed: overscroll suppressed in non-desktop mode
+ *  - MobileÂ·body-overscroll-suppressed: overscroll suppressed in non-desktop mode
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -18,9 +18,9 @@ import { GamePage } from './game-page';
 import { MahjongTile } from '../../components/mahjong-tile';
 import type { ClientGameState, HandRevealPayload, GameEndedPayload } from '@nanchang/shared';
 
-// ── Mocks ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Mock the 3D canvas — jsdom has no WebGL context; render a stub div instead
+// Mock the 3D canvas â€” jsdom has no WebGL context; render a stub div instead
 vi.mock('../../r3f/GameCanvas', () => ({
   GameCanvas: () => <div data-testid="game-canvas-3d" aria-hidden="true" />,
 }));
@@ -52,7 +52,7 @@ vi.mock('../../lib/socket', () => ({
   disconnectSocket: vi.fn(),
 }));
 
-// ── useOrientation mock (Phase 14A) ──────────────────────────────────────────
+// â”€â”€ useOrientation mock (Phase 14A) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Default: desktop mode so existing tests are unaffected.
 const mockRequestNativeLandscape = vi.fn().mockResolvedValue(undefined);
 const mockOrientation = {
@@ -68,7 +68,7 @@ vi.mock('../../hooks/use-orientation', () => ({
   MOBILE_BREAKPOINT_PX: 600,
 }));
 
-// ── Snapshot fixtures ─────────────────────────────────────────────────────────
+// â”€â”€ Snapshot fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState {
   return {
@@ -81,7 +81,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 40,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
@@ -188,7 +188,7 @@ function renderGamePage(gameId = 'game-test') {
   );
 }
 
-// ── Helper to simulate a server snapshot ──────────────────────────────────────
+// â”€â”€ Helper to simulate a server snapshot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function pushSnapshot(snapshot: ClientGameState) {
   // Wait for useEffect to register the handler (it may lag the initial render)
@@ -199,7 +199,7 @@ async function pushSnapshot(snapshot: ClientGameState) {
   if (handler) await act(async () => handler({ state: snapshot }));
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('GamePage', () => {
   beforeEach(() => {
@@ -246,29 +246,29 @@ describe('GamePage', () => {
     await pushSnapshot(makeSnapshot());
 
     await waitFor(() => {
-      expect(screen.getByText(/round|圈/i)).toBeInTheDocument();
+      expect(screen.getByText(/round|åœˆ/i)).toBeInTheDocument();
     });
   });
 
-  it('Gameplay·snapshot-redaction: viewer hand is accessible, opponent hands are hidden', async () => {
+  it('GameplayÂ·snapshot-redaction: viewer hand is accessible, opponent hands are hidden', async () => {
     renderGamePage();
     await pushSnapshot(makeSnapshot()); // viewerSeat=0, hand has 13 tiles
 
     await waitFor(() => {
       // Viewer's tiles are exposed via sr-only AccessibleHand buttons
       const tiles = screen.getAllByRole('button', { name: /character|bamboo|dot|wind|dragon/i });
-      // Viewer has 13 tiles in makeSnapshot — exactly 13 accessible buttons
+      // Viewer has 13 tiles in makeSnapshot â€” exactly 13 accessible buttons
       expect(tiles.length).toBe(13);
     });
 
-    // Opponent tiles are rendered only in the 3D canvas (aria-hidden) — no DOM buttons
+    // Opponent tiles are rendered only in the 3D canvas (aria-hidden) â€” no DOM buttons
     const allTileButtons = screen.queryAllByRole('button', {
       name: /character|bamboo|dot|wind|dragon/i,
     });
     expect(allTileButtons.length).toBe(13);
   });
 
-  it('Gameplay·snapshot-redaction: spectator sees no player hands as buttons', async () => {
+  it('GameplayÂ·snapshot-redaction: spectator sees no player hands as buttons', async () => {
     renderGamePage();
     const spectatorSnap = makeSnapshot({ viewerSeat: null });
     spectatorSnap.seats.forEach((s) => {
@@ -277,7 +277,7 @@ describe('GamePage', () => {
     await pushSnapshot(spectatorSnap);
 
     await waitFor(() => {
-      expect(screen.getByText(/round|圈/i)).toBeInTheDocument();
+      expect(screen.getByText(/round|åœˆ/i)).toBeInTheDocument();
     });
 
     // No clickable tile buttons (spectator has no hand)
@@ -290,25 +290,25 @@ describe('GamePage', () => {
     await pushSnapshot(makeSnapshot()); // currentSeat=0, viewerSeat=0
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /1 character|1萬/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('button', { name: /1 character|1è¬/i }).length).toBeGreaterThan(0);
     });
 
-    const tile = screen.getAllByRole('button', { name: /1 character|1萬/i })[0];
+    const tile = screen.getAllByRole('button', { name: /1 character|1è¬/i })[0];
 
-    // First tap → selects (no emit yet)
+    // First tap â†’ selects (no emit yet)
     fireEvent.click(tile);
     expect(mockEmit).not.toHaveBeenCalledWith('game:discard', expect.anything());
 
-    // Second tap → discard
+    // Second tap â†’ discard
     fireEvent.click(tile);
     expect(mockEmit).toHaveBeenCalledWith('game:discard', { tile: '1m' });
   });
 
-  it('Gameplay·reconnect: reconnecting overlay appears after ~1.5s disconnect', async () => {
+  it('GameplayÂ·reconnect: reconnecting overlay appears after ~1.5s disconnect', async () => {
     renderGamePage();
     // Push snapshot with real timers (pushSnapshot uses waitFor internally)
     await pushSnapshot(makeSnapshot());
-    await waitFor(() => expect(screen.getByText(/round|圈/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/round|åœˆ/i)).toBeInTheDocument());
 
     // Switch to fake timers AFTER async setup is complete
     vi.useFakeTimers();
@@ -318,13 +318,13 @@ describe('GamePage', () => {
       registeredHandlers.get('disconnect')?.(undefined);
     });
 
-    // Before 1.5s — overlay should NOT appear
+    // Before 1.5s â€” overlay should NOT appear
     act(() => {
       vi.advanceTimersByTime(1000);
     });
     expect(screen.queryByText(/reconnecting/i)).toBeNull();
 
-    // After 1.5s — overlay SHOULD appear (role=alert set on ReconnectingOverlay)
+    // After 1.5s â€” overlay SHOULD appear (role=alert set on ReconnectingOverlay)
     await act(async () => {
       vi.advanceTimersByTime(600);
     });
@@ -337,7 +337,7 @@ describe('GamePage', () => {
     renderGamePage();
     await pushSnapshot(makeSnapshot({ phase: 'awaiting_claims' }));
 
-    await waitFor(() => expect(screen.getByText(/round|圈/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/round|åœˆ/i)).toBeInTheDocument());
 
     await act(async () => {
       registeredHandlers.get('game:claim-window')?.({
@@ -347,15 +347,15 @@ describe('GamePage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /pung|碰/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /pass|过/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /pung|ç¢°/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /pass|è¿‡/i })).toBeInTheDocument();
     });
   });
 
   it('clicking Pass emits game:pass', async () => {
     renderGamePage();
     await pushSnapshot(makeSnapshot({ phase: 'awaiting_claims' }));
-    await waitFor(() => expect(screen.getByText(/round|圈/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/round|åœˆ/i)).toBeInTheDocument());
 
     await act(async () => {
       registeredHandlers.get('game:claim-window')?.({
@@ -365,13 +365,13 @@ describe('GamePage', () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /pass|过/i })).toBeInTheDocument(),
+      expect(screen.getByRole('button', { name: /pass|è¿‡/i })).toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByRole('button', { name: /pass|过/i }));
+    fireEvent.click(screen.getByRole('button', { name: /pass|è¿‡/i }));
     expect(mockEmit).toHaveBeenCalledWith('game:pass', {});
   });
 
-  // ── BUG-025: end-of-hand screen order ────────────────────────────────────────
+  // â”€â”€ BUG-025: end-of-hand screen order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   it('BUG-025: winner announcement shows before the hand-reveal detail screen', async () => {
     renderGamePage();
@@ -381,20 +381,20 @@ describe('GamePage', () => {
       registeredHandlers.get('game:hand-reveal')?.(makeHandReveal({ winnerSeat: 1 }));
     });
 
-    // Announcement popup first — the detail screen must NOT be visible yet
+    // Announcement popup first â€” the detail screen must NOT be visible yet
     expect(screen.getByText('Player Wins!')).toBeInTheDocument();
     expect(screen.queryByText(/hand complete/i)).not.toBeInTheDocument();
 
-    // Tap anywhere to skip → detail screen (HandRevealScreen) appears
+    // Tap anywhere to skip â†’ detail screen (HandRevealScreen) appears
     fireEvent.click(screen.getByText('Player Wins!'));
     await waitFor(() => {
       expect(screen.getByText(/hand complete/i)).toBeInTheDocument();
     });
   });
 
-  it('BUG-025: session end — announcement first, results second, hand details last', async () => {
+  it('BUG-025: session end â€” announcement first, results second, hand details last', async () => {
     renderGamePage();
-    // viewerSeat=0 === dealerSeat=0 → this client is the host
+    // viewerSeat=0 === dealerSeat=0 â†’ this client is the host
     await pushSnapshot(makeSnapshot({ phase: 'finished' }));
 
     await act(async () => {
@@ -403,7 +403,7 @@ describe('GamePage', () => {
       );
     });
 
-    // Host auto-ends the session — no manual "View Final Scores" click needed
+    // Host auto-ends the session â€” no manual "View Final Scores" click needed
     expect(mockEmit).toHaveBeenCalledWith('game:advance-hand', { gameId: 'game-test' });
 
     // 1. Winner announcement is the FIRST screen (no results table behind it yet)
@@ -414,14 +414,14 @@ describe('GamePage', () => {
       registeredHandlers.get('game:ended')?.(makeEnded());
     });
 
-    // 2. Skip the announcement → results screen (placement, scores, rating)
+    // 2. Skip the announcement â†’ results screen (placement, scores, rating)
     fireEvent.click(screen.getByText(/you win/i));
     await waitFor(() => {
       expect(screen.getByText(/final scores/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/1st place/i)).toBeInTheDocument();
 
-    // 3. View Hand Details → the detailed reveal is the LAST screen
+    // 3. View Hand Details â†’ the detailed reveal is the LAST screen
     fireEvent.click(screen.getByRole('button', { name: /view hand details/i }));
     await waitFor(() => {
       expect(screen.getByText(/all hands/i)).toBeInTheDocument();
@@ -452,9 +452,9 @@ describe('GamePage', () => {
     });
   });
 
-  // ── Phase 14A: mobile overscroll suppression ─────────────────────────────────
+  // â”€â”€ Phase 14A: mobile overscroll suppression â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  it('Mobile·body-overscroll-suppressed: body overscrollBehavior is none in non-desktop mode', async () => {
+  it('MobileÂ·body-overscroll-suppressed: body overscrollBehavior is none in non-desktop mode', async () => {
     mockOrientation.mode = 'needs-gesture';
 
     const { unmount } = renderGamePage();
@@ -467,7 +467,7 @@ describe('GamePage', () => {
     unmount();
   });
 
-  it('Mobile·status-bar-compact: wall count shows only number (no label) in mobile mode', async () => {
+  it('MobileÂ·status-bar-compact: wall count shows only number (no label) in mobile mode', async () => {
     mockOrientation.mode = 'css-landscape';
     mockOrientation.isMobileLandscapeForced = true;
 
@@ -476,7 +476,7 @@ describe('GamePage', () => {
     await pushSnapshot(snap);
 
     await waitFor(() => {
-      // On mobile, the wall count renders as just the number — no "Wall:" label
+      // On mobile, the wall count renders as just the number â€” no "Wall:" label
       expect(screen.getByText('42')).toBeInTheDocument();
     });
 
@@ -484,7 +484,7 @@ describe('GamePage', () => {
     expect(screen.queryByText(/wall left/i)).not.toBeInTheDocument();
   });
 
-  it('Mobile·history-toggle-hidden: right-edge history toggle is absent in mobile mode', async () => {
+  it('MobileÂ·history-toggle-hidden: right-edge history toggle is absent in mobile mode', async () => {
     mockOrientation.mode = 'native-landscape';
     mockOrientation.isMobileLandscapeForced = false;
 
@@ -496,17 +496,17 @@ describe('GamePage', () => {
       expect(screen.getByTestId('mobile-game-table-2d')).toBeInTheDocument();
     });
 
-    // The right-edge tab toggle has no aria-pressed (it uses text arrows ◀/▶).
+    // The right-edge tab toggle has no aria-pressed (it uses text arrows â—€/â–¶).
     // On mobile, the toggle is an icon button in the status bar with aria-pressed.
     // We verify: the gameHistoryTitle button (if present) has aria-pressed (= mobile icon).
-    const historyButtons = screen.queryAllByRole('button', { name: /game log|历史/i });
+    const historyButtons = screen.queryAllByRole('button', { name: /game log|åŽ†å²/i });
     historyButtons.forEach((btn) => {
       // Mobile icon button has aria-pressed; desktop edge tab does not
       expect(btn).toHaveAttribute('aria-pressed');
     });
   });
 
-  it('Mobile·siderail-above-hand: SideRail bottom is var(--mj-hand-height,90px) in mobile mode', async () => {
+  it('MobileÂ·siderail-above-hand: SideRail bottom is var(--mj-hand-height,90px) in mobile mode', async () => {
     mockOrientation.mode = 'css-landscape';
     mockOrientation.isMobileLandscapeForced = true;
 
@@ -526,14 +526,14 @@ describe('GamePage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('dialog', { name: /claim|碰|抢/i })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /claim|ç¢°|æŠ¢/i })).toBeInTheDocument();
     });
 
-    const rail = screen.getByRole('dialog', { name: /claim|碰|抢/i });
+    const rail = screen.getByRole('dialog', { name: /claim|ç¢°|æŠ¢/i });
     expect(rail.style.bottom).toBe('var(--mj-hand-height, 90px)');
   });
 
-  it('Mobile·body-overscroll-restored: body overscrollBehavior is restored on unmount', async () => {
+  it('MobileÂ·body-overscroll-restored: body overscrollBehavior is restored on unmount', async () => {
     // Set a pre-existing value to verify it is restored rather than blanked.
     document.body.style.overscrollBehavior = 'auto';
     mockOrientation.mode = 'css-landscape';
@@ -553,7 +553,7 @@ describe('GamePage', () => {
   });
 });
 
-// ── MahjongTile unit tests ─────────────────────────────────────────────────────
+// â”€â”€ MahjongTile unit tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('MahjongTile', () => {
   it('renders with correct aria-label from tile-map (EN)', () => {

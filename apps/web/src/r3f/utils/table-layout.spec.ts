@@ -1,8 +1,8 @@
-/**
+﻿/**
  * table-layout.spec.ts
  *
  * Unit tests for the pure 3D layout math in table-layout.ts.
- * No WebGL context, no React, no Three.js — plain Vitest.
+ * No WebGL context, no React, no Three.js â€” plain Vitest.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -19,7 +19,7 @@ import {
 } from './table-layout';
 import type { ClientGameState, ClientSeatState, TileType, Meld } from '@nanchang/shared';
 
-// ── Test fixtures ─────────────────────────────────────────────────────────────
+// â”€â”€ Test fixtures â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
   return {
@@ -65,7 +65,7 @@ function makeSnapshot(overrides: {
     dealerSeat: 0,
     currentSeat: 0,
     wallCount: 70,
-    deadWallCount: 0,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     jingIndicator: null,
@@ -82,10 +82,10 @@ function makeSnapshot(overrides: {
 // Approximate equality helper for floating-point values
 const APPROX = 0.001;
 function approx(a: number, b: number, msg?: string) {
-  expect(Math.abs(a - b), msg ?? `expected ${a} ≈ ${b}`).toBeLessThan(APPROX);
+  expect(Math.abs(a - b), msg ?? `expected ${a} â‰ˆ ${b}`).toBeLessThan(APPROX);
 }
 
-// ── Viewer hand ───────────────────────────────────────────────────────────────
+// â”€â”€ Viewer hand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('viewerHand', () => {
   it('returns one pose per tile in the viewer hand', () => {
@@ -117,7 +117,7 @@ describe('viewerHand', () => {
     const xs = layout.viewerHand.map((p) => p.x);
     const first = xs[0];
     const last = xs[xs.length - 1];
-    approx(first + last, 0, 'hand should be centered: first.x + last.x ≈ 0');
+    approx(first + last, 0, 'hand should be centered: first.x + last.x â‰ˆ 0');
   });
 
   it('viewer tiles are evenly spaced by TILE_STRIDE_W', () => {
@@ -143,7 +143,7 @@ describe('viewerHand', () => {
   });
 });
 
-// ── Opponent hands ─────────────────────────────────────────────────────────────
+// â”€â”€ Opponent hands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('opponentHands', () => {
   it('across opponent is at Z = -HAND_DIST', () => {
@@ -176,7 +176,7 @@ describe('opponentHands', () => {
     }
   });
 
-  it('across opponent tiles face away from viewer (ry ≈ π)', () => {
+  it('across opponent tiles face away from viewer (ry â‰ˆ Ï€)', () => {
     const snap = makeSnapshot({ seats: [{}, {}, { handCount: 5 }, {}] });
     const layout = computeTableLayout(snap);
     for (const pose of layout.opponentHands.across) {
@@ -219,7 +219,7 @@ describe('opponentHands', () => {
   });
 });
 
-// ── Viewer seat rotation ───────────────────────────────────────────────────────
+// â”€â”€ Viewer seat rotation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('viewerSeat rotation', () => {
   it('when viewerSeat=1, viewer hand is at X = +HAND_DIST', () => {
@@ -247,7 +247,7 @@ describe('viewerSeat rotation', () => {
   });
 });
 
-// ── Discards ──────────────────────────────────────────────────────────────────
+// â”€â”€ Discards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('discards', () => {
   it('returns 4 discard arrays (one per seat)', () => {
@@ -281,7 +281,7 @@ describe('discards', () => {
     }
   });
 
-  it('viewer discards start near DISCARD_START (first tile at Z ≈ DISCARD_START)', () => {
+  it('viewer discards start near DISCARD_START (first tile at Z â‰ˆ DISCARD_START)', () => {
     const snap = makeSnapshot({
       seats: [{ discards: ['1m'] as TileType[] }, {}, {}, {}],
     });
@@ -318,7 +318,7 @@ describe('discards', () => {
     approx(Math.abs(row2Z - row1Z), TILE_STRIDE_H);
   });
 
-  it('discards lie flat (rx = -π/2)', () => {
+  it('discards lie flat (rx = -Ï€/2)', () => {
     const snap = makeSnapshot({ seats: [{ discards: ['1m', '2m'] as TileType[] }, {}, {}, {}] });
     const layout = computeTableLayout(snap);
     for (const pose of layout.discards[0]) {
@@ -345,7 +345,7 @@ describe('discards', () => {
   });
 });
 
-// ── Open melds ────────────────────────────────────────────────────────────────
+// â”€â”€ Open melds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('openMelds', () => {
   function makeMeld(count: 3 | 4): Meld {
@@ -409,7 +409,7 @@ describe('openMelds', () => {
     expect(Math.abs(secondMeldCenterX - firstMeldCenterX)).toBeGreaterThan(0.5);
   });
 
-  it('open meld tiles lie flat (rx = -π/2)', () => {
+  it('open meld tiles lie flat (rx = -Ï€/2)', () => {
     const snap = makeSnapshot({
       seats: [{ openMelds: [makeMeld(3)] }, {}, {}, {}],
     });
@@ -420,7 +420,7 @@ describe('openMelds', () => {
   });
 });
 
-// ── Full layout structural check ──────────────────────────────────────────────
+// â”€â”€ Full layout structural check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('computeTableLayout', () => {
   it('returns all required top-level keys', () => {

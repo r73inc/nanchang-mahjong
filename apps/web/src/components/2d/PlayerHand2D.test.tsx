@@ -1,12 +1,12 @@
-/**
+﻿/**
  * PlayerHand2D.test.tsx
  *
  * Feature coverage:
- *  - 2DHand·merge:        mergeLocalOrder pure-function logic
- *  - 2DHand·render:       hand tiles appear; empty/null snapshot renders nothing
- *  - 2DHand·select:       first tap selects; second tap triggers onDiscard
- *  - 2DHand·claim:        tiles are non-interactive during claim window / pendingMove
- *  - 2DHand·discard-hint: nudge shown when pendingDiscard is set
+ *  - 2DHandÂ·merge:        mergeLocalOrder pure-function logic
+ *  - 2DHandÂ·render:       hand tiles appear; empty/null snapshot renders nothing
+ *  - 2DHandÂ·select:       first tap selects; second tap triggers onDiscard
+ *  - 2DHandÂ·claim:        tiles are non-interactive during claim window / pendingMove
+ *  - 2DHandÂ·discard-hint: nudge shown when pendingDiscard is set
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -17,7 +17,7 @@ import type { LocalEntry } from './PlayerHand2D';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState } from '@nanchang/shared';
 
-// ── Module mocks ──────────────────────────────────────────────────────────────
+// â”€â”€ Module mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 vi.mock('../../stores/game.store', () => ({
   useGameStore: vi.fn(),
@@ -48,7 +48,7 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 60,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
@@ -128,9 +128,9 @@ function renderHand(onDiscard = vi.fn()) {
   );
 }
 
-// ── mergeLocalOrder — pure function ──────────────────────────────────────────
+// â”€â”€ mergeLocalOrder â€” pure function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('mergeLocalOrder · 2DHand·merge', () => {
+describe('mergeLocalOrder Â· 2DHandÂ·merge', () => {
   it('initializes from empty prev + server hand', () => {
     const result = mergeLocalOrder([], ['1m', '2m', '3m']);
     expect(result).toHaveLength(3);
@@ -211,9 +211,9 @@ describe('mergeLocalOrder · 2DHand·merge', () => {
   });
 });
 
-// ── PlayerHand2D — render ─────────────────────────────────────────────────────
+// â”€â”€ PlayerHand2D â€” render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D render · 2DHand·render', () => {
+describe('PlayerHand2D render Â· 2DHandÂ·render', () => {
   beforeEach(() => setupStore());
 
   it('renders the hand container', () => {
@@ -288,9 +288,9 @@ describe('PlayerHand2D render · 2DHand·render', () => {
   });
 });
 
-// ── PlayerHand2D — select and discard ────────────────────────────────────────
+// â”€â”€ PlayerHand2D â€” select and discard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D select/discard · 2DHand·select', () => {
+describe('PlayerHand2D select/discard Â· 2DHandÂ·select', () => {
   beforeEach(() => setupStore());
 
   it('first tile tap selects it (aria-pressed becomes true)', () => {
@@ -328,9 +328,9 @@ describe('PlayerHand2D select/discard · 2DHand·select', () => {
   });
 });
 
-// ── PlayerHand2D — claim window / pendingMove disable interaction ─────────────
+// â”€â”€ PlayerHand2D â€” claim window / pendingMove disable interaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D claim window · 2DHand·claim', () => {
+describe('PlayerHand2D claim window Â· 2DHandÂ·claim', () => {
   it('tiles have role="img" (non-interactive) during an active claim window', () => {
     setupStore({ claimWindow: { actions: [], deadline: Date.now() + 8000 } });
     renderHand();
@@ -344,9 +344,9 @@ describe('PlayerHand2D claim window · 2DHand·claim', () => {
   });
 });
 
-// ── PlayerHand2D — discard hint ───────────────────────────────────────────────
+// â”€â”€ PlayerHand2D â€” discard hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D discard hint · 2DHand·discard-hint', () => {
+describe('PlayerHand2D discard hint Â· 2DHandÂ·discard-hint', () => {
   it('shows "Tap to discard" when pendingDiscard is set and it is viewer turn', () => {
     setupStore({ snapshot: makeSnapshot({ pendingDiscard: '5p' }) });
     renderHand();
@@ -360,17 +360,17 @@ describe('PlayerHand2D discard hint · 2DHand·discard-hint', () => {
   });
 });
 
-// ── PlayerHand2D — Phase 14C: --mj-hand-height ResizeObserver ────────────────
+// â”€â”€ PlayerHand2D â€” Phase 14C: --mj-hand-height ResizeObserver â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D hand-height CSS var · Hand·hand-height', () => {
+describe('PlayerHand2D hand-height CSS var Â· HandÂ·hand-height', () => {
   beforeEach(() => setupStore());
 
-  it('Mobile·hand-height-prop-set: --mj-hand-height is set on :root after mounting', () => {
+  it('MobileÂ·hand-height-prop-set: --mj-hand-height is set on :root after mounting', () => {
     // ResizeObserver in jsdom does not fire callbacks automatically (no layout engine).
     // The useLayoutEffect runs update() synchronously on mount via offsetHeight (0 in jsdom).
-    // We verify the property is present — the value will be "0px" in jsdom (no layout).
+    // We verify the property is present â€” the value will be "0px" in jsdom (no layout).
     const { unmount } = renderHand();
-    // The var should be set (even if 0px — jsdom has no layout engine)
+    // The var should be set (even if 0px â€” jsdom has no layout engine)
     const val = document.documentElement.style.getPropertyValue('--mj-hand-height');
     // Should be set as a string (empty string means absent)
     expect(val).toBeDefined();
@@ -378,7 +378,7 @@ describe('PlayerHand2D hand-height CSS var · Hand·hand-height', () => {
     unmount();
   });
 
-  it('Mobile·hand-height-prop-cleanup: --mj-hand-height is removed from :root on unmount', () => {
+  it('MobileÂ·hand-height-prop-cleanup: --mj-hand-height is removed from :root on unmount', () => {
     const { unmount } = renderHand();
     unmount();
     const val = document.documentElement.style.getPropertyValue('--mj-hand-height');
@@ -387,12 +387,12 @@ describe('PlayerHand2D hand-height CSS var · Hand·hand-height', () => {
   });
 });
 
-// ── PlayerHand2D — Phase 14B: flex-shrink ────────────────────────────────────
+// â”€â”€ PlayerHand2D â€” Phase 14B: flex-shrink â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D mobile constraints · Hand·flex-shrink', () => {
+describe('PlayerHand2D mobile constraints Â· HandÂ·flex-shrink', () => {
   beforeEach(() => setupStore());
 
-  it('Hand·flex-shrink-group: Reorder.Group container has flexShrink and minWidth styles', () => {
+  it('HandÂ·flex-shrink-group: Reorder.Group container has flexShrink and minWidth styles', () => {
     renderHand();
     // The Reorder.Group renders as a div with data-testid="player-hand-2d" as its parent.
     // Find the hand container and inspect the first child (the Reorder.Group div).
@@ -405,10 +405,10 @@ describe('PlayerHand2D mobile constraints · Hand·flex-shrink', () => {
     expect(style.minWidth).toBe('0');
   });
 
-  it('Hand·flex-shrink-items: each Reorder.Item has flexShrink and minWidth styles', () => {
+  it('HandÂ·flex-shrink-items: each Reorder.Item has flexShrink and minWidth styles', () => {
     renderHand();
     const tiles = screen.getAllByTestId('mahjong-tile-2d');
-    // Each tile is inside a Reorder.Item div — check the parent
+    // Each tile is inside a Reorder.Item div â€” check the parent
     tiles.forEach((tile) => {
       const item = tile.closest('[style]') as HTMLElement | null;
       if (item && item !== tile) {
@@ -419,16 +419,16 @@ describe('PlayerHand2D mobile constraints · Hand·flex-shrink', () => {
         }
       }
     });
-    // At minimum, the Reorder.Group has flex-shrink (tested above) — this test
+    // At minimum, the Reorder.Group has flex-shrink (tested above) â€” this test
     // verifies structural correctness of the rendered DOM.
     expect(tiles.length).toBeGreaterThan(0);
   });
 });
 
-// ── PlayerHand2D — Phase 14D: confirmMode (mobile floating button) ─────────
+// â”€â”€ PlayerHand2D â€” Phase 14D: confirmMode (mobile floating button) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
-  beforeEach(() => setupStore()); // currentSeat=0, viewerSeat=0, phase='playing' → isMyTurn=true
+describe('PlayerHand2D confirm mode Â· HandÂ·confirm-mode', () => {
+  beforeEach(() => setupStore()); // currentSeat=0, viewerSeat=0, phase='playing' â†’ isMyTurn=true
 
   function renderConfirmHand(onDiscard = vi.fn()) {
     return render(
@@ -438,12 +438,12 @@ describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
     );
   }
 
-  it('Hand·confirm-mode-no-btn-idle: discard button hidden when no tile is selected', () => {
+  it('HandÂ·confirm-mode-no-btn-idle: discard button hidden when no tile is selected', () => {
     renderConfirmHand();
     expect(screen.queryByTestId('mobile-discard-confirm-btn')).toBeNull();
   });
 
-  it('Hand·confirm-mode-btn-appears: discard button appears after selecting a tile on player turn', () => {
+  it('HandÂ·confirm-mode-btn-appears: discard button appears after selecting a tile on player turn', () => {
     renderConfirmHand();
     const buttons = screen.getAllByRole('button');
     // First button is the tile, not the discard btn (discard btn not yet visible)
@@ -451,7 +451,7 @@ describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
     expect(screen.getByTestId('mobile-discard-confirm-btn')).toBeInTheDocument();
   });
 
-  it('Hand·confirm-mode-tap-deselects: tapping selected tile again deselects (no discard)', () => {
+  it('HandÂ·confirm-mode-tap-deselects: tapping selected tile again deselects (no discard)', () => {
     const onDiscard = vi.fn();
     renderConfirmHand(onDiscard);
     const tileButtons = screen.getAllByRole('button');
@@ -461,7 +461,7 @@ describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
     expect(screen.queryByTestId('mobile-discard-confirm-btn')).toBeNull();
   });
 
-  it('Hand·confirm-mode-btn-discards: clicking the confirm button triggers onDiscard', () => {
+  it('HandÂ·confirm-mode-btn-discards: clicking the confirm button triggers onDiscard', () => {
     const onDiscard = vi.fn();
     renderConfirmHand(onDiscard);
     const tileButtons = screen.getAllByRole('button');
@@ -472,7 +472,7 @@ describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
     expect(onDiscard).toHaveBeenCalledWith('1m'); // first tile in makeSnapshot
   });
 
-  it('Hand·confirm-mode-btn-removes-tile: tile is removed from hand after confirm discard', () => {
+  it('HandÂ·confirm-mode-btn-removes-tile: tile is removed from hand after confirm discard', () => {
     renderConfirmHand();
     const tileButtons = screen.getAllByRole('button');
     fireEvent.click(tileButtons[0]); // select
@@ -480,7 +480,7 @@ describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
     expect(screen.getAllByTestId('mahjong-tile-2d')).toHaveLength(2);
   });
 
-  it('Hand·confirm-mode-double-tap-no-discard: second tap on same tile does NOT discard (deselects only)', () => {
+  it('HandÂ·confirm-mode-double-tap-no-discard: second tap on same tile does NOT discard (deselects only)', () => {
     const onDiscard = vi.fn();
     renderConfirmHand(onDiscard);
     const tileButtons = screen.getAllByRole('button');
@@ -490,8 +490,8 @@ describe('PlayerHand2D confirm mode · Hand·confirm-mode', () => {
     expect(screen.getAllByTestId('mahjong-tile-2d')).toHaveLength(3); // still 3 tiles
   });
 
-  it('Hand·confirm-mode-btn-hidden-outside-turn: confirm button hidden when not player turn', () => {
-    // currentSeat=1, viewerSeat=0 → isMyTurn=false → interactive=false
+  it('HandÂ·confirm-mode-btn-hidden-outside-turn: confirm button hidden when not player turn', () => {
+    // currentSeat=1, viewerSeat=0 â†’ isMyTurn=false â†’ interactive=false
     // Tiles render as role="img" (not clickable buttons); the confirm button never appears.
     setupStore({ snapshot: makeSnapshot({ currentSeat: 1 }) });
     renderConfirmHand();

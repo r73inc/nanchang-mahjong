@@ -272,6 +272,7 @@
   "preGameBonusTile1pt": "1 pt each",
   "preGameSettlementTitle": "Settlement Tile",
   "preGameSettlementDesc": "Players earn points for each copy of this tile",
+  "preGameDiceRolled": "Dealer rolled {0} + {1}",
   "preGameIndicatorHint": "Spirit indicator →",
   "preGameYou": "You",
   "preGameIndicator": "Indicator",

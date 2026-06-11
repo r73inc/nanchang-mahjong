@@ -13,7 +13,7 @@
  */
 
 import { GameEngine } from './engine';
-import type { GameEvent, GameState, SeatWind } from './types';
+import type { GameConfig, GameEvent, GameState, SeatWind } from './types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,11 @@ export interface ReplayHandConfig {
   startingScores: [number, number, number, number];
   dealerSeat: 0 | 1 | 2 | 3;
   roundWind: SeatWind;
+  /**
+   * Rule-variant flags the hand was played with. Required for correct replay:
+   * ruleTopBottomJing changes what revealJing() does (settlement + swap).
+   */
+  config?: Partial<GameConfig>;
 }
 
 // ── replayHand ────────────────────────────────────────────────────────────────
@@ -31,6 +36,7 @@ export function replayHand(config: ReplayHandConfig, events: GameEvent[]): GameS
     startingScores: config.startingScores,
     dealerSeat: config.dealerSeat,
     roundWind: config.roundWind,
+    config: config.config,
   }).deal();
 
   const states: GameState[] = [engine.state]; // post-deal state (jing_reveal phase)
@@ -42,7 +48,9 @@ export function replayHand(config: ReplayHandConfig, events: GameEvent[]): GameS
 
     switch (event.kind) {
       case 'deal':
-        // Already applied by GameEngine.create().deal() — skip
+      case 'dice_roll':
+        // Dice rolls and the deal are seed-derived and already applied by
+        // GameEngine.create().deal() / revealJing() — skip.
         i += 1;
         continue;
 
