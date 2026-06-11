@@ -155,6 +155,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   const snapshot = useGameStore((s) => s.snapshot);
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
+  const canTsumo = useGameStore((s) => s.canTsumo);
 
   // ── Hand-height CSS variable ──────────────────────────────────────────────
   // Observes the container height and sets --mj-hand-height on :root so that
@@ -215,7 +216,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
 
   // ── Interaction ───────────────────────────────────────────────────────────
 
-  const interactive = isMyTurn && !claimWindow && !pendingMove;
+  const interactive = isMyTurn && !claimWindow && !pendingMove && !canTsumo;
 
   /**
    * Drag-reorder eligibility.

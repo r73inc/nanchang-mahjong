@@ -561,6 +561,145 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 
 ---
 
+## PR · `fix/bug-027-bust-end-condition`
+
+### BUG-027 · Bust-mode end condition fires mid-round and wrong starting score
+
+**Root cause (end condition):** `GameService.isSessionOver()` checked `cumulativeScores.some(s => s < 0)` after every hand. This could terminate a bust-mode session immediately when a player went negative due to spirit settlement mid-round, even though they could recover by winning subsequent hands in the same round.
+
+**Root cause (starting score):** Bust mode sessions were using `settings.startingScore` (defaulting to 0) instead of the required starting score of 20. No UI existed to set `startingScore`, so it was always 0.
+
+**Fix:**
+
+1. `apps/api/src/game/game.service.ts` — `isSessionOver()`: added `nextDealerInfo.roundComplete &&` guard to the bust check. The elimination check now only runs when a full four-hand rotation has completed.
+2. `apps/api/src/game/game.service.ts` — game start: `initialScore = settings.terminationType === 'bust' ? 20 : settings.startingScore`. Bust mode always begins at 20 regardless of the room's `startingScore` field.
+3. `apps/api/src/game/game-session-over.spec.ts` — 8 new unit tests covering bust mid-round/round-end cases and rounds east/east+south cases.
+
+**Key learning:** In this rules system a "round" = one full rotation of the dealer position (all four seats being dealer once). The `nextDealerInfo.roundComplete` flag from `nextDealer()` is the correct gate for any end-of-round check. Do not use per-hand score checks for round-level termination conditions.
+
+---
+
+### BUG-028 · End of game INVALID_PHASE error — host/non-host continue inconsistency
+
+**Root cause (INVALID_PHASE):** `handleAdvanceHand` returned `INVALID_PHASE` when `session.pendingHandEnd` was null. This could be hit legitimately when: (a) the dealer's auto-advance already fired and cleared `pendingHandEnd`, but `game:ended` was briefly delayed and the player clicked the manual fallback Continue button; or (b) the dealer is a bot seat and the server allows any human to advance — two humans clicking in quick succession would have the second one hit the null check.
+
+**Root cause (bot-dealer freeze):** When the current hand's dealer seat is occupied by a bot, `isDealer = viewerSeat === snapshot.dealerSeat` is false for all human players. Both `HandRevealScreen` and `PreGameFlow` received `isHost={false}`, showing WaitingDots to everyone. The auto-advance effect also checked `vs === snapshot.dealerSeat` before firing, so it never triggered. Result: the game was permanently frozen whenever the dealer rotated to a bot seat.
+
+**Fix:**
+
+1. `apps/api/src/game/game.service.ts` — `handleAdvanceHand()`: changed `return this.emitError(socket, 'INVALID_PHASE')` to a silent `return` when `!pending`. The caller will shortly receive `game:ended` or the next hand's `game:snapshot`; emitting an error served no purpose and caused visible UX problems.
+2. `apps/web/src/pages/game/game-page.tsx` — Added `canAdvanceHand` computed value: `isDealer || (dealerIsBot && viewerSeat === firstHumanSeat)`. When the dealer is a bot, the first non-bot seat index acts as the advance proxy — matching the server's "any human may advance when dealer is bot" permission.
+3. `HandRevealScreen` and `PreGameFlow` now receive `isHost={canAdvanceHand}` so the Continue button appears for the correct player even with a bot dealer.
+4. Auto-advance effect updated with the same bot-dealer logic: fires for the first human seat when `isLastHand=true` and the dealer is a bot.
+
+**Key learning:** "Dealer" and "room host" are distinct concepts (see Key Learning #2). When bot seats can hold the dealer role, advance-hand permissions need to fall back to a designated human rather than silently showing WaitingDots to everyone. `pendingHandEnd === null` in `handleAdvanceHand` is always a race/duplicate — never a client bug worth surfacing as an error.
+
+---
+
+### IMP-014 · Language change during active game
+
+**Root cause:** `LangToggle` was only rendered inside `ScreenShell`, which is not used by `GamePage` (the game has its own full-screen layout with a status bar). There was no path for a player to switch language once gameplay started.
+
+**Fix:** Added `LangToggle` to the right-side controls in `GamePage`'s status bar (the `absolute top-0` bar that also shows round wind, wall count, history, and concede). A single import change (`LangToggle` added alongside `useI18n`) and one JSX addition. The underlying `changeLanguage` from react-i18next re-renders all `t()` calls globally and instantly — no engine involvement needed, purely a UI concern.
+
+**Key learning:** Language switching is stateless in react-i18next — calling `instance.changeLanguage()` triggers a re-render of every component using `useTranslation()`. There are no mid-game stability concerns; the engine and server are language-agnostic. The only blocker was surface area: the game page never mounted the toggle.
+
+---
+
+### IMP-018 · Per-seat bot assignment in room config
+
+**Root cause:** Bots were configured only at room-creation time via a lobby-page stepper (count 0–3, uniform difficulty). There was no REST endpoint, no service method, and no UI to add a bot to a specific seat after the room existed.
+
+**Fix:**
+
+1. `apps/api/src/rooms/dto/add-bot.dto.ts` — new `AddBotDto` with `difficulty: 'easy' | 'normal'`.
+2. `apps/api/src/rooms/rooms.service.ts` — `addBotToSeat(roomId, seatIdx, difficulty, requestingUserId)`: validates host + empty seat, writes bot item via DynamoDB transact with `attribute_not_exists(PK)` guard.
+3. `apps/api/src/rooms/rooms.controller.ts` — `POST /rooms/:roomId/seats/:seatIdx/bot`: host-only, broadcasts `room:update` after success.
+4. `apps/web/src/hooks/use-room.ts` — removed `BotConfig` param from `createRoom`; added `addBotToSeat(roomId, seatIdx, difficulty)` action.
+5. `apps/web/src/pages/lobby/lobby-page.tsx` — removed bot count stepper and difficulty toggle; `handleCreate` now calls `createRoom()` with no args.
+6. `apps/web/src/pages/room/room-page.tsx` — empty seats (host-only) show an "Add Bot" button that expands to Easy Bot / Normal Bot pill buttons. Cancellable with ✕. Existing kick button removes bots (already supported by `kickSeat`).
+7. i18n: added `roomAddBot` key (EN: "Add Bot", ZH: "添加机器人").
+
+**Key learning:** Bot userId convention `bot-<difficulty>-<seatIdx>` is the only identifier used by the game engine — no schema migration needed. The DynamoDB `ConditionExpression: 'attribute_not_exists(PK)'` prevents a race where two clients both try to add a bot to the same seat.
+
+---
+
+### BUG-035 · Tile textures show broken-image placeholder during active game
+
+**Symptom:** Some tiles in the player's hand, open bot melds, and the discard pool showed the browser's native broken-image (mountain/landscape) icon instead of their SVG textures. The specific tiles affected were inconsistent across sessions.
+
+**Root cause:** When the Vite dev server restarts or hot-reloads, in-flight HTTP requests for static SVG texture files may return transient 404 responses. The browser caches these 404s. Because React does not update `<img>` `src` attributes unless the prop value changes — and the prop value (`/textures/Tiles/Regular/Man5.svg`) stays the same — the browser never retries the request. The result is a permanently broken image for the rest of that session, even after the server is healthy.
+
+A secondary risk is any future runtime path where an invalid tile type is passed to `tileTexturePath` (e.g., an incorrect cast, a future engine type mismatch). `TILE_TO_FLUFFY[unknownType]` returns `undefined`, producing a path of `/textures/Tiles/Regular/undefined.svg` — a guaranteed 404.
+
+**Fix:**
+
+1. `apps/web/src/components/2d/MahjongTile2D.tsx` — Added `retryCount` state and `handleImgError` callback to the component.
+   - `retryCount = 0`: normal load from `baseSrc`.
+   - `retryCount = 1`: first error → retry with `baseSrc?r=1` (cache-busting query string bypasses the browser's cached 404; if the dev server is now healthy the tile loads correctly).
+   - `retryCount = 2`: retry also failed → `imgSrc = null` → `<img>` is not rendered. The tile body (ivory background + gold border) remains visible as a plain blank-face tile — no broken-image icon.
+   - A `useEffect` resets `retryCount` to 0 whenever `baseSrc` changes so a newly-drawn tile always gets a fresh load attempt.
+2. `apps/web/src/r3f/utils/tile-texture-map.ts` — `tileTexturePath` now casts the lookup to `Record<string, string | undefined>` before reading, enabling a runtime-safe null check. If the name is `undefined` (unknown tile type), logs `console.warn` and returns `Blank.svg` as a fallback instead of producing an `undefined.svg` path.
+
+**Key learning:** React's diffing algorithm does not remount `<img>` elements when only the browser-side load state changes — only when the `src` prop changes in the VDOM. To recover from a browser-cached 404, you must supply a new `src` value (e.g., by appending a cache-busting query string). An `onError` handler that updates React state is the correct mechanism; direct DOM mutation via `e.currentTarget.src = ...` gets overwritten on the next React render.
+
+---
+
+### IMP-019 · Manual tsumo — winning must be a conscious player action
+
+**Request:** When a player draws a tile that completes their hand, the game previously auto-declared a self-draw win (tsumo) immediately with no player input. Players should instead be offered a choice: declare the win or continue playing (e.g., to chase a higher-scoring hand).
+
+**Fix:**
+
+1. `packages/shared/src/game.events.ts` — Added `CanTsumoPayload { seat }` interface for the new `game:can-tsumo` socket event.
+2. `apps/api/src/game/game.service.ts` — Removed the auto-tsumo block from `startTurn()`. Replaced with a `game:can-tsumo` private emit to the active player's socket when their 14-tile hand is a winning hand. Added `handleTsumo(socket, userId, gameId)` method which validates seat/phase and calls `applyWinClaim(..., 'tsumo', ...)`. Moved bot auto-tsumo into `handleBotTurn()` (bots still auto-win — they have no UI to interact with).
+3. `apps/api/src/game/game.gateway.ts` — Added `game:tsumo` to the throttle map (limit 2/s) and a `@SubscribeMessage('game:tsumo')` handler that delegates to `gameService.handleTsumo`.
+4. `apps/web/src/stores/game.store.ts` — Added `canTsumo: boolean` state and `setCanTsumo` action. Cleared in `setSnapshot` (turn moved on) and on discard.
+5. `apps/web/src/hooks/use-game.ts` — Added `handleCanTsumo` listener for `game:can-tsumo` (sets `canTsumo = true` for the viewer's seat only). Added `declareTsumo` action (emits `game:tsumo`, clears `canTsumo`). `discard` action now also clears `canTsumo` (player chose to keep playing). Exports `canTsumo` and `declareTsumo`.
+6. `apps/web/src/pages/game/game-page.tsx` — Added `TsumoSheet` component (same bottom-sheet pattern as `KongActionSheet`): gold title "You can win!", subtitle, "Declare Win" primary button and "Keep Playing" dismiss button. Wired into `GameTable` via `canTsumo` + `onDeclareTsumo` + `onDismissTsumo` props. Tiles are non-interactive while the sheet is visible (`ViewerHandHUD` and `AccessibleHand` gated on `!canTsumo`).
+7. `apps/web/src/components/2d/PlayerHand2D.tsx` — Added `canTsumo` store read; added to `interactive` guard so 2D tiles are also non-interactive while the tsumo offer is showing.
+8. i18n: 4 new keys in EN+ZH (`tsumoTitle`, `tsumoSubtitle`, `tsumoDeclare`, `tsumoContinue`).
+
+**Key learning:** Server-emitted private events (targeted to one socket) are the right pattern for turn-private information like "you can declare a win". The event is not broadcast — other players do not learn that the active player has a winning hand until they actually declare it.
+
+---
+
+## PR · `fix/bug-036-spirit-double-settlement` (2026-06-11)
+
+### BUG-036 · End-of-hand spirit settlement double-counted on won hands
+
+**Symptom:** After any hand that ended in a win, players holding spirit (jing) tiles received — and others paid — exactly double the correct spirit settlement amount. Draw and concede hands settled correctly. The error compounded across the session because each hand's `startingScores` seeded from the inflated cumulative totals, and `isSessionOver()` read those same inflated figures so bust-mode termination could trigger at the wrong time.
+
+**Root cause:** Two layers both applied the spirit settlement on the win path:
+
+1. `packages/engine/src/engine.ts` `win()` computed `calculateSpiritSettlement(...)` and baked it into `seats[i].score` alongside the win payment.
+2. `apps/api/src/game/game.service.ts` `handleHandEnd()` called `calculateSpiritSettlement(state.seats, ...)` again on those same finished-state seats (hands/openMelds unchanged → identical deltas) and added the result a second time: `cumulativeScores[i] = state.seats[i].score + spiritDeltas[i]`.
+
+Draw and concede paths were correct because the engine never touched scores there — `handleHandEnd`'s single application was the only one.
+
+**Fix:** Removed `calculateSpiritSettlement` from the engine's `win()` entirely. The engine now applies only the win payment (`paymentResult.scoreDelta`). The service's `handleHandEnd()` remains the single, uniform place that applies spirit settlement for all three hand-end types (win / draw / concede). The `calculateSpiritSettlement` import was also removed from `engine.ts` since it is no longer called there.
+
+**Files changed:**
+
+- `packages/engine/src/engine.ts` — removed spirit delta from `win()` score application; removed `calculateSpiritSettlement` import
+- `packages/engine/src/__tests__/engine.test.ts` — added `Engine·BUG-036-regression` describe block: injects state with a winning hand that holds spirit tiles, confirms post-win seat score equals starting + win payment only, and confirms `calculateSpiritSettlement` on the finished state returns a non-zero delta (proving spirit would have changed the score if the engine had applied it)
+
+**Key learning:** When two layers each hold partial responsibility for a calculation, the invariant is fragile. For settlements that must apply once regardless of how the hand ended, own the logic in exactly one place (here: the service layer). The engine's `win()` should only apply the win payment — it has no business knowing about the service-side cumulative score model.
+
+---
+
+### BUG-030 · Settlement bonus points incorrectly doubled (closed as duplicate of BUG-036)
+
+**Symptom:** When one player held spirit (jing) tiles and no other player had any (the Indomitable Spirit case), the bonus was reported as double the correct amount and the other players were charged double. The symptom was most visible with the Indomitable Spirit rule (sole spirit holder, intentionally ×2), where that ×2 was applied by the formula and then the entire settlement was doubled again.
+
+**Root cause:** Same as BUG-036 — the spirit settlement was computed and applied twice on the win path (once in the engine, once in the service). For normal multi-player spirit cases this produces an incorrect but less-obvious doubled figure. For the Indomitable Spirit case (only one player has spirits) the effective score is `raw × 2` (Indomitable) × 2 (double-count) = 4× the correct value, which made it immediately visible. BUG-030 was filed with "flowers/seasons" framing but the app uses spirit tiles (jing) for all end-of-hand bonus settlement — same code path.
+
+**Fix:** Closed by the BUG-036 fix. No additional changes needed.
+
+**Key learning:** The most extreme edge case (Indomitable Spirit — sole holder) surfaces the bug most clearly because the intentional ×2 amplifies the accidental ×2 into a visually obvious ×4. Always test the "only one player qualifies" edge case for any settlement rule that includes a multiplier for that condition.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.
@@ -574,3 +713,4 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 9. **Engine vs. resolver:** Engine functions are general-purpose. Family-specific rule restrictions apply at the boundary layer (claim-resolver).
 10. **Testing edge cases:** Position-dependent mechanics need tests for all seat positions, including wrap-around.
 11. **Character localization:** Hardcoded characters in code must be validated for semantic correctness — they won't auto-translate and visual correctness alone doesn't guarantee the character is the right choice semantically.
+12. **Image retry on 404:** React does not re-request an `<img>` whose `src` prop hasn't changed, even if the browser cached a transient 404. The only way to force a retry is to change the `src` value (e.g., append a cache-busting query string). Use `onError` state to drive this; avoid direct DOM mutation (`e.currentTarget.src = ...`) which React will overwrite on the next render.

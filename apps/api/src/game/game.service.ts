@@ -112,11 +112,13 @@ export class GameService {
     const seed = (Math.random() * 0x7fff_ffff) >>> 0; // non-negative 31-bit int
     const now = new Date().toISOString();
 
+    // Bust mode always starts at 20 regardless of the room's startingScore setting.
+    const initialScore = settings.terminationType === 'bust' ? 20 : settings.startingScore;
     const startingScores: [number, number, number, number] = [
-      settings.startingScore,
-      settings.startingScore,
-      settings.startingScore,
-      settings.startingScore,
+      initialScore,
+      initialScore,
+      initialScore,
+      initialScore,
     ];
 
     const engine = GameEngine.create(seed, {
@@ -443,7 +445,11 @@ export class GameService {
     if (!dealerIsBot && userId !== dealerUserId) return this.emitError(socket, 'NOT_HOST');
 
     const pending = session.pendingHandEnd;
-    if (!pending) return this.emitError(socket, 'INVALID_PHASE');
+    // pendingHandEnd is null when advance was already processed (e.g. auto-advance fired
+    // and the client resent due to a network delay, or two humans both clicked when
+    // the dealer was a bot seat).  The correct response is a silent no-op — the caller
+    // will shortly receive game:ended or the next hand's game:snapshot.
+    if (!pending) return;
 
     session.pendingHandEnd = null;
     session.lastHandReveal = null;
@@ -467,31 +473,8 @@ export class GameService {
     const activeSeat = session.engine.state.currentSeat;
     const st = session.engine.state;
 
-    // ── Auto-tsumo detection ──────────────────────────────────────────────────
-    // After any draw (or after a 4th open meld when the remaining pair is already
-    // in hand), check if the active player's full hand is already complete.
-    // fullHand = open meld tiles + concealed hand tiles. If exactly 14 tiles and
-    // isWinningHand is true, auto-declare self-draw win (tsumo).
-    //
-    // This is correct for a family game: players never decline a winning hand.
-    // The engine validates the win, so there's no way for invalid wins to sneak in.
-    if (st.jingPrimary && st.jingSecondary && st.phase === 'playing') {
-      const jingTypes: TileType[] = [st.jingPrimary, st.jingSecondary];
-      const seatState = st.seats[activeSeat];
-      const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles] as TileType[]);
-      const fullHand = [...openMeldTiles, ...seatState.hand];
-
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
-        this.logger.log(
-          `Auto-tsumo: seat ${activeSeat} has a complete 14-tile hand (game ${session.gameId})`,
-        );
-        this.applyWinClaim(session, activeSeat, 'tsumo', { isRobKong: false });
-        return;
-      }
-    }
-
     // Bot seat: schedule the async turn handler and return immediately.
-    // The bot will think, discard, and advance the game without a socket.
+    // The bot will think (and auto-tsumo if its hand is complete), then discard.
     if (session.isBotSeat(activeSeat)) {
       void this.handleBotTurn(session, activeSeat);
       return;
@@ -504,6 +487,27 @@ export class GameService {
     const socketId = session.socketIdForSeat(activeSeat);
     if (socketId && this.server) {
       this.server.to(socketId).emit('game:your-turn', { seat: activeSeat });
+    }
+
+    // ── Tsumo opportunity detection ───────────────────────────────────────────
+    // If the player's full 14-tile hand is already complete, notify them privately
+    // so the UI can show a "Declare Win" button. Winning is a conscious player
+    // action — the server does NOT auto-win; the player must emit game:tsumo.
+    // They may instead choose to discard normally and continue playing.
+    if (st.jingPrimary && st.jingSecondary && st.phase === 'playing') {
+      const jingTypes: TileType[] = [st.jingPrimary, st.jingSecondary];
+      const seatState = st.seats[activeSeat];
+      const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles] as TileType[]);
+      const fullHand = [...openMeldTiles, ...seatState.hand];
+
+      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
+        this.logger.log(
+          `Can-tsumo: seat ${activeSeat} has a complete 14-tile hand (game ${session.gameId})`,
+        );
+        if (socketId && this.server) {
+          this.server.to(socketId).emit('game:can-tsumo', { seat: activeSeat });
+        }
+      }
     }
 
     // Player offline — fire a push notification (no-op if not subscribed or push disabled)
@@ -553,6 +557,18 @@ export class GameService {
     if (state.jingPrimary) jingTypes.push(state.jingPrimary);
     if (state.jingSecondary) jingTypes.push(state.jingSecondary);
 
+    // Bots auto-declare tsumo when their hand is complete — no button needed.
+    if (jingTypes.length === 2) {
+      const seatState = state.seats[seat];
+      const openMeldTiles = seatState.openMelds.flatMap((m) => [...m.tiles] as TileType[]);
+      const fullHand = [...openMeldTiles, ...seatState.hand];
+      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
+        this.logger.log(`Bot auto-tsumo: seat ${seat} (game ${session.gameId})`);
+        this.applyWinClaim(session, seat, 'tsumo', { isRobKong: false });
+        return;
+      }
+    }
+
     const tile = getBotDiscard(state.seats[seat].hand, jingTypes, session.getBotDifficulty(seat));
 
     try {
@@ -596,6 +612,22 @@ export class GameService {
 
     // Open claim window or proceed
     this.openClaimWindowAfterDiscard(session);
+  }
+
+  /**
+   * Handle game:tsumo from the active player.
+   * The player has a complete 14-tile winning hand and chooses to declare self-draw.
+   */
+  handleTsumo(socket: Socket, userId: string, gameId: string): void {
+    const session = this.sessions.get(gameId);
+    if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
+
+    const seat = session.getSeat(userId);
+    if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
+    if (seat !== session.engine.state.currentSeat) return this.emitError(socket, 'NOT_YOUR_TURN');
+    if (session.engine.state.phase !== 'playing') return this.emitError(socket, 'INVALID_PHASE');
+
+    this.applyWinClaim(session, seat, 'tsumo', { isRobKong: false });
   }
 
   private openClaimWindowAfterDiscard(session: GameSession): void {
@@ -1136,8 +1168,10 @@ export class GameService {
     const { settings, cumulativeScores, engine } = session;
 
     if (settings.terminationType === 'bust') {
-      // Bust: session ends if any player's score goes below 0 after this hand
-      if (cumulativeScores.some((s) => s < 0)) return true;
+      // Bust: only eliminate after a full round completes (roundComplete = true).
+      // A player may go negative mid-round from spirit settlement and recover;
+      // the check must not fire until all hands in that rotation are done.
+      if (nextDealerInfo.roundComplete && cumulativeScores.some((s) => s < 0)) return true;
     }
 
     if (settings.terminationType === 'rounds') {

@@ -170,6 +170,7 @@
   "botSeatLabel": "Bot ({{0}})",
   "botDifficultyEasyFull": "Easy Bot",
   "botDifficultyNormalFull": "Normal Bot",
+  "roomAddBot": "Add Bot",
 
   "settingStyleLabel": "Style",
   "settingStyle": "Nanchang (南昌)",
@@ -317,6 +318,10 @@
   "kongActionAddTitle": "Extend Kong?",
   "kongActionKong": "Kong",
   "kongActionDiscard": "Discard",
+  "tsumoTitle": "You can win!",
+  "tsumoSubtitle": "Declare self-draw win or keep playing",
+  "tsumoDeclare": "Declare Win",
+  "tsumoContinue": "Keep Playing",
   "gameDrawRound": "Draw — No Winner",
   "gameConceded": "Player Conceded",
   "gameMobileEnterTitle": "Rotate to Play",

@@ -418,6 +418,68 @@ export class RoomsService {
   }
 
   /**
+   * Host adds a bot to a specific empty seat.
+   * The bot is named "Bot <seatIdx>" so each seat has a deterministic name.
+   */
+  async addBotToSeat(
+    roomId: string,
+    seatIdx: number,
+    difficulty: BotDifficulty,
+    requestingUserId: string,
+  ): Promise<RoomState> {
+    const room = await this.queryRoom(roomId);
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.hostUserId !== requestingUserId)
+      throw new ForbiddenException('Only the host can add bots');
+    if (room.status !== 'waiting')
+      throw new BadRequestException('Cannot change seats during a game');
+
+    const seat = room.seats[seatIdx];
+    if (!seat) throw new BadRequestException('Invalid seat index');
+    if (seat.userId !== null) throw new ConflictException('Seat is already occupied');
+
+    const now = new Date().toISOString();
+    const diffLabel = difficulty === 'easy' ? 'Easy' : 'Normal';
+
+    await this.db.transactWrite({
+      TransactItems: [
+        {
+          Put: {
+            TableName: this.db.tableName,
+            Item: {
+              ...DK.roomSeat(roomId, seatIdx),
+              roomId,
+              seatIdx,
+              userId: `bot-${difficulty}-${seatIdx}`,
+              handle: `Bot ${seatIdx}`,
+              displayName: `Bot ${seatIdx} (${diffLabel})`,
+              ready: true,
+              joinedAt: now,
+              isBot: true,
+              botDifficulty: difficulty,
+            },
+            ConditionExpression: 'attribute_not_exists(PK)',
+          },
+        },
+        {
+          Update: {
+            TableName: this.db.tableName,
+            Key: DK.room(roomId),
+            UpdateExpression: 'SET #ttl = :ttl, idleAt = :now',
+            ExpressionAttributeNames: { '#ttl': 'ttl' },
+            ExpressionAttributeValues: {
+              ':ttl': this.ttlFromNow(),
+              ':now': now,
+            },
+          },
+        },
+      ],
+    });
+
+    return (await this.queryRoom(roomId))!;
+  }
+
+  /**
    * Toggle a player's ready status.
    */
   async setReady(roomId: string, userId: string, ready: boolean): Promise<RoomState> {

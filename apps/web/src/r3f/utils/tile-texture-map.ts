@@ -82,7 +82,16 @@ export type TilePaletteVariant = 'Regular';
  *   tileTexturePath('east', 'Black')  →  '/textures/Tiles/Black/Ton.svg'
  */
 export function tileTexturePath(tile: TileType, palette: TilePaletteVariant = 'Regular'): string {
-  return `/textures/Tiles/${palette}/${TILE_TO_FLUFFY[tile]}.svg`;
+  // TILE_TO_FLUFFY is Record<TileType, string> so TypeScript guarantees completeness,
+  // but at runtime an incorrect cast or future schema change could pass an unknown value.
+  // The cast to `string | undefined` enables the runtime safety check without losing
+  // the compile-time Record guarantee for callers with correct types.
+  const name = (TILE_TO_FLUFFY as Record<string, string | undefined>)[tile as string];
+  if (!name) {
+    console.warn(`[tileTexturePath] Unknown tile type "${String(tile)}" — using blank fallback`);
+    return `/textures/Tiles/${palette}/Blank.svg`;
+  }
+  return `/textures/Tiles/${palette}/${name}.svg`;
 }
 
 /**

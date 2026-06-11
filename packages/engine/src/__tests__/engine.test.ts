@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { GameEngine, nextDealer } from '../engine';
 import { isWinningHand } from '../hand';
 import { chowOptions } from '../calls';
+import { calculateSpiritSettlement } from '../scoring';
 import type { TileType, GameState, Meld, GameEvent, SeatState, SeatWind } from '../types';
 import { typeOf } from '../tiles';
 
@@ -321,15 +322,25 @@ describe('Engine·win', () => {
     }
   });
 
-  it('score changes after a win', () => {
+  it('score after a win equals starting score + win payment (exact, not just > 0)', () => {
+    // Find a heavenly-win seed, then verify the score is exactly what the payment says.
+    // Checking `> 0` would NOT catch a double-count bug; reading paymentResult.scoreDelta
+    // from the event and asserting equality WILL catch it.
     let foundWin = false;
     for (let seed = 0; seed < 10000; seed++) {
       const g = GameEngine.create(seed).deal().revealJing();
       const hand = g.state.seats[0].hand;
       const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
       if (isWinningHand(hand, jts)) {
+        const startingScore = g.state.seats[0].score;
         const finished = g.declareWin(0);
-        expect(finished.state.seats[0].score).toBeGreaterThan(0);
+        const winEvent = finished.events.find((e: { kind: string }) => e.kind === 'win') as
+          | { kind: 'win'; paymentResult: { scoreDelta: number[] } }
+          | undefined;
+        expect(winEvent).toBeDefined();
+        const expectedScore = startingScore + winEvent!.paymentResult.scoreDelta[0];
+        // Must be exactly this value — spirit settlement is NOT applied by the engine
+        expect(finished.state.seats[0].score).toBe(expectedScore);
         foundWin = true;
         break;
       }
@@ -614,16 +625,30 @@ describe('Engine·rob-kong-scores-as-tsumo', () => {
     const finished = engine.declareWin(2, { robKongSeat: 0 });
 
     expect(finished.state.phase).toBe('finished');
-    const winEvent = finished.events.find((e: GameEvent) => e.kind === 'win');
-    expect(winEvent).toBeDefined();
 
-    // Konger (seat 0) pays for everyone; seats 1 and 3 pay nothing from win
+    // Derive expected values from the event rather than hard-coding a payment amount.
+    // The payment depends on German detection (winJings === 0 → German), dealer modifiers, etc.
+    // Asserting score === before + paymentDelta is the correct invariant: it catches any
+    // double-counting bug without requiring the test to replicate the scoring formula.
+    const winEvent = finished.events.find((e: { kind: string }) => e.kind === 'win') as
+      | { kind: 'win'; paymentResult: { scoreDelta: number[] } }
+      | undefined;
+    expect(winEvent).toBeDefined();
+    const pd = winEvent!.paymentResult.scoreDelta;
+
+    // Rob-kong structure: konger(0) pays all, bystanders(1,3) pay nothing, winner(2) receives
+    expect(pd[0]).toBeLessThan(0); // konger pays
+    expect(pd[1]).toBe(0); // bystander: no payment
+    expect(pd[2]).toBeGreaterThan(0); // winner receives
+    expect(pd[3]).toBe(0); // bystander: no payment
+    expect(pd.reduce((s: number, v: number) => s + v, 0)).toBe(0); // zero-sum
+
+    // Each seat's score must equal starting score + payment delta — no more, no less.
+    // Spirit settlement is NOT applied by the engine (owned by the service layer).
     const afterWin = finished.state.seats;
-    // Seat 0 (konger): score should decrease
-    expect(afterWin[0].score).toBeLessThan(before[0]);
-    // Seat 1 and 3: score unchanged from win payment (spirit settlement may apply)
-    // (We just verify the rob-kong payment direction is correct)
-    expect(afterWin[2].score).toBeGreaterThan(before[2]);
+    for (let i = 0; i < 4; i++) {
+      expect(afterWin[i].score).toBe(before[i] + pd[i]);
+    }
   });
 });
 
@@ -1046,5 +1071,89 @@ describe('Engine·ruleTopBottomJing', () => {
     };
     expect(ev1.settlementTile).toBe(ev2.settlementTile);
     expect(ev1.scoreDelta).toEqual(ev2.scoreDelta);
+  });
+});
+
+// ── BUG-036 regression: win() must NOT apply spirit settlement ─────────────────
+// Spirit settlement is applied exactly once by the service layer (handleHandEnd).
+// The engine's win() must only apply the win payment so there is no double-count.
+
+describe('Engine·BUG-036-regression', () => {
+  it('declareWin scores contain only win payment — spirit settlement not included', () => {
+    // Inject a state where:
+    //   seat 0 (tsumo): winning 14-tile hand that includes jingPrimary tiles (spirits)
+    //   seats 1-3: blank hands with no spirits
+    // After declareWin(0), seats[0].score must equal starting score + tsumo payment only.
+    // calculateSpiritSettlement must return a non-zero delta to confirm spirit would
+    // have changed the score — proving the engine did NOT apply it.
+    const g = startedGame(42);
+
+    const jingPrimary: TileType = 'east';
+    const jingSecondary: TileType = 'south';
+
+    // Full 14-tile tsumo winning hand (3×pung + 1×chow + 1×pair), includes 2 jingPrimary.
+    // Breakdown: [1m1m1m] + [2p3p4p] + [5p6p7p] + [8s8s8s] + [east east] — 14 tiles ✓
+    const winHand: TileType[] = [
+      '1m',
+      '1m',
+      '1m',
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8s',
+      '8s',
+      '8s',
+      'east',
+      'east',
+    ];
+
+    const startingScore = 20;
+    const blankHand: TileType[] = [];
+
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: winHand, openMelds: [], score: startingScore };
+    for (let i = 1; i < 4; i++) {
+      patchedSeats[i] = {
+        ...g.state.seats[i],
+        hand: blankHand,
+        openMelds: [],
+        score: startingScore,
+      };
+    }
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        dealerSeat: 3, // seat 0 is NOT the dealer — simpler payment math
+        jingPrimary,
+        jingSecondary,
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    const finished = engine.declareWin(0);
+
+    // Confirm spirit delta is non-zero (Indomitable: only seat 0 holds spirits)
+    const spiritDelta = calculateSpiritSettlement(finished.state.seats, jingPrimary, jingSecondary);
+    expect(spiritDelta[0]).toBeGreaterThan(0);
+
+    // The win event must exist and carry a scoreDelta for the winner
+    const winEvent = finished.events.find((e: { kind: string }) => e.kind === 'win') as
+      | { kind: 'win'; paymentResult: { scoreDelta: number[] } }
+      | undefined;
+    expect(winEvent).toBeDefined();
+    const winPayment = winEvent!.paymentResult.scoreDelta[0];
+
+    // Engine score must equal starting + win payment ONLY (no spirit)
+    expect(finished.state.seats[0].score).toBe(startingScore + winPayment);
+    // If spirit were included it would be: startingScore + winPayment + spiritDelta[0]
+    expect(finished.state.seats[0].score).not.toBe(startingScore + winPayment + spiritDelta[0]);
   });
 });
