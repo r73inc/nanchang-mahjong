@@ -561,6 +561,24 @@ If options exist, the `KongActionSheet` (z-40, matches existing sheet style) sho
 
 ---
 
+## PR · `fix/bug-027-bust-end-condition`
+
+### BUG-027 · Bust-mode end condition fires mid-round and wrong starting score
+
+**Root cause (end condition):** `GameService.isSessionOver()` checked `cumulativeScores.some(s => s < 0)` after every hand. This could terminate a bust-mode session immediately when a player went negative due to spirit settlement mid-round, even though they could recover by winning subsequent hands in the same round.
+
+**Root cause (starting score):** Bust mode sessions were using `settings.startingScore` (defaulting to 0) instead of the required starting score of 20. No UI existed to set `startingScore`, so it was always 0.
+
+**Fix:**
+
+1. `apps/api/src/game/game.service.ts` — `isSessionOver()`: added `nextDealerInfo.roundComplete &&` guard to the bust check. The elimination check now only runs when a full four-hand rotation has completed.
+2. `apps/api/src/game/game.service.ts` — game start: `initialScore = settings.terminationType === 'bust' ? 20 : settings.startingScore`. Bust mode always begins at 20 regardless of the room's `startingScore` field.
+3. `apps/api/src/game/game-session-over.spec.ts` — 8 new unit tests covering bust mid-round/round-end cases and rounds east/east+south cases.
+
+**Key learning:** In this rules system a "round" = one full rotation of the dealer position (all four seats being dealer once). The `nextDealerInfo.roundComplete` flag from `nextDealer()` is the correct gate for any end-of-round check. Do not use per-hand score checks for round-level termination conditions.
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

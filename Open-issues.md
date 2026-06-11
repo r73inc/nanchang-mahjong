@@ -14,7 +14,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-022    | Player rejoin blocks tile play       | Reconnected player cannot play tiles on their turn                         |
 | BUG-08     | Viewer discards invisible (3D)       | Viewer's own discard pile not visible on the 3D table                      |
 | BUG-09     | TileWall3D needs redesign (3D)       | TileWall removed due to red Back.svg background; needs neutral replacement |
-| BUG-027    | Bust-mode end condition wrong        | Score check may fire mid-round; bust mode should start players at 20 pts   |
 | BUG-028    | INVALID_PHASE on game continue       | Non-host gets error continuing after game end; host game hangs             |
 | BUG-029    | Copy room code broken on mobile      | Room code copy button has no effect on mobile                              |
 | BUG-030    | Bonus points doubled in settlement   | Solo bonus-tile player charged/receives double the correct amount          |
@@ -106,28 +105,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 **Current state:** `TileWall3D` component still exists and is fully functional — just not mounted in `GameCanvas.tsx`.
 
 **Reinstate in:** `apps/web/src/r3f/GameCanvas.tsx` — re-add import and `<TileWall3D wallCount={snapshot.wallCount} ... />`.
-
----
-
-### BUG-027 · Bust-mode end condition incorrect — should start at 20 points per player
-
-**Symptom:** Bust mode (elimination mode where the last player standing wins) may not be correctly implementing the rule: start with all players at 20 points, game ends when any player's score goes negative AFTER a round completes (settlement included).
-
-**Status:** ACTIVE, UNRESOLVED (as of 2026-06-09)
-
-**Expected behavior:**
-
-- At session start (bust mode): all four players begin with exactly 20 points (not 0).
-- During a round: any payouts are applied, followed by spirit settlement.
-- After the round is fully resolved: check if any player has score < 0. If so, that player is eliminated and the session ends.
-- A player may temporarily go to 0 or negative during settlement; this is allowed. Only after all settlement is done (at the END of the round) should we check for elimination.
-
-**Suspected cause:** The end-condition check may be triggering mid-round (e.g., during settlement phase) rather than waiting until the hand-end is fully processed.
-
-**Where to look:**
-
-- `apps/api/src/game/game.service.ts` — `isSessionOver()` method, bust-mode logic
-- `apps/api/src/game/game-session.ts` — initial score setup for bust mode
 
 ---
 
