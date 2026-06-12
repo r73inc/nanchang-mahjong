@@ -100,8 +100,10 @@ export interface MahjongTile2DProps {
   role?: SeatRole;
   /** Lift and gold-ring treatment when selected for discard. */
   selected?: boolean;
-  /** Gold-glow treatment + 节 label for the round's spirit tile. */
+  /** Gold-glow treatment + 精 label for the round's spirit tile. */
   isJing?: boolean;
+  /** When false, suppresses the 精 character below the tile even when isJing is true. Defaults to true. */
+  showJingLabel?: boolean;
   /** When true pointer events fire and the tile is keyboard-focusable. */
   interactive?: boolean;
   /**
@@ -128,6 +130,7 @@ export function MahjongTile2D({
   role = 'bottom',
   selected = false,
   isJing = false,
+  showJingLabel = true,
   interactive = false,
   layoutId,
   isLastDiscard = false,
@@ -302,7 +305,7 @@ export function MahjongTile2D({
         />
       )}
 
-      {isJing && (
+      {isJing && showJingLabel && (
         <span
           aria-hidden="true"
           style={{

@@ -15,7 +15,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-045 | Bot dice roll animation not visible          | Bot roll animation and result flash by in under a frame; human roll works correctly                                                                   |
 | BUG-046 | Wildcard / kong rule violations              | Jings can upgrade an open pung to kong (revealed meld wildcard — forbidden); self-discard kong trigger suspected with wildcards in hand               |
 | IMP-022 | User profile rework                          | Single username, profile picture with circle avatar, random tile default, account-screen upload                                                       |
-| IMP-023 | Remove spirit char from status bar           | "精" label below tiles in top-left spirit preview pushes tiles off-screen; show just the tile                                                         |
 | IMP-024 | Gameplay sound effects (audio files)         | Dice roll, point transfer, tile discard, round start — each triggers a randomly-picked MP3 from bundled assets                                        |
 | IMP-025 | Standardise in-game popups to centered modal | Bottom-sheet popups (KongActionSheet, JingDiscardConfirmSheet, ConcedeSheet) must be replaced with the centered-dialog style used by the claim window |
 
@@ -142,19 +141,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 - `apps/api/src/storage/storage.service.ts` — existing `StorageService`; add a `putProfilePicture(userId, buffer)` method and bucket/key convention (e.g. `avatars/<userId>.jpg`)
 - `apps/web/src/pages/game/game-page.tsx` — opponent seat info boxes, top banner
 - `packages/shared/src/` — `UserProfile` or equivalent type
-
----
-
-### IMP-023 · Remove spirit tile character from status bar previews
-
-**Current behaviour:** In the top-left area of the gameplay status bar, spirit tile previews (`JingTileChip` on desktop, `MobileJingButton` on mobile) render `MahjongTile2D` with `isJing={true}`. This causes `MahjongTile2D` to render the `精` character below each tile (via the `isJing` label branch). In the compact status bar, this character takes up vertical space that pushes the tiles off screen.
-
-**Desired behaviour:** The spirit tile previews in the status bar should show only the tile graphic. The gold glow and gold border from `isJing` are fine to keep (they visually identify the tiles as spirit tiles), but the `精` label below the tile must be suppressed for these small status bar previews. The label can remain visible in the full overlay views (e.g. the tap-to-enlarge overlay in `MobileJingButton`).
-
-**Where to look:**
-
-- `apps/web/src/components/2d/MahjongTile2D.tsx` — `JING_CHAR` label rendered at lines 305-318 when `isJing={true}`. Add an optional `showJingLabel?: boolean` prop (default `true`) that suppresses the `精` span when `false`.
-- `apps/web/src/pages/game/game-page.tsx` — `JingTileChip` (desktop, ~line 2156) and `MobileJingButton` button area (~line 2061-2092): pass `showJingLabel={false}` to the status bar tile chips. The tap-to-enlarge overlays can keep `showJingLabel={true}`.
 
 ---
 

@@ -2078,6 +2078,7 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
           size="xxs"
           role="bottom"
           isJing
+          showJingLabel={false}
           interactive={false}
         />
         {snapshot.jingSecondary && (
@@ -2086,6 +2087,7 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
             size="xxs"
             role="bottom"
             isJing
+            showJingLabel={false}
             interactive={false}
           />
         )}
@@ -2163,7 +2165,14 @@ function JingTileChip({ tile }: { tile: TileType }) {
         aria-label={JING_CHIP_ARIA}
         style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 0 }}
       >
-        <MahjongTile2D tile={tile} size="xs" role="bottom" isJing interactive={false} />
+        <MahjongTile2D
+          tile={tile}
+          size="xs"
+          role="bottom"
+          isJing
+          showJingLabel={false}
+          interactive={false}
+        />
       </button>
 
       {enlarged && (
