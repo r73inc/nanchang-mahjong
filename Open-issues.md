@@ -8,10 +8,11 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID     | Name                           | Summary                                                                    |
-| ------ | ------------------------------ | -------------------------------------------------------------------------- |
-| BUG-08 | Viewer discards invisible (3D) | Viewer's own discard pile not visible on the 3D table                      |
-| BUG-09 | TileWall3D needs redesign (3D) | TileWall removed due to red Back.svg background; needs neutral replacement |
+| ID      | Name                                  | Summary                                                                                            |
+| ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| BUG-08  | Viewer discards invisible (3D)        | Viewer's own discard pile not visible on the 3D table                                              |
+| BUG-09  | TileWall3D needs redesign (3D)        | TileWall removed due to red Back.svg background; needs neutral replacement                         |
+| BUG-042 | Opponent info blocks drift with melds | Left/right/top player name-tags shift toward centre as melds are revealed; viewer score unreadable |
 
 ---
 
@@ -46,6 +47,34 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 **Current state:** `TileWall3D` component still exists and is fully functional — just not mounted in `GameCanvas.tsx`.
 
 **Reinstate in:** `apps/web/src/r3f/GameCanvas.tsx` — re-add import and `<TileWall3D wallCount={snapshot.wallCount} ... />`.
+
+---
+
+### BUG-042 · Opponent info blocks drift toward centre as melds are revealed; active player score unreadable
+
+**Symptom (two related layout problems):**
+
+1. **Drifting info blocks:** The left and right opponent player name-tags / score blocks are positioned inside the same layout container as their open melds. As each opponent reveals more melds, the info block shifts progressively toward the centre of the board instead of staying anchored to the screen edge. The top (opposite) opponent's info block has the same issue.
+
+2. **Viewer score unreadable:** The active (bottom) player's score is displayed in the seat area at the bottom of the screen where it is obscured or too small to read comfortably. It should be moved to the top status banner where there is more space and better contrast.
+
+**Status:** ACTIVE, UNRESOLVED (logged 2026-06-11)
+
+**Expected behaviour:**
+
+- Left opponent's info block remains anchored to the left edge of the screen regardless of how many melds are revealed.
+- Right opponent's info block remains anchored to the right edge of the screen.
+- Top opponent's info block remains anchored to its fixed position.
+- Open melds grow inward from the edge as usual; only the info block is stationary.
+- Active player's score is displayed in the top banner (already contains round/wind/wall-count info) rather than in the bottom seat area.
+
+**Suspected cause:** The opponent seat containers use a flex or flow layout where the info block and the meld tiles are siblings. When more meld tiles are rendered, the flex alignment (probably `justify-content: center` or similar) re-centres the group, dragging the info block with it. The fix is to take the info block out of the meld flow — either by using `position: absolute` pinned to the screen edge, or by splitting it into a separate always-visible overlay layer.
+
+**Where to look:**
+
+- `apps/web/src/pages/game/game-page.tsx` — side/top opponent seat layout, SeatHUD positioning, top status banner (for viewer score addition)
+- Any `OpponentSeat`, `SeatHUD`, or `SideOpponent` components in `apps/web/src/`
+- `apps/web/src/r3f/` — if the 3D SeatHUD corners are affected as well
 
 ---
 
