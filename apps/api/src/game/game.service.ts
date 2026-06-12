@@ -113,6 +113,8 @@ export class GameService {
     /** Game ID assigned by RoomsService.startGame() — reuse it so room + game IDs agree. */
     gameId: string,
     seatNames: [string, string, string, string],
+    /** Pre-resolved avatar URLs from the room snapshot (includes bot profile paths). */
+    preResolvedAvatarUrls?: [string | null, string | null, string | null, string | null],
   ): Promise<void> {
     const seed = (Math.random() * 0x7fff_ffff) >>> 0; // non-negative 31-bit int
     const now = new Date().toISOString();
@@ -133,22 +135,24 @@ export class GameService {
       config: { ruleTopBottomJing: settings.ruleTopBottomJing },
     });
 
-    // Fetch avatar URLs for human seats (bots get null).
-    // Any DDB/S3 failure is non-fatal — the game still starts, seat just has no avatar.
-    const seatAvatarUrls = (await Promise.all(
-      seatMap.map(async (userId) => {
-        if (userId.startsWith('bot-')) return null;
-        try {
-          const res = await this.db.get({ Key: DK.userProfile(userId) });
-          const avatarKey = res.Item?.avatarKey as string | undefined;
-          if (!avatarKey) return null;
-          return `/users/${userId}/avatar`;
-        } catch (err) {
-          this.logger.warn(`Avatar fetch failed for ${userId}: ${String(err)}`);
-          return null;
-        }
-      }),
-    )) as [string | null, string | null, string | null, string | null];
+    // Use pre-resolved avatar URLs when available (includes bot profile paths).
+    // Fall back to fetching from DDB for human seats if not provided.
+    const seatAvatarUrls: [string | null, string | null, string | null, string | null] =
+      preResolvedAvatarUrls ??
+      ((await Promise.all(
+        seatMap.map(async (userId) => {
+          if (userId.startsWith('bot-')) return null;
+          try {
+            const res = await this.db.get({ Key: DK.userProfile(userId) });
+            const avatarKey = res.Item?.avatarKey as string | undefined;
+            if (!avatarKey) return null;
+            return `/users/${userId}/avatar`;
+          } catch (err) {
+            this.logger.warn(`Avatar fetch failed for ${userId}: ${String(err)}`);
+            return null;
+          }
+        }),
+      )) as [string | null, string | null, string | null, string | null]);
 
     const session = new GameSession({
       engine,
