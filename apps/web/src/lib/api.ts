@@ -28,6 +28,11 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // FormData needs axios to auto-generate "multipart/form-data; boundary=..." —
+  // deleting the hardcoded JSON Content-Type lets the browser set it correctly.
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
