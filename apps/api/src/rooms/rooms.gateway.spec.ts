@@ -144,19 +144,56 @@ describe('RoomsGateway', () => {
   // ── Disconnect cleanup ─────────────────────────────────────────────────────
 
   describe('handleDisconnect', () => {
-    it('calls leaveRoom and broadcasts when roomId is set', async () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('Reconnect·grace-period: does not call leaveRoom immediately on disconnect', () => {
       const socket = makeSocket({ roomId: 'room-1' });
       (mockRoomsService.leaveRoom as jest.Mock).mockResolvedValue(SAMPLE_ROOM);
 
-      await gateway.handleDisconnect(socket as never);
+      gateway.handleDisconnect(socket as never);
+
+      expect(mockRoomsService.leaveRoom).not.toHaveBeenCalled();
+    });
+
+    it('Reconnect·grace-period: calls leaveRoom and broadcasts after 15 s grace period', async () => {
+      const socket = makeSocket({ roomId: 'room-1' });
+      (mockRoomsService.leaveRoom as jest.Mock).mockResolvedValue(SAMPLE_ROOM);
+
+      gateway.handleDisconnect(socket as never);
+      jest.advanceTimersByTime(15_000);
+      await Promise.resolve(); // flush the .then() microtask
 
       expect(mockRoomsService.leaveRoom).toHaveBeenCalledWith('room-1', 'u1');
       expect(toEmit).toHaveBeenCalledWith('room:update', { room: SAMPLE_ROOM });
     });
 
-    it('does nothing when socket has no roomId', async () => {
+    it('Reconnect·grace-period: cancels pending leave when user resubscribes before timeout', async () => {
+      const socket = makeSocket({ roomId: 'room-1' });
+      (mockRoomsService.leaveRoom as jest.Mock).mockResolvedValue(SAMPLE_ROOM);
+
+      gateway.handleDisconnect(socket as never);
+
+      // Simulate the browser refreshing: same user resubscribes to same room
+      gateway.handleSubscribe(socket as never, { roomId: 'room-1' });
+
+      jest.advanceTimersByTime(15_000);
+      await Promise.resolve();
+
+      expect(mockRoomsService.leaveRoom).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when socket has no roomId', () => {
       const socket = makeSocket();
-      await gateway.handleDisconnect(socket as never);
+      gateway.handleDisconnect(socket as never);
+
+      jest.advanceTimersByTime(15_000);
+
       expect(mockRoomsService.leaveRoom).not.toHaveBeenCalled();
     });
   });

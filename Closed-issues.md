@@ -6,6 +6,27 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-031-host-refresh-locks-config` (2026-06-11)
+
+### BUG-031 · Host browser close/refresh makes room config non-interactable (MAJOR)
+
+**Symptom:** If the host refreshed or briefly closed the browser while on the waiting-room config page, they could no longer change settings or click Start Game after returning. The room config controls were all rendered as read-only labels, and the Start button was absent.
+
+**Root cause:** `RoomsGateway.handleDisconnect` called `roomsService.leaveRoom` synchronously on every WebSocket disconnection — including the transient disconnect caused by a browser refresh. `leaveRoom` deletes the host's seat from DynamoDB and transfers `hostUserId` to the next seated player. When the page reloaded and fetched the room state via `GET /rooms/:code`, the host was no longer in any seat and `room.hostUserId` pointed to someone else. `isHost = myUserId === room.hostUserId` evaluated to `false`, hiding every host-only UI element.
+
+**Fix:** Added a 15-second grace period in `handleDisconnect`. Instead of calling `leaveRoom` immediately, the gateway schedules a `setTimeout`. In `handleSubscribe`, when the same user resubscribes to the same room before the timer fires (the browser-refresh case), the timer is cancelled via `clearTimeout`. The seat and `hostUserId` in DynamoDB are never touched, so after the page reloads and fetches the room state, the host sees themselves as host with full controls.
+
+- `apps/api/src/rooms/rooms.gateway.ts` — `pendingLeaves` Map, deferred `handleDisconnect`, cancel in `handleSubscribe`.
+- `apps/api/src/rooms/rooms.gateway.spec.ts` — 4 new tests: no immediate leave, leave after 15 s, cancel on resubscribe, no-op when no roomId.
+
+**Key learnings:**
+
+- **WebSocket disconnect ≠ intentional leave.** Browser refresh, mobile backgrounding, and short network blips all look like disconnects. Firing destructive DDB mutations immediately on any disconnect is too aggressive for a waiting-room scenario.
+- **Grace periods solve refresh flicker cheaply.** A 15 s delay covers all realistic reload/reconnect times while still cleaning up seats that are genuinely abandoned.
+- **The explicit REST leave (`DELETE /rooms/:id/leave`) is unaffected** — clicking the Leave button still removes the seat immediately. The grace period only applies to the involuntary socket disconnect path.
+
+---
+
 ## `fix/wall-model-rework` (2026-06-11)
 
 ### BUG-037 · Wall model wrong — no dice rolls, no segmented walls, wrong settlement/spirit position (MAJOR)

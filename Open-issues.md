@@ -8,15 +8,14 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID         | Name                                   | Summary                                                                                                                           |
-| ---------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| BUG-022    | Player rejoin blocks tile play         | Reconnected player cannot play tiles on their turn                                                                                |
-| BUG-08     | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                                             |
-| BUG-09     | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                                        |
-| BUG-029    | Copy room code broken on mobile        | Room code copy button has no effect on mobile                                                                                     |
-| BUG-031 ⚠️ | Host refresh locks config (CRITICAL)   | After browser refresh, host cannot change config or start the game                                                                |
-| BUG-032    | Kicked player not redirected           | Kicked player remains on config screen instead of returning to menu                                                               |
-| BUG-041    | Spirit tile popup shows too many tiles | Spirit tiles still cut off in top-left during gameplay; popup shows current→arrow→next→next-sequence instead of just current+next |
+| ID      | Name                                   | Summary                                                                                                                           |
+| ------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| BUG-022 | Player rejoin blocks tile play         | Reconnected player cannot play tiles on their turn                                                                                |
+| BUG-08  | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                                                             |
+| BUG-09  | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement                                                        |
+| BUG-029 | Copy room code broken on mobile        | Room code copy button has no effect on mobile                                                                                     |
+| BUG-032 | Kicked player not redirected           | Kicked player remains on config screen instead of returning to menu                                                               |
+| BUG-041 | Spirit tile popup shows too many tiles | Spirit tiles still cut off in top-left during gameplay; popup shows current→arrow→next→next-sequence instead of just current+next |
 
 ---
 
@@ -103,32 +102,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### BUG-031 · Host browser close/refresh makes room config non-interactable (MAJOR)
-
-**Symptom:** If the host is setting up a game and closes the browser tab/app (or the page refreshes), and then returns to the browser or revisits the room, they can no longer change the game configuration or start the game. The config controls are unresponsive and the "Start Game" button does not function.
-
-**Status:** CRITICAL (as of 2026-06-09)
-
-**Expected behavior:** The host should be able to return to an active room and resume control of the game config, with all previous settings preserved.
-
-**Suspected cause:** Likely related to:
-
-- Host authority (hostUserId) not being re-established after reconnection
-- Socket connection missing a re-join or re-auth step for the room
-- Store state not re-hydrating correctly after page refresh
-- Server-side `RoomSession` state not recognizing the reconnected user as host
-
-**Where to look:**
-
-- `apps/api/src/room/room.service.ts` — host validation, reconnection flow
-- `apps/api/src/room/room.gateway.ts` — `room:join` handler after refresh
-- `apps/web/src/hooks/use-room.ts` — room state persistence and reconnection logic
-- `apps/web/src/stores/room.store.ts` — host flag and config state
-
-**Next steps:** Verify that the host flag is correctly restored after page refresh. Check if a fresh page load triggers a new `room:join` that updates host status correctly.
-
----
-
 ### BUG-032 · Kicked player not redirected — remains on config screen
 
 **Symptom:** When the host kicks a player out of the room using the kick button, that player's name is removed from the player list. However, the kicked player is not redirected back to the home menu. Instead, they remain on the room config screen, seeing a stale view of the room with themselves no longer in the player list.
@@ -172,8 +145,7 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 - Verify that the `xxs` size (from IMP-018) fully resolves the clipping — if not, further reduce `MobileJingButton` padding or container height.
 - Rewrite `MobileJingButton` popup to show only two tiles: current (large) and next (smaller, perhaps with an arrow or "next round" label). Remove the next-sequence tile from the display.
-
-**Where to look:** `apps/web/src/pages/game/game-page.tsx` — `MobileJingButton` component.
+  **Where to look:** `apps/web/src/pages/game/game-page.tsx` — `MobileJingButton` component.
 
 ---
 
