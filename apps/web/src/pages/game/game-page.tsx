@@ -49,8 +49,8 @@ import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
 import { DiceRollOverlay } from '../../components/2d/DiceRollOverlay';
-import { SettlementPreview } from '../../components/game/SettlementPreview';
 import { GameWinnerPopup } from '../../components/game/GameWinnerPopup';
+import { SettlementPreview } from '../../components/game/SettlementPreview';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 import { useOrientation } from '../../hooks/use-orientation';
 
@@ -255,57 +255,28 @@ function PreGameFlow({
     );
   }
 
-  // ── Step 2: Settlement preview (ruleTopBottomJing only) ────────────────────
-  if (phase === 'settlement' && settlementPreview) {
-    return (
+  // ── Step 1.5: Settlement — bonus tile payout (ruleTopBottomJing only) ──────
+  if (phase === 'settlement') {
+    if (!settlementPreview) return <LoadingScreen />;
+    const footer = isHost ? (
+      <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
+    ) : (
       <>
-        <SettlementPreview
-          settlementPreview={settlementPreview}
-          snapshot={snapshot}
-          viewerSeat={viewerSeat}
-        />
-
-        {/* Viewer's own hand — always visible so they can count their bonus tiles */}
-        <div className="flex flex-col items-center px-6 pb-24 max-w-xs mx-auto">
-          {myHand.length > 0 && (
-            <div className="w-full">
-              <p className="text-[10px] text-mj-bone/40 uppercase tracking-wider mb-2">
-                {t('preGameYourHand')}
-              </p>
-              <div className="flex flex-wrap justify-center gap-1">
-                {myHand.map((tile, i) => (
-                  <MahjongTile2D
-                    key={`${tile}-${i}`}
-                    tile={tile}
-                    size="xs"
-                    interactive={false}
-                    isJing={
-                      tile === settlementPreview.settlementTile ||
-                      tile === settlementPreview.nextTile
-                    }
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Continue button */}
-          <div className="w-full mt-8">
-            {isHost ? (
-              <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <WaitingDots />
-                <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <WaitingDots />
+        <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
       </>
+    );
+    return (
+      <SettlementPreview
+        settlementPreview={settlementPreview}
+        snapshot={snapshot}
+        viewerSeat={viewerSeat}
+        footer={footer}
+      />
     );
   }
 
-  // ── Step 3: Jing wildcards revealed ────────────────────────────────────────
+  // ── Step 2: Jing wildcards revealed ────────────────────────────────────────
   if (phase === 'jing') {
     const primary = snapshot.jingPrimary;
     const secondary = snapshot.jingSecondary;

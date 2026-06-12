@@ -6,6 +6,43 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-043-044-dice-animation-spirit-sequence` (2026-06-11)
+
+### BUG-043 · Dice roll animation not visible when bot follows a human roll
+
+**Symptom:** When a human player rolls deal_1, the on-screen dice flash briefly then the game jumps straight to the next screen. The deal_2 animation (when the next roller is a bot) was essentially invisible.
+
+**Root cause:** `doBotRollIfNeeded()` was synchronous — it called `handleRollDiceInternal()` immediately after the previous roll broadcast. Both `game:event` (dice_roll) messages arrived at the client within the same network tick. The deal_2 dice event replaced the deal_1 `diceAnimation` state before the 1.2s Framer Motion animation could complete, effectively killing the first animation. The `isDiceAnimatingRef` guard queued snapshots correctly, but the animation itself was overwritten.
+
+**Fix:** Added a 2000ms `setTimeout` in `doBotRollIfNeeded()` before calling `handleRollDiceInternal()`. Guards check that `session.pendingRoll` hasn't changed and the session is still active before rolling. This gives the preceding animation (~1.5s total: 1.2s spin + 0.3s result fade) time to complete and the "Waiting for X to roll..." state to render before the bot fires.
+
+**Key learnings:**
+
+- Bot roll timing affects human UX even when the bot is only performing deal_2 (not the active human's roll). Any `doBotRollIfNeeded` call immediately after a `broadcastEvent` will race with the client animation.
+- Always delay bot auto-actions that follow broadcast events so client animations can complete.
+
+---
+
+### BUG-044 · Opening spirit flip shows settlement before dice roll (wrong sequence)
+
+**Symptom:** With `ruleTopBottomJing` enabled, clicking past the hand-reveal screen shows "Reveal Bonus Tile" which previews the settlement tile and per-player payouts. The dealer then clicks again to trigger the dice roll. The correct sequence is: roll first, then settlement happens and spirit is revealed as a result.
+
+**Root cause:** `handleAdvancePreGame` for `preGamePhase === 'hands'` with `ruleTopBottomJing` computed the settlement tile deterministically from the seed (before any roll), broadcast a `game:settlement-preview` event, and set `preGamePhase = 'settlement'`. This created an extra UX step where settlement info was revealed before the dice were rolled, which is the wrong game logic order.
+
+**Fix:**
+
+- Removed the `'settlement'` preGamePhase from the normal flow. `handleAdvancePreGame` now silently computes and stores the settlement preview in `session.lastSettlementPreview` but immediately calls `setJingRevealPendingRoll()` for both standard and `ruleTopBottomJing` rules.
+- Added `game:settlement-preview` broadcast in `handleRollDiceInternal()` AFTER the jing_reveal roll completes — so clients receive the settlement data as part of the `'jing'` phase, alongside the revealed spirit tiles.
+- Updated the reconnect handler to re-emit `game:settlement-preview` for `'jing'` phase (in addition to `'settlement'` for legacy sessions).
+- Frontend: unified the 'hands' phase button to always say "Reveal Spirit Tiles →"; removed the 'settlement' phase block from `PreGameFlow`; added a compact settlement summary (settlement tile + per-player deltas) inside the 'jing' phase screen.
+
+**Key learnings:**
+
+- Deterministic pre-computation is an implementation detail — it should never drive UI ordering. Settlement data can be computed in advance but must only be shown to players after the dice roll it depends on.
+- Removing a UI phase is safe as long as the data it displayed is surfaced in the adjacent phase instead.
+
+---
+
 ## `fix/remaining-bugs-022-029-032-041` (2026-06-11)
 
 ### BUG-022 · Player rejoin fails — tile play blocked after socket reconnection

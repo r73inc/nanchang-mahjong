@@ -424,6 +424,9 @@ export function useGame(gameId: string, spectate = false) {
    * Flushes any queued snapshots and clears the animation state.
    */
   const onDiceAnimationComplete = useCallback(() => {
+    // Guard: Framer Motion fires onAnimationComplete for exit animations too.
+    // Skip if already handled (isDiceAnimatingRef was cleared by the enter callback).
+    if (!isDiceAnimatingRef.current) return;
     isDiceAnimatingRef.current = false;
     // Flush queued snapshots in order
     const queue = snapshotQueueRef.current.splice(0);
