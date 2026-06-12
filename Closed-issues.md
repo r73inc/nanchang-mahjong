@@ -6,6 +6,38 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-046-wildcard-kong-violations` (2026-06-12)
+
+### BUG-046 · Wildcard / kong rule violations — jings in revealed melds and visual "tile transformation"
+
+**Root cause:** Rules §3.2 states Jings may replace tiles in Chow, Pung, or Pair — but explicitly **not** in a Kong. Three functions in `packages/engine/src/calls.ts` incorrectly allowed jing substitution in kongs:
+
+1. **`addToKongOptions`** — returned a jing tile as a valid 4th tile to upgrade an open pung to kong. An open pung is a revealed meld, making this a direct wildcard-in-revealed-meld violation. The jing was silently consumed and the meld recorded as 4 naturals — visually "transforming" the jing into the pung tile.
+
+2. **`canKongFromDiscard`** — allowed 2 naturals + 1 jing (or 3 jings + 1 natural discard) to satisfy an open kong-from-discard. The server-side `claim-resolver.ts` already used strict exact-count logic (`hand.filter(t => t === pendingDiscard).length >= 3`) but the engine predicate was inconsistent.
+
+3. **`concealedKongOptions`** — offered concealed kong options for 3 naturals + 1 jing, 2 naturals + 2 jings, and 1 natural + 3 jings. Rules §3.2 applies to all kongs (concealed and open alike).
+
+**Fix (`packages/engine/src/calls.ts` and `engine.ts`):**
+
+1. `addToKongOptions` — removed the jing fallback branch; only returns `[openPungTile]` when the exact natural tile is in hand.
+
+2. `canKongFromDiscard` — replaced jing-counting logic with a simple `hand.filter(t => t === discarded).length >= 3`. Spirit Kong (discarded tile is itself a jing type) is handled correctly: the filter counts exact copies of the jing tile without special-casing.
+
+3. `concealedKongOptions` — removed the "3 naturals + 1 jing", "2 naturals + 2 jings", and "1 natural + 3 jings" branches. Only 4 exact naturals or Spirit Kong (4 actual copies of a jing tile type) remain valid.
+
+4. `engine.ts` `kongFromDiscard` and `kongConcealed` — removed the now-unreachable jing-removal branches; simplified to `removeFromHandN(hand, tile, 3/4)`.
+
+**Violation 3 (self-discard kong) — not a real bug:** The claim-resolver's `if (seat === discardedBySeat) continue` guard and the engine's own `if (seatIdx === this.state.discardedBySeat) throw` guard correctly prevent this. The playtesting observation was a misidentification of which seat had discarded.
+
+**Key learnings:**
+
+- Rules §3.2 is unambiguous — "A Jing can replace any tile in a Chow, Pung, or Pair (except when used in a Kong)" applies to **all** kongs (open, concealed, add-to-kong). The only jings valid in a kong are the 4 copies of the same jing tile forming a Spirit Kong (杠精) — those are the konged tiles themselves, not substitutes.
+- When a predicate function and a server-side resolver implement the same rule, they must use identical logic. `canKongFromDiscard` and `claim-resolver.ts` were divergent — always keep them in sync.
+- A jing silently consumed by the engine (removed from hand, recorded as the natural tile in the meld) is visually indistinguishable from "tile transformation" to the player — this is the primary source of the reported symptom.
+
+---
+
 ## `feat/imp-024-sound-effects` (2026-06-12)
 
 ### IMP-024 · Gameplay sound effects using audio files

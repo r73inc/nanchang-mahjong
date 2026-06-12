@@ -911,21 +911,8 @@ export class GameEngine {
       throw new Error(`Cannot kong ${tile} from discard`);
     }
 
-    let hand = [...seat.hand];
-    const { naturals: kNaturals, jingCount: kJingCount } = separateJing(hand, this.jingTypes);
-    const naturalCount = kNaturals.filter((t) => t === tile).length;
-
-    if (naturalCount >= 3) {
-      hand = removeFromHandN(hand, tile, 3);
-    } else if (naturalCount === 2 && kJingCount >= 1) {
-      hand = removeFromHandN(hand, tile, 2);
-      hand = this.removeJings(hand, 1);
-    } else if (naturalCount === 1 && kJingCount >= 2) {
-      hand = removeFromHand(hand, tile);
-      hand = this.removeJings(hand, 2);
-    } else {
-      hand = this.removeJings(hand, 3);
-    }
+    // canKongFromDiscard guarantees 3 exact copies of tile in hand (no jing substitution).
+    const hand = removeFromHandN([...seat.hand], tile, 3);
 
     const discarder = this.state.discardedBySeat!;
     const discarderSeat = this.state.seats[discarder];
@@ -973,16 +960,9 @@ export class GameEngine {
     const options = concealedKongOptions(seat.hand, this.jingTypes);
     if (!options.includes(tile)) throw new Error(`Cannot declare concealed kong of ${tile}`);
 
-    let hand = [...seat.hand];
-    const naturalCount = hand.filter((t) => t === tile).length;
-
-    if (naturalCount >= 4) {
-      hand = removeFromHandN(hand, tile, 4);
-    } else {
-      const jingsNeeded = 4 - naturalCount;
-      hand = removeFromHandN(hand, tile, naturalCount);
-      hand = this.removeJings(hand, jingsNeeded);
-    }
+    // concealedKongOptions guarantees 4 exact copies of tile in hand (no jing substitution;
+    // Spirit Kong also satisfies this since the jing tile itself appears 4 times).
+    const hand = removeFromHandN([...seat.hand], tile, 4);
 
     const newSeatsAfterMeld = this.patchSeat(seatIdx, {
       hand,

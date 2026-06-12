@@ -65,40 +65,37 @@ export function canPung(hand: TileType[], discarded: TileType, jingTypes: TileTy
 /**
  * True if the player can declare an open Kong off the discarded tile.
  *
- * Requirements: hand has 3 tiles (natural + jing combinations) matching the discard.
- * The quadruplet must have ≥1 natural (discard itself satisfies this).
+ * Rules §3.2: wildcards may NOT substitute in Kongs (only in Chow, Pung, Pair).
+ * Requires 3 exact copies of the discarded tile in hand (no jing substitution).
+ * Spirit Kong (discarded tile is itself a jing type, player holds 3 copies) is
+ * covered naturally: hand.filter(t => t === discarded) counts all matching tiles.
  */
 export function canKongFromDiscard(
   hand: TileType[],
   discarded: TileType,
-  jingTypes: TileType[],
+  _jingTypes: TileType[],
 ): boolean {
-  const { naturals, jingCount } = separateJing(hand, jingTypes);
-  const naturalCount = naturals.filter((t) => t === discarded).length;
-
-  if (naturalCount >= 3) return true;
-  if (naturalCount === 2 && jingCount >= 1) return true;
-  if (naturalCount === 1 && jingCount >= 2) return true;
-  if (naturalCount === 0 && jingCount >= 3) return true; // 3 jings + 1 natural discard ✓
-
-  return false;
+  return hand.filter((t) => t === discarded).length >= 3;
 }
 
 /**
  * Find all tile types the player can declare a **concealed Kong** with (from their draw).
- * Returns the list of tile types that have 4 copies in hand (natural or jing-counted).
+ *
+ * Rules §3.2: wildcards may NOT substitute in Kongs.
+ * Valid cases:
+ *   - 4 natural copies of the same non-jing tile type
+ *   - Spirit Kong (杠精): 4 copies of the same jing tile type (not wildcard use — the
+ *     jings ARE the tile being konged)
  */
 export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): TileType[] {
-  const { naturals, jingCount } = separateJing(hand, jingTypes);
-  // Note: no hand-length guard — concealed kongs are valid for any hand size
-  // (a player with open melds holds fewer than 14 concealed tiles).
-
+  const { naturals } = separateJing(hand, jingTypes);
   const options: TileType[] = [];
   const seen = new Set<TileType>();
+
   const counts = new Map<TileType, number>();
   for (const t of naturals) counts.set(t, (counts.get(t) ?? 0) + 1);
 
-  // All 4 naturals of the same type
+  // 4 natural copies of the same type
   for (const [t, cnt] of counts) {
     if (cnt >= 4 && !seen.has(t)) {
       options.push(t);
@@ -106,42 +103,12 @@ export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): T
     }
   }
 
-  // 4 of the same jing type → Spirit Kong (杠精)
+  // Spirit Kong: 4 copies of the same jing tile type
   for (const jt of jingTypes) {
     const jtCount = hand.filter((t) => t === jt).length;
     if (jtCount >= 4 && !seen.has(jt)) {
       options.push(jt);
       seen.add(jt);
-    }
-  }
-
-  // 3 naturals + 1 jing
-  if (jingCount >= 1) {
-    for (const [t, cnt] of counts) {
-      if (cnt >= 3 && !seen.has(t)) {
-        options.push(t);
-        seen.add(t);
-      }
-    }
-  }
-
-  // 2 naturals + 2 jings
-  if (jingCount >= 2) {
-    for (const [t, cnt] of counts) {
-      if (cnt >= 2 && !seen.has(t)) {
-        options.push(t);
-        seen.add(t);
-      }
-    }
-  }
-
-  // 1 natural + 3 jings
-  if (jingCount >= 3) {
-    for (const [t, cnt] of counts) {
-      if (cnt >= 1 && !seen.has(t)) {
-        options.push(t);
-        seen.add(t);
-      }
     }
   }
 
@@ -151,20 +118,17 @@ export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): T
 /**
  * Find all tile types the player can add to an existing open Pung to make a Kong.
  * `openPungTile` is the TileType of the open Pung.
+ *
+ * Rules §3.2: wildcards may NOT substitute in Kongs. An open pung is a revealed meld,
+ * so only the exact natural tile may be added — no jing substitution.
  */
 export function addToKongOptions(
   hand: TileType[],
   openPungTile: TileType,
   jingTypes: TileType[],
 ): TileType[] {
-  const { naturals, jingCount } = separateJing(hand, jingTypes);
-  // Has the natural tile in hand?
+  const { naturals } = separateJing(hand, jingTypes);
   if (naturals.includes(openPungTile)) return [openPungTile];
-  // Has a jing to fill in?
-  if (jingCount > 0) {
-    const availableJing = jingTypes.find((jt) => hand.includes(jt));
-    return availableJing ? [availableJing] : [];
-  }
   return [];
 }
 
