@@ -6,6 +6,36 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-020-021-win-claim-ux` (2026-06-11)
+
+### IMP-020 · Declare-win UX redesign
+
+**What changed:**
+
+1. **Non-blocking tsumo prompt:** `TsumoSheet` (full-screen `inset-0` overlay) was replaced by a compact `TsumoBar` component that pins to the bottom of the screen exactly like `SideRail`. In 3D desktop mode the 3D canvas and hand tiles remain fully visible; on mobile it appears above the hand strip at `bottom: var(--mj-hand-height, 90px)`.
+
+2. **Persistent win button:** Clicking "Keep Playing" no longer calls `setCanTsumo(false)` immediately. Instead, `GameTable` sets a local `tsumoSuppressed` state. The tsumo bar hides and a gold "Declare Win" pill appears above the hand HUD on the right side. Clicking it clears `tsumoSuppressed` and reopens the bar. The `canTsumo` store flag is only cleared when the player actually discards (existing logic in `use-game.ts`).
+
+3. **Win-reason label:** The `TsumoBar` shows a "Self-draw" badge next to the title (i18n key `tsumoWinReason`).
+
+4. **Specific claim-win labels:** `SideRail` infers the win button label from co-present actions: if `pung` is also in the action list → "Win by Pung"; `chow` → "Win by Chow"; `kong` → "Win by Kong"; otherwise plain "Win".
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx`, `apps/web/src/i18n/en.json`, `apps/web/src/i18n/zh.json`
+
+**Tests added:** `IMP-020·tsumo-nonblocking`, `IMP-020·tsumo-persistent`
+
+---
+
+### IMP-021 · Claim window minimize — inspect discard pile before deciding
+
+**What changed:** `SideRail` gained a `minimized` boolean state. When minimized the full action rail collapses to a single-row chip showing the pending discard tile thumbnail, countdown, and a chevron-up. Tapping the chip calls `setMinimized(false)` to restore the full rail. The countdown timer continues to tick in both states (computed live from `claimWindow.deadline`). The minimize button (chevron-down) appears in the claim window header.
+
+**Files changed:** `apps/web/src/pages/game/game-page.tsx`, `apps/web/src/i18n/en.json`, `apps/web/src/i18n/zh.json`
+
+**Tests added:** `IMP-021·claim-minimize`, `IMP-021·win-by-pung-label`
+
+---
+
 ## `fix/bug-043-044-dice-animation-spirit-sequence` (2026-06-11)
 
 ### BUG-043 · Dice roll animation not visible when bot follows a human roll

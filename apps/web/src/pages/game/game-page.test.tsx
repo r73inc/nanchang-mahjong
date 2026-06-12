@@ -372,6 +372,104 @@ describe('GamePage', () => {
     expect(mockEmit).toHaveBeenCalledWith('game:pass', {});
   });
 
+  // ── IMP-021: Claim window minimize ─────────────────────────────────────────
+
+  it('IMP-021·claim-minimize: minimize button collapses rail to chip; chip re-expands', async () => {
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'awaiting_claims' }));
+    await waitFor(() => expect(screen.getByTestId('game-canvas-3d')).toBeInTheDocument());
+
+    await act(async () => {
+      registeredHandlers.get('game:claim-window')?.({
+        actions: [{ kind: 'pung' }],
+        deadline: Date.now() + 8000,
+      });
+    });
+
+    // Full rail visible; minimize button present
+    await waitFor(() => expect(screen.getByRole('button', { name: /pung/i })).toBeInTheDocument());
+    const minimizeBtn = screen.getByRole('button', { name: /minimize/i });
+    expect(minimizeBtn).toBeInTheDocument();
+
+    // Click minimize → action buttons gone; collapsed chip appears
+    fireEvent.click(minimizeBtn);
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /pung/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /expand/i })).toBeInTheDocument();
+    });
+
+    // Click chip → rail re-expands
+    fireEvent.click(screen.getByRole('dialog', { name: /expand/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /pung/i })).toBeInTheDocument();
+    });
+  });
+
+  it('IMP-021·win-by-pung-label: win button reads "Win by Pung" when pung also available', async () => {
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ phase: 'awaiting_claims' }));
+    await waitFor(() => expect(screen.getByTestId('game-canvas-3d')).toBeInTheDocument());
+
+    await act(async () => {
+      registeredHandlers.get('game:claim-window')?.({
+        actions: [{ kind: 'win' }, { kind: 'pung' }],
+        deadline: Date.now() + 8000,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /win by pung/i })).toBeInTheDocument();
+    });
+  });
+
+  // ── IMP-020: Declare-win UX ────────────────────────────────────────────────
+
+  it('IMP-020·tsumo-nonblocking: tsumo bar shows as a dialog without full-screen overlay', async () => {
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ currentSeat: 0, viewerSeat: 0 }));
+    await waitFor(() => expect(screen.getByTestId('game-canvas-3d')).toBeInTheDocument());
+
+    await act(async () => {
+      registeredHandlers.get('game:can-tsumo')?.({ seat: 0 });
+    });
+
+    await waitFor(() => {
+      const dialog = screen.getByRole('dialog', { name: /you can win/i });
+      expect(dialog).toBeInTheDocument();
+      // Must NOT be a full-screen overlay — no inset-0 on the element
+      expect(dialog.className).not.toContain('inset-0');
+    });
+  });
+
+  it('IMP-020·tsumo-persistent: Keep Playing hides bar; persistent button re-opens it', async () => {
+    renderGamePage();
+    await pushSnapshot(makeSnapshot({ currentSeat: 0, viewerSeat: 0 }));
+    await waitFor(() => expect(screen.getByTestId('game-canvas-3d')).toBeInTheDocument());
+
+    await act(async () => {
+      registeredHandlers.get('game:can-tsumo')?.({ seat: 0 });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /keep playing/i })).toBeInTheDocument(),
+    );
+
+    // Dismiss the bar
+    fireEvent.click(screen.getByRole('button', { name: /keep playing/i }));
+
+    // Bar gone; persistent button appears
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /you can win/i })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /declare win/i })).toBeInTheDocument();
+    });
+
+    // Tap persistent button → bar re-opens
+    fireEvent.click(screen.getByRole('button', { name: /declare win/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /you can win/i })).toBeInTheDocument();
+    });
+  });
+
   // â”€â”€ BUG-025: end-of-hand screen order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   it('BUG-025: winner announcement shows before the hand-reveal detail screen', async () => {
