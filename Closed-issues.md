@@ -6,6 +6,23 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-023-spirit-label` (2026-06-12)
+
+### IMP-023 · Remove spirit tile character from status bar previews
+
+**Root cause:** `MahjongTile2D` unconditionally renders a `精` character below the tile whenever `isJing={true}`. In the compact status bar the label takes up vertical space that pushes the tile out of the bar's bounds. The label is useful in larger contexts (the tap-to-enlarge overlays) but is surplus information in the tiny `xxs`/`xs` chips.
+
+**Fix:** Added an optional `showJingLabel` prop (default `true`) to `MahjongTile2D`. Changed the label render from `{isJing && ...}` to `{isJing && showJingLabel && ...}`. Passed `showJingLabel={false}` to the three status bar tile instances:
+
+- `JingTileChip` — the `xs` chip button in the desktop status bar
+- `MobileJingButton` — the two `xxs` chip buttons in the mobile status bar
+
+The enlarged overlay tiles in both components keep the default (`showJingLabel={true}`) so the label remains visible when the player taps to inspect the spirit tile.
+
+**Key learning:** When a component has a display element that is useful at large sizes but disruptive at small ones, a boolean prop is cleaner than forking the component or adding size-conditional CSS — it lets the caller decide per usage site.
+
+---
+
 ## `fix/bug-042-opponent-info-drift` (2026-06-12)
 
 ### BUG-042 · Opponent info blocks drift toward centre as melds are revealed; active player score unreadable
