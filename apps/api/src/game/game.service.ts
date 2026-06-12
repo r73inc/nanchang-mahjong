@@ -40,6 +40,7 @@ import type {
   HandType,
   SeatState,
   Meld,
+  GameEvent,
 } from '@nanchang/engine';
 import type {
   RoomSettings,
@@ -1034,10 +1035,53 @@ export class GameService {
     winType: WinType,
     opts: { isRobKong: boolean; robKongSeat?: Seat4 },
   ): void {
+    const state = session.engine.state;
+    const jingPrimary = state.jingPrimary!;
+    const jingSecondary = state.jingSecondary!;
+    const jingTypes: TileType[] = [jingPrimary, jingSecondary];
+
+    const winnerState = state.seats[winnerSeat];
+    const isTsumo = winType === 'tsumo' && !opts.isRobKong;
+
+    // Determine any "extra" winning tile not yet in the winner's hand.
+    // For ron: the pending discard. For rob-kong: the tile from the kong_added event.
+    let winningTileExtra: TileType[] = [];
+    if (!isTsumo && !opts.isRobKong && state.pendingDiscard) {
+      winningTileExtra = [state.pendingDiscard];
+    } else if (opts.isRobKong) {
+      const lastKongAdded = [...session.engine.events]
+        .reverse()
+        .find((e): e is Extract<GameEvent, { kind: 'kong_added' }> => e.kind === 'kong_added');
+      if (lastKongAdded) winningTileExtra = [lastKongAdded.tile];
+    }
+
+    const winnerAllTiles: TileType[] = [
+      ...winnerState.hand,
+      ...winnerState.openMelds.flatMap((m: Meld) => m.tiles as TileType[]),
+      ...winningTileExtra,
+    ];
+
+    // True German: winner used no Jing AND no other player holds any Jing tiles.
+    const winnerHasNoJing = !winnerAllTiles.some((t) => jingTypes.includes(t));
+    const noOtherPlayerHasJing = ([0, 1, 2, 3] as const).every((i) => {
+      if (i === winnerSeat) return true;
+      const s = state.seats[i];
+      return ![...s.hand, ...s.openMelds.flatMap((m: Meld) => m.tiles as TileType[])].some((t) =>
+        jingTypes.includes(t),
+      );
+    });
+    const isTrueGerman = winnerHasNoJing && noOtherPlayerHasJing;
+
+    // Spirit Fishing: tsumo win with 4 open melds while holding at least one Jing.
+    const isSpiritFishing =
+      isTsumo &&
+      winnerState.openMelds.length === 4 &&
+      winnerAllTiles.some((t) => jingTypes.includes(t));
+
     try {
       session.engine = session.engine.declareWin(winnerSeat, {
-        isTrueGerman: false,
-        isSpiritFishing: false,
+        isTrueGerman,
+        isSpiritFishing,
         robKongSeat: opts.robKongSeat,
       });
       session.moveLog.push(...getNewEvents(session));

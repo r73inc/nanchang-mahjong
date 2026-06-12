@@ -8,15 +8,17 @@
  *   Ron:       discarder pays          (base × multiplier × 2)
  *              each other non-winner   (base × multiplier × 1)
  *   Rob Kong:  same structure as Tsumo, but only the konger pays (all 3 shares)
- *   Heavenly / Earthly Win: flat 20 from each loser — overrides all multipliers
+ *   Heavenly / Earthly Win: flat 20 from each loser (40 if Spirit Fishing) — overrides all multipliers
  *
  * ── Multipliers (stackable) ───────────────────────────────────────────────────
  *   Hand type:  Seven Pairs ×2 · All Triplets ×2 · Thirteen Misfits ×2 · Seven Star ×4
- *   German:     ×2  (+5 flat per loser)
- *   True German: ×4  (+5 flat per loser) — supersedes German ×2
+ *   Kong Bloom: ×2 (for ×4 total when combined with tsumo ×2) — win on kong replacement draw
+ *   German:     +5 flat per loser only (no ×2 multiplier)
+ *   True German: ×2 (+5 flat per loser) — winner & table both jing-free; supersedes German
  *   Spirit Fishing: ×2
  *   Dealer win: ×2  (when winner is the current dealer)
- *   Dealer loss: discarder pays ×2 extra on their own portion (ron, discarder is dealer)
+ *   Dealer loss tsumo: dealer pays ×4 (instead of ×2) when winner is not the dealer
+ *   Dealer loss ron:   dealer pays ×2× their base rate (discarder ×4, non-discarder ×2)
  *
  * ── Instant payouts (separate from win, called per-event) ────────────────────
  *   Open/Supplement Kong: 1 pt from each other player  (§6.1)
@@ -61,24 +63,30 @@ export function calculateWinPayout(ctx: ScoringContext): WinPaymentResult {
     isSpiritFishing,
     isHeavenlyWin,
     isEarthlyWin,
+    isAfterKong,
   } = ctx;
 
-  // ── Heavenly / Earthly Win — flat 20 from each, overrides everything ─────────
+  // ── Heavenly / Earthly Win — flat rate, overrides standard multipliers ────────
+  // Spirit Fishing doubles the flat rate (20 → 40) per §2.3.
   if (isHeavenlyWin || isEarthlyWin) {
-    const flat = 20;
+    const flat = isSpiritFishing ? 40 : 20;
     const scoreDelta: [number, number, number, number] = [0, 0, 0, 0];
     for (let i = 0; i < 4; i++) {
       scoreDelta[i] = i === winnerSeat ? flat * 3 : -flat;
     }
+    const items: MultiplierItem[] = [
+      {
+        name: isHeavenlyWin ? 'Heavenly Win' : 'Earthly Win',
+        nameZh: isHeavenlyWin ? '天胡' : '地胡',
+        multiplier: 1,
+        flatPerLoser: isSpiritFishing ? 0 : flat,
+      },
+    ];
+    if (isSpiritFishing) {
+      items.push({ name: 'Spirit Fishing', nameZh: '精钓', multiplier: 1, flatPerLoser: flat });
+    }
     return {
-      items: [
-        {
-          name: isHeavenlyWin ? 'Heavenly Win' : 'Earthly Win',
-          nameZh: isHeavenlyWin ? '天胡' : '地胡',
-          multiplier: 1,
-          flatPerLoser: flat,
-        },
-      ],
+      items,
       totalMultiplier: 1,
       flatBonusPerLoser: flat,
       scoreDelta,
@@ -128,24 +136,31 @@ export function calculateWinPayout(ctx: ScoringContext): WinPaymentResult {
     // 'standard': no hand-type multiplier
   }
 
-  // German / True German (§6.4) — True German supersedes German
+  // German (§2.4): no ×2 multiplier — only a flat +5 per loser added after other multipliers.
+  // True German (§2.4): an additional ×2 on top of accumulated multipliers, plus flat +5.
+  // True German supersedes German.
   if (isTrueGerman) {
-    items.push({ name: 'True German', nameZh: '德中德', multiplier: 4, flatPerLoser: 5 });
-    multiplier *= 4;
+    items.push({ name: 'True German', nameZh: '德中德', multiplier: 2, flatPerLoser: 5 });
+    multiplier *= 2;
     flatBonusPerLoser += 5;
   } else if (isGerman) {
-    items.push({ name: 'German', nameZh: '德国', multiplier: 2, flatPerLoser: 5 });
-    multiplier *= 2;
+    items.push({ name: 'German', nameZh: '德国', multiplier: 1, flatPerLoser: 5 });
     flatBonusPerLoser += 5;
   }
 
-  // Spirit Fishing (§6.4)
+  // Spirit Fishing (§2.2)
   if (isSpiritFishing) {
     items.push({ name: 'Spirit Fishing', nameZh: '精钓', multiplier: 2, flatPerLoser: 0 });
     multiplier *= 2;
   }
 
-  // Dealer win (§6.3): winner is the current dealer → ×2 on the whole hand
+  // Kong Bloom (§2.2): win on a kong replacement draw (杠开) adds ×2 to stack (→ ×4 total with tsumo ×2).
+  if (isAfterKong) {
+    items.push({ name: 'Kong Bloom', nameZh: '杠开', multiplier: 2, flatPerLoser: 0 });
+    multiplier *= 2;
+  }
+
+  // Dealer win (§2.2): winner is the current dealer → ×2 on the whole hand
   const isDealer = winnerSeat === dealerSeat;
   if (isDealer) {
     items.push({ name: 'Dealer', nameZh: '庄家', multiplier: 2, flatPerLoser: 0 });
@@ -157,28 +172,39 @@ export function calculateWinPayout(ctx: ScoringContext): WinPaymentResult {
   const scoreDelta: [number, number, number, number] = [0, 0, 0, 0];
 
   if (isRobKong && kongSeat !== undefined) {
-    // Rob Kong (§6.3): treated as tsumo; konger pays all three shares
-    const kongerPays = multiplier * 2 * 3 + flatBonusPerLoser * 3;
+    // Rob Kong: konger pays all three shares (treated as tsumo).
+    // If the konger is the dealer-loser, their entire payment is doubled.
+    const kongerIsDealer = !isDealer && kongSeat === dealerSeat;
+    const kongerRate = kongerIsDealer ? 4 : 2;
+    const kongerPays = multiplier * kongerRate * 3 + flatBonusPerLoser * 3;
     scoreDelta[winnerSeat] += kongerPays;
     scoreDelta[kongSeat] -= kongerPays;
     // The other two seats pay nothing
   } else if (winType === 'tsumo') {
-    // Self-draw: everyone pays ×2 (§6.3)
-    const perLoser = multiplier * 2 + flatBonusPerLoser;
-    for (let i = 0; i < 4; i++) {
-      scoreDelta[i] = i === winnerSeat ? perLoser * 3 : -perLoser;
-    }
-  } else {
-    // Ron: discarder pays ×2, each other non-winner pays ×1 (§6.3)
-    const discarder = discarderSeat!;
-    // Dealer loss (§6.3): if discarder is the dealer but winner is not, discarder pays ×2 extra
-    const isDiscarderDealer = discarder === dealerSeat && !isDealer;
-    const discarderPays = multiplier * 2 * (isDiscarderDealer ? 2 : 1) + flatBonusPerLoser;
-    const otherPays = multiplier * 1 + flatBonusPerLoser;
-
+    // Self-draw: each loser pays ×2.
+    // Dealer loss (§2.2): when winner is not the dealer, the dealer pays ×4 instead of ×2.
     for (let i = 0; i < 4; i++) {
       if (i === winnerSeat) continue;
-      const pays = i === discarder ? discarderPays : otherPays;
+      const payerIsDealer = !isDealer && i === dealerSeat;
+      const pays = multiplier * (payerIsDealer ? 4 : 2) + flatBonusPerLoser;
+      scoreDelta[i] = -pays;
+      scoreDelta[winnerSeat] += pays;
+    }
+  } else {
+    // Ron: discarder pays ×2, each other non-winner pays ×1.
+    // Dealer loss (§2.2): when dealer is a losing payer, their rate is doubled.
+    //   Dealer-as-discarder: ×2 × ×2 = ×4
+    //   Dealer-as-non-discarder: ×1 × ×2 = ×2
+    const discarder = discarderSeat!;
+    for (let i = 0; i < 4; i++) {
+      if (i === winnerSeat) continue;
+      const payerIsDealer = !isDealer && i === dealerSeat;
+      let pays: number;
+      if (i === discarder) {
+        pays = multiplier * (payerIsDealer ? 4 : 2) + flatBonusPerLoser;
+      } else {
+        pays = multiplier * (payerIsDealer ? 2 : 1) + flatBonusPerLoser;
+      }
       scoreDelta[i] -= pays;
       scoreDelta[winnerSeat] += pays;
     }

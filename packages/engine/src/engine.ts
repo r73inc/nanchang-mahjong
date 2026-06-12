@@ -538,17 +538,57 @@ export class GameEngine {
       throw new Error(`Tile ${tile} not in hand`);
     }
 
+    // Build updated seats for the discard (hand/discards only; scores adjusted below if needed).
+    let updatedSeats = this.patchSeat(seatIdx, {
+      hand: removeFromHand(seat.hand, tile),
+      discards: [...seat.discards, tile],
+    });
+
+    const extraEvents: GameEvent[] = [];
+
+    // ── Sacking the Dealer (踢庄) detection ─────────────────────────────────
+    // Condition: the 4th discard completes the first round with all four players
+    // discarding the same tile type, and no claims (pung/chow/kong) have occurred.
+    const prevDiscards = this.events.filter(
+      (e): e is Extract<GameEvent, { kind: 'discard' }> => e.kind === 'discard',
+    );
+    if (prevDiscards.length === 3) {
+      const prevDraws = this.events.filter((e) => e.kind === 'draw').length;
+      const noClaims = !this.events.some(
+        (e) =>
+          e.kind === 'pung' ||
+          e.kind === 'chow' ||
+          e.kind === 'kong_open' ||
+          e.kind === 'kong_concealed' ||
+          e.kind === 'kong_added',
+      );
+      if (prevDraws <= 3 && noClaims) {
+        const allTiles: TileType[] = [...prevDiscards.map((e) => e.tile), tile];
+        if (allTiles.every((t) => t === allTiles[0])) {
+          // All four first-round discards are the same tile — dealer pays 5 to each other player.
+          const dealer = this.state.dealerSeat;
+          const sackDelta: [number, number, number, number] = [0, 0, 0, 0];
+          for (let i = 0; i < 4; i++) {
+            sackDelta[i] = i === dealer ? -15 : 5;
+          }
+          const sackSeats = [...updatedSeats] as GameState['seats'];
+          for (let i = 0; i < 4; i++) {
+            sackSeats[i] = { ...sackSeats[i], score: sackSeats[i].score + sackDelta[i] };
+          }
+          updatedSeats = sackSeats as GameState['seats'];
+          extraEvents.push({ kind: 'sacking_dealer', tile: allTiles[0], scoreDelta: sackDelta });
+        }
+      }
+    }
+
     return this.withState(
       {
         phase: 'awaiting_claims',
-        seats: this.patchSeat(seatIdx, {
-          hand: removeFromHand(seat.hand, tile),
-          discards: [...seat.discards, tile],
-        }),
+        seats: updatedSeats,
         pendingDiscard: tile,
         discardedBySeat: seatIdx,
       },
-      [{ kind: 'discard', seat: seatIdx, tile }],
+      [{ kind: 'discard', seat: seatIdx, tile }, ...extraEvents],
     );
   }
 

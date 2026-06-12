@@ -125,7 +125,7 @@ export interface ScoringContext {
   isHeavenlyWin: boolean;
   /** Non-dealer wins on the very first discard ever, before any player draws (地胡). */
   isEarthlyWin: boolean;
-  /** Won on a Kong replacement draw (杠上花). Informational; not a win multiplier. */
+  /** Won on a Kong replacement draw (杠上花/杠开). ×4 multiplier (Self-Draw ×2 × Kong Bloom ×2). */
   isAfterKong: boolean;
   /** Won on the very last tile in the wall (海底捞月). Informational. */
   isLastTile: boolean;
@@ -331,4 +331,11 @@ export type GameEvent =
       paymentResult: WinPaymentResult;
     }
   | { kind: 'draw_game' }
-  | { kind: 'concede'; seat: 0 | 1 | 2 | 3 };
+  | { kind: 'concede'; seat: 0 | 1 | 2 | 3 }
+  | {
+      kind: 'sacking_dealer';
+      /** The tile type all four players discarded in the first round. */
+      tile: TileType;
+      /** Zero-sum score delta [seat0..3]: dealer pays −15, each other player receives +5. */
+      scoreDelta: [number, number, number, number];
+    };
