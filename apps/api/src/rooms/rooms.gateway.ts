@@ -29,6 +29,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(RoomsGateway.name);
 
+  /**
+   * Deferred leave timers keyed by `${roomId}:${userId}`.
+   * A browser refresh triggers a disconnect + reconnect in quick succession.
+   * We hold off on calling leaveRoom for 15 s so that a page reload can
+   * resubscribe before the seat is removed. The timer is cancelled in
+   * handleSubscribe when the same user rejoins the same room.
+   */
+  private readonly pendingLeaves = new Map<string, ReturnType<typeof setTimeout>>();
+
   constructor(private readonly roomsService: RoomsService) {}
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -44,24 +53,30 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.debug(`WS connected: ${user.handle} (${client.id})`);
   }
 
-  async handleDisconnect(client: Socket) {
+  handleDisconnect(client: Socket) {
     const user = client.data.user as WsUser | undefined;
     const roomId = client.data.roomId as string | undefined;
 
     if (!user || !roomId) return;
 
-    this.logger.debug(`WS disconnected: ${user.handle} — leaving room ${roomId}`);
+    this.logger.debug(
+      `WS disconnected: ${user.handle} — scheduling deferred leave for room ${roomId}`,
+    );
 
-    try {
-      const updated = await this.roomsService.leaveRoom(roomId, user.sub);
-      if (updated) {
-        this.broadcastRoomUpdate(roomId, updated);
-      } else {
-        // Room was deleted — no one left to notify
-      }
-    } catch {
-      // Room may have already been cleaned up; silently ignore
-    }
+    const key = `${roomId}:${user.sub}`;
+    const timer = setTimeout(() => {
+      this.pendingLeaves.delete(key);
+      void this.roomsService
+        .leaveRoom(roomId, user.sub)
+        .then((updated) => {
+          if (updated) this.broadcastRoomUpdate(roomId, updated);
+        })
+        .catch(() => {
+          // Room may have already been cleaned up; silently ignore
+        });
+    }, 15_000);
+
+    this.pendingLeaves.set(key, timer);
   }
 
   // ── Message handlers ────────────────────────────────────────────────────────
@@ -70,11 +85,28 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Client subscribes to real-time updates for a specific room.
    * `socket.data.roomId` is set so `handleDisconnect` knows which room to
    * clean up when this connection drops.
+   *
+   * Also cancels any pending deferred leave for this user+room — this is the
+   * reconnection path after a browser refresh.
    */
   @SubscribeMessage('room:subscribe')
   handleSubscribe(client: Socket, payload: { roomId: string }) {
     const { roomId } = payload;
     if (!roomId) return;
+
+    // Cancel any pending leave if this user is rejoining the same room.
+    const user = client.data.user as WsUser | undefined;
+    if (user) {
+      const key = `${roomId}:${user.sub}`;
+      const pending = this.pendingLeaves.get(key);
+      if (pending) {
+        clearTimeout(pending);
+        this.pendingLeaves.delete(key);
+        this.logger.debug(
+          `Reconnect: cancelled pending leave for ${user.handle} in room ${roomId}`,
+        );
+      }
+    }
 
     // Leave any previously subscribed room first (one subscription at a time)
     const prev = client.data.roomId as string | undefined;
