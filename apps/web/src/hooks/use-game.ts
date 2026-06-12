@@ -283,6 +283,11 @@ export function useGame(gameId: string, spectate = false) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      // Clear stale error/pending state so the game UI renders cleanly on reconnect.
+      // Without this, a game:error received before the disconnect (e.g. NOT_YOUR_TURN
+      // from a race) would persist and show GameErrorScreen after the socket recovers.
+      setGameError(null);
+      setPendingMove(false);
       setConnection('live');
       // Re-join to get a fresh snapshot (PLAN §7.5: reconnection = re-join)
       s.emit('game:join', { gameId, spectate });

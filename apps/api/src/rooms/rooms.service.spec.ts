@@ -317,7 +317,7 @@ describe('RoomsService', () => {
   // ── kickSeat ───────────────────────────────────────────────────────────────
 
   describe('kickSeat', () => {
-    it('removes the specified seat', async () => {
+    it('removes the specified seat and returns the kicked userId', async () => {
       const { meta, seat0 } = buildRoomItems();
       const seat1 = {
         PK: 'ROOM#room-1',
@@ -332,11 +332,12 @@ describe('RoomsService', () => {
       };
       db.query.mockResolvedValue({ Items: [meta, seat0, seat1] });
 
-      await service.kickSeat('room-1', 1, 'user-host');
+      const result = await service.kickSeat('room-1', 1, 'user-host');
 
       const { TransactItems } = txInput(db);
       const del = (TransactItems![0] as { Delete: { Key: Record<string, unknown> } }).Delete.Key;
       expect(del['SK']).toBe('SEAT#1');
+      expect(result.kickedUserId).toBe('user-2');
     });
 
     it('throws ForbiddenException when caller is not host', async () => {

@@ -65,8 +65,14 @@ export function RoomPage() {
     [navigate],
   );
 
+  // Handle being kicked by the host
+  const handleKicked = useCallback(() => {
+    clearRoom();
+    navigate('/home');
+  }, [clearRoom, navigate]);
+
   // Subscribe to real-time room updates
-  useRoomSubscription(room?.roomId, handleStarted);
+  useRoomSubscription(room?.roomId, handleStarted, handleKicked);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -105,6 +111,7 @@ export function RoomPage() {
 
   // Which empty seat is showing the bot difficulty picker (null = none open)
   const [addingBotToSeat, setAddingBotToSeat] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   async function handleAddBot(seatIdx: number, difficulty: BotDifficulty) {
     if (!room) return;
@@ -114,10 +121,29 @@ export function RoomPage() {
 
   async function handleCopy() {
     if (!room) return;
+    const text = room.code;
+    let success = false;
     try {
-      await navigator.clipboard.writeText(room.code);
+      await navigator.clipboard.writeText(text);
+      success = true;
     } catch {
-      // Clipboard API not available in all browsers/contexts
+      // Clipboard API unavailable (e.g. iOS Safari without user gesture) — try execCommand
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        success = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch {
+        // Both methods failed — silent failure
+      }
+    }
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   }
 
@@ -193,11 +219,14 @@ export function RoomPage() {
               onClick={handleCopy}
               className="px-4 py-1.5 rounded-full text-xs font-semibold text-mj-gold"
               style={{
-                background: 'rgba(201,169,97,0.18)',
-                border: '1px solid rgba(201,169,97,0.4)',
+                background: copied ? 'rgba(31,122,77,0.18)' : 'rgba(201,169,97,0.18)',
+                border: copied ? '1px solid rgba(31,122,77,0.5)' : '1px solid rgba(201,169,97,0.4)',
+                color: copied ? '#7fc299' : '#c9a961',
+                transition: 'background 0.2s, border-color 0.2s, color 0.2s',
               }}
+              aria-live="polite"
             >
-              {t('copy')}
+              {copied ? t('copied') : t('copy')}
             </button>
           </div>
         </div>

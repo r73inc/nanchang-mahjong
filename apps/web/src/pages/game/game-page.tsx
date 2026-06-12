@@ -70,7 +70,6 @@ const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '
 const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
 const JING_CHAR = '节' as const;
-const JING_ARROW = '→' as const;
 const MULT_CHAR = '×' as const;
 
 const WIND_COLOR: Record<SeatWind, string> = {
@@ -2033,33 +2032,38 @@ function MobileJingButton({ snapshot }: { snapshot: ClientGameState }) {
           >
             {t('gameSpiritTiles')}
           </p>
-          <div className="flex gap-4 items-center">
-            {snapshot.jingIndicator && (
+          <div className="flex gap-6 items-end">
+            <div className="flex flex-col items-center gap-1.5">
               <MahjongTile2D
-                tile={snapshot.jingIndicator}
-                size="lg"
-                role="bottom"
-                interactive={false}
-              />
-            )}
-            <span style={{ color: 'rgba(var(--felt-ink-rgb),0.3)', fontSize: 20 }}>
-              {JING_ARROW}
-            </span>
-            <MahjongTile2D
-              tile={snapshot.jingPrimary}
-              size="lg"
-              role="bottom"
-              isJing
-              interactive={false}
-            />
-            {snapshot.jingSecondary && (
-              <MahjongTile2D
-                tile={snapshot.jingSecondary}
+                tile={snapshot.jingPrimary}
                 size="lg"
                 role="bottom"
                 isJing
                 interactive={false}
               />
+              <span
+                className="text-[9px] tracking-widest uppercase"
+                style={{ color: 'rgba(201,169,97,0.6)' }}
+              >
+                {t('gameSpiritCurrent')}
+              </span>
+            </div>
+            {snapshot.jingSecondary && (
+              <div className="flex flex-col items-center gap-1.5">
+                <MahjongTile2D
+                  tile={snapshot.jingSecondary}
+                  size="lg"
+                  role="bottom"
+                  isJing
+                  interactive={false}
+                />
+                <span
+                  className="text-[9px] tracking-widest uppercase"
+                  style={{ color: 'rgba(var(--felt-ink-rgb),0.35)' }}
+                >
+                  {t('gameSpiritNext')}
+                </span>
+              </div>
             )}
           </div>
           <p className="text-[9px]" style={{ color: 'rgba(var(--felt-ink-rgb),0.25)' }}>
