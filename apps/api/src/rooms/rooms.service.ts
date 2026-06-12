@@ -460,6 +460,7 @@ export class RoomsService {
       .map((s) => BOT_PROFILES.find((p) => p.name === s.handle)?.id)
       .filter((id): id is string => id !== undefined);
     const available = BOT_PROFILES.filter((p) => !usedIds.includes(p.id));
+    if (available.length === 0) throw new BadRequestException('No more bot profiles available');
     const profile = available[Math.floor(Math.random() * available.length)];
 
     const now = new Date().toISOString();
