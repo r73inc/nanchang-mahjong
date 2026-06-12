@@ -1303,7 +1303,7 @@ function SideRail({
   if (minimized) {
     return (
       <button
-        className="absolute top-3 right-3 flex items-center gap-2 px-3 py-2 rounded-xl z-20 animate-call-prompt-enter"
+        className="fixed top-[calc(1rem+env(safe-area-inset-top))] right-[calc(1rem+env(safe-area-inset-right))] flex items-center gap-2 px-3 py-2 rounded-xl z-20 animate-call-prompt-enter"
         style={{
           background: 'rgba(10,10,10,0.92)',
           backdropFilter: 'blur(12px)',
@@ -1462,8 +1462,8 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   const { t } = useI18n();
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
     >
       <div
         className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
@@ -1507,8 +1507,8 @@ function JingDiscardConfirmSheet({
   const { t } = useI18n();
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
     >
       <div
         className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
@@ -2230,8 +2230,8 @@ function KongActionSheet({
   const titleKey = opt.type === 'concealed' ? 'kongActionConcealedTitle' : 'kongActionAddTitle';
   return (
     <div
-      className="absolute inset-0 z-40 flex items-center justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
     >
       <div
         className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
