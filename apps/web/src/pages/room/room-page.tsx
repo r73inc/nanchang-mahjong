@@ -39,6 +39,34 @@ type TerminationOption = (typeof TERMINATION_OPTIONS)[number];
 const CLAIM_WINDOW_OPTIONS = [5, 8, 15, 30, 0] as const;
 type ClaimWindowOption = (typeof CLAIM_WINDOW_OPTIONS)[number];
 
+function InfoButton({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <button
+      onClick={onClick}
+      aria-label={t('settingInfoOpen')}
+      style={{
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
+        color: 'rgba(var(--felt-ink-rgb),0.35)',
+        fontSize: 9,
+        fontWeight: 700,
+        cursor: 'pointer',
+        background: 'none',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        lineHeight: 1,
+      }}
+    >
+      {INFO_GLYPH}
+    </button>
+  );
+}
+
 export function RoomPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -454,28 +482,7 @@ export function RoomPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {label}
-                  <button
-                    onClick={() => setInfoKey(infoK)}
-                    aria-label={t('settingInfoOpen')}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-                      color: 'rgba(var(--felt-ink-rgb),0.35)',
-                      fontSize: 9,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      background: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {INFO_GLYPH}
-                  </button>
+                  <InfoButton onClick={() => setInfoKey(infoK)} />
                 </span>
                 <span className="text-mj-gold font-semibold">{value}</span>
               </div>
@@ -488,28 +495,7 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingViewModeLabel')}
-                <button
-                  onClick={() => setInfoKey('settingViewModeInfo')}
-                  aria-label={t('settingInfoOpen')}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-                    color: 'rgba(var(--felt-ink-rgb),0.35)',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  {INFO_GLYPH}
-                </button>
+                <InfoButton onClick={() => setInfoKey('settingViewModeInfo')} />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div className="flex gap-1.5" role="group" aria-label={t('settingViewModeLabel')}>
@@ -552,28 +538,7 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTerminationLabel')}
-                <button
-                  onClick={() => setInfoKey('settingTerminationInfo')}
-                  aria-label={t('settingInfoOpen')}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-                    color: 'rgba(var(--felt-ink-rgb),0.35)',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  {INFO_GLYPH}
-                </button>
+                <InfoButton onClick={() => setInfoKey('settingTerminationInfo')} />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div
@@ -625,28 +590,7 @@ export function RoomPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {t('settingRoundsLabel')}
-                  <button
-                    onClick={() => setInfoKey('settingRoundsInfo')}
-                    aria-label={t('settingInfoOpen')}
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: '50%',
-                      border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-                      color: 'rgba(var(--felt-ink-rgb),0.35)',
-                      fontSize: 9,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      background: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {INFO_GLYPH}
-                  </button>
+                  <InfoButton onClick={() => setInfoKey('settingRoundsInfo')} />
                 </span>
                 {isHost && room.status === 'waiting' ? (
                   <div className="flex gap-1.5" role="group" aria-label={t('settingRoundsLabel')}>
@@ -694,28 +638,7 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingClaimWindowLabel')}
-                <button
-                  onClick={() => setInfoKey('settingClaimWindowInfo')}
-                  aria-label={t('settingInfoOpen')}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-                    color: 'rgba(var(--felt-ink-rgb),0.35)',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  {INFO_GLYPH}
-                </button>
+                <InfoButton onClick={() => setInfoKey('settingClaimWindowInfo')} />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div
@@ -782,28 +705,7 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTopBottomJingLabel')}
-                <button
-                  onClick={() => setInfoKey('settingTopBottomJingInfo')}
-                  aria-label={t('settingInfoOpen')}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-                    color: 'rgba(var(--felt-ink-rgb),0.35)',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    background: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  {INFO_GLYPH}
-                </button>
+                <InfoButton onClick={() => setInfoKey('settingTopBottomJingInfo')} />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <button
@@ -850,7 +752,7 @@ export function RoomPage() {
         {/* ── Setting info modal ────────────────────────────────────────────── */}
         {infoKey && (
           <div
-            className="absolute inset-0 z-50 flex items-center justify-center"
+            className="fixed inset-0 z-50 flex items-center justify-center"
             style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
             onClick={() => setInfoKey(null)}
           >
@@ -859,6 +761,7 @@ export function RoomPage() {
               style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
               role="dialog"
               aria-modal="true"
+              aria-label={t('settingInfoOpen')}
               onClick={(e) => e.stopPropagation()}
             >
               <p className="text-sm text-mj-bone/70 leading-relaxed">
