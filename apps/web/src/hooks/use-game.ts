@@ -59,11 +59,32 @@ export function useGame(gameId: string, spectate = false) {
     reset,
   } = useGameStore();
 
-  const { playDiceRoll, playShuffle, playTilePlace } = useSound();
+  const {
+    playDiceRoll,
+    playShuffle,
+    playTilePlace,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+  } = useSound();
   // Stable ref so event handlers inside useEffect always call the current
   // callback without adding sound deps to the effect dependency array.
-  const soundRef = useRef({ playDiceRoll, playShuffle, playTilePlace });
-  soundRef.current = { playDiceRoll, playShuffle, playTilePlace };
+  const soundRef = useRef({
+    playDiceRoll,
+    playShuffle,
+    playTilePlace,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+  });
+  soundRef.current = {
+    playDiceRoll,
+    playShuffle,
+    playTilePlace,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+  };
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot queue: snapshots received during dice animation are held here and
@@ -159,6 +180,16 @@ export function useGame(gameId: string, spectate = false) {
       // we cleared on draw the pulse would never appear (same-batch problem).
       // The pulse stays until the next seat discards (replacing lastDiscard) or
       // a claim removes it.
+
+      // ── Callout sounds ────────────────────────────────────────────────────
+      if (event.kind === 'chow') soundRef.current.playCallOutChow();
+      else if (event.kind === 'pung') soundRef.current.playCallOutPung();
+      else if (
+        event.kind === 'kong_open' ||
+        event.kind === 'kong_concealed' ||
+        event.kind === 'kong_added'
+      )
+        soundRef.current.playCallOutKong();
 
       // ── Toast handling ────────────────────────────────────────────────────
       if (event.kind === 'opening_jing_settlement') {

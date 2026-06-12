@@ -38,6 +38,12 @@ const POINT_TRANSFER_SOUNDS = [
 
 const SHUFFLE_SOUNDS = ['/sounds/shuffle/shuffle_the_mahjong_tiles.mp3'];
 
+const CALLOUT_CHOW_SOUNDS = ['/sounds/callOuts/chow/chow.mp3'];
+
+const CALLOUT_PUNG_SOUNDS = ['/sounds/callOuts/pung/pung.mp3'];
+
+const CALLOUT_KONG_SOUNDS = ['/sounds/callOuts/kong/kong.mp3'];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function pickRandom(pool: string[]): string {
@@ -113,10 +119,34 @@ export function useSound() {
     playAudio(pickRandom(SHUFFLE_SOUNDS));
   }, [soundEnabled]);
 
+  const playCallOutChow = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(CALLOUT_CHOW_SOUNDS));
+  }, [soundEnabled]);
+
+  const playCallOutPung = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(CALLOUT_PUNG_SOUNDS));
+  }, [soundEnabled]);
+
+  const playCallOutKong = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(CALLOUT_KONG_SOUNDS));
+  }, [soundEnabled]);
+
   const playChime = useCallback(() => {
     if (!soundEnabled) return;
     once(synthesiseChime);
   }, [soundEnabled]);
 
-  return { playTilePlace, playDiceRoll, playPointTransfer, playShuffle, playChime };
+  return {
+    playTilePlace,
+    playDiceRoll,
+    playPointTransfer,
+    playShuffle,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+    playChime,
+  };
 }
