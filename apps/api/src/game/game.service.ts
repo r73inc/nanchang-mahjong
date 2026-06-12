@@ -328,8 +328,6 @@ export class GameService {
       return this.emitError(socket, 'NOT_HOST');
     }
 
-    const { ruleTopBottomJing } = session.settings;
-
     if (session.preGamePhase === 'dealing') {
       // Dice rolls are in progress — advance-pre-game cannot skip this phase.
       this.logger.warn(`advance-pre-game ignored: preGamePhase=dealing for game ${gameId}`);
@@ -337,40 +335,12 @@ export class GameService {
     }
 
     if (session.preGamePhase === 'hands') {
-      if (ruleTopBottomJing) {
-        // Pre-compute the settlement preview silently (no 'settlement' phase shown).
-        // previewJingReveal is deterministic from the seed, so the result agrees
-        // with revealJing() exactly. We store it here and broadcast it to clients
-        // AFTER the jing_reveal dice roll so the sequence is: roll → settle → spirit.
-        const state = session.engine.state;
-        if (!state.wall) return this.emitError(socket, 'ENGINE_ERROR');
-        const jingPreview = previewJingReveal(state);
-        const settlementTile = jingPreview.topTile;
-        const nextTile = stepAbove(settlementTile);
-        const seatCounts = state.seats.map(
-          (s) => s.hand.filter((t) => t === settlementTile).length,
-        ) as [number, number, number, number];
-        const delta = calculateOpeningJingSettlement(settlementTile, state.seats, 2);
-        const nextTileSeatCounts = state.seats.map(
-          (s) => s.hand.filter((t) => t === nextTile).length,
-        ) as [number, number, number, number];
-        const nextTileDelta = calculateOpeningJingSettlement(nextTile, state.seats, 1);
-        session.lastSettlementPreview = {
-          dice: jingPreview.dice,
-          stackGlobal: jingPreview.stackGlobal,
-          settlementTile,
-          nextTile,
-          seatCounts,
-          delta,
-          nextTileSeatCounts,
-          nextTileDelta,
-        };
-      }
-      // Always proceed straight to the jing_reveal dice roll (no settlement preview screen)
+      // Trigger the jing_reveal dice roll; settlement is computed and shown after the roll.
       this.setJingRevealPendingRoll(session);
     } else if (session.preGamePhase === 'settlement') {
-      // Legacy path: handled for any sessions that were mid-flow before this fix.
-      this.setJingRevealPendingRoll(session);
+      // Settlement acknowledged — advance to spirit tile reveal.
+      session.preGamePhase = 'jing';
+      this.broadcastSnapshots(session);
     } else if (session.preGamePhase === 'jing') {
       // Final step: start the game turn.
       session.preGamePhase = null;
@@ -474,10 +444,39 @@ export class GameService {
         return;
       }
 
+      // Capture state before revealJing — previewJingReveal needs the pre-reveal hand counts.
+      const stateBeforeReveal = session.engine.state;
+
       session.engine = session.engine.revealJing();
       session.moveLog.push(...getNewEvents(session));
       session.pendingRoll = null;
-      session.preGamePhase = 'jing';
+      // With ruleTopBottomJing: show detailed settlement screen before spirit tiles.
+      session.preGamePhase = session.settings.ruleTopBottomJing ? 'settlement' : 'jing';
+
+      // Compute and store settlement preview (hand counts read from pre-reveal state).
+      if (session.settings.ruleTopBottomJing) {
+        const jingPreview = previewJingReveal(stateBeforeReveal);
+        const settlementTile = jingPreview.topTile;
+        const nextTile = stepAbove(settlementTile);
+        const seatCounts = stateBeforeReveal.seats.map(
+          (s) => s.hand.filter((t) => t === settlementTile).length,
+        ) as [number, number, number, number];
+        const delta = calculateOpeningJingSettlement(settlementTile, stateBeforeReveal.seats, 2);
+        const nextTileSeatCounts = stateBeforeReveal.seats.map(
+          (s) => s.hand.filter((t) => t === nextTile).length,
+        ) as [number, number, number, number];
+        const nextTileDelta = calculateOpeningJingSettlement(nextTile, stateBeforeReveal.seats, 1);
+        session.lastSettlementPreview = {
+          dice: jingPreview.dice,
+          stackGlobal: jingPreview.stackGlobal,
+          settlementTile,
+          nextTile,
+          seatCounts,
+          delta,
+          nextTileSeatCounts,
+          nextTileDelta,
+        };
+      }
 
       // Broadcast the jing dice_roll event so clients animate
       const jingDiceEvent = session.engine.events.find(
@@ -495,8 +494,7 @@ export class GameService {
       // Snapshot after event so scores reflect settlement payout before toast
       this.broadcastSnapshots(session);
 
-      // Broadcast settlement-preview now (after the roll) so the 'jing' phase screen
-      // can display the settlement breakdown alongside the spirit tiles.
+      // Broadcast settlement-preview so the 'settlement' phase screen can display the breakdown.
       if (session.settings.ruleTopBottomJing && session.lastSettlementPreview) {
         if (this.server) {
           this.server

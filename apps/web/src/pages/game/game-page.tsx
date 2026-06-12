@@ -50,6 +50,7 @@ import { GameTable2D, MahjongTile2D } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
 import { DiceRollOverlay } from '../../components/2d/DiceRollOverlay';
 import { GameWinnerPopup } from '../../components/game/GameWinnerPopup';
+import { SettlementPreview } from '../../components/game/SettlementPreview';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 import { useOrientation } from '../../hooks/use-orientation';
 
@@ -207,7 +208,9 @@ function PreGameFlow({
 
   // ── Step 1: Hands ─────────────────────────────────────────────────────────
   if (phase === 'hands') {
-    const buttonLabel = t('preGameRevealSpirit');
+    const buttonLabel = snapshot.ruleTopBottomJing
+      ? t('preGameRevealSettlement')
+      : t('preGameRevealSpirit');
     return (
       <div
         className="flex flex-col items-center justify-center gap-8 min-h-dvh px-6 text-center bg-mj-bg-page"
@@ -252,77 +255,36 @@ function PreGameFlow({
     );
   }
 
+  // ── Step 1.5: Settlement — bonus tile payout (ruleTopBottomJing only) ──────
+  if (phase === 'settlement') {
+    if (!settlementPreview) return <LoadingScreen />;
+    const footer = isHost ? (
+      <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
+    ) : (
+      <>
+        <WaitingDots />
+        <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+      </>
+    );
+    return (
+      <SettlementPreview
+        settlementPreview={settlementPreview}
+        snapshot={snapshot}
+        viewerSeat={viewerSeat}
+        footer={footer}
+      />
+    );
+  }
+
   // ── Step 2: Jing wildcards revealed ────────────────────────────────────────
   if (phase === 'jing') {
     const primary = snapshot.jingPrimary;
     const secondary = snapshot.jingSecondary;
     return (
       <div
-        className="flex flex-col items-center gap-6 min-h-dvh px-6 py-10 text-center bg-mj-bg-page overflow-y-auto"
+        className="flex flex-col items-center justify-center gap-8 min-h-dvh px-6 text-center bg-mj-bg-page"
         aria-label={t('gameSpiritTiles')}
       >
-        {/* Compact settlement summary — shown after the dice roll revealed the tiles */}
-        {settlementPreview && (
-          <div className="w-full max-w-xs bg-white/5 rounded-xl px-4 py-4">
-            <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-3">
-              {t('preGameBonusTile')}
-            </p>
-            <div className="flex items-end justify-center gap-4 mb-3">
-              <div className="flex flex-col items-center gap-1">
-                <MahjongTile2D
-                  tile={settlementPreview.settlementTile}
-                  size="sm"
-                  isJing
-                  interactive={false}
-                />
-                <p className="text-[9px] text-mj-gold/70 font-bold uppercase tracking-wider">
-                  {t('preGameBonusTile2pt')}
-                </p>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <MahjongTile2D tile={settlementPreview.nextTile} size="xs" interactive={false} />
-                <p className="text-[9px] text-mj-gold/50 font-bold uppercase tracking-wider">
-                  {t('preGameBonusTile1pt')}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              {settlementPreview.delta.map((d, i) => {
-                const total = d + settlementPreview.nextTileDelta[i];
-                const seatName = snapshot.seats[i]?.seatName;
-                const isViewer = i === viewerSeat;
-                return (
-                  <div
-                    key={i}
-                    className={`flex justify-between text-xs px-2 py-1 rounded ${
-                      isViewer ? 'bg-mj-gold/15' : ''
-                    }`}
-                  >
-                    <span className={isViewer ? 'text-mj-bone/80' : 'text-mj-bone/50'}>
-                      {seatName}
-                    </span>
-                    <span
-                      className={
-                        total > 0
-                          ? 'text-emerald-400 font-bold'
-                          : total < 0
-                            ? 'text-red-400 font-bold'
-                            : 'text-mj-bone/40'
-                      }
-                    >
-                      {total > 0
-                        ? t('settlementReceived', String(total))
-                        : total < 0
-                          ? t('settlementPaid', String(Math.abs(total)))
-                          : t('settlementEven')}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         <div>
           <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
             {t('gameSpirit')}

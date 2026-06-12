@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { MahjongTile2D } from '../2d/MahjongTile2D';
 import { useI18n } from '../../i18n';
 import type {
@@ -106,12 +107,14 @@ interface SettlementPreviewProps {
   settlementPreview: SettlementPreviewPayload;
   snapshot: ClientGameState;
   viewerSeat: number | null;
+  footer?: ReactNode;
 }
 
 export function SettlementPreview({
   settlementPreview,
   snapshot,
   viewerSeat,
+  footer,
 }: SettlementPreviewProps) {
   const { t } = useI18n();
   const [expandedSeat, setExpandedSeat] = useState<number | null>(null);
@@ -262,6 +265,8 @@ export function SettlementPreview({
           );
         })}
       </div>
+
+      {footer && <div className="flex flex-col items-center gap-3 pt-4 pb-8 px-6">{footer}</div>}
     </div>
   );
 }
