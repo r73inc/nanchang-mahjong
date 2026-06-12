@@ -53,6 +53,7 @@ import { GameWinnerPopup } from '../../components/game/GameWinnerPopup';
 import { SettlementPreview } from '../../components/game/SettlementPreview';
 import { tileTexturePath } from '../../r3f/utils/tile-texture-map';
 import { useOrientation } from '../../hooks/use-orientation';
+import { useSound } from '../../hooks/use-sound';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
 
@@ -2983,6 +2984,27 @@ export function GamePage() {
     diceAnimation,
   } = useGame(gameId ?? '', spectate);
 
+  // ── Sound effects ─────────────────────────────────────────────────────────────
+  const { playTilePlace, playPointTransfer } = useSound();
+
+  const discardWithSound = useCallback(
+    (tile: TileType) => {
+      playTilePlace();
+      discard(tile);
+    },
+    [discard, playTilePlace],
+  );
+
+  // Play point-transfer sound when post-hand scoring arrives.
+  useEffect(() => {
+    if (handReveal) playPointTransfer();
+  }, [handReveal, playPointTransfer]);
+
+  // Play point-transfer sound for opening spirit settlement toast.
+  useEffect(() => {
+    if (toast?.kind === 'opening_settlement') playPointTransfer();
+  }, [toast, playPointTransfer]);
+
   // ── Loading timeout ───────────────────────────────────────────────────────────
   // If we haven't received a game:snapshot within GAME_JOIN_TIMEOUT_MS, the
   // connection is broken or the server rejected us silently. Surface a TIMEOUT
@@ -3169,7 +3191,7 @@ export function GamePage() {
             toast={toast}
             pendingMove={pendingMove}
             onSelect={selectTile}
-            onDiscard={discard}
+            onDiscard={discardWithSound}
             onKongConcealed={kongConcealed}
             onKongAdd={kongAdd}
             onClaim={claim}

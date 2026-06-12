@@ -15,6 +15,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getSocket } from '../lib/socket';
 import { useGameStore } from '../stores/game.store';
+import { useSound } from './use-sound';
 import type { TileType, ClientGameState } from '@nanchang/shared';
 
 // Delay before showing the reconnecting overlay (PLAN §7.5: 1.5s)
@@ -57,6 +58,33 @@ export function useGame(gameId: string, spectate = false) {
     setLastDiscard,
     reset,
   } = useGameStore();
+
+  const {
+    playDiceRoll,
+    playShuffle,
+    playTilePlace,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+  } = useSound();
+  // Stable ref so event handlers inside useEffect always call the current
+  // callback without adding sound deps to the effect dependency array.
+  const soundRef = useRef({
+    playDiceRoll,
+    playShuffle,
+    playTilePlace,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+  });
+  soundRef.current = {
+    playDiceRoll,
+    playShuffle,
+    playTilePlace,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+  };
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot queue: snapshots received during dice animation are held here and
@@ -117,6 +145,7 @@ export function useGame(gameId: string, spectate = false) {
 
       // ── Dice roll animation ───────────────────────────────────────────────
       if (event.kind === 'dice_roll') {
+        soundRef.current.playDiceRoll();
         isDiceAnimatingRef.current = true;
         setDiceAnimation({
           dice: event.dice as [number, number],
@@ -129,6 +158,11 @@ export function useGame(gameId: string, spectate = false) {
 
       // ── Last-discard tracking ─────────────────────────────────────────────
       if (event.kind === 'discard') {
+        // For opponent/bot discards play the tile-place sound here.
+        // The viewer's own discard is covered by discardWithSound in game-page.tsx
+        // (plays immediately on click rather than waiting for the server echo).
+        const viewerSeat = useGameStore.getState().snapshot?.viewerSeat ?? null;
+        if (event.seat !== viewerSeat) soundRef.current.playTilePlace();
         // A tile has landed in the discard pool — start pulsing it.
         // Kept until the next discard or a claim that removes it.
         setLastDiscard({ seat: event.seat, tile: event.tile });
@@ -146,6 +180,16 @@ export function useGame(gameId: string, spectate = false) {
       // we cleared on draw the pulse would never appear (same-batch problem).
       // The pulse stays until the next seat discards (replacing lastDiscard) or
       // a claim removes it.
+
+      // ── Callout sounds ────────────────────────────────────────────────────
+      if (event.kind === 'chow') soundRef.current.playCallOutChow();
+      else if (event.kind === 'pung') soundRef.current.playCallOutPung();
+      else if (
+        event.kind === 'kong_open' ||
+        event.kind === 'kong_concealed' ||
+        event.kind === 'kong_added'
+      )
+        soundRef.current.playCallOutKong();
 
       // ── Toast handling ────────────────────────────────────────────────────
       if (event.kind === 'opening_jing_settlement') {

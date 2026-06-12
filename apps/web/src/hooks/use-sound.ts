@@ -1,57 +1,115 @@
 /**
- * use-sound.ts — Web Audio API sound effects hook.
+ * use-sound.ts — Sound effects hook.
  *
- * Sound is opt-in (soundEnabled defaults false). All sounds are synthesised
- * via the Web Audio API — no audio files are bundled.
+ * Provides MP3-based sound effects for gameplay events (tile place, dice roll,
+ * point transfer, shuffle/round start) plus a synthesised chime for wins.
+ * Sound is opt-in (soundEnabled defaults false in ThemeStore).
  *
  * Usage:
- *   const { playClack, playChime } = useSound();
- *   // call inside a user-gesture handler (e.g. discard button click)
+ *   const { playTilePlace, playDiceRoll, playPointTransfer, playShuffle, playChime } = useSound();
  */
 
 import { useCallback } from 'react';
 import { useThemeStore } from '../stores/theme.store';
 
+// ── Static sound pools ────────────────────────────────────────────────────────
+
+const TILE_PLACE_SOUNDS = [
+  '/sounds/tilePlace/mahjong_tile_1.mp3',
+  '/sounds/tilePlace/mahjong_tile_2.mp3',
+  '/sounds/tilePlace/mahjong_tile_3.mp3',
+  '/sounds/tilePlace/mahjong_tile_4.mp3',
+  '/sounds/tilePlace/mahjong_tile_5.mp3',
+  '/sounds/tilePlace/mahjong_tile_6.mp3',
+];
+
+const DICE_ROLL_SOUNDS = [
+  '/sounds/diceRoll/roll_two_dice_1.mp3',
+  '/sounds/diceRoll/roll_two_dice_2.mp3',
+  '/sounds/diceRoll/roll_two_dice_3.mp3',
+];
+
+const POINT_TRANSFER_SOUNDS = [
+  '/sounds/pointTransfer/take_the_bets_1.mp3',
+  '/sounds/pointTransfer/take_the_bets_2.mp3',
+  '/sounds/pointTransfer/take_the_bets_3.mp3',
+  '/sounds/pointTransfer/take_the_bets_4.mp3',
+];
+
+const SHUFFLE_SOUNDS = ['/sounds/shuffle/shuffle_the_mahjong_tiles.mp3'];
+
+const CALLOUT_CHOW_SOUNDS = ['/sounds/callOuts/chow/chow.mp3'];
+
+const CALLOUT_PUNG_SOUNDS = ['/sounds/callOuts/pung/pung.mp3'];
+
+const CALLOUT_KONG_SOUNDS = ['/sounds/callOuts/kong/kong.mp3'];
+
+// ── Audio cache ───────────────────────────────────────────────────────────────
+// Pre-decoded HTMLAudioElement per URL. Populated once at module load so the
+// browser fetches and decodes every file in the background before the first
+// game event fires — eliminating the decode-on-demand stutter on mobile.
+
+const audioCache = new Map<string, HTMLAudioElement>();
+
+function preloadAudio(pools: string[][]): void {
+  try {
+    for (const pool of pools) {
+      for (const url of pool) {
+        if (!audioCache.has(url)) {
+          audioCache.set(url, new Audio(url));
+        }
+      }
+    }
+  } catch {
+    // Audio API unavailable (e.g. jsdom in tests) — silently skip
+  }
+}
+
+preloadAudio([
+  TILE_PLACE_SOUNDS,
+  DICE_ROLL_SOUNDS,
+  POINT_TRANSFER_SOUNDS,
+  SHUFFLE_SOUNDS,
+  CALLOUT_CHOW_SOUNDS,
+  CALLOUT_PUNG_SOUNDS,
+  CALLOUT_KONG_SOUNDS,
+]);
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function pickRandom(pool: string[]): string {
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function playAudio(url: string): void {
+  try {
+    const cached = audioCache.get(url);
+    // cloneNode lets a second instance start while the original is still playing
+    // (e.g. rapid tile placements), without interrupting the in-flight audio.
+    const audio = cached ? (cached.cloneNode(true) as HTMLAudioElement) : new Audio(url);
+    audio.play().catch(() => {
+      // Ignore autoplay policy errors — sound is best-effort
+    });
+  } catch {
+    // Audio API unavailable (e.g. jsdom in tests) — silently skip
+  }
+}
+
 /**
- * Create a very short audio context, play it, then close — avoids leaking
- * AudioContext instances since browsers allow a limited number.
+ * Create a short AudioContext, run fn, then close — avoids leaking
+ * AudioContext instances since browsers cap the total allowed.
  */
 function once(fn: (ctx: AudioContext) => void): void {
   try {
     const ctx = new AudioContext();
     fn(ctx);
-    // Auto-close after 500 ms (well past any sound duration)
     setTimeout(() => void ctx.close(), 500);
   } catch {
-    // AudioContext not available (e.g. jsdom in tests) — silently skip
+    // AudioContext not available — silently skip
   }
 }
 
-/** Short noise burst — used for tile-clack on discard. */
-function synthesiseClack(ctx: AudioContext): void {
-  const dur = 0.04; // 40 ms
-  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) {
-    // Decaying white noise
-    data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 1.5;
-  }
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  // Band-pass filter to give it a woody click
-  const bp = ctx.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = 1400;
-  bp.Q.value = 1.5;
-  const gain = ctx.createGain();
-  gain.gain.value = 0.35;
-  src.connect(bp);
-  bp.connect(gain);
-  gain.connect(ctx.destination);
-  src.start();
-}
-
-/** Ascending two-note chime — used for win. */
+/** Ascending two-note chime — used for win announcement. */
 function synthesiseChime(ctx: AudioContext): void {
   const notes = [523.25, 783.99]; // C5, G5
   notes.forEach((freq, i) => {
@@ -70,12 +128,44 @@ function synthesiseChime(ctx: AudioContext): void {
   });
 }
 
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
 export function useSound() {
   const soundEnabled = useThemeStore((s) => s.soundEnabled);
 
-  const playClack = useCallback(() => {
+  const playTilePlace = useCallback(() => {
     if (!soundEnabled) return;
-    once(synthesiseClack);
+    playAudio(pickRandom(TILE_PLACE_SOUNDS));
+  }, [soundEnabled]);
+
+  const playDiceRoll = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(DICE_ROLL_SOUNDS));
+  }, [soundEnabled]);
+
+  const playPointTransfer = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(POINT_TRANSFER_SOUNDS));
+  }, [soundEnabled]);
+
+  const playShuffle = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(SHUFFLE_SOUNDS));
+  }, [soundEnabled]);
+
+  const playCallOutChow = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(CALLOUT_CHOW_SOUNDS));
+  }, [soundEnabled]);
+
+  const playCallOutPung = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(CALLOUT_PUNG_SOUNDS));
+  }, [soundEnabled]);
+
+  const playCallOutKong = useCallback(() => {
+    if (!soundEnabled) return;
+    playAudio(pickRandom(CALLOUT_KONG_SOUNDS));
   }, [soundEnabled]);
 
   const playChime = useCallback(() => {
@@ -83,5 +173,14 @@ export function useSound() {
     once(synthesiseChime);
   }, [soundEnabled]);
 
-  return { playClack, playChime };
+  return {
+    playTilePlace,
+    playDiceRoll,
+    playPointTransfer,
+    playShuffle,
+    playCallOutChow,
+    playCallOutPung,
+    playCallOutKong,
+    playChime,
+  };
 }

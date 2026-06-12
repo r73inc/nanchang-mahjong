@@ -14,7 +14,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-09  | TileWall3D needs redesign (3D)               | TileWall removed due to red Back.svg background; needs neutral replacement                                                                            |
 | BUG-045 | Bot dice roll animation not visible          | Bot roll animation and result flash by in under a frame; human roll works correctly                                                                   |
 | BUG-046 | Wildcard / kong rule violations              | Jings can upgrade an open pung to kong (revealed meld wildcard — forbidden); self-discard kong trigger suspected with wildcards in hand               |
-| IMP-024 | Gameplay sound effects (audio files)         | Dice roll, point transfer, tile discard, round start — each triggers a randomly-picked MP3 from bundled assets                                        |
 | IMP-025 | Standardise in-game popups to centered modal | Bottom-sheet popups (KongActionSheet, JingDiscardConfirmSheet, ConcedeSheet) must be replaced with the centered-dialog style used by the claim window |
 
 ---
@@ -110,32 +109,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 ---
 
 ## Open Improvements
-
-### IMP-024 · Gameplay sound effects using audio files
-
-**Current behaviour:** The `use-sound.ts` hook synthesises two effects via the Web Audio API: a synthetic clack (`playClack`) and a two-note chime (`playChime`). There are no sounds for dice rolls, point transfers, or round starts.
-
-**Desired behaviour:** Replace the synthesised sounds with randomly-picked MP3 files for four gameplay events:
-
-| Event                 | Sound pool                        | When to trigger                                                        |
-| --------------------- | --------------------------------- | ---------------------------------------------------------------------- |
-| Tile discarded        | `sounds/tilePlace/` (6 files)     | Viewer discards a tile (the discard action fires)                      |
-| Dice roll             | `sounds/diceRoll/` (3 files)      | Any `dice_roll` game event received in `use-game.ts`                   |
-| Point transfer        | `sounds/pointTransfer/` (4 files) | Any score change — hand settlement, spirit settlement, tsumo payout    |
-| Round start / shuffle | `sounds/shuffle/` (1 file)        | Each new hand begins (`new_hand` event or equivalent in `use-game.ts`) |
-
-Each trigger must pick a file at random from its pool. All sounds must respect the global `soundEnabled` flag in `ThemeStore`.
-
-**Audio file location:** Files are currently in `tempSoundsDir/` at the repo root. When implementing this improvement, move them to `apps/web/public/sounds/` (maintaining the sub-directory structure: `diceRoll/`, `pointTransfer/`, `shuffle/`, `tilePlace/`) so Vite serves them statically. The `tempSoundsDir/` directory should be deleted from the repo root after the move.
-
-**Where to look:**
-
-- `apps/web/src/hooks/use-sound.ts` — add `playTilePlace()`, `playDiceRoll()`, `playPointTransfer()`, `playShuffle()` using `new Audio(url).play()` with a random file picker. Keep `playClack` and `playChime` or replace as appropriate.
-- `apps/web/src/hooks/use-game.ts` — wire `playDiceRoll()` into the `dice_roll` event handler and `playShuffle()` into the `new_hand` / deal event handler.
-- `apps/web/src/pages/game/game-page.tsx` — wire `playTilePlace()` into the discard handler and `playPointTransfer()` into settlement / tsumo display logic.
-- `tempSoundsDir/` (repo root) — source files to move to `apps/web/public/sounds/` at implementation time.
-
----
 
 ### IMP-025 · Standardise in-game popups to centered modal style
 

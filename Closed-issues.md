@@ -6,6 +6,28 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-024-sound-effects` (2026-06-12)
+
+### IMP-024 · Gameplay sound effects using audio files
+
+**Fix:**
+
+1. **Moved audio files** from `tempSoundsDir/` (repo root) to `apps/web/public/sounds/` maintaining sub-directory structure (`diceRoll/`, `pointTransfer/`, `shuffle/`, `tilePlace/`). Vite serves them as static assets at `/sounds/…`. `tempSoundsDir/` deleted.
+
+2. **`use-sound.ts` rewritten:** Replaced the synthesised `playClack` (unused) with four MP3-based functions: `playTilePlace()` (6-file pool), `playDiceRoll()` (3-file pool), `playPointTransfer()` (4-file pool), `playShuffle()` (1-file pool). Each picks a random file and plays it via `new Audio(url).play()`. `playChime()` (synthesised, for win popup) is retained. All functions guard on `soundEnabled` from `ThemeStore`.
+
+3. **`use-game.ts`:** Added `useSound()` call; used a mutable `soundRef` so event handlers inside the stable `useEffect` always call the current callback without adding sound to the effect's dependency array. `playDiceRoll()` fires on every `dice_roll` event; `playShuffle()` fires additionally when `event.purpose === 'deal_1'` (first roll of each new hand).
+
+4. **`game-page.tsx`:** Added `useSound()` call; `discardWithSound` wraps `discard` to play `playTilePlace()` before emitting the socket event. Two `useEffect`s fire `playPointTransfer()`: one on `handReveal` changes (post-hand settlement and tsumo payouts) and one when `toast.kind === 'opening_settlement'` (spirit tile settlement).
+
+**Key learnings:**
+
+- `new Audio(url).play()` returns a Promise; always `.catch(() => {})` the result to silence browser autoplay-policy rejections silently.
+- Sound callbacks from a React hook (`useSound`) should be kept in a mutable `soundRef` when consumed inside a long-lived `useEffect` so the closure always calls the latest callback without adding the hook's returns to the effect's dependency array (which would re-register all socket listeners on every `soundEnabled` toggle).
+- `playShuffle` triggers on `wall_selection` purpose dice roll — this is the first event of every new hand and naturally represents the "round start / shuffle" moment in the game flow. (Note: `pendingRoll.purpose` uses `deal_1`/`deal_2` naming, but the broadcast `PublicGameEvent` `dice_roll.purpose` uses `wall_selection`/`deal_start`/`jing_reveal`.)
+
+---
+
 ## `feat/imp-022-profile-rework` (2026-06-12)
 
 ### IMP-022 · User profile rework — single username, profile picture, circle avatar
