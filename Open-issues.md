@@ -15,8 +15,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-042 | Opponent info blocks drift with melds | Left/right/top player name-tags shift toward centre as melds are revealed; viewer score unreadable            |
 | BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly                           |
 | BUG-046 | Wildcard / kong rule violations       | Jings can upgrade an open pung to kong (revealed meld wildcard — forbidden); visual "transformation" artefact |
-| IMP-020 | Declare-win UX redesign               | Win popup blocks hand view; no persistent button after rejection; no win-reason label; claim labels generic   |
-| IMP-021 | Claim window minimize to inspect pile | No way to temporarily hide pung/kong/chow popup to see the discard pile before deciding                       |
 | IMP-022 | User profile rework                   | Single username, profile picture with circle avatar, random tile default, account-screen upload               |
 
 ---
@@ -138,47 +136,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 ---
 
 ## Open Improvements
-
-### IMP-020 · Declare-win UX redesign
-
-**Current behaviour:** When the player's hand is eligible to win (self-draw, or from a pung/kong claim), a popup appears that blocks the entire hand view. If the player dismisses it, there is no persistent way to declare the win later without re-triggering the same blocking overlay. The popup does not state what action triggered the win opportunity (e.g. "You drew a winning tile" vs. "Win by claiming this pung"). Claim-type win buttons show generic labels rather than specifying the meld type.
-
-**Desired behaviour:**
-
-1. **Non-blocking overlay:** The declare-win prompt should not hide the player's hand. Use the same side-rail / bottom-banner interface already used for pung/kong/chow claims — the hand tiles remain visible so the player can confirm they actually want to declare.
-
-2. **Persistent win button:** If the player rejects the initial win prompt, a persistent "Declare Win" button should appear on the right side of the screen (similar to the existing Sort button) for as long as the hand remains in a winning state. Clicking it re-opens the confirm dialog. The button disappears once the hand is no longer winning (e.g. after a discard changes the state).
-
-3. **Win-reason label:** The initial prompt should display what triggered the opportunity: self-draw, from a discard, from a kong, from robbing a kong, etc.
-
-4. **Specific claim-win labels:** When the win is via a claim, the confirm button should say "Win by Chow", "Win by Pung", or "Win by Kong" rather than a generic "Declare Win".
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx` — win confirmation UI, `SideRail` claim overlay, action toast
-- `apps/web/src/hooks/use-game.ts` — `claimWindow` state, pending win actions
-- `packages/shared/src/` — `ClaimAction` types, snapshot fields related to win eligibility
-
----
-
-### IMP-021 · Claim window minimize — inspect discard pile before deciding
-
-**Current behaviour:** When the pung / kong / chow claim window appears, it covers part of the screen and there is no way to temporarily hide it to see the full discard pile before deciding whether to claim. Players must decide blind.
-
-**Desired behaviour:**
-
-- A "minimise" button (e.g. a small arrow or eye icon) on the claim popup collapses it to a slim bar or floating chip that says "Claim pending — tap to expand".
-- While minimised the player can scroll / inspect the discard pile.
-- Tapping the chip re-expands the full claim window.
-- The claim timer continues ticking while minimised.
-- The player must act (claim or pass) before the timer expires; they cannot use any other game actions (discard, kong, etc.) while a claim window is open and minimised.
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx` — `SideRail` component and claim-window overlay
-- `apps/web/src/hooks/use-game.ts` — `claimWindow` state and deadline tracking
-
----
 
 ### IMP-022 · User profile rework — single username, profile picture, circle avatar
 

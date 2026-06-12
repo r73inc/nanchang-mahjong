@@ -1199,6 +1199,7 @@ function SideRail({
   isMobile?: boolean;
 }) {
   const { t } = useI18n();
+  const [minimized, setMinimized] = useState(false);
   const secLeft = Math.max(0, Math.ceil((claimWindow.deadline - Date.now()) / 1000));
 
   type ExpandedAction =
@@ -1235,28 +1236,103 @@ function SideRail({
     chow: '#5a7d8c',
   };
 
-  const CLAIM_LABELS = {
-    win: t('gameWin'),
+  // Infer win label from co-present actions: "Win by Pung/Chow/Kong" when the
+  // win is specifically via that meld type; plain "Win" when claiming outright.
+  const winLabel = (() => {
+    const kinds = new Set(claimWindow.actions.map((a) => a.kind));
+    if (kinds.has('pung')) return t('gameWinByPung');
+    if (kinds.has('chow')) return t('gameWinByChow');
+    if (kinds.has('kong')) return t('gameWinByKong');
+    return t('gameWin');
+  })();
+
+  const CLAIM_LABELS: Record<string, string> = {
+    win: winLabel,
     pung: t('gamePung'),
     kong: t('gameKong'),
     chow: t('gameChow'),
   };
 
+  const bottomStyle = isMobile ? 'var(--mj-hand-height, 90px)' : 0;
+
+  // ── Minimized chip ────────────────────────────────────────────────────────
+  if (minimized) {
+    return (
+      <button
+        className="absolute left-0 right-0 flex items-center justify-between px-4 py-3 max-w-viewport mx-auto z-20 animate-call-prompt-enter"
+        style={{
+          bottom: bottomStyle,
+          background: 'rgba(10,10,10,0.92)',
+          backdropFilter: 'blur(12px)',
+          borderTop: '1px solid rgba(var(--felt-ink-rgb),0.12)',
+        }}
+        onClick={() => setMinimized(false)}
+        aria-label={t('claimExpand')}
+        role="dialog"
+      >
+        <div className="flex items-center gap-2">
+          {pendingDiscard && <MahjongTile2D tile={pendingDiscard} size="xs" interactive={false} />}
+          <span className="text-[11px] font-bold text-mj-bone/70">{t('gameClaimWindow')}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-mj-bone/40">
+            {t('gameClaimWindowDesc', String(secLeft))}
+          </span>
+          {/* Chevron up */}
+          <svg
+            className="w-4 h-4 text-mj-bone/40"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+          </svg>
+        </div>
+      </button>
+    );
+  }
+
+  // ── Expanded rail ─────────────────────────────────────────────────────────
   return (
     <div
       className="absolute left-0 right-0 flex flex-col items-center gap-2 px-4 pt-3 pb-4 max-w-viewport mx-auto animate-call-prompt-enter z-20"
       style={{
-        bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
+        bottom: bottomStyle,
         background: 'rgba(10,10,10,0.92)',
         backdropFilter: 'blur(12px)',
       }}
       role="dialog"
       aria-label={t('gameClaimWindow')}
     >
-      {/* Header: label + countdown */}
+      {/* Header: label + minimize button + countdown */}
       <div className="flex items-center justify-between w-full">
         <p className="text-[11px] font-bold text-mj-bone/70">{t('gameClaimWindow')}</p>
-        <p className="text-[10px] text-mj-bone/40">{t('gameClaimWindowDesc', String(secLeft))}</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMinimized(true)}
+            aria-label={t('claimMinimize')}
+            className="flex items-center justify-center w-5 h-5 rounded text-mj-bone/40 hover:text-mj-bone/70"
+            style={{ background: 'rgba(255,255,255,0.05)' }}
+          >
+            {/* Chevron down */}
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+          <p className="text-[10px] text-mj-bone/40">{t('gameClaimWindowDesc', String(secLeft))}</p>
+        </div>
       </div>
 
       {/* Prominent claimed tile with gold ring */}
@@ -2143,41 +2219,63 @@ function KongActionSheet({
   );
 }
 
-function TsumoSheet({ onDeclare, onContinue }: { onDeclare: () => void; onContinue: () => void }) {
+/**
+ * Compact bottom-bar tsumo prompt — does NOT cover the hand or 3D scene.
+ * Positioned like SideRail: above the mobile hand strip, at bottom-0 on
+ * desktop where the game canvas shows the hand in 3D perspective.
+ */
+function TsumoBar({
+  onDeclare,
+  onDismiss,
+  isMobile = false,
+}: {
+  onDeclare: () => void;
+  onDismiss: () => void;
+  isMobile?: boolean;
+}) {
   const { t } = useI18n();
   return (
     <div
-      className="absolute inset-0 z-40 flex items-end justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute left-0 right-0 flex flex-col gap-2 px-4 pt-3 pb-4 max-w-viewport mx-auto z-20 animate-call-prompt-enter"
+      style={{
+        bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
+        background: 'rgba(10,10,10,0.92)',
+        backdropFilter: 'blur(12px)',
+        borderTop: '1px solid rgba(201,169,97,0.25)',
+      }}
+      role="dialog"
+      aria-label={t('tsumoTitle')}
     >
-      <div
-        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(201,169,97,0.4)' }}
-        role="dialog"
-        aria-label={t('tsumoTitle')}
-      >
-        <div className="flex flex-col gap-1">
-          <h2 className="font-bold text-lg" style={{ color: '#c9a961' }}>
-            {t('tsumoTitle')}
-          </h2>
-          <p className="text-sm text-mj-bone/60">{t('tsumoSubtitle')}</p>
-        </div>
-        <div className="flex gap-3 mt-1">
-          <button
-            onClick={onContinue}
-            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
-          >
-            {t('tsumoContinue')}
-          </button>
-          <button
-            onClick={onDeclare}
-            className="flex-1 py-3 rounded-xl font-bold text-sm"
-            style={{ background: '#c9a961', color: '#1a1a1a' }}
-          >
-            {t('tsumoDeclare')}
-          </button>
-        </div>
+      <div className="flex items-center gap-2">
+        <p className="font-bold text-sm flex-1" style={{ color: '#c9a961' }}>
+          {t('tsumoTitle')}
+        </p>
+        <span
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+          style={{
+            background: 'rgba(201,169,97,0.15)',
+            border: '1px solid rgba(201,169,97,0.3)',
+            color: 'rgba(201,169,97,0.8)',
+          }}
+        >
+          {t('tsumoWinReason')}
+        </span>
+      </div>
+      <div className="flex gap-3">
+        <button
+          onClick={onDismiss}
+          className="flex-1 py-2.5 rounded-xl font-bold text-sm text-mj-bone/70"
+          style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
+        >
+          {t('tsumoContinue')}
+        </button>
+        <button
+          onClick={onDeclare}
+          className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+          style={{ background: '#c9a961', color: '#1a1a1a' }}
+        >
+          {t('tsumoDeclare')}
+        </button>
       </div>
     </div>
   );
@@ -2214,7 +2312,6 @@ function GameTable({
   onPass,
   onConcede,
   onDeclareTsumo,
-  onDismissTsumo,
 }: {
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
@@ -2230,7 +2327,6 @@ function GameTable({
   onPass: () => void;
   onConcede: () => void;
   onDeclareTsumo: () => void;
-  onDismissTsumo: () => void;
 }) {
   const { t } = useI18n();
   const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
@@ -2241,6 +2337,13 @@ function GameTable({
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const nextHistoryId = useRef(0);
   const prevSnapshotRef = useRef<ClientGameState | null>(null);
+
+  // tsumoSuppressed: player clicked "Keep Playing" — hide the prompt but show a
+  // persistent "Declare Win" button. Cleared automatically when canTsumo resets.
+  const [tsumoSuppressed, setTsumoSuppressed] = useState(false);
+  useEffect(() => {
+    if (!canTsumo) setTsumoSuppressed(false);
+  }, [canTsumo]);
 
   // Auto-close history when a claim window opens — the rail covers the bottom
   // half of the screen and the history panel would just be in the way.
@@ -2593,16 +2696,38 @@ function GameTable({
       {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
       {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
       {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
-      {!showConcedeSheet && !kongActionPending && !canTsumo && snapshot.viewMode !== '2D' && (
+      {/* Kept visible when canTsumo is true so the hand remains visible while  */}
+      {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
+      {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
         <ViewerHandHUD
           hand={viewerHand}
           selectedTileIdx={selectedTileIdx}
           onSelect={onSelect}
           onDiscard={handleDiscardOrKong}
-          isMyTurn={isMyTurn}
+          isMyTurn={isMyTurn && !canTsumo}
           jingTypes={jingTypes}
           pendingMove={pendingMove}
         />
+      )}
+
+      {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
+      {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
+      {/* HUD and lets them re-open the win prompt at any time before discarding.*/}
+      {canTsumo && tsumoSuppressed && isMyTurn && !showConcedeSheet && !kongActionPending && (
+        <button
+          onClick={() => setTsumoSuppressed(false)}
+          className="absolute right-2 font-bold text-sm px-3 py-2 rounded-xl animate-call-prompt-enter"
+          style={{
+            zIndex: 15,
+            bottom: 'calc(var(--mj-hand-height, 80px) + 8px)',
+            background: 'rgba(201,169,97,0.18)',
+            border: '1px solid rgba(201,169,97,0.5)',
+            color: '#c9a961',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          {t('tsumoDeclare')}
+        </button>
       )}
 
       {/* ── Accessible hand — sr-only DOM buttons for a11y + tests ─────────── */}
@@ -2678,10 +2803,21 @@ function GameTable({
         />
       )}
 
-      {/* ── Tsumo declaration sheet ─────────────────────────────────────────── */}
-      {canTsumo && isMyTurn && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-        <TsumoSheet onDeclare={onDeclareTsumo} onContinue={onDismissTsumo} />
-      )}
+      {/* ── Tsumo bar (IMP-020) ─────────────────────────────────────────────── */}
+      {/* Non-blocking compact bar — does NOT cover the hand/canvas.            */}
+      {/* Dismissed → shows persistent "Declare Win" button instead (above).    */}
+      {canTsumo &&
+        isMyTurn &&
+        !tsumoSuppressed &&
+        !showConcedeSheet &&
+        !jingDiscardPending &&
+        !kongActionPending && (
+          <TsumoBar
+            onDeclare={onDeclareTsumo}
+            onDismiss={() => setTsumoSuppressed(true)}
+            isMobile={isMobile}
+          />
+        )}
 
       {/* ── A11y live region ───────────────────────────────────────────────── */}
       <div aria-live="polite" aria-atomic="true" className="sr-only" id="game-live-region">
@@ -2787,8 +2923,6 @@ export function GamePage() {
     onDiceAnimationComplete,
     diceAnimation,
   } = useGame(gameId ?? '', spectate);
-
-  const setCanTsumo = useGameStore((s) => s.setCanTsumo);
 
   // ── Loading timeout ───────────────────────────────────────────────────────────
   // If we haven't received a game:snapshot within GAME_JOIN_TIMEOUT_MS, the
@@ -2983,7 +3117,6 @@ export function GamePage() {
             onPass={pass}
             onConcede={concede}
             onDeclareTsumo={declareTsumo}
-            onDismissTsumo={() => setCanTsumo(false)}
           />
         )}
 
