@@ -6,6 +6,19 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-025-centered-modals` (2026-06-12)
+
+### IMP-025 · Standardise in-game popups to centered modal style
+
+**Fix:** Converted all three bottom-sheet confirmation dialogs (`ConcedeSheet`, `JingDiscardConfirmSheet`, `KongActionSheet`) from bottom-anchored sheets (`flex items-end justify-center`, `rounded-t-xl`, `w-full max-w-viewport`) to centered modals (`flex items-center justify-center`, `rounded-xl`, `w-full max-w-sm mx-4`). All content and button layouts unchanged. Also fixed the minimized claim-window chip: it previously anchored to the bottom of the screen and overlapped the active player's revealed melds; it now floats in the upper-right corner (`absolute top-3 right-3`) as a compact pill, leaving the player's hand, melds, and the centre discard pile fully visible.
+
+**Key learnings:**
+
+- A bottom-sheet that the player minimizes to "see their hand" is counterproductive if the minimized state still sits at the bottom edge above the hand strip — move minimized states out of the player's direct line of sight (upper corner).
+- The three confirmation dialogs previously used `pb-8` extra bottom padding (safe-area compensation) which is no longer needed once the sheet becomes a centered modal.
+
+---
+
 ## `fix/bug-046-wildcard-kong-violations` (2026-06-12)
 
 ### BUG-046 · Wildcard / kong rule violations — jings in revealed melds and visual "tile transformation"

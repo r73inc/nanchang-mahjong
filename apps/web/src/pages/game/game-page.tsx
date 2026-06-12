@@ -1298,39 +1298,36 @@ function SideRail({
   const bottomStyle = isMobile ? 'var(--mj-hand-height, 90px)' : 0;
 
   // ── Minimized chip ────────────────────────────────────────────────────────
+  // Anchored to the upper-right so it never covers the active player's hand,
+  // melds, or the discard pile in the centre.
   if (minimized) {
     return (
       <button
-        className="absolute left-0 right-0 flex items-center justify-between px-4 py-3 max-w-viewport mx-auto z-20 animate-call-prompt-enter"
+        className="fixed top-[calc(1rem+env(safe-area-inset-top))] right-[calc(1rem+env(safe-area-inset-right))] flex items-center gap-2 px-3 py-2 rounded-xl z-20 animate-call-prompt-enter"
         style={{
-          bottom: bottomStyle,
           background: 'rgba(10,10,10,0.92)',
           backdropFilter: 'blur(12px)',
-          borderTop: '1px solid rgba(var(--felt-ink-rgb),0.12)',
+          border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
         }}
         onClick={() => setMinimized(false)}
         aria-label={t('claimExpand')}
         role="dialog"
       >
-        <div className="flex items-center gap-2">
-          {pendingDiscard && <MahjongTile2D tile={pendingDiscard} size="xs" interactive={false} />}
-          <span className="text-[11px] font-bold text-mj-bone/70">{t('gameClaimWindow')}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-mj-bone/40">
-            {t('gameClaimWindowDesc', String(secLeft))}
-          </span>
-          {/* Chevron up */}
-          <svg
-            className="w-4 h-4 text-mj-bone/40"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-          </svg>
-        </div>
+        {pendingDiscard && <MahjongTile2D tile={pendingDiscard} size="xs" interactive={false} />}
+        <span className="text-[11px] font-bold text-mj-bone/70">{t('gameClaimWindow')}</span>
+        <span className="text-[10px] text-mj-bone/40">
+          {t('gameClaimWindowDesc', String(secLeft))}
+        </span>
+        {/* Chevron down */}
+        <svg
+          className="w-3 h-3 text-mj-bone/40"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
     );
   }
@@ -1465,11 +1462,11 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   const { t } = useI18n();
   return (
     <div
-      className="absolute inset-0 z-40 flex items-end justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
     >
       <div
-        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
         style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
         role="dialog"
         aria-label={t('gameConcedeTitle')}
@@ -1510,11 +1507,11 @@ function JingDiscardConfirmSheet({
   const { t } = useI18n();
   return (
     <div
-      className="absolute inset-0 z-40 flex items-end justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
     >
       <div
-        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
         style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
         role="dialog"
         aria-label={t('jingDiscardTitle')}
@@ -2233,11 +2230,11 @@ function KongActionSheet({
   const titleKey = opt.type === 'concealed' ? 'kongActionConcealedTitle' : 'kongActionAddTitle';
   return (
     <div
-      className="absolute inset-0 z-40 flex items-end justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
     >
       <div
-        className="w-full max-w-viewport rounded-t-xl p-6 pb-8 flex flex-col gap-4"
+        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
         style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
         role="dialog"
         aria-label={t(titleKey)}
