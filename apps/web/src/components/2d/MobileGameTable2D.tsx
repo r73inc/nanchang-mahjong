@@ -134,15 +134,15 @@ function RoundWatermark() {
 }
 
 // ── MobileScoreStrip2D ───────────────────────────────────────────────────────
-// Compact one-liner showing the viewer's display name and current score.
+// Compact one-liner showing the viewer's handle and current score.
 // Floats just above the PlayerHand2D tile row, pointer-events: none so it
-// never blocks tile taps. Reads displayName from auth store (not in snapshot)
+// never blocks tile taps. Reads handle from auth store (not in snapshot)
 // and score from the game snapshot.
 
 function MobileScoreStrip2D() {
   const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
-  const displayName = useAuthStore((s) => s.user?.displayName ?? '');
+  const handle = useAuthStore((s) => s.user?.handle ?? '');
   if (!snapshot) return null;
 
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
@@ -160,7 +160,7 @@ function MobileScoreStrip2D() {
         whiteSpace: 'nowrap',
       }}
     >
-      {t(I18N_SCORE_STRIP, displayName, seat.score.toLocaleString())}
+      {t(I18N_SCORE_STRIP, handle, seat.score.toLocaleString())}
     </span>
   );
 }

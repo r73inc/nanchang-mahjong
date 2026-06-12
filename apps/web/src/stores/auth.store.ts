@@ -8,7 +8,6 @@ export type UserRole = 'user' | 'admin';
 export interface AuthUser {
   sub: string;
   handle: string;
-  displayName: string;
   role: UserRole;
 }
 
@@ -32,14 +31,12 @@ function parseUser(accessToken: string): AuthUser | null {
     const payload = decodeJwtPayload(accessToken) as {
       sub?: string;
       handle?: string;
-      displayName?: string;
       role?: UserRole;
     };
     if (!payload.sub || !payload.handle) return null;
     return {
       sub: payload.sub,
       handle: payload.handle,
-      displayName: payload.displayName ?? payload.handle,
       role: payload.role ?? 'user',
     };
   } catch {

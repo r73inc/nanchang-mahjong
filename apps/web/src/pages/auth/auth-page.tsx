@@ -108,13 +108,6 @@ function SignUpForm({ onSuccess }: { onSuccess: () => void }) {
         {...register('inviteCode')}
       />
       <FormField
-        label={t('displayName')}
-        type="text"
-        autoComplete="name"
-        error={errors.displayName}
-        {...register('displayName')}
-      />
-      <FormField
         label={t('handle')}
         type="text"
         autoComplete="username"

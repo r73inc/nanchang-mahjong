@@ -49,7 +49,6 @@ export class AuthService {
     await this.users.createProfile({
       sub,
       handle: dto.handle,
-      displayName: dto.displayName,
       role: 'user',
       passwordHash,
     });
@@ -57,7 +56,6 @@ export class AuthService {
     const user: AuthenticatedUser = {
       sub,
       handle: dto.handle.toLowerCase(),
-      displayName: dto.displayName,
       role: 'user',
     };
 
@@ -83,7 +81,6 @@ export class AuthService {
     return this.issueTokens({
       sub: profile.sub,
       handle: profile.handle,
-      displayName: profile.displayName,
       role: profile.role,
     });
   }
@@ -123,7 +120,6 @@ export class AuthService {
       {
         sub: payload.sub,
         handle: payload.handle,
-        displayName: payload.displayName,
         role: payload.role,
         type: 'access',
       },
@@ -139,7 +135,6 @@ export class AuthService {
     const base = {
       sub: user.sub,
       handle: user.handle,
-      displayName: user.displayName,
       role: user.role,
     };
     const jwtCfg = this.config.get('jwt', { infer: true });

@@ -31,7 +31,7 @@ function makeSocket(overrides: Partial<FakeSocket['data']> = {}): FakeSocket {
   return {
     id: `socket-${Math.random().toString(36).slice(2)}`,
     data: {
-      user: { sub: 'u1', handle: 'player1', displayName: 'P1', role: 'user' },
+      user: { sub: 'u1', handle: 'player1', role: 'user' },
       ...overrides,
     },
     emit: jest.fn(),

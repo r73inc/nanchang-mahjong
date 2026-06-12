@@ -49,7 +49,6 @@ interface RoomSeatItem {
   seatIdx: number;
   userId: string;
   handle: string;
-  displayName: string;
   ready: boolean;
   joinedAt: string;
   isBot?: boolean;
@@ -83,30 +82,39 @@ export class RoomsService {
     return Math.floor(Date.now() / 1000) + this.ROOM_TTL_SECONDS;
   }
 
-  private assembleRoom(meta: RoomMetaItem, seatItems: RoomSeatItem[]): RoomState {
-    const seats: RoomSeat[] = [0, 1, 2, 3].map((idx) => {
-      const s = seatItems.find((si) => si.seatIdx === idx);
-      if (!s) {
+  private async assembleRoom(meta: RoomMetaItem, seatItems: RoomSeatItem[]): Promise<RoomState> {
+    const seats: RoomSeat[] = await Promise.all(
+      [0, 1, 2, 3].map(async (idx) => {
+        const s = seatItems.find((si) => si.seatIdx === idx);
+        if (!s) {
+          return { seatIdx: idx, userId: null, handle: null, ready: false, isHost: false };
+        }
+
+        // Resolve avatar: check if an avatarKey is stored, then return the API proxy path.
+        // The proxy endpoint streams bytes from S3 server-side so the browser never touches MinIO.
+        let avatarUrl: string | null = null;
+        if (!s.isBot) {
+          try {
+            const profileRes = await this.db.get({ Key: DK.userProfile(s.userId) });
+            const avatarKey = profileRes?.Item?.avatarKey as string | undefined;
+            if (avatarKey) avatarUrl = `/users/${s.userId}/avatar`;
+          } catch {
+            // non-fatal
+          }
+        }
+
         return {
           seatIdx: idx,
-          userId: null,
-          handle: null,
-          displayName: null,
-          ready: false,
-          isHost: false,
+          userId: s.userId,
+          handle: s.handle,
+          ready: s.ready,
+          isHost: s.userId === meta.hostUserId,
+          isBot: s.isBot,
+          botDifficulty: s.botDifficulty,
+          avatarUrl,
         };
-      }
-      return {
-        seatIdx: idx,
-        userId: s.userId,
-        handle: s.handle,
-        displayName: s.displayName,
-        ready: s.ready,
-        isHost: s.userId === meta.hostUserId,
-        isBot: s.isBot,
-        botDifficulty: s.botDifficulty,
-      };
-    });
+      }),
+    );
 
     return {
       roomId: meta.roomId,
@@ -135,7 +143,7 @@ export class RoomsService {
       (i) => typeof i.SK === 'string' && i.SK.startsWith('SEAT#'),
     ) as RoomSeatItem[];
 
-    return this.assembleRoom(meta, seatItems);
+    return await this.assembleRoom(meta, seatItems);
   }
 
   /** Refresh the room TTL in META (call after any player activity). */
@@ -153,12 +161,7 @@ export class RoomsService {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
-  async createRoom(
-    hostUserId: string,
-    handle: string,
-    displayName: string,
-    dto?: CreateRoomDto,
-  ): Promise<RoomState> {
+  async createRoom(hostUserId: string, handle: string, dto?: CreateRoomDto): Promise<RoomState> {
     const roomId = randomUUID();
     const code = this.generateCode();
     const now = new Date().toISOString();
@@ -182,7 +185,6 @@ export class RoomsService {
     const botSeatPuts = Array.from({ length: botCount }, (_, i) => {
       const seatIdx = 3 - i; // seats 3, 2, 1 for bots 1, 2, 3
       const botNumber = i + 1;
-      const diffLabel = botDifficulty === 'easy' ? 'Easy' : 'Normal';
       return {
         Put: {
           TableName: this.db.tableName,
@@ -192,7 +194,6 @@ export class RoomsService {
             seatIdx,
             userId: `bot-${botDifficulty}-${seatIdx}`,
             handle: `Bot ${botNumber}`,
-            displayName: `Bot ${botNumber} (${diffLabel})`,
             ready: true,
             joinedAt: now,
             isBot: true,
@@ -233,7 +234,6 @@ export class RoomsService {
               seatIdx: 0,
               userId: hostUserId,
               handle,
-              displayName,
               ready: false,
               joinedAt: now,
             },
@@ -269,12 +269,7 @@ export class RoomsService {
     return this.queryRoom(meta.roomId);
   }
 
-  async joinRoom(
-    code: string,
-    userId: string,
-    handle: string,
-    displayName: string,
-  ): Promise<RoomState> {
+  async joinRoom(code: string, userId: string, handle: string): Promise<RoomState> {
     const room = await this.getRoomByCode(code);
     if (!room) throw new NotFoundException('Room not found');
     if (room.status !== 'waiting')
@@ -304,7 +299,6 @@ export class RoomsService {
               seatIdx: emptySeat.seatIdx,
               userId,
               handle,
-              displayName,
               ready: false,
               joinedAt: now,
             },
@@ -448,7 +442,6 @@ export class RoomsService {
     if (seat.userId !== null) throw new ConflictException('Seat is already occupied');
 
     const now = new Date().toISOString();
-    const diffLabel = difficulty === 'easy' ? 'Easy' : 'Normal';
 
     await this.db.transactWrite({
       TransactItems: [
@@ -461,7 +454,6 @@ export class RoomsService {
               seatIdx,
               userId: `bot-${difficulty}-${seatIdx}`,
               handle: `Bot ${seatIdx}`,
-              displayName: `Bot ${seatIdx} (${diffLabel})`,
               ready: true,
               joinedAt: now,
               isBot: true,

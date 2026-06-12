@@ -8,7 +8,6 @@ export type FriendStatus = 'pending_sent' | 'pending_received' | 'accepted';
 export interface FriendWithProfile {
   friendSub: string;
   handle: string;
-  displayName: string;
   status: FriendStatus;
   createdAt: string;
   updatedAt: string;
@@ -17,7 +16,6 @@ export interface FriendWithProfile {
 export interface SearchResult {
   sub: string;
   handle: string;
-  displayName: string;
   friendStatus: FriendStatus | null;
 }
 

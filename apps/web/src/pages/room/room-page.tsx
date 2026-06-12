@@ -9,6 +9,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
+import { AvatarImg } from '../../components/ui/avatar-img';
 import { useI18n } from '../../i18n';
 import { useRoomStore } from '../../stores/room.store';
 import { useRoomActions, useRoomSubscription } from '../../hooks/use-room';
@@ -271,22 +272,30 @@ export function RoomPage() {
                       : '1px solid rgba(var(--felt-ink-rgb),0.1)',
                   }}
                 >
-                  {/* Wind badge */}
-                  <div
-                    className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"
-                    style={{
-                      background: isEmpty
-                        ? 'rgba(var(--felt-ink-rgb),0.04)'
-                        : 'rgba(201,169,97,0.2)',
-                      border: isEmpty
-                        ? '1px dashed rgba(var(--felt-ink-rgb),0.15)'
-                        : '1px solid rgba(201,169,97,0.4)',
-                      color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#c9a961',
-                    }}
-                    aria-hidden="true"
-                  >
-                    {WIND_SYMBOLS[seat.seatIdx]}
-                  </div>
+                  {/* Avatar circle (human) or wind badge (empty / bot) */}
+                  {!isEmpty && !seat.isBot ? (
+                    <AvatarImg
+                      avatarUrl={seat.avatarUrl}
+                      seed={seat.userId ?? seat.handle ?? ''}
+                      size={36}
+                    />
+                  ) : (
+                    <div
+                      className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"
+                      style={{
+                        background: isEmpty
+                          ? 'rgba(var(--felt-ink-rgb),0.04)'
+                          : 'rgba(90,125,140,0.2)',
+                        border: isEmpty
+                          ? '1px dashed rgba(var(--felt-ink-rgb),0.15)'
+                          : '1px solid rgba(90,125,140,0.4)',
+                        color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#7ab5cc',
+                      }}
+                      aria-hidden="true"
+                    >
+                      {WIND_SYMBOLS[seat.seatIdx]}
+                    </div>
+                  )}
 
                   {/* Name / status */}
                   <div className="flex-1 min-w-0">
@@ -294,11 +303,7 @@ export function RoomPage() {
                       <p className="text-sm font-semibold text-mj-bone truncate">
                         {isEmpty
                           ? t('waiting')
-                          : [
-                              seat.displayName,
-                              isMe && t('youSuffix'),
-                              seat.isHost && t('hostBadge'),
-                            ]
+                          : [seat.handle, isMe && t('youSuffix'), seat.isHost && t('hostBadge')]
                               .filter(Boolean)
                               .join(' ')}
                       </p>
@@ -400,7 +405,7 @@ export function RoomPage() {
                       onClick={() => handleKick(seat.seatIdx)}
                       className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
                       style={{ background: 'rgba(192,57,43,0.12)' }}
-                      aria-label={`Kick ${seat.displayName ?? ''}`}
+                      aria-label={`Kick ${seat.handle ?? ''}`}
                     >
                       {t('kickPlayerBtn')}
                     </button>

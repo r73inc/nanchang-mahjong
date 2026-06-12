@@ -16,7 +16,6 @@ export interface InviteRecord {
 export interface AdminUser {
   sub: string;
   handle: string;
-  displayName: string;
   role: 'user' | 'admin';
   disabled: boolean;
   createdAt: string;

@@ -4,6 +4,7 @@ import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify
 import { ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import fastifyMultipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { WsAuthAdapter } from './common/adapters/ws-auth.adapter';
 import type { AppConfig } from './config/configuration';
@@ -15,6 +16,12 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter({ logger: !isTest }),
   );
+
+  // Enable multipart/form-data parsing for file uploads (avatar endpoint).
+  // Type cast needed: pnpm deduplication leaves two Fastify versions in the graph,
+  // causing a structural mismatch on FastifyInstance — runtime behaviour is identical.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await app.register(fastifyMultipart as any, { limits: { fileSize: 2_097_152 } });
 
   // Strip unknown fields and coerce primitives before they reach controllers.
   app.useGlobalPipes(

@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import { useSignout } from '../../hooks/use-auth';
+import { useMyProfile } from '../../hooks/use-profile';
 import { ScreenShell } from '../../components/ui/screen-shell';
+import { AvatarImg } from '../../components/ui/avatar-img';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
@@ -19,6 +21,7 @@ export function HomeStubPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const signout = useSignout();
+  const { data: profile } = useMyProfile();
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
     usePushNotifications();
 
@@ -26,10 +29,23 @@ export function HomeStubPage() {
     <ScreenShell title={t('homeTitle')}>
       <div className="px-5 py-6">
         {/* Welcome banner */}
-        <div className="mb-8">
-          <p className="text-sm text-mj-bone/60 mb-0.5">{t('welcomeBack')}</p>
-          <h2 className="text-2xl font-bold text-mj-bone">{user?.displayName ?? '—'}</h2>
-          <p className="text-sm text-mj-bone/50 mt-0.5">@{user?.handle}</p>
+        <div className="mb-8 flex items-center gap-3">
+          {/* Avatar circle — links to profile page for easy upload */}
+          <button
+            onClick={() => navigate('/profile')}
+            aria-label={t('profileLink')}
+            className="rounded-full flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-mj-gold/50"
+          >
+            <AvatarImg
+              avatarUrl={profile?.avatarUrl}
+              seed={user?.sub ?? user?.handle ?? ''}
+              size={56}
+            />
+          </button>
+          <div>
+            <p className="text-sm text-mj-bone/60">{t('welcomeBack')}</p>
+            <h2 className="text-2xl font-bold text-mj-bone">@{user?.handle ?? '—'}</h2>
+          </div>
           {user?.role === 'admin' && (
             <span
               className="inline-block mt-2 px-2.5 py-0.5 rounded-md text-[11px] font-bold

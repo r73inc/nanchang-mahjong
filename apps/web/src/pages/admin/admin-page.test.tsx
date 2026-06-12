@@ -50,7 +50,6 @@ const mockUseSetDisabled = vi.mocked(useSetDisabled);
 const adminUser = {
   sub: 'admin-sub',
   handle: 'admin',
-  displayName: 'Admin',
   role: 'admin' as const,
 };
 
@@ -65,7 +64,6 @@ const sampleInvite: InviteRecord = {
 const sampleUser: AdminUser = {
   sub: 'user-sub',
   handle: 'alice',
-  displayName: 'Alice',
   role: 'user',
   disabled: false,
   createdAt: '2024-01-01T00:00:00.000Z',
@@ -211,7 +209,6 @@ describe('AdminPage — Users', () => {
 
   it('renders the user list', () => {
     renderAdminPage();
-    expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('@alice')).toBeInTheDocument();
     expect(screen.getByText('User')).toBeInTheDocument();
   });

@@ -291,8 +291,7 @@ function UserRow({
   return (
     <li className="rounded-[12px] px-3 py-3 space-y-1.5" style={rowStyle}>
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold text-mj-bone">{user.displayName}</span>
-        <span className="text-[11px] text-mj-bone/45">@{user.handle}</span>
+        <span className="text-sm font-semibold text-mj-bone">@{user.handle}</span>
 
         {/* Role badge */}
         <span

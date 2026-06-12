@@ -25,6 +25,7 @@ export const configuration = () => ({
 
   s3: {
     replayBucket: process.env.S3_REPLAY_BUCKET ?? 'nanchang-replays',
+    avatarBucket: process.env.S3_AVATAR_BUCKET ?? 'nanchang-avatars',
   },
 
   rateLimit: {

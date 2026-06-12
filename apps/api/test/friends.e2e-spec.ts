@@ -329,15 +329,14 @@ describe('Friends & Profile (e2e)', () => {
   });
 
   describe('Profile·update-handle', () => {
-    it('updates displayName', async () => {
+    it('returns 200 with current profile when no fields changed', async () => {
       const res = await app.inject({
         method: 'PATCH',
         url: '/users/me',
         headers: { authorization: `Bearer ${aliceToken}` },
-        payload: { displayName: 'Alice Updated' },
+        payload: {},
       });
       expect(res.statusCode).toBe(200);
-      expect(res.json<{ displayName: string }>().displayName).toBe('Alice Updated');
     });
 
     it('rejects a handle already taken by another user', async () => {

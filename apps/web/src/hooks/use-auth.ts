@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, getApiErrorMessage } from '../lib/api';
 import { useAuthStore } from '../stores/auth.store';
@@ -36,7 +36,9 @@ export function useSignin() {
 export function useSignout() {
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const navigate = useNavigate();
+  const qc = useQueryClient();
   return () => {
+    qc.clear();
     clearAuth();
     navigate('/auth', { replace: true });
   };

@@ -20,7 +20,6 @@ export interface FriendEdge {
 
 export interface FriendWithProfile extends FriendEdge {
   handle: string;
-  displayName: string;
 }
 
 @Injectable()
@@ -70,7 +69,6 @@ export class FriendsService {
     return edges.map((edge, i) => ({
       ...edge,
       handle: profiles[i]?.handle ?? '',
-      displayName: profiles[i]?.displayName ?? '',
     }));
   }
 

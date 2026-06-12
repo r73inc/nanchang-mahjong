@@ -33,10 +33,10 @@ const SAMPLE_ROOM: RoomState = {
   hostUserId: 'u1',
   status: 'waiting',
   seats: [
-    { seatIdx: 0, userId: 'u1', handle: 'h1', displayName: 'P1', ready: false, isHost: true },
-    { seatIdx: 1, userId: null, handle: null, displayName: null, ready: false, isHost: false },
-    { seatIdx: 2, userId: null, handle: null, displayName: null, ready: false, isHost: false },
-    { seatIdx: 3, userId: null, handle: null, displayName: null, ready: false, isHost: false },
+    { seatIdx: 0, userId: 'u1', handle: 'h1', ready: false, isHost: true },
+    { seatIdx: 1, userId: null, handle: null, ready: false, isHost: false },
+    { seatIdx: 2, userId: null, handle: null, ready: false, isHost: false },
+    { seatIdx: 3, userId: null, handle: null, ready: false, isHost: false },
   ],
   settings: {
     rounds: 'east+south',

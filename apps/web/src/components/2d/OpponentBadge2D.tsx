@@ -88,6 +88,25 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
           minWidth: 44,
         }}
       >
+        {/* Avatar circle (shown when player has one) */}
+        {seat.avatarUrl && (
+          <img
+            src={seat.avatarUrl}
+            alt=""
+            aria-hidden="true"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: `1px solid ${windColor}`,
+            }}
+          />
+        )}
+
         {/* Wind dot + character row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           {/* Wind colour dot */}

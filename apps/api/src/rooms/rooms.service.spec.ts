@@ -65,7 +65,6 @@ function buildRoomItems(overrides: Record<string, unknown> = {}) {
     seatIdx: 0,
     userId: 'user-host',
     handle: 'hosthandle',
-    displayName: 'Host',
     ready: false,
     joinedAt: '2024-01-01T00:00:00.000Z',
   };
@@ -83,7 +82,6 @@ function buildFullReadyRoom(roomId = 'room-full') {
     seatIdx: idx,
     userId: `user-${idx}`,
     handle: `handle${idx}`,
-    displayName: `Player ${idx}`,
     ready: true,
     joinedAt: '2024-01-01T00:00:00.000Z',
   }));
@@ -114,7 +112,7 @@ describe('RoomsService', () => {
     it('writes META + SEAT#0 in a transaction', async () => {
       db.query.mockResolvedValue({ Items: buildRoomItems().items });
 
-      await service.createRoom('user-host', 'hosthandle', 'Host');
+      await service.createRoom('user-host', 'hosthandle');
 
       expect(db.transactWrite).toHaveBeenCalledTimes(1);
       const { TransactItems } = txInput(db);
@@ -129,7 +127,7 @@ describe('RoomsService', () => {
     it('returns a RoomState with the host in seat 0', async () => {
       db.query.mockResolvedValue({ Items: buildRoomItems().items });
 
-      const room = await service.createRoom('user-host', 'hosthandle', 'Host');
+      const room = await service.createRoom('user-host', 'hosthandle');
 
       expect(room.seats[0].userId).toBe('user-host');
       expect(room.seats[0].isHost).toBe(true);
@@ -140,7 +138,7 @@ describe('RoomsService', () => {
     it('generates a XX-XXXX room code', async () => {
       db.query.mockResolvedValue({ Items: buildRoomItems().items });
 
-      await service.createRoom('user-host', 'h', 'H');
+      await service.createRoom('user-host', 'h');
 
       const { TransactItems } = txInput(db);
       const meta = (TransactItems![0] as { Put: { Item: Record<string, unknown> } }).Put.Item;
@@ -150,7 +148,7 @@ describe('RoomsService', () => {
     it('merges provided settings', async () => {
       db.query.mockResolvedValue({ Items: buildRoomItems().items });
 
-      await service.createRoom('user-host', 'h', 'H', {
+      await service.createRoom('user-host', 'h', {
         settings: { timerSecs: 15, rounds: undefined, minFan: undefined },
       });
 
@@ -195,7 +193,7 @@ describe('RoomsService', () => {
         .mockResolvedValueOnce({ Items: items })
         .mockResolvedValue({ Items: items });
 
-      await service.joinRoom('AB-1234', 'user-2', 'h2', 'Player 2');
+      await service.joinRoom('AB-1234', 'user-2', 'h2');
 
       expect(db.transactWrite).toHaveBeenCalled();
       const { TransactItems } = txInput(db);
@@ -212,7 +210,6 @@ describe('RoomsService', () => {
         seatIdx: n,
         userId: `user-${n}`,
         handle: `h${n}`,
-        displayName: `P${n}`,
         ready: false,
         joinedAt: '2024-01-01T00:00:00.000Z',
       }));
@@ -221,23 +218,21 @@ describe('RoomsService', () => {
         .mockResolvedValueOnce({ Items: [meta, ...fullSeats] })
         .mockResolvedValue({ Items: [meta, ...fullSeats] });
 
-      await expect(service.joinRoom('AB-1234', 'user-5', 'h5', 'P5')).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.joinRoom('AB-1234', 'user-5', 'h5')).rejects.toThrow(ConflictException);
     });
 
     it('is idempotent when player is already seated', async () => {
       const { meta, items } = buildRoomItems();
       db.query.mockResolvedValueOnce({ Items: [meta] }).mockResolvedValue({ Items: items });
 
-      const room = await service.joinRoom('AB-1234', 'user-host', 'hosthandle', 'Host');
+      const room = await service.joinRoom('AB-1234', 'user-host', 'hosthandle');
       expect(db.transactWrite).not.toHaveBeenCalled();
       expect(room.seats[0].userId).toBe('user-host');
     });
 
     it('throws NotFoundException for unknown code', async () => {
       db.query.mockResolvedValue({ Items: [] });
-      await expect(service.joinRoom('ZZ-9999', 'u', 'h', 'd')).rejects.toThrow(NotFoundException);
+      await expect(service.joinRoom('ZZ-9999', 'u', 'h')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -276,7 +271,6 @@ describe('RoomsService', () => {
         seatIdx: 1,
         userId: 'user-2',
         handle: 'h2',
-        displayName: 'P2',
         ready: false,
         joinedAt: '2024-01-01T00:00:00.000Z',
       };
@@ -326,7 +320,6 @@ describe('RoomsService', () => {
         seatIdx: 1,
         userId: 'user-2',
         handle: 'h2',
-        displayName: 'P2',
         ready: false,
         joinedAt: '2024-01-01T00:00:00.000Z',
       };
@@ -392,7 +385,7 @@ describe('RoomsService', () => {
     it('writes a ttl attribute on create', async () => {
       db.query.mockResolvedValue({ Items: buildRoomItems().items });
 
-      await service.createRoom('u', 'h', 'd');
+      await service.createRoom('u', 'h');
 
       const { TransactItems } = txInput(db);
       const meta = (TransactItems![0] as { Put: { Item: Record<string, unknown> } }).Put.Item;

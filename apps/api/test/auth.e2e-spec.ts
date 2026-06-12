@@ -152,7 +152,6 @@ describe('Auth (e2e)', () => {
     const validBody = {
       password: 'Password1',
       handle: 'bob',
-      displayName: 'Bob',
       inviteCode: 'TESTABC1',
     };
 
@@ -217,7 +216,6 @@ describe('Auth (e2e)', () => {
               SK: 'PROFILE',
               sub: 'sub-bob',
               handle: 'bob',
-              displayName: 'Bob',
               role: 'user',
               disabled: false,
               passwordHash: hash,

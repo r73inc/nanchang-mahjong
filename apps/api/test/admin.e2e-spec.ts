@@ -30,7 +30,6 @@ function makeToken(
   payload: {
     sub: string;
     handle: string;
-    displayName: string;
     role: 'user' | 'admin';
   },
 ): string {
@@ -61,7 +60,6 @@ function buildDdbStub() {
     SK: 'PROFILE',
     sub: 'admin-sub',
     handle: 'admin',
-    displayName: 'Admin',
     role: 'admin',
     disabled: false,
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -74,7 +72,6 @@ function buildDdbStub() {
     SK: 'PROFILE',
     sub: 'user-sub',
     handle: 'alice',
-    displayName: 'Alice',
     role: 'user',
     disabled: false,
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -228,13 +225,11 @@ describe('Admin (e2e)', () => {
     adminToken = makeToken(jwtService, {
       sub: 'admin-sub',
       handle: 'admin',
-      displayName: 'Admin',
       role: 'admin',
     });
     userToken = makeToken(jwtService, {
       sub: 'user-sub',
       handle: 'alice',
-      displayName: 'Alice',
       role: 'user',
     });
   });
@@ -374,7 +369,6 @@ describe('Admin (e2e)', () => {
         payload: {
           password: 'Password1',
           handle: 'newuser',
-          displayName: 'New User',
           inviteCode: 'ACTIVE01',
         },
       });

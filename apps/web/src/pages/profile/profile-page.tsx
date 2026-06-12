@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { Spinner } from '../../components/ui/spinner';
 import { useI18n } from '../../i18n';
-import { useMyProfile, useUpdateProfile } from '../../hooks/use-profile';
-import { getApiErrorMessage } from '../../lib/api';
+import { useMyProfile, useUpdateProfile, useUploadAvatar } from '../../hooks/use-profile';
+import { seededTile } from '../../components/ui/avatar-img';
+import { getApiErrorMessage, API_BASE } from '../../lib/api';
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
@@ -26,21 +27,101 @@ function StatTile({ label, value }: { label: string; value: number }) {
   );
 }
 
+// ── Avatar circle ─────────────────────────────────────────────────────────────
+
+function AvatarCircle({
+  avatarUrl,
+  sub,
+  handle,
+  onUpload,
+  uploading,
+}: {
+  avatarUrl?: string | null;
+  sub: string;
+  handle: string;
+  onUpload: (file: File) => void;
+  uploading: boolean;
+}) {
+  const { t } = useI18n();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imgError, setImgError] = useState(false);
+  const tile = seededTile(sub);
+  const resolvedUrl = avatarUrl?.startsWith('/') ? `${API_BASE}${avatarUrl}` : avatarUrl;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading}
+        className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center
+                   select-none relative"
+        style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
+        aria-label={t('profileUploadPhoto')}
+      >
+        {resolvedUrl && !imgError ? (
+          <img
+            src={resolvedUrl}
+            alt={handle}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <img
+            src={`/textures/Tiles/Regular/${tile}.svg`}
+            alt=""
+            className="w-[88%] h-[88%] object-contain"
+            draggable={false}
+          />
+        )}
+        {/* Upload chip — always visible to signal interactivity */}
+        {!uploading && (
+          <div className="absolute inset-0 flex items-end justify-center pb-2" aria-hidden="true">
+            <span
+              className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
+            >
+              {t('profileUploadPhoto')}
+            </span>
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <Spinner />
+          </div>
+        )}
+      </button>
+      <p className="text-[11px] text-mj-bone/45 text-center">{t('profileUploadHint')}</p>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) {
+            setImgError(false);
+            onUpload(f);
+          }
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}
+
 // ── Edit form ─────────────────────────────────────────────────────────────────
 
 function EditForm({
-  initialDisplayName,
   initialHandle,
   onSave,
   onCancel,
 }: {
-  initialDisplayName: string;
   initialHandle: string;
-  onSave: (displayName: string, handle: string) => Promise<void>;
+  onSave: (handle: string) => Promise<void>;
   onCancel: () => void;
 }) {
   const { t } = useI18n();
-  const [displayName, setDisplayName] = useState(initialDisplayName);
   const [handle, setHandle] = useState(initialHandle);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,7 +131,7 @@ function EditForm({
     setError('');
     setSaving(true);
     try {
-      await onSave(displayName.trim(), handle.trim().toLowerCase());
+      await onSave(handle.trim().toLowerCase());
     } catch (err) {
       setError(getApiErrorMessage(err, t('error')));
     } finally {
@@ -60,21 +141,6 @@ function EditForm({
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
-      <div>
-        <label className="block text-[11px] font-semibold uppercase tracking-wider text-mj-bone/60 mb-1.5">
-          {t('displayName')}
-        </label>
-        <input
-          type="text"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          maxLength={50}
-          required
-          className="w-full px-3 py-2.5 rounded-[10px] text-sm text-mj-bone bg-mj-bone/[0.07]
-                     border border-mj-bone/15 focus:border-mj-gold/50 outline-none"
-        />
-      </div>
-
       <div>
         <label className="block text-[11px] font-semibold uppercase tracking-wider text-mj-bone/60 mb-1.5">
           {t('handle')}
@@ -136,15 +202,27 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { data: profile, isLoading } = useMyProfile();
   const updateProfile = useUpdateProfile();
+  const uploadAvatar = useUploadAvatar();
 
   const [editing, setEditing] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  const handleSave = async (displayName: string, handle: string) => {
-    await updateProfile.mutateAsync({ displayName, handle });
+  const handleSave = async (handle: string) => {
+    await updateProfile.mutateAsync({ handle });
     setEditing(false);
     setSuccessMsg(t('profileUpdated'));
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    try {
+      await uploadAvatar.mutateAsync(file);
+      setSuccessMsg(t('profilePhotoUpdated'));
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      setSuccessMsg(getApiErrorMessage(err, t('error')));
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
   };
 
   return (
@@ -158,18 +236,15 @@ export function ProfilePage() {
           <>
             {/* Avatar + name block */}
             <div className="flex flex-col items-center gap-3 pt-2">
-              {/* Initials avatar */}
-              <div
-                className="w-20 h-20 rounded-full flex items-center justify-center text-2xl
-                           font-bold text-mj-slate select-none"
-                style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
-                aria-hidden="true"
-              >
-                {profile.displayName.charAt(0).toUpperCase()}
-              </div>
+              <AvatarCircle
+                avatarUrl={profile.avatarUrl}
+                sub={profile.sub}
+                handle={profile.handle}
+                onUpload={(f) => void handleAvatarUpload(f)}
+                uploading={uploadAvatar.isPending}
+              />
               <div className="text-center">
-                <p className="text-xl font-bold text-mj-bone">{profile.displayName}</p>
-                <p className="text-sm text-mj-bone/45 mt-0.5">@{profile.handle}</p>
+                <p className="text-xl font-bold text-mj-bone">@{profile.handle}</p>
               </div>
             </div>
 
@@ -192,7 +267,6 @@ export function ProfilePage() {
             <div className="rounded-[14px] px-4 py-4" style={cardStyle}>
               {editing ? (
                 <EditForm
-                  initialDisplayName={profile.displayName}
                   initialHandle={profile.handle}
                   onSave={handleSave}
                   onCancel={() => setEditing(false)}

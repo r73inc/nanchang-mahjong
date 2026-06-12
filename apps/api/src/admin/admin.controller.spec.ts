@@ -12,7 +12,6 @@ import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.
 const adminUser: AuthenticatedUser = {
   sub: 'admin-sub',
   handle: 'admin',
-  displayName: 'Admin',
   role: 'admin',
 };
 
@@ -27,7 +26,6 @@ const sampleInvite = {
 const sampleUser = {
   sub: 'user-sub',
   handle: 'alice',
-  displayName: 'Alice',
   role: 'user' as const,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

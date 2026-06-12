@@ -7,15 +7,10 @@ export class SignupDto {
   password!: string;
 
   @IsString()
-  @MinLength(1)
-  @MaxLength(50)
-  displayName!: string;
-
-  @IsString()
   @MinLength(2)
   @MaxLength(30)
   @Matches(/^[a-zA-Z0-9_-]+$/, {
-    message: 'Handle can only contain letters, numbers, underscores and hyphens',
+    message: 'Username can only contain letters, numbers, underscores and hyphens',
   })
   handle!: string;
 

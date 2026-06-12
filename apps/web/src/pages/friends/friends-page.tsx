@@ -67,8 +67,7 @@ function SearchRow({ result }: { result: SearchResult }) {
   return (
     <li className="rounded-[12px] px-3 py-3 flex items-center gap-2" style={rowStyle}>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-mj-bone truncate">{result.displayName}</p>
-        <p className="text-[11px] text-mj-bone/45">@{result.handle}</p>
+        <p className="text-sm font-semibold text-mj-bone truncate">@{result.handle}</p>
       </div>
 
       {/* Action buttons based on friendship status */}
@@ -128,8 +127,7 @@ function FriendRow({ friend }: { friend: FriendWithProfile }) {
     <li className="rounded-[12px] px-3 py-3 flex items-center gap-2" style={rowStyle}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="text-sm font-semibold text-mj-bone">{friend.displayName}</p>
-          <p className="text-[11px] text-mj-bone/45">@{friend.handle}</p>
+          <p className="text-sm font-semibold text-mj-bone">@{friend.handle}</p>
           <StatusBadge status={friend.status} />
         </div>
       </div>

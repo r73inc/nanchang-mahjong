@@ -129,6 +129,7 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
         'hands',
         undefined,
         undefined,
+        undefined,
         { purpose: 'jing_reveal', roller: 0 },
       );
       expect(snap.pendingRoll).toEqual({ purpose: 'jing_reveal', roller: 0 });

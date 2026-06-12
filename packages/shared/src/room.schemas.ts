@@ -65,13 +65,14 @@ export interface RoomSeat {
   seatIdx: number;
   userId: string | null;
   handle: string | null;
-  displayName: string | null;
   ready: boolean;
   isHost: boolean;
   /** True when this seat is occupied by a bot rather than a human player. */
   isBot?: boolean;
   /** Difficulty of the bot occupying this seat (only set when isBot is true). */
   botDifficulty?: BotDifficulty;
+  /** Pre-signed avatar URL, null if the player has no photo. */
+  avatarUrl?: string | null;
 }
 
 export interface RoomState {

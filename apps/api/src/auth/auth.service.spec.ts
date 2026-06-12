@@ -54,14 +54,12 @@ const HASH = '$2b$12$testhashfortesting1234567890123456789012345678901234'; // f
 const signupDto = {
   password: 'Password1',
   handle: 'alice',
-  displayName: 'Alice',
   inviteCode: 'INVITE01',
 };
 
 const userProfile = {
   sub: 'sub-123',
   handle: 'alice',
-  displayName: 'Alice',
   role: 'user' as const,
   createdAt: '2025-01-01T00:00:00.000Z',
   updatedAt: '2025-01-01T00:00:00.000Z',
@@ -204,7 +202,6 @@ describe('AuthService', () => {
       mockJwt.verify.mockReturnValue({
         sub: 'sub-123',
         handle: 'alice',
-        displayName: 'Alice',
         role: 'user',
         type: 'refresh',
       });
