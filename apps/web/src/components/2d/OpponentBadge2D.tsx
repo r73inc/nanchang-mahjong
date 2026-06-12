@@ -64,7 +64,11 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
       style={{
         display: 'flex',
         flexDirection: position === 'top' ? 'row' : 'column',
-        alignItems: 'center',
+        // 'center' works for 'top' (melds extend to one side in a row).
+        // For 'left'/'right' we must pin the badge pill to the screen edge:
+        // 'center' would shift the pill inward when melds grow wider than the pill.
+        alignItems:
+          position === 'left' ? 'flex-start' : position === 'right' ? 'flex-end' : 'center',
         gap: 4,
       }}
     >

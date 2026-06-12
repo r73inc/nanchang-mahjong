@@ -25,7 +25,6 @@ import { DiscardContext } from './DiscardContext';
 import { Table2DScaleContext, computeTileScale } from './Table2DContext';
 import { seatConfig } from './layout-2d';
 import { FeltSurface2D } from './FeltSurface2D';
-import { SeatLabel2D } from './SeatLabel2D';
 import { OpponentHand2D } from './OpponentHand2D';
 import { CenterDiscards2D } from './CenterDiscards2D';
 import { OpenMelds2D } from './OpenMelds2D';
@@ -144,25 +143,15 @@ export function DesktopGameTable2D({ onDiscard }: DesktopGameTable2DProps) {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: 'center',
                     padding: '4px 2px',
                     transform: cfg.containerTransform,
                     position: 'relative',
                     zIndex: 1,
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
-                    <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
-                  </div>
-                  <SeatLabel2D seatIdx={seatIdx} />
+                  <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
+                  <OpponentHand2D seatIdx={seatIdx} role={cfg.role} />
                 </div>
               );
             })}

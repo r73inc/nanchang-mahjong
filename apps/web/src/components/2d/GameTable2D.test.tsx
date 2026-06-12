@@ -110,14 +110,15 @@ describe('GameTable2D Â· 2DBoardÂ·smoke', () => {
 describe('GameTable2D Â· 2DBoardÂ·zones', () => {
   beforeEach(() => setupStore());
 
-  it('renders seat labels for the three opponent seats', () => {
+  it('BUG-042: seat labels are not inside the rotated zone containers (moved to SeatHUD overlay)', () => {
     renderTable();
-    // Viewer (seat 0, role=bottom) shows PlayerHand2D â€” no SeatLabel2D
+    // SeatLabel2D was removed from rotated containers to fix drifting info blocks
+    // (BUG-042). Opponent nameplates are now provided by the SeatHUD overlay in
+    // game-page.tsx, which uses absolute positioning independent of meld tiles.
     expect(screen.queryByTestId('seat-label-0')).not.toBeInTheDocument();
-    // Each opponent zone has a nameplate
-    expect(screen.getByTestId('seat-label-1')).toBeInTheDocument();
-    expect(screen.getByTestId('seat-label-2')).toBeInTheDocument();
-    expect(screen.getByTestId('seat-label-3')).toBeInTheDocument();
+    expect(screen.queryByTestId('seat-label-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('seat-label-2')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('seat-label-3')).not.toBeInTheDocument();
   });
 
   it('renders opponent hand for each non-viewer seat', () => {

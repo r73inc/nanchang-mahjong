@@ -71,6 +71,7 @@ const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
 const JING_CHAR = '节' as const;
 const MULT_CHAR = '×' as const;
+const SCORE_SEP = ': ' as const;
 
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
@@ -888,7 +889,21 @@ function GameEndScreen({
 
 // ── DOM overlays ──────────────────────────────────────────────────────────────
 
-/** Single-seat nameplate chip — wind dot, dealer badge, score, AFK/disconnect. */
+/**
+ * Single-seat nameplate chip — wind dot, dealer badge, score, bot/AFK/disconnect.
+ *
+ * RIGID DIMENSIONS: width and height are fixed so that badge toggling (dealer
+ * rotation, AFK, bot chip) and score updates never change the bounding box.
+ * SeatHUD positions the chip with translate(-50%) / translate(-50%) anchors;
+ * if the footprint were dynamic those translations would shift every re-render,
+ * producing visible wiggling. `overflow: hidden` + `flex-1 min-w-0 truncate`
+ * on the name span handle any content that exceeds the fixed width.
+ *
+ * Geometry clearance (2D desktop mode, 800 × 600 reference viewport):
+ *   Left  chip: x = [8, 138 px]  — left meld inner extent ≈ 189 px  → 51 px gap
+ *   Right chip: symmetric
+ *   Top   chip: y = [56, 84 px]  — top  meld inner extent ≈ 167 px  → 83 px gap
+ */
 function Nameplate({
   seat,
   seatIdx,
@@ -907,10 +922,14 @@ function Nameplate({
   return (
     <div
       className={[
-        'flex items-center gap-1.5 px-2 py-1 rounded-md',
+        'flex items-center gap-1.5 px-2 rounded-md',
         compact ? 'text-[10px]' : 'text-xs',
       ].join(' ')}
       style={{
+        width: 130,
+        height: 28,
+        overflow: 'hidden',
+        flexShrink: 0,
         background: isActive ? 'rgba(201,169,97,0.18)' : 'rgba(var(--felt-ink-rgb),0.05)',
         border: `1px solid ${isActive ? 'rgba(201,169,97,0.5)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
         boxShadow: isActive ? '0 0 8px rgba(201,169,97,0.2)' : 'none',
@@ -920,7 +939,7 @@ function Nameplate({
         className="w-2 h-2 rounded-full shrink-0"
         style={{ background: WIND_COLOR[seat.wind] }}
       />
-      <span className="font-semibold text-mj-bone/90 max-w-[80px] truncate">{seat.seatName}</span>
+      <span className="font-semibold text-mj-bone/90 flex-1 min-w-0 truncate">{seat.seatName}</span>
       {isDealer && (
         <span
           className="text-[9px] font-bold px-1 rounded shrink-0"
@@ -929,23 +948,37 @@ function Nameplate({
           {t('gameDealerBadge')}
         </span>
       )}
-      <span className="text-mj-bone/60 font-mono tabular-nums">{seat.score}</span>
-      {seat.afk && (
-        <span className="text-mj-loss-light text-[9px] ml-1">{t('gameWaitingTurn')}</span>
-      )}
-      {!seat.connected && (
+      <span className="text-mj-bone/60 font-mono tabular-nums shrink-0">{seat.score}</span>
+      {seat.isBot ? (
         <span
-          className="w-1.5 h-1.5 rounded-full bg-mj-loss shrink-0"
-          title={t('gameReconnecting')}
-        />
+          className="text-[8px] font-bold px-1 rounded shrink-0"
+          style={{ background: 'rgba(90,125,140,0.3)', color: '#7ab5cc' }}
+          aria-label={t(
+            seat.botDifficulty === 'normal' ? 'botDifficultyNormalFull' : 'botDifficultyEasyFull',
+          )}
+        >
+          {t('botBadge')}
+        </span>
+      ) : (
+        <>
+          {seat.afk && (
+            <span className="text-mj-loss-light text-[9px] shrink-0">{t('gameWaitingTurn')}</span>
+          )}
+          {!seat.connected && (
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-mj-loss shrink-0"
+              title={t('gameReconnecting')}
+            />
+          )}
+        </>
       )}
     </div>
   );
 }
 
 /**
- * Four corner HUD nameplates — replaces the DOM compass nameplate chips that
- * lived inside the old tile layout.
+ * Three opponent nameplate chips anchored to screen edges.
+ * Viewer score is in the top status bar instead.
  */
 function SeatHUD({ snapshot }: { snapshot: ClientGameState }) {
   const viewerSeat = (snapshot.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
@@ -974,15 +1007,6 @@ function SeatHUD({ snapshot }: { snapshot: ClientGameState }) {
       {/* Left — left edge, vertically centered */}
       <div className="absolute left-2 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
         <Nameplate seat={snapshot.seats[leftSeat]} seatIdx={leftSeat} snapshot={snapshot} compact />
-      </div>
-      {/* Viewer — above the hand HUD (which is ~90px tall at bottom-0) */}
-      <div className="absolute bottom-28 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-        <Nameplate
-          seat={snapshot.seats[viewerSeat]}
-          seatIdx={viewerSeat}
-          snapshot={snapshot}
-          compact
-        />
       </div>
     </>
   );
@@ -2594,10 +2618,19 @@ function GameTable({
           )}
         </div>
 
-        {/* Wall count */}
-        <span className="text-mj-bone/50" style={{ fontSize: isMobile ? 10 : 10 }}>
-          {isMobile ? snapshot.wallCount : `${t('gameWallLeft')} ${snapshot.wallCount}`}
-        </span>
+        {/* Wall count + viewer score (desktop) */}
+        <div className="flex items-center gap-3">
+          <span className="text-mj-bone/50" style={{ fontSize: isMobile ? 10 : 10 }}>
+            {isMobile ? snapshot.wallCount : `${t('gameWallLeft')} ${snapshot.wallCount}`}
+          </span>
+          {!isMobile && (
+            <span className="font-mono tabular-nums" style={{ fontSize: 10, color: '#c9a961' }}>
+              {snapshot.seats[viewerSeat].seatName}
+              {SCORE_SEP}
+              {snapshot.seats[viewerSeat].score}
+            </span>
+          )}
+        </div>
 
         {/* Right-side controls */}
         <div className="flex items-center gap-2">

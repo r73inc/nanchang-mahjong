@@ -6,6 +6,33 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-042-opponent-info-drift` (2026-06-12)
+
+### BUG-042 · Opponent info blocks drift toward centre as melds are revealed; active player score unreadable
+
+**Root cause:**
+
+`DesktopGameTable2D` used a rotated flex column (`rotateZ(90deg)` / `rotateZ(-90deg)`) for each opponent seat zone. `SeatLabel2D` was a flex sibling of `OpenMelds2D` + `OpponentHand2D` inside the rotated container. Due to the CSS rotation geometry, the "bottom" of the pre-rotation flex column (where `justifyContent: space-between` places the last item) maps to a position outside the visible table area for the left and right seats. The label was either invisible or shifted relative to the meld tiles as game state changed.
+
+For the viewer's score: the only desktop score display was a `Nameplate` in `SeatHUD` at `bottom-28` (112 px from the bottom), which sits at the bottom edge of the canvas area and is small, low-contrast, and partially obscured by the hand tiles.
+
+**Fix:**
+
+1. **`DesktopGameTable2D.tsx`** — Removed `SeatLabel2D` from inside the rotated seat containers and removed the `justifyContent: space-between` that was trying (incorrectly) to position it at the outer edge. Opponent meld tiles now fill the container with `justifyContent: center`. The `SeatHUD` overlay in `game-page.tsx` (which was already rendering `Nameplate` chips at `absolute left-2 top-1/2`, `absolute right-2 top-1/2`, `absolute top-14 left-1/2`) takes sole responsibility for opponent info blocks — those are independently positioned DOM overlays completely outside the meld flow.
+
+2. **`game-page.tsx` (SeatHUD)** — Removed the viewer `Nameplate` from the `SeatHUD` (it was at `absolute bottom-28 left-1/2`, the now-defunct "seat area" display). Three opponent nameplates remain at screen-edge positions.
+
+3. **`game-page.tsx` (status bar)** — Added a compact `name: score` chip for the viewer (desktop only) in the top status bar's centre section alongside the wall count. Gold colour (`#c9a961`), monospace tabular nums, consistent with the rest of the status bar.
+
+4. **`Nameplate` component** — Added bot chip display (matching `SeatLabel2D`) so bot opponents are correctly identified in both 2D and 3D modes via the SeatHUD overlay.
+
+**Key learnings:**
+
+- CSS `rotateZ` transforms the visual rendering but NOT the layout space. `justify-content: space-between` inside a rotated flex container distributes items in pre-rotation coordinates; after rotation the "bottom" item can map to a position outside the visible viewport. Info blocks that need to stay anchored to screen edges must be `position: absolute` DOM overlays that live outside the rotated meld zone.
+- The existing `SeatHUD` component already provided correctly anchored opponent nameplates for 3D mode; removing `SeatLabel2D` from the rotated containers let it serve both modes without duplication.
+
+---
+
 ## `feat/imp-020-021-win-claim-ux` (2026-06-11)
 
 ### IMP-020 · Declare-win UX redesign
