@@ -5,7 +5,7 @@ import { Spinner } from '../../components/ui/spinner';
 import { useI18n } from '../../i18n';
 import { useMyProfile, useUpdateProfile, useUploadAvatar } from '../../hooks/use-profile';
 import { seededTile } from '../../components/ui/avatar-img';
-import { getApiErrorMessage } from '../../lib/api';
+import { getApiErrorMessage, API_BASE } from '../../lib/api';
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
@@ -46,6 +46,7 @@ function AvatarCircle({
   const fileRef = useRef<HTMLInputElement>(null);
   const [imgError, setImgError] = useState(false);
   const tile = seededTile(sub);
+  const resolvedUrl = avatarUrl?.startsWith('/') ? `${API_BASE}${avatarUrl}` : avatarUrl;
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -58,9 +59,9 @@ function AvatarCircle({
         style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
         aria-label={t('profileUploadPhoto')}
       >
-        {avatarUrl && !imgError ? (
+        {resolvedUrl && !imgError ? (
           <img
-            src={avatarUrl}
+            src={resolvedUrl}
             alt={handle}
             className="w-full h-full object-cover"
             onError={() => setImgError(true)}
