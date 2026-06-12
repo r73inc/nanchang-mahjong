@@ -4,6 +4,7 @@ import { ScreenShell } from '../../components/ui/screen-shell';
 import { Spinner } from '../../components/ui/spinner';
 import { useI18n } from '../../i18n';
 import { useMyProfile, useUpdateProfile, useUploadAvatar } from '../../hooks/use-profile';
+import { seededTile } from '../../components/ui/avatar-img';
 import { getApiErrorMessage } from '../../lib/api';
 
 // ── Style tokens ──────────────────────────────────────────────────────────────
@@ -30,11 +31,13 @@ function StatTile({ label, value }: { label: string; value: number }) {
 
 function AvatarCircle({
   avatarUrl,
+  sub,
   handle,
   onUpload,
   uploading,
 }: {
   avatarUrl?: string | null;
+  sub: string;
   handle: string;
   onUpload: (file: File) => void;
   uploading: boolean;
@@ -42,6 +45,7 @@ function AvatarCircle({
   const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
   const [imgError, setImgError] = useState(false);
+  const tile = seededTile(sub);
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -50,7 +54,7 @@ function AvatarCircle({
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
         className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center
-                   text-3xl font-bold text-mj-slate select-none relative"
+                   select-none relative"
         style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
         aria-label={t('profileUploadPhoto')}
       >
@@ -62,9 +66,14 @@ function AvatarCircle({
             onError={() => setImgError(true)}
           />
         ) : (
-          <span>{handle.charAt(0).toUpperCase()}</span>
+          <img
+            src={`/textures/Tiles/Regular/${tile}.svg`}
+            alt=""
+            className="w-[88%] h-[88%] object-contain"
+            draggable={false}
+          />
         )}
-        {/* Camera icon overlay — always visible to signal interactivity */}
+        {/* Upload chip — always visible to signal interactivity */}
         {!uploading && (
           <div className="absolute inset-0 flex items-end justify-center pb-2" aria-hidden="true">
             <span
@@ -81,7 +90,6 @@ function AvatarCircle({
           </div>
         )}
       </button>
-      {/* Size hint */}
       <p className="text-[11px] text-mj-bone/45 text-center">{t('profileUploadHint')}</p>
       <input
         ref={fileRef}
@@ -229,6 +237,7 @@ export function ProfilePage() {
             <div className="flex flex-col items-center gap-3 pt-2">
               <AvatarCircle
                 avatarUrl={profile.avatarUrl}
+                sub={profile.sub}
                 handle={profile.handle}
                 onUpload={(f) => void handleAvatarUpload(f)}
                 uploading={uploadAvatar.isPending}

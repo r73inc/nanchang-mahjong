@@ -45,7 +45,7 @@ export function useUploadAvatar() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
-      const dataUri = await resizeImageToCanvas(file, 1024);
+      const dataUri = await resizeImageToCanvas(file, 200);
       const contentType = file.type.startsWith('image/png') ? 'image/png' : 'image/jpeg';
       const blob = dataURItoBlob(dataUri, contentType);
       const formData = new FormData();

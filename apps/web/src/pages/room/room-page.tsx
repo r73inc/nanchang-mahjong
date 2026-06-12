@@ -9,6 +9,7 @@
 import { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
+import { AvatarImg } from '../../components/ui/avatar-img';
 import { useI18n } from '../../i18n';
 import { useRoomStore } from '../../stores/room.store';
 import { useRoomActions, useRoomSubscription } from '../../hooks/use-room';
@@ -273,24 +274,11 @@ export function RoomPage() {
                 >
                   {/* Avatar circle (human) or wind badge (empty / bot) */}
                   {!isEmpty && !seat.isBot ? (
-                    <div
-                      className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-sm text-mj-slate select-none"
-                      style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
-                      aria-hidden="true"
-                    >
-                      {seat.avatarUrl ? (
-                        <img
-                          src={seat.avatarUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <span>{(seat.handle ?? '?').charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
+                    <AvatarImg
+                      avatarUrl={seat.avatarUrl}
+                      seed={seat.userId ?? seat.handle ?? ''}
+                      size={36}
+                    />
                   ) : (
                     <div
                       className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"

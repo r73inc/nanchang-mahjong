@@ -15,7 +15,6 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
-import { StorageService } from '../storage/storage.service';
 import type {
   RoomState,
   RoomSeat,
@@ -66,10 +65,7 @@ export class RoomsService {
   /** Characters used for code generation (no O/0, I/1/L to avoid confusion). */
   private readonly CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
-  constructor(
-    private readonly db: DynamoDBService,
-    private readonly storage: StorageService,
-  ) {}
+  constructor(private readonly db: DynamoDBService) {}
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
@@ -94,14 +90,13 @@ export class RoomsService {
           return { seatIdx: idx, userId: null, handle: null, ready: false, isHost: false };
         }
 
-        // Fetch avatar URL for human seats (bots have no profile).
+        // Fetch avatar data URI for human seats (bots have no profile).
         // Failures are non-fatal — the room still opens without an avatar.
         let avatarUrl: string | null = null;
         if (!s.isBot) {
           try {
             const profileRes = await this.db.get({ Key: DK.userProfile(s.userId) });
-            const avatarKey = profileRes?.Item?.avatarKey as string | undefined;
-            if (avatarKey) avatarUrl = await this.storage.getAvatarUrl(avatarKey);
+            avatarUrl = (profileRes?.Item?.avatarDataUrl as string | undefined) ?? null;
           } catch {
             // non-fatal
           }

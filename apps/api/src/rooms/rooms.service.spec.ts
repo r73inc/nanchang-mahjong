@@ -8,7 +8,6 @@ import {
 import type { TransactWriteCommandInput } from '@aws-sdk/lib-dynamodb';
 import { RoomsService } from './rooms.service';
 import { DynamoDBService } from '../database/dynamodb.service';
-import { StorageService } from '../storage/storage.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -100,14 +99,8 @@ describe('RoomsService', () => {
   beforeEach(async () => {
     db = makeMockDb();
 
-    const mockStorage = { getAvatarUrl: jest.fn().mockResolvedValue(null) };
-
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RoomsService,
-        { provide: DynamoDBService, useValue: db },
-        { provide: StorageService, useValue: mockStorage },
-      ],
+      providers: [RoomsService, { provide: DynamoDBService, useValue: db }],
     }).compile();
 
     service = module.get<RoomsService>(RoomsService);

@@ -3,6 +3,7 @@ import { useAuthStore } from '../../stores/auth.store';
 import { useSignout } from '../../hooks/use-auth';
 import { useMyProfile } from '../../hooks/use-profile';
 import { ScreenShell } from '../../components/ui/screen-shell';
+import { AvatarImg } from '../../components/ui/avatar-img';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
@@ -33,21 +34,13 @@ export function HomeStubPage() {
           <button
             onClick={() => navigate('/profile')}
             aria-label={t('profileLink')}
-            className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-xl text-mj-slate select-none"
-            style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
+            className="rounded-full flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-mj-gold/50"
           >
-            {profile?.avatarUrl ? (
-              <img
-                src={profile.avatarUrl}
-                alt={profile.handle}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            ) : (
-              <span>{(user?.handle ?? '?').charAt(0).toUpperCase()}</span>
-            )}
+            <AvatarImg
+              avatarUrl={profile?.avatarUrl}
+              seed={user?.sub ?? user?.handle ?? ''}
+              size={56}
+            />
           </button>
           <div>
             <p className="text-sm text-mj-bone/60">{t('welcomeBack')}</p>
