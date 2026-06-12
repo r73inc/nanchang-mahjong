@@ -23,6 +23,7 @@ import {
   DiscardPayloadSchema,
   ClaimPayloadSchema,
   KongConcealedPayloadSchema,
+  RollDicePayloadSchema,
 } from '@nanchang/shared';
 import type { WsUser } from '../common/adapters/ws-auth.adapter';
 import { GameService } from './game.service';
@@ -58,6 +59,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     'game:advance-pre-game': { limit: 3, windowMs: 2_000 },
     'game:advance-hand': { limit: 2, windowMs: 2_000 },
     'game:rematch': { limit: 1, windowMs: 10_000 },
+    'game:roll-dice': { limit: 2, windowMs: 1_000 },
   });
 
   constructor(private readonly gameService: GameService) {}
@@ -206,6 +208,21 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
 
     this.gameService.handleConcede(socket, user.sub, gameId);
+  }
+
+  @SubscribeMessage('game:roll-dice')
+  handleRollDice(socket: Socket, raw: unknown): void {
+    if (!this.checkRate(socket, 'game:roll-dice')) return;
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const parsed = RollDicePayloadSchema.safeParse(raw ?? {});
+    if (!parsed.success) return this.emitError(socket, 'INVALID_PAYLOAD');
+
+    const gameId = socket.data.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
+
+    this.gameService.handleRollDice(socket, user.sub, gameId);
   }
 
   @SubscribeMessage('game:advance-pre-game')

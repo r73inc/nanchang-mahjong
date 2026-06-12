@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { GameEngine, nextDealer } from '../engine';
+import { GameEngine, nextDealer, previewJingReveal } from '../engine';
 import { isWinningHand } from '../hand';
 import { chowOptions } from '../calls';
 import { calculateSpiritSettlement } from '../scoring';
+import { tilesRemaining } from '../wall';
 import type { TileType, GameState, Meld, GameEvent, SeatState, SeatWind } from '../types';
-import { typeOf } from '../tiles';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,13 +37,14 @@ describe('GameEngine lifecycle', () => {
     expect(g.state.jingSecondary).not.toBeNull();
   });
 
-  it('revealJing removes the indicator from deadWall, leaving 3 replacement tiles', () => {
+  it('revealJing rolls the jing dice and flips the indicator in place — nothing consumed', () => {
     const afterDeal = GameEngine.create(42).deal();
-    expect(afterDeal.state.deadWall).toHaveLength(4);
+    expect(afterDeal.state.wall!.jingDice).toBeNull();
     const afterReveal = afterDeal.revealJing();
-    expect(afterReveal.state.deadWall).toHaveLength(3);
-    // The indicator (index 0) must no longer be the first replacement tile
-    expect(afterReveal.state.deadWall[0]).not.toBe(afterDeal.state.deadWall[0]);
+    expect(afterReveal.state.wall!.jingDice).not.toBeNull();
+    expect(afterReveal.state.wall!.jingStackGlobal).not.toBeNull();
+    // No tiles are consumed — the indicator stays in the wall and is drawable
+    expect(tilesRemaining(afterReveal.state.wall!)).toBe(tilesRemaining(afterDeal.state.wall!));
   });
 
   it('jingIndicator is set after revealJing()', () => {
@@ -93,10 +94,8 @@ describe('Engine·deal-determinism', () => {
   it('total tiles dealt = 136 (no tile left behind)', () => {
     const g = GameEngine.create(7).deal();
     const handsTotal = g.state.seats.reduce((sum, s) => sum + s.hand.length, 0);
-    const wallTotal = g.state.wall.length;
-    const deadTotal = g.state.deadWall.length;
-    // Hands: 14+13+13+13=53; dead wall: 4; live wall: remainder
-    expect(handsTotal + wallTotal + deadTotal).toBe(136);
+    // Hands: 14+13+13+13 = 53; remaining drawable wall: 83
+    expect(handsTotal + tilesRemaining(g.state.wall!)).toBe(136);
   });
 
   it('no duplicate tile types beyond 4 copies in any single seat', () => {
@@ -143,15 +142,12 @@ describe('discard', () => {
 
   it('throws if tile not in hand', () => {
     const g = startedGame(42);
-    expect(() => g.discard('bai' as TileType)).not.toThrow(); // bai might be in hand
     // Find a tile definitely NOT in hand
     const hand = new Set(g.state.seats[0].hand);
-    // If hand has all 34 types this is tricky, but practically:
     const allTypes: TileType[] = ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m'];
     const notInHand = allTypes.find((t) => !hand.has(t));
-    if (notInHand) {
-      expect(() => g.discard(notInHand)).toThrow();
-    }
+    expect(notInHand).toBeDefined();
+    expect(() => g.discard(notInHand!)).toThrow();
   });
 });
 
@@ -169,10 +165,10 @@ describe('passClaims → draw', () => {
 
   it('wall shrinks by 1 after a draw', () => {
     const g = startedGame(42);
-    const wallBefore = g.state.wall.length;
+    const wallBefore = tilesRemaining(g.state.wall!);
     const tile = g.state.seats[0].hand[0];
     const after = g.discard(tile).passClaims();
-    expect(after.state.wall.length).toBe(wallBefore - 1);
+    expect(tilesRemaining(after.state.wall!)).toBe(wallBefore - 1);
   });
 
   it('records draw event', () => {
@@ -455,10 +451,13 @@ describe('Engine·draw-conditions', () => {
     const g = startedGame(1);
     const event = g.events.find((e) => e.kind === 'deal');
     expect(event).toBeDefined();
-    // Wall exhaustion logic: passClaims when wall is empty → draw_game
+    // Wall exhaustion logic: passClaims when no tiles remain → draw_game
     // (hard to test end-to-end quickly, so test the transition logic)
-    // Build a minimal state: discard then pass with empty wall
-    const depleted = { ...g.state, wall: [] };
+    // Build a minimal state: front and back pointers have met (0 remaining)
+    const depleted = {
+      ...g.state,
+      wall: { ...g.state.wall!, drawPtr: 136, kongDraws: 0 },
+    };
     // @ts-expect-error — accessing private constructor for testing
     const engine = new GameEngine(depleted, g.events);
     const tile = g.state.seats[0].hand[0];
@@ -472,10 +471,9 @@ describe('Engine·draw-conditions', () => {
 // ── Event log ─────────────────────────────────────────────────────────────────
 
 describe('Event log', () => {
-  it('deal event is recorded', () => {
+  it('deal records both setup dice rolls then the deal event', () => {
     const g = GameEngine.create(42).deal();
-    expect(g.events).toHaveLength(1);
-    expect(g.events[0].kind).toBe('deal');
+    expect(g.events.map((e) => e.kind)).toEqual(['dice_roll', 'dice_roll', 'deal']);
   });
 
   it('jing_indicator event is recorded', () => {
@@ -963,37 +961,32 @@ describe('Engine·ruleTopBottomJing', () => {
     expect(g.state.jingSecondary).not.toBeNull();
   });
 
-  it('dead wall remains 4 tiles intact (not consumed for indicator)', () => {
+  it('no tiles are consumed by the reveal — wall count unchanged', () => {
     const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
-    expect(afterDeal.state.deadWall).toHaveLength(4);
+    const before = tilesRemaining(afterDeal.state.wall!);
     const afterReveal = afterDeal.revealJing();
-    // Standard path removes deadWall[0]; top-bottom path leaves deadWall intact
-    expect(afterReveal.state.deadWall).toHaveLength(4);
-    expect(afterReveal.state.deadWall[0]).toBe(afterDeal.state.deadWall[0]);
+    expect(tilesRemaining(afterReveal.state.wall!)).toBe(before);
   });
 
-  it('live wall loses 2 tiles (indicator consumed, settlement tile moved to bottom)', () => {
+  it('settlement tile and indicator are swapped in place within the dice-resolved stack', () => {
     const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
-    const wallBefore = afterDeal.state.wall.length;
+    const preview = previewJingReveal(afterDeal.state);
+    const topBefore = afterDeal.state.wall!.drawOrder[preview.topIdx];
+    const bottomBefore = afterDeal.state.wall!.drawOrder[preview.topIdx + 1];
     const afterReveal = afterDeal.revealJing();
-    // wall[1] consumed (indicator), wall[0] moved to bottom — net length unchanged
-    // Actually: wall.slice(2) + [wall[0]] = length - 1
-    expect(afterReveal.state.wall.length).toBe(wallBefore - 1);
+    // Swapped: former top (settlement) is now below; former bottom (indicator) on top
+    expect(afterReveal.state.wall!.drawOrder[preview.topIdx]).toBe(bottomBefore);
+    expect(afterReveal.state.wall!.drawOrder[preview.topIdx + 1]).toBe(topBefore);
   });
 
-  it('settlement tile (wall[0]) is tucked to the bottom of the live wall', () => {
+  it('both settlement and indicator tiles remain in the wall and are drawable', () => {
     const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
-    const settlementTileId = afterDeal.state.wall[0];
+    const preview = previewJingReveal(afterDeal.state);
+    const settlementId = afterDeal.state.wall!.drawOrder[preview.topIdx];
+    const indicatorId = afterDeal.state.wall!.drawOrder[preview.topIdx + 1];
     const afterReveal = afterDeal.revealJing();
-    const bottom = afterReveal.state.wall[afterReveal.state.wall.length - 1];
-    expect(bottom).toBe(settlementTileId);
-  });
-
-  it('indicator (wall[1]) is not in the new wall', () => {
-    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
-    const indicatorId = afterDeal.state.wall[1];
-    const afterReveal = afterDeal.revealJing();
-    expect(afterReveal.state.wall).not.toContain(indicatorId);
+    expect(afterReveal.state.wall!.drawOrder).toContain(settlementId);
+    expect(afterReveal.state.wall!.drawOrder).toContain(indicatorId);
   });
 
   it('emits opening_jing_settlement event before jing_indicator event', () => {
@@ -1028,30 +1021,34 @@ describe('Engine·ruleTopBottomJing', () => {
     }
   });
 
-  it('jingIndicator is derived from wall[1] (not deadWall[0])', () => {
+  it('jingIndicator is the BOTTOM tile of the dice-resolved stack', () => {
     const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
-    const indicatorTileId = afterDeal.state.wall[1];
-    const expectedIndicator = typeOf(indicatorTileId);
+    const preview = previewJingReveal(afterDeal.state);
     const afterReveal = afterDeal.revealJing();
-    expect(afterReveal.state.jingIndicator).toBe(expectedIndicator);
+    expect(afterReveal.state.jingIndicator).toBe(preview.bottomTile);
   });
 
-  it('standard path is unaffected (revealJing consumes deadWall[0] as before)', () => {
+  it('standard mode: indicator is the TOP tile of the dice-resolved stack, no swap', () => {
     const afterDeal = GameEngine.create(7).deal();
     expect(afterDeal.state.config.ruleTopBottomJing).toBe(false);
+    const preview = previewJingReveal(afterDeal.state);
     const afterReveal = afterDeal.revealJing();
-    // Standard: deadWall shrinks by 1; live wall is untouched
-    expect(afterReveal.state.deadWall).toHaveLength(3);
+    expect(afterReveal.state.jingIndicator).toBe(preview.topTile);
+    // No swap, nothing consumed
+    expect(afterReveal.state.wall!.drawOrder).toEqual(afterDeal.state.wall!.drawOrder);
+    expect(tilesRemaining(afterReveal.state.wall!)).toBe(tilesRemaining(afterDeal.state.wall!));
   });
 
-  it('throws if wall has fewer than 2 tiles when top-bottom rule is active', () => {
-    const afterDeal = GameEngine.create(7, { config: { ruleTopBottomJing: true } }).deal();
-    // @ts-expect-error — private constructor
-    const engine = new GameEngine(
-      { ...afterDeal.state, phase: 'jing_reveal', wall: [afterDeal.state.wall[0]] },
-      afterDeal.events,
-    );
-    expect(() => engine.revealJing()).toThrow(/not enough/i);
+  it('previewJingReveal matches what revealJing actually does (settlement tile)', () => {
+    const afterDeal = GameEngine.create(123, { config: { ruleTopBottomJing: true } }).deal();
+    const preview = previewJingReveal(afterDeal.state);
+    const afterReveal = afterDeal.revealJing();
+    const ev = afterReveal.events.find((e) => e.kind === 'opening_jing_settlement') as {
+      settlementTile: TileType;
+    };
+    expect(ev.settlementTile).toBe(preview.topTile);
+    expect(afterReveal.state.wall!.jingDice).toEqual(preview.dice);
+    expect(afterReveal.state.wall!.jingStackGlobal).toBe(preview.stackGlobal);
   });
 
   it('deterministic: same seed always produces same settlement tile and delta', () => {

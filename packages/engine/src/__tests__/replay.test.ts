@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameEngine } from '../engine';
 import { replayHand } from '../replay';
+import { tilesRemaining } from '../wall';
 import type { GameEvent, GameState } from '../types';
 
 // ── Helper: play a scripted game to completion and collect events ──────────────
@@ -74,9 +75,10 @@ describe('replayHand', () => {
       events,
     );
 
-    // Every replayed state should have a non-negative wall count
+    // Every replayed state should have a built wall with a non-negative count
     for (const state of replayedStates) {
-      expect(state.wall.length).toBeGreaterThanOrEqual(0);
+      expect(state.wall).not.toBeNull();
+      expect(tilesRemaining(state.wall!)).toBeGreaterThanOrEqual(0);
     }
   });
 

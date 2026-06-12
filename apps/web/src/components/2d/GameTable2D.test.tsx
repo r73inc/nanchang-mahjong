@@ -1,12 +1,12 @@
-/**
+﻿/**
  * GameTable2D.test.tsx
  *
  * Feature coverage:
- *  - 2DBoard·smoke:    full board renders without crashing
- *  - 2DBoard·zones:    all four seat zones are present
- *  - 2DBoard·discards: discard pool shows correct tile count
- *  - 2DBoard·melds:    open melds section present when melds exist
- *  - 2DBoard·scale:    computeTileScale returns sensible values (BUG-2D-02)
+ *  - 2DBoardÂ·smoke:    full board renders without crashing
+ *  - 2DBoardÂ·zones:    all four seat zones are present
+ *  - 2DBoardÂ·discards: discard pool shows correct tile count
+ *  - 2DBoardÂ·melds:    open melds section present when melds exist
+ *  - 2DBoardÂ·scale:    computeTileScale returns sensible values (BUG-2D-02)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -17,7 +17,7 @@ import { computeTileScale, TILE_SCALE_MIN } from './Table2DContext';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState, ClientSeatState, Meld, TileType } from '@nanchang/shared';
 
-// ── Store mock ────────────────────────────────────────────────────────────────
+// â”€â”€ Store mock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 vi.mock('../../stores/game.store', () => ({ useGameStore: vi.fn() }));
 const mockUseGameStore = vi.mocked(useGameStore);
@@ -27,7 +27,7 @@ vi.mock('../../r3f/GameCanvas', () => ({
   GameCanvas: () => <div data-testid="game-canvas-stub" />,
 }));
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
   return {
@@ -55,13 +55,14 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 60,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
     viewMode: '2D',
     ruleTopBottomJing: false,
     preGamePhase: null,
+    pendingRoll: null,
     seats: [
       makeSeat({ wind: 'east', hand: ['1m', '2m', '3m'] as TileType[], handCount: 3 }),
       makeSeat({ wind: 'south' }),
@@ -89,9 +90,9 @@ function renderTable() {
   return { ...result, onDiscard };
 }
 
-// ── Tests ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('GameTable2D · 2DBoard·smoke', () => {
+describe('GameTable2D Â· 2DBoardÂ·smoke', () => {
   beforeEach(() => setupStore());
 
   it('renders the table container', () => {
@@ -106,12 +107,12 @@ describe('GameTable2D · 2DBoard·smoke', () => {
   });
 });
 
-describe('GameTable2D · 2DBoard·zones', () => {
+describe('GameTable2D Â· 2DBoardÂ·zones', () => {
   beforeEach(() => setupStore());
 
   it('renders seat labels for the three opponent seats', () => {
     renderTable();
-    // Viewer (seat 0, role=bottom) shows PlayerHand2D — no SeatLabel2D
+    // Viewer (seat 0, role=bottom) shows PlayerHand2D â€” no SeatLabel2D
     expect(screen.queryByTestId('seat-label-0')).not.toBeInTheDocument();
     // Each opponent zone has a nameplate
     expect(screen.getByTestId('seat-label-1')).toBeInTheDocument();
@@ -125,7 +126,7 @@ describe('GameTable2D · 2DBoard·zones', () => {
     expect(screen.getByTestId('opponent-hand-1')).toBeInTheDocument();
     expect(screen.getByTestId('opponent-hand-2')).toBeInTheDocument();
     expect(screen.getByTestId('opponent-hand-3')).toBeInTheDocument();
-    // Seat 0 is the viewer — has PlayerHand2D, not OpponentHand2D
+    // Seat 0 is the viewer â€” has PlayerHand2D, not OpponentHand2D
     expect(screen.queryByTestId('opponent-hand-0')).not.toBeInTheDocument();
   });
 
@@ -136,7 +137,7 @@ describe('GameTable2D · 2DBoard·zones', () => {
 });
 
 // BUG-2D-05: all discards are merged into a single combined-discard-pool.
-describe('GameTable2D · 2DBoard·discards', () => {
+describe('GameTable2D Â· 2DBoardÂ·discards', () => {
   it('renders the combined discard pool when any seat has discards', () => {
     setupStore(
       makeSnapshot({
@@ -159,13 +160,13 @@ describe('GameTable2D · 2DBoard·discards', () => {
   });
 
   it('does not render the combined pool when no seat has discards', () => {
-    setupStore(); // default snapshot — all seats have empty discard arrays
+    setupStore(); // default snapshot â€” all seats have empty discard arrays
     renderTable();
     expect(screen.queryByTestId('combined-discard-pool')).not.toBeInTheDocument();
   });
 
   it('combined pool renders the total tile count across all discarding seats', () => {
-    // Seat 0: 3 discards, seat 1: 2 discards → 5 tiles total in combined pool.
+    // Seat 0: 3 discards, seat 1: 2 discards â†’ 5 tiles total in combined pool.
     setupStore(
       makeSnapshot({
         seats: [
@@ -183,12 +184,12 @@ describe('GameTable2D · 2DBoard·discards', () => {
     );
     renderTable();
     const pool = screen.getByTestId('combined-discard-pool');
-    // Round-robin: s0[0], s1[0], s0[1], s1[1], s0[2] → 5 tiles
+    // Round-robin: s0[0], s1[0], s0[1], s1[1], s0[2] â†’ 5 tiles
     expect(pool.querySelectorAll('[data-testid="mahjong-tile-2d"]')).toHaveLength(5);
   });
 });
 
-describe('GameTable2D · 2DBoard·melds', () => {
+describe('GameTable2D Â· 2DBoardÂ·melds', () => {
   it('renders open melds section when a seat has open melds', () => {
     const pung: Meld = {
       kind: 'pung',
@@ -222,10 +223,10 @@ describe('GameTable2D · 2DBoard·melds', () => {
   });
 });
 
-// ── BUG-2D-02: computeTileScale ───────────────────────────────────────────────
+// â”€â”€ BUG-2D-02: computeTileScale â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('GameTable2D · 2DBoard·scale', () => {
-  it('returns 1.0 at the 800 × 600 reference canvas', () => {
+describe('GameTable2D Â· 2DBoardÂ·scale', () => {
+  it('returns 1.0 at the 800 Ã— 600 reference canvas', () => {
     // At reference size both constraints resolve above 1.0 and the result is
     // capped at 1.0.
     const s = computeTileScale(800, 600);
@@ -233,17 +234,17 @@ describe('GameTable2D · 2DBoard·scale', () => {
     expect(s).toBeLessThanOrEqual(1.0);
   });
 
-  it('returns 1.0 on a large desktop viewport (1920 × 1080)', () => {
+  it('returns 1.0 on a large desktop viewport (1920 Ã— 1080)', () => {
     expect(computeTileScale(1920, 1080)).toBe(1.0);
   });
 
-  it('returns a reduced scale on a narrow viewport (600 × 400)', () => {
+  it('returns a reduced scale on a narrow viewport (600 Ã— 400)', () => {
     const s = computeTileScale(600, 400);
     expect(s).toBeLessThan(1.0);
     expect(s).toBeGreaterThanOrEqual(TILE_SCALE_MIN);
   });
 
-  it('is always ≥ TILE_SCALE_MIN regardless of viewport size', () => {
+  it('is always â‰¥ TILE_SCALE_MIN regardless of viewport size', () => {
     // Tiny viewport (e.g. very small embedded webview)
     const s = computeTileScale(200, 150);
     expect(s).toBeGreaterThanOrEqual(TILE_SCALE_MIN);

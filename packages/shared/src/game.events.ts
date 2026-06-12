@@ -22,6 +22,7 @@ import type {
   GameEvent,
   GameState,
   GameConfig,
+  WallState,
   ReplayHandConfig,
 } from '@nanchang/engine';
 
@@ -37,6 +38,7 @@ export type {
   GameEvent,
   GameState,
   GameConfig,
+  WallState,
   ReplayHandConfig,
 };
 // Re-export replay utility so web only needs @nanchang/shared.
@@ -74,6 +76,10 @@ export type ClaimPayload = z.infer<typeof ClaimPayloadSchema>;
 
 /** Player explicitly passes on the current claim window. */
 export const PassPayloadSchema = z.object({});
+
+/** Active roller triggers their dice roll — server computes from PRNG seed. */
+export const RollDicePayloadSchema = z.object({});
+export type RollDicePayload = z.infer<typeof RollDicePayloadSchema>;
 export type PassPayload = z.infer<typeof PassPayloadSchema>;
 
 /** Declare a concealed kong on the active player's turn. */
@@ -129,6 +135,31 @@ export interface ClientSeatState {
 }
 
 /**
+ * Public wall-position state — everything a renderer needs to draw the
+ * physical table (4 walls × 17 stacks × 2 tiles) without leaking any tile
+ * identities. Dice values and positions/counts are public table state; only
+ * the tiles' faces are secret.
+ */
+export interface ClientWallState {
+  /** Dice roll #1 (rolled by the dealer) — selected which seat's wall. */
+  wallSelectionDice: [number, number];
+  /** Dice roll #2 (rolled by the selected player) — selected the start stack. */
+  dealStartDice: [number, number];
+  /** Seat whose wall the deal started from. */
+  dealStartSeat: 0 | 1 | 2 | 3;
+  /** 0-based stack index within that seat's wall where dealing began. */
+  dealStartStack: number;
+  /** Next front (normal) draw position in draw order (53 right after deal). */
+  drawPtr: number;
+  /** Number of back (kong replacement) draws taken so far. */
+  kongDraws: number;
+  /** Jing reveal dice — null until the jing has been revealed. */
+  jingDice: [number, number] | null;
+  /** Global stack index (0–67) of the jing/settlement stack — null until reveal. */
+  jingStackGlobal: number | null;
+}
+
+/**
  * Per-viewer redacted game state.
  * Sent as `game:snapshot` after every applied move and on join/reconnect.
  * The viewer's own hand is revealed; all others are hidden (hand = null).
@@ -142,8 +173,10 @@ export interface ClientGameState {
   currentSeat: 0 | 1 | 2 | 3;
   dealerSeat: 0 | 1 | 2 | 3;
   roundWind: SeatWind;
+  /** Tiles remaining to draw (front + back combined). */
   wallCount: number;
-  deadWallCount: number;
+  /** Public wall-position state — null until the wall has been built (deal). */
+  wall: ClientWallState | null;
   pendingDiscard: TileType | null;
   discardedBySeat: (0 | 1 | 2 | 3) | null;
   /** null = spectator */
@@ -155,11 +188,21 @@ export interface ClientGameState {
   ruleTopBottomJing: boolean;
   /**
    * Pre-game reveal sub-phase (null once the game is actually in play).
+   *   'dealing'    — waiting for dice rolls before deal(); pendingRoll will be set
    *   'hands'      — hands dealt, waiting for host to advance
    *   'settlement' — settlement tile preview shown (ruleTopBottomJing only)
    *   'jing'       — jing indicator/primary/secondary revealed; waiting for host to start
    */
-  preGamePhase: 'hands' | 'settlement' | 'jing' | null;
+  preGamePhase: 'dealing' | 'hands' | 'settlement' | 'jing' | null;
+  /**
+   * Set while awaiting a manual dice roll from a specific player.
+   * The roller must emit game:roll-dice to advance.
+   * null during normal play.
+   */
+  pendingRoll: {
+    purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
+    roller: 0 | 1 | 2 | 3;
+  } | null;
 }
 
 // ── Pre-game & hand-reveal payloads ──────────────────────────────────────────
@@ -181,13 +224,18 @@ export interface SpiritCount {
  * Spirit" and the engine's `revealJing()` runs.
  */
 export interface SettlementPreviewPayload {
-  /** The flipped settlement tile (下精). Pays 2 pts per copy held. */
+  /** The jing dice (rolled by the dealer) that resolved the settlement stack. */
+  dice: [number, number];
+  /** Global stack index (0–67) of the dice-resolved settlement stack. */
+  stackGlobal: number;
+  /**
+   * The flipped settlement tile (下精) — the TOP tile of the dice-resolved
+   * stack. Pays 2 pts per copy held.
+   */
   settlementTile: TileType;
   /**
-   * The indicator tile (上精 / wall[1]). Shown as the smaller "next in sequence"
-   * tile beside the settlement tile. This tile is consumed when revealJing() runs
-   * and becomes jingIndicator, from which jingPrimary / jingSecondary are derived.
-   * Pays 1 pt per copy held.
+   * The "next in sequence" tile — stepAbove(settlementTile), purely derived
+   * (no physical tile is flipped for it). Pays 1 pt per copy held.
    */
   nextTile: TileType;
   /** How many copies of the settlement tile (wall[0]) each seat holds. */
@@ -249,6 +297,15 @@ export interface ClaimAction {
  * Contains only public information — no concealed tile values.
  */
 export type PublicGameEvent =
+  | {
+      kind: 'dice_roll';
+      /** What the roll resolved: wall selection, deal start, or jing reveal. */
+      purpose: 'wall_selection' | 'deal_start' | 'jing_reveal';
+      /** Seat of the player who rolled. */
+      roller: 0 | 1 | 2 | 3;
+      /** Individual die faces (each 1–6). */
+      dice: [number, number];
+    }
   | { kind: 'draw'; seat: 0 | 1 | 2 | 3 } // tile is private
   | { kind: 'discard'; seat: 0 | 1 | 2 | 3; tile: TileType }
   | { kind: 'pung'; seat: 0 | 1 | 2 | 3; tile: TileType }

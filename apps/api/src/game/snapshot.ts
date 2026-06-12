@@ -12,13 +12,42 @@
  */
 
 import type { GameState } from '@nanchang/engine';
-import type { ClientGameState, ClientSeatState, BotDifficulty } from '@nanchang/shared';
+import { tilesRemaining } from '@nanchang/engine';
+import type {
+  ClientGameState,
+  ClientSeatState,
+  ClientWallState,
+  BotDifficulty,
+} from '@nanchang/shared';
 import type { ConnState } from './game-session';
 
 export type ViewerSeat = 0 | 1 | 2 | 3 | null;
 
 /** Per-seat bot metadata to embed in the snapshot — undefined means human seat. */
 export type SeatBotMeta = { isBot: boolean; botDifficulty?: BotDifficulty } | undefined;
+
+/**
+ * Strip the wall down to its public positional state. Dice values, pointers,
+ * and stack positions are public table state — only tile identities
+ * (drawOrder) are secret and never leave the server.
+ *
+ * TODO (Spectator Mode): Expose a 'revealedWallTiles' array in ClientWallState
+ * so late-joining spectators can accurately render the faces of swapped Jing
+ * settlement tiles on the 2D table.
+ */
+function toClientWallState(wall: GameState['wall']): ClientWallState | null {
+  if (!wall) return null;
+  return {
+    wallSelectionDice: wall.wallSelectionDice,
+    dealStartDice: wall.dealStartDice,
+    dealStartSeat: wall.dealStartSeat,
+    dealStartStack: wall.dealStartStack,
+    drawPtr: wall.drawPtr,
+    kongDraws: wall.kongDraws,
+    jingDice: wall.jingDice,
+    jingStackGlobal: wall.jingStackGlobal,
+  };
+}
 
 export function toClientSnapshot(
   state: GameState,
@@ -27,9 +56,13 @@ export function toClientSnapshot(
   connState: readonly [ConnState, ConnState, ConnState, ConnState],
   viewMode: '2D' | '3D' = '3D',
   ruleTopBottomJing = false,
-  preGamePhase: 'hands' | 'settlement' | 'jing' | null = null,
+  preGamePhase: 'dealing' | 'hands' | 'settlement' | 'jing' | null = null,
   botMeta?: readonly [SeatBotMeta, SeatBotMeta, SeatBotMeta, SeatBotMeta],
   seatNames?: readonly [string, string, string, string],
+  pendingRoll: {
+    purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
+    roller: 0 | 1 | 2 | 3;
+  } | null = null,
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
@@ -57,8 +90,8 @@ export function toClientSnapshot(
     currentSeat: state.currentSeat,
     dealerSeat: state.dealerSeat,
     roundWind: state.roundWind,
-    wallCount: state.wall.length,
-    deadWallCount: state.deadWall.length,
+    wallCount: state.wall ? tilesRemaining(state.wall) : 0,
+    wall: toClientWallState(state.wall),
     pendingDiscard: state.pendingDiscard,
     discardedBySeat: state.discardedBySeat,
     viewerSeat,
@@ -66,5 +99,6 @@ export function toClientSnapshot(
     viewMode,
     ruleTopBottomJing,
     preGamePhase,
+    pendingRoll,
   };
 }

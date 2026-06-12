@@ -13,7 +13,16 @@
  *     so the score on SeatState always reflects the full game ledger.
  */
 import { buildWall, typeOf, sortTypes, stepAbove } from './tiles';
-import { seededShuffle } from './prng';
+import { seededShuffle, mulberry32 } from './prng';
+import { rollDice, DICE_SALT } from './dice';
+import {
+  buildWallState,
+  drawFront,
+  drawBack,
+  tilesRemaining,
+  resolveJingStack,
+  swapStackTiles,
+} from './wall';
 import { jingTypesFromIndicator, separateJing } from './jing';
 import { isWinningHand, decomposeHand } from './hand';
 import {
@@ -36,6 +45,7 @@ import type {
   WinPaymentResult,
   HandType,
   Decomposition,
+  WallState,
 } from './types';
 
 const SEAT_WINDS: SeatWind[] = ['east', 'south', 'west', 'north'];
@@ -102,6 +112,39 @@ export function nextDealer(
   return { dealerSeat: nextDealerSeat, roundWind, dealerChanged: true, roundComplete };
 }
 
+// ── Jing reveal preview ───────────────────────────────────────────────────────
+
+/**
+ * Pure preview of the jing reveal: derives the jing dice from the seed and
+ * resolves the stack they select, WITHOUT mutating state. The session layer
+ * uses this to build the settlement preview before revealJing() runs;
+ * revealJing() itself uses the same derivation, so preview and reveal always
+ * agree.
+ *
+ * topTile  — the tile flipped first (settlement tile in ruleTopBottomJing
+ *            mode; the jing indicator in standard mode).
+ * bottomTile — the tile under it (the jing indicator in ruleTopBottomJing
+ *            mode; untouched in standard mode).
+ */
+export function previewJingReveal(state: GameState): {
+  dice: [number, number];
+  stackGlobal: number;
+  topIdx: number;
+  topTile: TileType;
+  bottomTile: TileType;
+} {
+  if (!state.wall) throw new Error('Wall not built yet — call deal() first');
+  const dice = rollDice(mulberry32((state.seed ^ DICE_SALT.jing_reveal) >>> 0)) as [number, number];
+  const { stackGlobal, topIdx, bottomIdx } = resolveJingStack(state.wall, dice);
+  return {
+    dice,
+    stackGlobal,
+    topIdx,
+    topTile: typeOf(state.wall.drawOrder[topIdx]),
+    bottomTile: typeOf(state.wall.drawOrder[bottomIdx]),
+  };
+}
+
 // ── GameEngine ────────────────────────────────────────────────────────────────
 
 export class GameEngine {
@@ -155,8 +198,7 @@ export class GameEngine {
       jingIndicator: null,
       jingPrimary: null,
       jingSecondary: null,
-      wall: [],
-      deadWall: [],
+      wall: null,
       seats,
       currentSeat: dealerSeat,
       pendingDiscard: null,
@@ -170,6 +212,12 @@ export class GameEngine {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────
+
+  /** The wall after deal() — throws if accessed before the wall is built. */
+  private get wallState(): WallState {
+    if (!this.state.wall) throw new Error('Wall not built yet — call deal() first');
+    return this.state.wall;
+  }
 
   private get jingTypes(): TileType[] {
     if (!this.state.jingPrimary || !this.state.jingSecondary) {
@@ -285,29 +333,56 @@ export class GameEngine {
   // ── Deal ─────────────────────────────────────────────────────────────────────
 
   /**
-   * Shuffle the wall and deal tiles to all players.
-   * Transitions to 'jing_reveal'.
+   * Build the physical wall and deal tiles to all players the way the table
+   * does it. Transitions to 'jing_reveal'.
+   *
+   * Procedure (all derived from the hand seed — see wall.ts for conventions):
+   *   1. Shuffle the 136 tiles into the ring layout (4 walls × 17 stacks × 2).
+   *   2. Dice roll #1 (dealer): inclusive CCW count selects whose wall.
+   *   3. Dice roll #2 (selected player): inclusive count from the left of
+   *      that wall selects the starting stack.
+   *   4. Stack taking — dealer first, then CCW: one 2-tile stack per seat per
+   *      round, 6 rounds (12 tiles each); then one single tile each (13);
+   *      then the dealer alone takes a 14th.
+   *   5. Live drawing later continues from exactly where the deal stopped.
    */
   deal(): GameEngine {
     if (this.state.phase !== 'dealing') throw new Error('Not in dealing phase');
 
-    const shuffled = seededShuffle(buildWall(), this.state.seed);
+    const seed = this.state.seed;
+    const layout = seededShuffle(buildWall(), seed);
 
-    // Dead wall: 4 tiles from the end (indicator at index 0, rest for Kong replacements)
-    const deadWall = shuffled.slice(-4);
-    const liveWall = shuffled.slice(0, -4);
+    const wallSelectionDice = rollDice(mulberry32((seed ^ DICE_SALT.wall_selection) >>> 0)) as [
+      number,
+      number,
+    ];
+    const dealStartDice = rollDice(mulberry32((seed ^ DICE_SALT.deal_start) >>> 0)) as [
+      number,
+      number,
+    ];
 
-    // Deal: dealer gets 14, others get 13 (3 rounds of 4 + 1 each + 1 extra for dealer)
+    let wall = buildWallState(layout, wallSelectionDice, dealStartDice, this.state.dealerSeat);
+
     const dealt: [TileId[], TileId[], TileId[], TileId[]] = [[], [], [], []];
-    let wallIdx = 0;
-    for (let round = 0; round < 3; round++) {
-      for (let s = 0; s < 4; s++) {
-        for (let t = 0; t < 4; t++) dealt[s].push(liveWall[wallIdx++]);
+    const take = (seat: 0 | 1 | 2 | 3): void => {
+      const d = drawFront(wall);
+      wall = d.wall;
+      dealt[seat].push(d.tile);
+    };
+    const seatAt = (offset: number): 0 | 1 | 2 | 3 =>
+      ((this.state.dealerSeat + offset) % 4) as 0 | 1 | 2 | 3;
+
+    // 6 rounds of one full stack (2 tiles) per seat → 12 tiles each
+    for (let round = 0; round < 6; round++) {
+      for (let k = 0; k < 4; k++) {
+        take(seatAt(k));
+        take(seatAt(k));
       }
     }
-    for (let s = 0; s < 4; s++) dealt[s].push(liveWall[wallIdx++]);
-    // Dealer gets one extra
-    dealt[this.state.dealerSeat].push(liveWall[wallIdx++]);
+    // One single tile each → 13 each
+    for (let k = 0; k < 4; k++) take(seatAt(k));
+    // Dealer's 14th
+    take(this.state.dealerSeat);
 
     const hands = dealt.map((ids) => sortTypes(ids.map(typeOf))) as [
       TileType[],
@@ -316,60 +391,71 @@ export class GameEngine {
       TileType[],
     ];
 
-    const remainingWall = liveWall.slice(wallIdx);
-
     const seats = [...this.state.seats] as GameState['seats'];
     for (let i = 0; i < 4; i++) {
       seats[i] = { ...seats[i], hand: hands[i] };
     }
 
-    return this.withState({ phase: 'jing_reveal', wall: remainingWall, deadWall, seats }, [
-      { kind: 'deal', seed: this.state.seed, hands },
+    return this.withState({ phase: 'jing_reveal', wall, seats }, [
+      {
+        kind: 'dice_roll',
+        purpose: 'wall_selection',
+        roller: this.state.dealerSeat,
+        dice: wallSelectionDice,
+      },
+      { kind: 'dice_roll', purpose: 'deal_start', roller: wall.dealStartSeat, dice: dealStartDice },
+      { kind: 'deal', seed, hands },
     ]);
   }
 
   // ── Jing reveal ──────────────────────────────────────────────────────────────
 
   /**
-   * Reveal the Jing indicator and determine both wildcard tile types.
+   * Roll the jing dice, resolve the jing stack, and determine both wildcard
+   * tile types. Transitions to 'playing', dealer acts first (14 tiles).
+   *
+   * Both modes: the dealer rolls two dice; the sum counts stacks backwards
+   * from the BACK of the wall (inclusive) to resolve the jing stack. The
+   * dice are seed-derived (see previewJingReveal) so preview and replay
+   * always agree.
    *
    * Standard rule:
-   *   Primary Spirit (正精): deadWall[0] (the indicator tile).
-   *   Secondary Spirit (副精): one rank above the indicator.
-   *   Transitions to 'playing', dealer acts first (14 tiles).
+   *   The TOP tile of the resolved stack is flipped as the Jing indicator.
+   *   It stays in the wall, face up, and is drawn normally.
    *
    * With ruleTopBottomJing:
-   *   1. wall[0] = settlement tile (下精): instant payout — every player holding
-   *      this tile in their dealt hand receives 2 pts per copy from each other player.
-   *   2. The settlement tile is tucked to the bottom of the live wall.
-   *   3. wall[1] (now wall[0] after tuck) = true indicator for jing determination.
-   *   4. Indicator is consumed from the live wall (not the dead wall).
-   *   5. deadWall is left intact (4 tiles → all 4 available for kong replacements).
-   *   6. Two engine events are appended: opening_jing_settlement, then jing_indicator.
+   *   1. The TOP tile is the settlement tile (下精): instant payout — every
+   *      player holding it in their dealt hand receives 2 pts per copy from
+   *      each other player (+1 pt per copy of the next-in-sequence tile).
+   *   2. The settlement tile is swapped with the tile directly below it; the
+   *      revealed BOTTOM tile is the Jing indicator.
+   *   3. Both tiles remain in the wall in their swapped positions and are
+   *      drawn normally — neither is consumed.
+   *   4. Three events: dice_roll, opening_jing_settlement, jing_indicator.
    */
   revealJing(): GameEngine {
     if (this.state.phase !== 'jing_reveal') throw new Error('Not in jing_reveal phase');
 
+    const wall = this.wallState;
+    const { dice, stackGlobal, topIdx, topTile, bottomTile } = previewJingReveal(this.state);
+
+    const diceEvent: GameEvent = {
+      kind: 'dice_roll',
+      purpose: 'jing_reveal',
+      roller: this.state.dealerSeat,
+      dice,
+    };
+
     // ── Opening Top & Bottom Spirit Flip variant ─────────────────────────────
     if (this.state.config.ruleTopBottomJing) {
-      if (this.state.wall.length < 2) {
-        throw new Error('ruleTopBottomJing: not enough wall tiles for settlement + indicator');
-      }
-
-      const wall = this.state.wall;
-
-      // wall[0] = settlement tile (下精); wall[1] = indicator (上精 / true Jing indicator)
-      const settlementTileId = wall[0];
-      const indicatorTileId = wall[1];
-      const settlementTile = typeOf(settlementTileId);
-      const indicator = typeOf(indicatorTileId);
+      const settlementTile = topTile;
+      const indicator = bottomTile;
       const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);
 
-      // Compute instant payout for players holding the settlement tile (wall[0], 2 pts/copy)
+      // Instant payout for players holding the settlement tile (2 pts/copy)
       const scoreDelta0 = calculateOpeningJingSettlement(settlementTile, this.state.seats, 2);
-      // Compute 1 pt/copy payout for the "next in sequence" tile (stepAbove wall[0], 1 pt/copy).
-      // This tile is NEVER physically removed from the wall — it is only derived from the
-      // settlement tile's position and counted in each player's dealt hand.
+      // 1 pt/copy payout for the "next in sequence" tile (stepAbove settlement).
+      // Purely derived — no physical tile is involved in this part.
       const nextInSeq = stepAbove(settlementTile);
       const scoreDelta1 = calculateOpeningJingSettlement(nextInSeq, this.state.seats, 1);
       // Combined zero-sum delta (both settlements applied together)
@@ -380,7 +466,6 @@ export class GameEngine {
         number,
       ];
 
-      // Apply score deltas
       const seatsAfterSettlement = [...this.state.seats] as GameState['seats'];
       for (let i = 0; i < 4; i++) {
         seatsAfterSettlement[i] = {
@@ -389,11 +474,13 @@ export class GameEngine {
         };
       }
 
-      // Settlement tile tucked to bottom; indicator consumed (removed from live wall).
-      // Final wall: [wall[2], wall[3], ..., wall[n-1], wall[0]]
-      //   - wall[1] (indicator) is consumed (not available to draw)
-      //   - wall[0] (settlement tile) moves to the bottom (last-draw position)
-      const newWall = [...wall.slice(2), settlementTileId];
+      // Swap the settlement tile with the indicator below it — both stay in
+      // the wall in their swapped positions and remain drawable.
+      const newWall: WallState = {
+        ...swapStackTiles(wall, topIdx),
+        jingDice: dice,
+        jingStackGlobal: stackGlobal,
+      };
 
       return this.withState(
         {
@@ -402,20 +489,24 @@ export class GameEngine {
           jingPrimary,
           jingSecondary,
           wall: newWall,
-          // deadWall remains untouched (all 4 tiles available for kong replacements)
           seats: seatsAfterSettlement,
           currentSeat: this.state.dealerSeat,
         },
         [
+          diceEvent,
           { kind: 'opening_jing_settlement', settlementTile, scoreDelta },
-          { kind: 'jing_indicator', indicator, jingPrimary, jingSecondary },
+          {
+            kind: 'jing_indicator',
+            indicator,
+            jingPrimary,
+            jingSecondary,
+          },
         ],
       );
     }
 
     // ── Standard rule ────────────────────────────────────────────────────────
-    const indicatorId = this.state.deadWall[0];
-    const indicator = typeOf(indicatorId);
+    const indicator = topTile;
     const [jingPrimary, jingSecondary] = jingTypesFromIndicator(indicator);
 
     return this.withState(
@@ -424,10 +515,10 @@ export class GameEngine {
         jingIndicator: indicator,
         jingPrimary,
         jingSecondary,
-        deadWall: this.state.deadWall.slice(1),
+        wall: { ...wall, jingDice: dice, jingStackGlobal: stackGlobal },
         currentSeat: this.state.dealerSeat,
       },
-      [{ kind: 'jing_indicator', indicator, jingPrimary, jingSecondary }],
+      [diceEvent, { kind: 'jing_indicator', indicator, jingPrimary, jingSecondary }],
     );
   }
 
@@ -470,37 +561,37 @@ export class GameEngine {
     const fromSeat = this.state.discardedBySeat!;
     const nextSeat = ((fromSeat + 1) % 4) as 0 | 1 | 2 | 3;
 
-    if (this.state.wall.length === 0) {
-      return this.withState({ phase: 'finished' }, [{ kind: 'draw_game' }]);
-    }
-
     return this._drawFor(nextSeat, false);
   }
 
   // ── Draw (internal) ───────────────────────────────────────────────────────────
 
-  private _drawFor(seatIdx: 0 | 1 | 2 | 3, fromDeadWall: boolean): GameEngine {
-    const wall = fromDeadWall ? this.state.deadWall : this.state.wall;
-    if (wall.length === 0) {
+  /**
+   * Draw a tile for `seatIdx`. Normal draws come from the front of the wall
+   * (continuing from where dealing stopped); kong replacement draws come from
+   * the back. The hand is wall-exhausted when front and back meet.
+   */
+  private _drawFor(seatIdx: 0 | 1 | 2 | 3, fromBack: boolean): GameEngine {
+    const wall = this.wallState;
+    if (tilesRemaining(wall) === 0) {
       return this.withState({ phase: 'finished' }, [{ kind: 'draw_game' }]);
     }
 
-    const [tileId, ...remainingWall] = wall;
+    const { tile: tileId, wall: newWall } = fromBack ? drawBack(wall) : drawFront(wall);
     const tile = typeOf(tileId);
     const seat = this.state.seats[seatIdx];
-    const wallPatch = fromDeadWall ? { deadWall: remainingWall } : { wall: remainingWall };
 
     return this.withState(
       {
         phase: 'playing',
-        ...wallPatch,
+        wall: newWall,
         seats: this.patchSeat(seatIdx, { hand: sortTypes([...seat.hand, tile]) }),
         currentSeat: seatIdx,
         pendingDiscard: null,
         discardedBySeat: null,
-        isKongDraw: fromDeadWall,
+        isKongDraw: fromBack,
       },
-      [{ kind: 'draw', seat: seatIdx, tile, fromDeadWall }],
+      [{ kind: 'draw', seat: seatIdx, tile, fromBack }],
     );
   }
 
@@ -604,7 +695,7 @@ export class GameEngine {
       isHeavenlyWin,
       isEarthlyWin,
       isAfterKong: this.state.isKongDraw && isTsumo,
-      isLastTile: this.state.wall.length === 0,
+      isLastTile: tilesRemaining(this.wallState) === 0,
       jingsUsed: winJings,
       openMelds: winnerSeat.openMelds,
       decomposition: decompositions[0],
@@ -880,7 +971,7 @@ export class GameEngine {
   /**
    * Add a tile from hand to an existing open Pung, upgrading it to a Kong.
    * Emits a rob-kong claim window opportunity to opponents (handled by gateway).
-   * Draws a replacement tile from the dead wall.
+   * Draws a replacement tile from the back of the wall.
    * Applies instant open-kong payment (§6.1).
    */
   addToKong(seatIdx: 0 | 1 | 2 | 3, tile: TileType): GameEngine {
@@ -925,7 +1016,7 @@ export class GameEngine {
       [{ kind: 'kong_added', seat: seatIdx, tile }],
     );
 
-    // Draw replacement tile from dead wall
+    // Draw replacement tile from the back of the wall
     return g._drawFor(seatIdx, true);
   }
 

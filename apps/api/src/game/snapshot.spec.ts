@@ -99,15 +99,51 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
     });
   });
 
-  describe('wall / dead-wall redaction', () => {
-    it('wall contents are never included — only wallCount', () => {
+  describe('wall redaction', () => {
+    it('tile identities are never included — only counts and public positions', () => {
       const engine = dealedEngine();
       const snap = toClientSnapshot(engine.state, GAME_ID, 0, connState);
 
-      expect('wall' in snap).toBe(false);
-      expect('deadWall' in snap).toBe(false);
+      // The redacted wall must NOT carry drawOrder (the tile identities)
+      expect(snap.wall).not.toBeNull();
+      expect('drawOrder' in (snap.wall as object)).toBe(false);
       expect(snap.wallCount).toBeGreaterThan(0);
-      expect(snap.deadWallCount).toBeGreaterThan(0);
+      // Public positional state is present
+      expect(snap.wall!.wallSelectionDice).toHaveLength(2);
+      expect(snap.wall!.dealStartDice).toHaveLength(2);
+      expect(snap.wall!.drawPtr).toBe(53);
+      expect(snap.wall!.kongDraws).toBe(0);
+    });
+  });
+
+  describe('pendingRoll', () => {
+    it('passes pendingRoll through to the snapshot', () => {
+      const engine = dealedEngine();
+      const snap = toClientSnapshot(
+        engine.state,
+        GAME_ID,
+        0,
+        connState,
+        '2D',
+        false,
+        'hands',
+        undefined,
+        undefined,
+        { purpose: 'jing_reveal', roller: 0 },
+      );
+      expect(snap.pendingRoll).toEqual({ purpose: 'jing_reveal', roller: 0 });
+    });
+
+    it('defaults pendingRoll to null when not provided', () => {
+      const engine = dealedEngine();
+      const snap = toClientSnapshot(engine.state, GAME_ID, 0, connState);
+      expect(snap.pendingRoll).toBeNull();
+    });
+
+    it('Gameplay·dice-roll-pause: dealing preGamePhase is included in snapshot', () => {
+      const engine = GameEngine.create(42); // not dealt yet
+      const snap = toClientSnapshot(engine.state, GAME_ID, 0, connState, '2D', false, 'dealing');
+      expect(snap.preGamePhase).toBe('dealing');
     });
   });
 

@@ -1,10 +1,10 @@
-/**
- * a11y-h.test.tsx — Phase H accessibility tests (Phase 12B A11y deliverable).
+﻿/**
+ * a11y-h.test.tsx â€” Phase H accessibility tests (Phase 12B A11y deliverable).
  *
  * Feature coverage:
- *  - A11y·tile-aria:       aria-labels, roles, keyboard interaction on MahjongTile2D
+ *  - A11yÂ·tile-aria:       aria-labels, roles, keyboard interaction on MahjongTile2D
  *                          and PlayerHand2D
- *  - A11y·reduced-motion:  global CSS media-query rule present in index.css
+ *  - A11yÂ·reduced-motion:  global CSS media-query rule present in index.css
  */
 
 import { readFileSync } from 'fs';
@@ -17,12 +17,12 @@ import { PlayerHand2D } from './PlayerHand2D';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState } from '@nanchang/shared';
 
-// ── Module mocks ──────────────────────────────────────────────────────────────
+// â”€â”€ Module mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 vi.mock('../../stores/game.store', () => ({ useGameStore: vi.fn() }));
 const mockUseGameStore = vi.mocked(useGameStore);
 
-// AnimatePresence holds exited elements in jsdom — mock as pass-through.
+// AnimatePresence holds exited elements in jsdom â€” mock as pass-through.
 vi.mock('framer-motion', async (importOriginal) => {
   const mod = await importOriginal<typeof import('framer-motion')>();
   return {
@@ -31,7 +31,7 @@ vi.mock('framer-motion', async (importOriginal) => {
   };
 });
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState {
   return {
@@ -44,13 +44,14 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 60,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
     viewMode: '2D',
     ruleTopBottomJing: false,
     preGamePhase: null,
+    pendingRoll: null,
     seats: [
       {
         wind: 'east',
@@ -104,16 +105,16 @@ function setupStore(snapshot: ClientGameState | null = makeSnapshot()) {
   );
 }
 
-// ── A11y·tile-aria — MahjongTile2D ───────────────────────────────────────────
+// â”€â”€ A11yÂ·tile-aria â€” MahjongTile2D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('MahjongTile2D · A11y·tile-aria', () => {
+describe('MahjongTile2D Â· A11yÂ·tile-aria', () => {
   it('face-up tile has aria-label matching the EN tile name', () => {
     render(
       <I18nProvider>
         <MahjongTile2D tile="1m" size="md" role="bottom" interactive={false} />
       </I18nProvider>,
     );
-    // tileAriaLabel('1m', 'en') → '1 Character'
+    // tileAriaLabel('1m', 'en') â†’ '1 Character'
     expect(screen.getByRole('img', { name: '1 Character' })).toBeInTheDocument();
   });
 
@@ -238,9 +239,9 @@ describe('MahjongTile2D · A11y·tile-aria', () => {
   });
 });
 
-// ── A11y·tile-aria — PlayerHand2D ────────────────────────────────────────────
+// â”€â”€ A11yÂ·tile-aria â€” PlayerHand2D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('PlayerHand2D · A11y·tile-aria', () => {
+describe('PlayerHand2D Â· A11yÂ·tile-aria', () => {
   beforeEach(() => setupStore());
 
   it('Reorder.Group has aria-label="Your hand"', () => {
@@ -294,9 +295,9 @@ describe('PlayerHand2D · A11y·tile-aria', () => {
   });
 });
 
-// ── A11y·reduced-motion ───────────────────────────────────────────────────────
+// â”€â”€ A11yÂ·reduced-motion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('index.css · A11y·reduced-motion', () => {
+describe('index.css Â· A11yÂ·reduced-motion', () => {
   // Read the actual CSS file via process.cwd() (= apps/web when Vitest runs).
   // This is more reliable than import.meta.url which Vitest resolves as an
   // http URL in jsdom mode rather than a file URL.

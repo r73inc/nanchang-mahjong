@@ -1,9 +1,9 @@
-/**
- * last-discard-pulse.test.tsx — BUG-020 regression tests.
+﻿/**
+ * last-discard-pulse.test.tsx â€” BUG-020 regression tests.
  *
  * The last-discard red pulse is driven by the store's `lastDiscard` field
  * (set by game:event {kind:'discard'}). These tests use the REAL game store
- * (not a mock) so they exercise the same selector wiring as live gameplay —
+ * (not a mock) so they exercise the same selector wiring as live gameplay â€”
  * the original bug survived six fixes because every test mocked the store
  * and the mobile pool (the component phones actually render) was never
  * covered at all.
@@ -26,7 +26,7 @@ import { MobileDiscardPool2D } from './MobileDiscardPool2D';
 import { useGameStore } from '../../stores/game.store';
 import type { ClientGameState, ClientSeatState, TileType } from '@nanchang/shared';
 
-// ── Snapshot helpers ──────────────────────────────────────────────────────────
+// â”€â”€ Snapshot helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeSeat(overrides: Partial<ClientSeatState> = {}): ClientSeatState {
   return {
@@ -54,13 +54,14 @@ function makeSnapshot(overrides: Partial<ClientGameState> = {}): ClientGameState
     dealerSeat: 0,
     roundWind: 'east',
     wallCount: 60,
-    deadWallCount: 14,
+    wall: null,
     pendingDiscard: null,
     discardedBySeat: null,
     viewerSeat: 0,
     viewMode: '2D',
     ruleTopBottomJing: false,
     preGamePhase: null,
+    pendingRoll: null,
     seats: [
       makeSeat({ wind: 'east', discards: ['1m', '9p'] as TileType[] }),
       makeSeat({ wind: 'south', discards: ['5s'] as TileType[] }),
@@ -85,13 +86,13 @@ beforeEach(() => {
   });
 });
 
-// ── MobileDiscardPool2D (the component phones actually render) ────────────────
+// â”€â”€ MobileDiscardPool2D (the component phones actually render) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('MobileDiscardPool2D · BUG-020 last-discard pulse', () => {
+describe('MobileDiscardPool2D Â· BUG-020 last-discard pulse', () => {
   it('pulses the last-discarded tile WITHOUT a claim window', () => {
     act(() => {
       useGameStore.getState().setSnapshot(makeSnapshot());
-      // game:event {kind:'discard'} — seat 1 discarded 5s. No claimWindow:
+      // game:event {kind:'discard'} â€” seat 1 discarded 5s. No claimWindow:
       // the server only sends game:claim-window to seats with eligible claims.
       useGameStore.getState().setLastDiscard({ seat: 1, tile: '5s' as TileType });
     });
@@ -132,9 +133,9 @@ describe('MobileDiscardPool2D · BUG-020 last-discard pulse', () => {
   });
 });
 
-// ── CombinedDiscardPool2D (desktop 2D) ────────────────────────────────────────
+// â”€â”€ CombinedDiscardPool2D (desktop 2D) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('CombinedDiscardPool2D · BUG-020 last-discard pulse', () => {
+describe('CombinedDiscardPool2D Â· BUG-020 last-discard pulse', () => {
   it('pulses the last-discarded tile from the real store', () => {
     act(() => {
       useGameStore.getState().setSnapshot(makeSnapshot());
@@ -160,9 +161,9 @@ describe('CombinedDiscardPool2D · BUG-020 last-discard pulse', () => {
   });
 });
 
-// ── Store wiring — lastDiscard survives the no-claim snapshot batch ───────────
+// â”€â”€ Store wiring â€” lastDiscard survives the no-claim snapshot batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe('game.store · BUG-020 lastDiscard lifecycle', () => {
+describe('game.store Â· BUG-020 lastDiscard lifecycle', () => {
   it('setSnapshot preserves lastDiscard when pendingDiscard is already null', () => {
     act(() => {
       useGameStore.getState().setLastDiscard({ seat: 2, tile: '7p' as TileType });

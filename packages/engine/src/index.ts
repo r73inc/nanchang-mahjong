@@ -5,7 +5,7 @@
  * Use the seed + event log for replay; the engine re-derives any past state.
  */
 
-export const ENGINE_VERSION = '0.2.0';
+export const ENGINE_VERSION = '0.3.0';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,6 +27,7 @@ export type {
   SeatState,
   GameState,
   GameEvent,
+  WallState,
 } from './types';
 
 // ── Tile utilities ────────────────────────────────────────────────────────────
@@ -60,6 +61,28 @@ export {
 
 export { mulberry32, seededShuffle } from './prng';
 
+// ── Dice ──────────────────────────────────────────────────────────────────────
+
+export { rollDice, diceSum, DICE_SALT } from './dice';
+export type { DicePurpose } from './dice';
+
+// ── Wall (physical ring-of-stacks model) ──────────────────────────────────────
+
+export {
+  WALL_COUNT,
+  STACKS_PER_WALL,
+  TOTAL_STACKS,
+  TOTAL_TILES,
+  globalStackIndex,
+  startGlobalStack,
+  buildWallState,
+  tilesRemaining,
+  drawFront,
+  drawBack,
+  resolveJingStack,
+  swapStackTiles,
+} from './wall';
+
 // ── Jing (wildcard) ───────────────────────────────────────────────────────────
 
 export { jingTypeFromIndicator, jingTypesFromIndicator, isJing, separateJing } from './jing';
@@ -92,7 +115,7 @@ export {
 
 // ── Engine ────────────────────────────────────────────────────────────────────
 
-export { GameEngine, nextDealer } from './engine';
+export { GameEngine, nextDealer, previewJingReveal } from './engine';
 
 // ── Replay ────────────────────────────────────────────────────────────────────
 

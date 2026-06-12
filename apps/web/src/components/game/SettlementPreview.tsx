@@ -139,6 +139,16 @@ export function SettlementPreview({
           {t('preGameSettlementTitle')}
         </h1>
         <p className="text-sm text-mj-bone/50 mt-1">{t('preGameSettlementDesc')}</p>
+        {settlementPreview.dice && (
+          <p className="text-xs text-mj-gold/80 mt-2 font-semibold tracking-wide">
+            🎲{' '}
+            {t(
+              'preGameDiceRolled',
+              String(settlementPreview.dice[0]),
+              String(settlementPreview.dice[1]),
+            )}
+          </p>
+        )}
       </div>
 
       {/* Settlement tiles display */}

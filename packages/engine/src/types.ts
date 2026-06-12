@@ -184,17 +184,60 @@ export interface GameConfig {
   /**
    * Opening Top & Bottom Spirit Flip (开局上下翻精).
    *
-   * When true, the standard dead-wall indicator draw is replaced by a live-wall
-   * two-tile sequence immediately after dealing:
-   *   1. wall[0] (the settlement tile / 下精) is flipped; any player holding
-   *      it in their initial hand receives 2 pts from every other player per copy.
-   *   2. The settlement tile is tucked to the bottom of the live wall.
-   *   3. wall[1] (now wall[0] after the tuck) becomes the Jing indicator.
-   *   4. jingPrimary = indicator, jingSecondary = stepAbove(indicator).
+   * After dealing, the dealer rolls two dice; the sum counts stacks backwards
+   * from the back of the wall (inclusive) to resolve the jing stack.
    *
-   * Default: false (standard single-indicator rule).
+   * When true:
+   *   1. The TOP tile of the resolved stack is flipped — the settlement tile
+   *      (下精); any player holding it in their dealt hand receives 2 pts from
+   *      every other player per copy (+1 pt per copy of the next-in-sequence).
+   *   2. The settlement tile is swapped with the tile directly below it; the
+   *      revealed BOTTOM tile is the Jing indicator.
+   *   3. jingPrimary = indicator, jingSecondary = stepAbove(indicator).
+   *   4. Both tiles remain in the wall in their swapped positions and are
+   *      drawn normally — neither is consumed.
+   *
+   * When false (standard rule): the same dice procedure resolves the stack,
+   * the TOP tile is flipped as the Jing indicator (no settlement, no swap),
+   * and it likewise stays in the wall.
    */
   ruleTopBottomJing: boolean;
+}
+
+// ── Wall state (physical ring-of-stacks model) ────────────────────────────────
+
+/**
+ * The physical wall: 4 per-seat walls × 17 two-tile stacks = 68 stacks (136
+ * tiles), modeled as a ring. Dealing/drawing advances forward from the
+ * dice-resolved start stack; kong replacements come from the back. See
+ * wall.ts for the full conventions and the helpers that operate on this.
+ *
+ * All positional data a renderer needs to draw the physical table at any
+ * point in the hand is derivable from this state alone.
+ */
+export interface WallState {
+  /**
+   * All 136 tiles in draw order: index 0 = first tile dealt, walking the
+   * ring forward from the deal-start stack (top then bottom of each stack).
+   * Fixed at build except for the jing reveal in-place swap.
+   */
+  drawOrder: TileId[];
+  /** Dice roll #1 (rolled by the dealer) — selects which seat's wall. */
+  wallSelectionDice: [number, number];
+  /** Dice roll #2 (rolled by the selected player) — selects the start stack. */
+  dealStartDice: [number, number];
+  /** Seat whose wall the deal started from (resolved from roll #1). */
+  dealStartSeat: 0 | 1 | 2 | 3;
+  /** 0-based stack index within that seat's wall (resolved from roll #2). */
+  dealStartStack: number;
+  /** Next front (normal) draw position — index into drawOrder. */
+  drawPtr: number;
+  /** Number of back (kong replacement) draws taken so far. */
+  kongDraws: number;
+  /** Jing reveal dice (rolled by the dealer) — null until revealJing(). */
+  jingDice: [number, number] | null;
+  /** Global stack index (0–67) resolved by the jing dice — null until reveal. */
+  jingStackGlobal: number | null;
 }
 
 // ── Game state ────────────────────────────────────────────────────────────────
@@ -223,10 +266,11 @@ export interface GameState {
   jingPrimary: TileType | null;
   /** Secondary Spirit (副精): the tile one rank above the indicator — all 4 copies are wildcards. */
   jingSecondary: TileType | null;
-  /** Remaining live wall tile IDs (in draw order). */
-  wall: TileId[];
-  /** Dead wall (for Kong replacements). */
-  deadWall: TileId[];
+  /**
+   * The physical wall (ring-of-stacks model). Null only during the 'dealing'
+   * phase, before deal() has rolled the dice and built the wall.
+   */
+  wall: WallState | null;
   seats: [SeatState, SeatState, SeatState, SeatState];
   /** Index of the seat whose turn it is. */
   currentSeat: 0 | 1 | 2 | 3;
@@ -254,6 +298,15 @@ export interface GameState {
 // ── Events (move log for replay) ──────────────────────────────────────────────
 
 export type GameEvent =
+  | {
+      kind: 'dice_roll';
+      /** What this roll resolves — one event per physical dice moment. */
+      purpose: 'wall_selection' | 'deal_start' | 'jing_reveal';
+      /** Seat index of the player who physically rolls these dice. */
+      roller: 0 | 1 | 2 | 3;
+      /** Individual die faces (each 1–6) — never just the sum. */
+      dice: [number, number];
+    }
   | { kind: 'deal'; seed: number; hands: [TileType[], TileType[], TileType[], TileType[]] }
   | {
       kind: 'opening_jing_settlement';
@@ -263,7 +316,7 @@ export type GameEvent =
       scoreDelta: [number, number, number, number];
     }
   | { kind: 'jing_indicator'; indicator: TileType; jingPrimary: TileType; jingSecondary: TileType }
-  | { kind: 'draw'; seat: 0 | 1 | 2 | 3; tile: TileType; fromDeadWall: boolean }
+  | { kind: 'draw'; seat: 0 | 1 | 2 | 3; tile: TileType; fromBack: boolean }
   | { kind: 'discard'; seat: 0 | 1 | 2 | 3; tile: TileType }
   | { kind: 'pung'; seat: 0 | 1 | 2 | 3; tile: TileType }
   | { kind: 'kong_open'; seat: 0 | 1 | 2 | 3; tile: TileType }

@@ -6,6 +6,77 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/wall-model-rework` (2026-06-11)
+
+### BUG-037 · Wall model wrong — no dice rolls, no segmented walls, wrong settlement/spirit position (MAJOR)
+
+**Symptom:** The engine shuffled all 136 tiles into one flat pool and dealt from the front — no per-player walls, no 2-high stacks, no dice. The settlement tile and jing indicator were taken from `wall[0]`/`wall[1]`, the indicator was consumed, and the settlement tile was relocated to the bottom of the pool. Kong replacements came from a separate 4-tile `deadWall`. None of this matched the physical table, making a future spectator view impossible to animate from engine state.
+
+**Fix (full engine rework — no patching):** Replaced the flat-pool model with the physical **ring-of-stacks** wall:
+
+- **`packages/engine/src/dice.ts` (new):** `rollDice(rand, count)` — pure, PRNG-injected. Every dice moment derives an independent stream from `mulberry32(seed ^ DICE_SALT.<purpose>)` and emits a `dice_roll` GameEvent with individual die faces (`purpose: 'wall_selection' | 'deal_start' | 'jing_reveal'`, `roller`, `dice`).
+- **`packages/engine/src/wall.ts` (new):** `WallState` — 4 walls × 17 stacks × 2 tiles = 136 modeled as a ring. `drawOrder[136]` is fixed at build (top-then-bottom per stack, walking forward from the dice-resolved start stack); `drawPtr` advances for normal draws, `kongDraws` counts back draws (kong replacement = the current **last** tile of the wall, index `135 − kongDraws`). Exhaustion when the pointers meet (no reserved dead wall — every tile is drawable, 83 live tiles after the deal).
+- **`deal()` rewritten as the real procedure:** roll #1 (dealer) counts seats CCW inclusively to select a wall; roll #2 (selected player) counts stacks inclusively from the left of that wall; the dealer takes the counted stack first, then CCW one stack per seat per round for 6 rounds (12 each), then one single tile each (13), then the dealer's 14th. Live drawing continues exactly where the deal stopped.
+- **`revealJing()` rewritten:** dealer rolls the jing dice (per rules doc §3.1); the sum counts stacks backwards from the back of the wall, inclusive. Top-bottom mode: top tile = settlement (2 pts/copy + 1 pt/copy `stepAbove`, math unchanged), swap with the tile below, bottom = jing indicator — **both stay in the wall in their swapped positions and are drawn normally**. Standard mode: top tile = indicator, no swap, nothing consumed. New pure `previewJingReveal(state)` lets the service build the settlement preview before the reveal with guaranteed agreement.
+- **`GameState.wall`** is now `WallState | null` (`deadWall` removed; `draw` event field renamed `fromDeadWall` → `fromBack`).
+- **Shared:** `ClientGameState.wall: ClientWallState | null` (all dice values + positions public; `drawOrder` tile identities never leave the server), `deadWallCount` removed, `PublicGameEvent` gained `dice_roll`, `SettlementPreviewPayload` gained `dice` + `stackGlobal`.
+- **API:** `toClientSnapshot` redacts `WallState` → `ClientWallState`; settlement preview built via `previewJingReveal`; jing `dice_roll` broadcast to clients.
+- **Web:** settlement preview shows the rolled dice; `replayHand` now receives `config` (see below); test mocks updated.
+
+**Two latent bugs fixed in the same rework:**
+
+1. **`getNewEvents` dropped all hand-2+ events from the replay log.** It sliced `engine.events` by the cross-hand `moveLog.length`, but `engine.events` resets per hand. Fixed by offsetting with the current hand's `eventStartIdx`.
+2. **`replayHand` ignored rule variants.** `ReplayHandConfig` had no `config`, so top-bottom-jing games replayed down the standard branch (wrong indicator, no settlement). `config` is now part of `ReplayHandConfig` and `buildTimeline` passes `settings.ruleTopBottomJing`.
+
+**Documented conventions (decided during implementation, tested in `wall.test.ts`):**
+
+- Roll #2 uses **two dice** (matching roll #1 and the locked rules doc's jing roll; the family example "a 6" is compatible).
+- The skipped stacks before the deal-start stack form the **tail of the draw ring** — kong replacements consume them first, then the left-neighbour's wall, which matches the family's "kong from the wall left of the deal start" description.
+- Kong replacement = the current **last tile of the wall in draw order** (bottom of the back-most stack first).
+- The dice procedure applies to **both** jing modes (standard and top-bottom).
+- No reserved dead wall: the hand is drawn only when every tile has been taken. (Old model reserved 3–4 tiles; per the family procedure nothing is held back.)
+
+**Tests:** 331 engine (22 new in `wall.test.ts`: ring math, wraparound, dice determinism from seed, stack-taking deal sequence per the worked family example, front/back draws never overlap, swap-in-place, zero-sum settlement), 222 API, 352 web — all passing.
+
+**Key learnings:**
+
+- **Model the physical table, not the abstraction.** A flat array was "equivalent" for game logic but made dice, positions, and animations impossible to derive. The ring + two pointers is barely more code and every future feature (spectator view, deal animation) reads straight from state.
+- **Derive everything from the seed.** Dice use salted PRNG streams (`seed ^ 'WALL'/'DEAL'/'JING'`), so replays reproduce the entire physical setup with zero extra stored state.
+- **`engine.events` resets per hand but session logs span hands** — any "what's new" comparison between them must be offset by the hand's start index. Symmetric-looking lengths from hand 1 hid this for months.
+- **Replay needs the full game config, not just the seed.** Any rule flag that changes an engine transition must travel with the replay payload.
+
+---
+
+## `feat/dice-roll-animation` (2026-06-11)
+
+### IMP-019 · Manual dice-roll UI with 2D animation
+
+**Summary:** Three dice rolls that previously resolved instantly on the server now pause and wait for the designated player to press a "Roll Dice" button. A 2D Framer Motion die animation shows the exact faces, and the updated `ClientGameState` snapshot is buffered until the animation completes.
+
+**Scope of changes:**
+
+- **Shared (`packages/shared/src/game.events.ts`):** `ClientGameState` gains `preGamePhase: 'dealing'` (new value) and `pendingRoll: { purpose, roller } | null`. New `RollDicePayloadSchema` (empty C→S schema).
+- **API session (`apps/api/src/game/game-session.ts`):** `preGamePhase` default changed from `'hands'` to `'dealing'`; new `pendingRoll` field (includes server-only `seed`).
+- **API snapshot (`apps/api/src/game/snapshot.ts`):** Passes `pendingRoll` (without seed) to `ClientGameState`.
+- **API service (`apps/api/src/game/game.service.ts`):** `createGame` and `startNextHand` no longer call `.deal()` — they set `pendingRoll = { purpose: 'deal_1', roller: dealerSeat }` and `preGamePhase = 'dealing'`. New `handleRollDice`, `handleRollDiceInternal`, and `doBotRollIfNeeded` methods. `handleAdvancePreGame` no longer calls `doRevealJing` directly; sets `pendingRoll` for `jing_reveal` and bots auto-chain. `setJingRevealPendingRoll` extracted as a helper.
+- **API gateway (`apps/api/src/game/game.gateway.ts`):** `game:roll-dice` handler added with 2/s throttle.
+- **Web store (`apps/web/src/stores/game.store.ts`):** `diceAnimation` state + `setDiceAnimation` action.
+- **Web hook (`apps/web/src/hooks/use-game.ts`):** `snapshotQueueRef` + `isDiceAnimatingRef` buffer snapshots during animation. `handleSnapshot` queues while animating; `handleGameEvent` intercepts `dice_roll` events; new `rollDice` action and `onDiceAnimationComplete` callback.
+- **Web component (`apps/web/src/components/2d/DiceRollOverlay.tsx`):** Full-screen overlay. Shows animated Framer Motion dice (spin → settle on final value), "Roll Dice" gold button for the active roller, "Waiting for X to roll…" for others. Calls `onAnimationComplete` after the result text animates in.
+- **Web page (`apps/web/src/pages/game/game-page.tsx`):** `DiceRollOverlay` rendered at z-[60] whenever `pendingRoll !== null || diceAnimation !== null`. `PreGameFlow` handles `'dealing'` phase with a simple loading screen (hidden behind the overlay).
+- **i18n:** 8 new keys in `en.json` and `zh.json` (`diceRollTitle`, `diceRollDealing`, `diceRollDeal1`, `diceRollDeal2`, `diceRollJing`, `diceRollButton`, `diceRollWaiting`, `diceRollResult`).
+
+**Tests:** 331 engine (unchanged), 228 API (+6: gateway `handleRollDice`, snapshot `pendingRoll`), 360 web (+8: `DiceRollOverlay` interactive/waiting/purpose/animation states) — all passing.
+
+**Key learnings:**
+
+- **Stage reveals via service-layer PRNG re-computation, not engine splitting.** The engine's `deal()` computes all 3 dice atomically; we pre-compute each roll using the same `mulberry32(seed ^ DICE_SALT.<purpose>)` formula and broadcast staged events. When `engine.deal()` is finally called, its internal computation produces identical dice because the PRNG is deterministic from the seed.
+- **Queue snapshots during animation, don't block.** The server sends `game:event` + `game:snapshot` in the same Node.js tick. The client must buffer snapshots while `isDiceAnimatingRef.current === true` and flush after `onAnimationComplete` — otherwise the wall/hand state updates instantly, racing the dice animation.
+- **Bot chaining: synchronous recursion is safe here.** `doBotRollIfNeeded` calls `handleRollDiceInternal` which calls `doBotRollIfNeeded` again — at most 3 levels deep (deal_1 → deal_2 → jing_reveal), all synchronous, no stack overflow risk.
+- **`preGamePhase: 'dealing'` is needed to gate the frontend.** Without it, `PreGameFlow` has no phase to render before `deal()` is called (the engine's `phase` is `'dealing'` but that's the engine-internal phase, not the pre-game UI phase). The new value keeps the UI logic consistent with the other pre-game phases.
+
+---
+
 ## `fix/mobile-ux-hand-reveal-polish` (2026-06-11)
 
 ### BUG-039 · Unmatched tiles unsorted in hand-reveal screen
