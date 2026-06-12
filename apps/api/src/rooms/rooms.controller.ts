@@ -107,8 +107,9 @@ export class RoomsController {
     @Param('roomId') roomId: string,
     @Param('seatIdx', ParseIntPipe) seatIdx: number,
   ) {
-    const room = await this.service.kickSeat(roomId, seatIdx, user.sub);
+    const { room, kickedUserId } = await this.service.kickSeat(roomId, seatIdx, user.sub);
     this.gateway.broadcastRoomUpdate(roomId, room);
+    this.gateway.emitToUser(kickedUserId, 'room:kicked', {});
     return room;
   }
 

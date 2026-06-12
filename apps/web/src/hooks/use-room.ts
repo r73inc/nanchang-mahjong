@@ -185,6 +185,7 @@ export function useRoomActions() {
 export function useRoomSubscription(
   roomId: string | undefined,
   onStarted?: (payload: WsRoomStartedPayload) => void,
+  onKicked?: () => void,
 ) {
   const { setRoom } = useRoomStore();
 
@@ -209,13 +210,19 @@ export function useRoomSubscription(
       onStarted?.(payload);
     };
 
+    const handleKicked = () => {
+      onKicked?.();
+    };
+
     socket.on('room:update', handleUpdate);
     socket.on('room:started', handleStarted);
+    socket.on('room:kicked', handleKicked);
 
     return () => {
       socket?.emit('room:unsubscribe', { roomId });
       socket?.off('room:update', handleUpdate);
       socket?.off('room:started', handleStarted);
+      socket?.off('room:kicked', handleKicked);
     };
-  }, [roomId, setRoom, onStarted]);
+  }, [roomId, setRoom, onStarted, onKicked]);
 }

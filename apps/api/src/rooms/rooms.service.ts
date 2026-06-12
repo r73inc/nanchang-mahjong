@@ -384,8 +384,14 @@ export class RoomsService {
 
   /**
    * Host kicks a player by seat index.
+   * Returns the updated room state and the userId of the kicked player so the
+   * caller can emit a targeted socket event to that player.
    */
-  async kickSeat(roomId: string, seatIdx: number, requestingUserId: string): Promise<RoomState> {
+  async kickSeat(
+    roomId: string,
+    seatIdx: number,
+    requestingUserId: string,
+  ): Promise<{ room: RoomState; kickedUserId: string }> {
     const room = await this.queryRoom(roomId);
     if (!room) throw new NotFoundException('Room not found');
     if (room.hostUserId !== requestingUserId)
@@ -395,6 +401,8 @@ export class RoomsService {
     const seat = room.seats[seatIdx];
     if (!seat?.userId) throw new BadRequestException('Seat is empty');
     if (seat.userId === requestingUserId) throw new BadRequestException('Cannot kick yourself');
+
+    const kickedUserId = seat.userId;
 
     await this.db.transactWrite({
       TransactItems: [
@@ -414,7 +422,8 @@ export class RoomsService {
       ],
     });
 
-    return (await this.queryRoom(roomId))!;
+    const updatedRoom = (await this.queryRoom(roomId))!;
+    return { room: updatedRoom, kickedUserId };
   }
 
   /**

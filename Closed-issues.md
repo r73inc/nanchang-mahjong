@@ -6,6 +6,72 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/remaining-bugs-022-029-032-041` (2026-06-11)
+
+### BUG-022 · Player rejoin fails — tile play blocked after socket reconnection
+
+**Symptom:** After a WebSocket disconnect and reconnect while the game page was mounted, the player could not play tiles — either the game showed a stale `GameErrorScreen` or the UI appeared stuck.
+
+**Root cause:** `handleConnect` in `use-game.ts` restored the live connection and re-emitted `game:join`, but it did NOT clear `gameError` or `pendingMove` from the Zustand store. If a transient `game:error` event (e.g. `NOT_YOUR_TURN` from a race before the disconnect, or `TOO_FAST` from the rate limiter) had been stored before the disconnect, it persisted through reconnect and kept `GameErrorScreen` visible. Similarly, a `pendingMove: true` set by a discard that was never confirmed (because the socket dropped mid-flight) could block subsequent tile interactions.
+
+**Fix:** In `handleConnect` in `apps/web/src/hooks/use-game.ts`, added `setGameError(null)` and `setPendingMove(false)` before re-emitting `game:join`. The incoming `game:snapshot` then replaces all game state cleanly, and the player can interact normally.
+
+**Key learnings:**
+
+- **Socket reconnect ≠ component remount.** `reset()` runs on unmount and clears all Zustand state, but socket reconnect fires `handleConnect` while the component is still mounted — store state from before the disconnect survives unless explicitly cleared.
+- **Clear error state on reconnect.** Any `game:error` received before a disconnect should be treated as transient; the server re-confirms state via `game:snapshot` after `game:join`, making any prior error irrelevant.
+
+---
+
+### BUG-029 · Copy room code button non-functional on mobile
+
+**Symptom:** Tapping the "Copy" button in the room waiting page had no effect on mobile browsers (especially iOS Safari).
+
+**Root cause:** `handleCopy` used `navigator.clipboard.writeText()` exclusively, with no feedback on success or failure. iOS Safari requires the Clipboard API call to happen within a user gesture AND the page must be served over HTTPS. In some contexts (e.g. local dev, WebView, insecure origin) the call silently fails. Additionally, no visual confirmation was shown, so the user had no way to know if the copy succeeded.
+
+**Fix:** Added `document.execCommand('copy')` textarea fallback in `apps/web/src/pages/room/room-page.tsx`. On success (either method), a `copied` state variable is set for 2 seconds, turning the button green and changing its label to "Copied!". Added i18n keys `copied` / `已复制！` to `en.json` / `zh.json`.
+
+**Key learnings:**
+
+- **Clipboard API can fail silently on mobile.** Always use a `execCommand('copy')` textarea fallback and give the user visual confirmation so they know the copy was attempted.
+
+---
+
+### BUG-032 · Kicked player not redirected — remains on config screen
+
+**Symptom:** When the host kicked a player, the kicked player saw their name disappear from the seat list but stayed on the room config screen with a stale view.
+
+**Root cause:** The `kickSeat` REST endpoint (`DELETE /rooms/:id/seats/:n`) called `broadcastRoomUpdate` which emits `room:update` to everyone in the socket.io room. The kicked player's `useRoomSubscription` handled `room:update` by replacing the room state — their seat was now empty, but no navigation was triggered. There was no dedicated socket event for the kicked player.
+
+**Fix (three-part):**
+
+1. **`apps/api/src/rooms/rooms.service.ts`** — `kickSeat` now returns `{ room: RoomState; kickedUserId: string }` instead of plain `RoomState`, capturing the kicked user's ID before the seat is deleted.
+2. **`apps/api/src/rooms/rooms.gateway.ts`** — added `emitToUser(userId, event, payload)` which iterates `server.sockets.sockets` to find all connected sockets owned by the given userId and emits the event directly to each. Called from the controller as `gateway.emitToUser(kickedUserId, 'room:kicked', {})`.
+3. **Frontend** — `useRoomSubscription` in `apps/web/src/hooks/use-room.ts` gained an optional `onKicked` callback; it now listens for `room:kicked`. `RoomPage` passes `handleKicked` which calls `clearRoom()` then navigates to `/home`.
+
+Added 1 new gateway test (`Kick·redirect`) and updated the service test to assert `kickedUserId` in the return value.
+
+**Key learnings:**
+
+- **`room:update` broadcast alone is insufficient for destructive events.** A kicked player receives the updated room (minus their seat), but the client has no way to know it was _them_ who was removed without a dedicated per-player event.
+- **Iterating `server.sockets.sockets` is the correct pattern for targeted userId-addressed emission** when there is no dedicated socket room for individual users.
+
+---
+
+### BUG-041 · Spirit tile popup shows indicator+arrow instead of current+next only
+
+**Symptom:** Tapping the spirit tile button during gameplay opened a popup showing four elements: the jing indicator tile → arrow → jingPrimary → jingSecondary. The user expected to see only the two active spirit tiles (current and next).
+
+**Root cause:** The `MobileJingButton` popup in `apps/web/src/pages/game/game-page.tsx` was rendering `snapshot.jingIndicator` (the physical tile used to determine the spirit) plus an arrow, followed by `jingPrimary` and `jingSecondary`. This exposed an internal game concept (the indicator tile) that players do not need to see; they only care about which tiles are wild.
+
+**Fix:** Removed `jingIndicator` and the arrow from the popup. The popup now shows `jingPrimary` and `jingSecondary` side by side, each with a label ("Current" / "Next"). Added i18n keys `gameSpiritCurrent` / `gameSpiritNext` (EN/ZH). No backend changes.
+
+**Key learnings:**
+
+- **Don't expose implementation details in the UI.** The indicator tile is a mechanical detail for determining which tile is the spirit. Players only need to know which tiles are wild (primary and secondary).
+
+---
+
 ## `fix/bug-031-host-refresh-locks-config` (2026-06-11)
 
 ### BUG-031 · Host browser close/refresh makes room config non-interactable (MAJOR)

@@ -140,6 +140,7 @@
   "privateRoom": "私人房间",
   "roomCode": "房间号",
   "copy": "复制",
+  "copied": "已复制！",
   "shareLink": "分享",
   "waitingForPlayers": "等待玩家加入…",
   "shareCodeHint": "将上方房间号分享给好友。",
@@ -257,6 +258,8 @@
   "gameRevealSpirit": "揭示精牌",
   "gameWaitingReveal": "等待房主揭示精牌…",
   "gameSpiritTiles": "精牌",
+  "gameSpiritCurrent": "当前精牌",
+  "gameSpiritNext": "下一张",
   "gameSpiritDesc": "{{0}} 和 {{1}} 是本局精牌",
 
   "preGameHandTitle": "发牌完成",

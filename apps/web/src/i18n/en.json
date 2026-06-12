@@ -140,6 +140,7 @@
   "privateRoom": "Private Room",
   "roomCode": "ROOM CODE",
   "copy": "Copy",
+  "copied": "Copied!",
   "shareLink": "Share",
   "waitingForPlayers": "Waiting for players to join…",
   "shareCodeHint": "Share the code above with your friends.",
@@ -257,6 +258,8 @@
   "gameRevealSpirit": "Reveal Spirit",
   "gameWaitingReveal": "Waiting for host to reveal Spirit…",
   "gameSpiritTiles": "Spirit Tiles",
+  "gameSpiritCurrent": "Current",
+  "gameSpiritNext": "Next",
   "gameSpiritDesc": "{{0}} and {{1}} are tonight's wildcards",
 
   "preGameHandTitle": "Hand Dealt",

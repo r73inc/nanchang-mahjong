@@ -141,6 +141,30 @@ describe('RoomsGateway', () => {
     });
   });
 
+  describe('emitToUser', () => {
+    it('Kick·redirect: emits event to all sockets owned by the target user', () => {
+      const targetEmit = jest.fn();
+      const otherEmit = jest.fn();
+      const fakeSockets = new Map<string, unknown>([
+        [
+          'sock-target',
+          { data: { user: { sub: 'u-target', handle: 'target' } }, emit: targetEmit },
+        ],
+        ['sock-other', { data: { user: { sub: 'u-other', handle: 'other' } }, emit: otherEmit }],
+        ['sock-no-user', { data: {}, emit: jest.fn() }],
+      ]);
+      const serverObj = gateway as unknown as {
+        server: { to: jest.Mock; sockets: { sockets: Map<string, unknown> } };
+      };
+      serverObj.server = { ...serverObj.server, sockets: { sockets: fakeSockets } } as never;
+
+      gateway.emitToUser('u-target', 'room:kicked', {});
+
+      expect(targetEmit).toHaveBeenCalledWith('room:kicked', {});
+      expect(otherEmit).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Disconnect cleanup ─────────────────────────────────────────────────────
 
   describe('handleDisconnect', () => {

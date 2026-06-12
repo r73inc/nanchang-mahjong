@@ -137,4 +137,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const payload: WsRoomStartedPayload = { roomId, gameId };
     this.server.to(`room:${roomId}`).emit('room:started', payload);
   }
+
+  /** Emit an event directly to all sockets owned by a specific user. */
+  emitToUser(userId: string, event: string, payload: unknown): void {
+    const sockets = this.server.sockets.sockets;
+    for (const [, socket] of sockets) {
+      const user = socket.data.user as WsUser | undefined;
+      if (user?.sub === userId) {
+        socket.emit(event, payload);
+      }
+    }
+  }
 }
