@@ -44,6 +44,37 @@ const CALLOUT_PUNG_SOUNDS = ['/sounds/callOuts/pung/pung.mp3'];
 
 const CALLOUT_KONG_SOUNDS = ['/sounds/callOuts/kong/kong.mp3'];
 
+// ── Audio cache ───────────────────────────────────────────────────────────────
+// Pre-decoded HTMLAudioElement per URL. Populated once at module load so the
+// browser fetches and decodes every file in the background before the first
+// game event fires — eliminating the decode-on-demand stutter on mobile.
+
+const audioCache = new Map<string, HTMLAudioElement>();
+
+function preloadAudio(pools: string[][]): void {
+  try {
+    for (const pool of pools) {
+      for (const url of pool) {
+        if (!audioCache.has(url)) {
+          audioCache.set(url, new Audio(url));
+        }
+      }
+    }
+  } catch {
+    // Audio API unavailable (e.g. jsdom in tests) — silently skip
+  }
+}
+
+preloadAudio([
+  TILE_PLACE_SOUNDS,
+  DICE_ROLL_SOUNDS,
+  POINT_TRANSFER_SOUNDS,
+  SHUFFLE_SOUNDS,
+  CALLOUT_CHOW_SOUNDS,
+  CALLOUT_PUNG_SOUNDS,
+  CALLOUT_KONG_SOUNDS,
+]);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function pickRandom(pool: string[]): string {
@@ -52,7 +83,10 @@ function pickRandom(pool: string[]): string {
 
 function playAudio(url: string): void {
   try {
-    const audio = new Audio(url);
+    const cached = audioCache.get(url);
+    // cloneNode lets a second instance start while the original is still playing
+    // (e.g. rapid tile placements), without interrupting the in-flight audio.
+    const audio = cached ? (cached.cloneNode(true) as HTMLAudioElement) : new Audio(url);
     audio.play().catch(() => {
       // Ignore autoplay policy errors — sound is best-effort
     });
