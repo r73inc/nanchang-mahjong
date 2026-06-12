@@ -72,6 +72,29 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
         gap: 4,
       }}
     >
+      {/* Avatar — outside the pill, above it (left/right) or to its left (top) */}
+      {seat.avatarUrl && (
+        <img
+          src={seat.avatarUrl}
+          alt=""
+          aria-hidden="true"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            border: `2px solid ${isActive ? '#c9a961' : windColor}`,
+            flexShrink: 0,
+            // Center the avatar over the pill when the outer container is pinned
+            // to a screen edge (flex-start / flex-end) rather than centered.
+            alignSelf: position === 'left' || position === 'right' ? 'center' : undefined,
+          }}
+        />
+      )}
+
       {/* ── Main badge pill ─────────────────────────────────────────────── */}
       <div
         className={isActive ? 'mj-opponent-badge-active' : undefined}
@@ -88,25 +111,6 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
           minWidth: 44,
         }}
       >
-        {/* Avatar circle (shown when player has one) */}
-        {seat.avatarUrl && (
-          <img
-            src={seat.avatarUrl}
-            alt=""
-            aria-hidden="true"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: `1px solid ${windColor}`,
-            }}
-          />
-        )}
-
         {/* Wind dot + character row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           {/* Wind colour dot */}
