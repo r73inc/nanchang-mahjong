@@ -316,6 +316,12 @@ describe('addToKongOptions', () => {
     const hand: TileType[] = ['7p', '8p', '9p'];
     expect(addToKongOptions(hand, '3m', NO_JINGS)).toHaveLength(0);
   });
+
+  it('allows Spirit Pung upgrade: player holds 4th jing tile matching an open jing pung', () => {
+    // Open pung is of JING tiles; player draws the 4th → Spirit Kong (杠精)
+    const hand: TileType[] = [JING, '7p', '8p'];
+    expect(addToKongOptions(hand, JING, JINGS)).toEqual([JING]);
+  });
 });
 
 // ── chowOptions ───────────────────────────────────────────────────────────────

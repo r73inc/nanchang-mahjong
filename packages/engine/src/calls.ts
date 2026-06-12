@@ -120,16 +120,16 @@ export function concealedKongOptions(hand: TileType[], jingTypes: TileType[]): T
  * `openPungTile` is the TileType of the open Pung.
  *
  * Rules §3.2: wildcards may NOT substitute in Kongs. An open pung is a revealed meld,
- * so only the exact natural tile may be added — no jing substitution.
+ * so only the exact matching tile may be added — no jing substitution.
+ * Spirit Pung (open pung of jing tiles): the 4th jing tile IS the matching tile,
+ * so the raw hand is checked directly — separateJing must not be used here.
  */
 export function addToKongOptions(
   hand: TileType[],
   openPungTile: TileType,
-  jingTypes: TileType[],
+  _jingTypes: TileType[],
 ): TileType[] {
-  const { naturals } = separateJing(hand, jingTypes);
-  if (naturals.includes(openPungTile)) return [openPungTile];
-  return [];
+  return hand.includes(openPungTile) ? [openPungTile] : [];
 }
 
 // ── Chow ──────────────────────────────────────────────────────────────────────
