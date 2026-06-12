@@ -8,7 +8,6 @@ import {
   HeadBucketCommand,
   PutBucketPolicyCommand,
 } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { AppConfig } from '../config/configuration';
 import type { ReplayGamePayload } from '@nanchang/shared';
 
@@ -146,18 +145,15 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
-   * Return a URL for an avatar key.
-   * - Local dev (MinIO): direct URL — bucket is publicly readable, no auth needed.
-   * - Production (AWS S3): pre-signed URL (1 hour expiry).
+   * Fetch an avatar from S3 and return its raw bytes + content-type.
+   * Used by the avatar proxy endpoint — the API streams the bytes back to the browser
+   * so the browser never needs a direct connection to MinIO.
    */
-  async getAvatarUrl(key: string): Promise<string> {
-    if (this.localEndpoint) {
-      return `${this.localEndpoint}/${this.avatarBucket}/${key}`;
-    }
-    return getSignedUrl(
-      this.client,
+  async getAvatarBuffer(key: string): Promise<{ buffer: Buffer; contentType: string }> {
+    const res = await this.client.send(
       new GetObjectCommand({ Bucket: this.avatarBucket, Key: key }),
-      { expiresIn: 3600 },
     );
+    const bytes = await res.Body!.transformToByteArray();
+    return { buffer: Buffer.from(bytes), contentType: res.ContentType ?? 'image/jpeg' };
   }
 }

@@ -4,7 +4,9 @@ import {
   Patch,
   Put,
   Body,
+  Param,
   Req,
+  Res,
   Query,
   UseGuards,
   ParseIntPipe,
@@ -12,7 +14,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { FastifyRequest } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
@@ -33,7 +35,9 @@ export class UsersController {
   @Get('me')
   async getMe(@CurrentUser() actor: AuthenticatedUser) {
     const profile = await this.users.getOrThrow(actor.sub);
-    const avatarUrl = profile.avatarKey ? await this.storage.getAvatarUrl(profile.avatarKey) : null;
+    // Return an API-relative path so the browser loads via the Vite proxy (or the prod API host)
+    // rather than hitting MinIO directly — which is unreachable from the browser in local dev.
+    const avatarUrl = profile.avatarKey ? `/users/${profile.sub}/avatar` : null;
     return {
       ...profile,
       avatarUrl,
@@ -69,8 +73,7 @@ export class UsersController {
 
     const key = await this.storage.putAvatar(actor.sub, buffer, contentType);
     await this.users.updateAvatar(actor.sub, key);
-    const avatarUrl = await this.storage.getAvatarUrl(key);
-    return { avatarUrl };
+    return { avatarUrl: `/users/${actor.sub}/avatar` };
   }
 
   /** GET /users/me/games — paginated game history for the authenticated user. */
@@ -92,5 +95,32 @@ export class UsersController {
   async search(@Query('q') q: string) {
     const users = await this.users.searchPublic(q ?? '');
     return { users };
+  }
+}
+
+/**
+ * Public avatar proxy — no JWT guard.
+ * Browsers can't reach MinIO directly in local dev (Docker Desktop port mapping),
+ * so we stream the S3 bytes back through the API. The Vite dev proxy routes
+ * /api/users/:id/avatar → localhost:3001/users/:id/avatar transparently.
+ */
+@Controller('users')
+export class UserAvatarController {
+  constructor(
+    private readonly users: UsersService,
+    private readonly storage: StorageService,
+  ) {}
+
+  @Get(':userId/avatar')
+  async getAvatar(@Param('userId') userId: string, @Res() res: FastifyReply) {
+    const profile = await this.users.findBySub(userId);
+    if (!profile?.avatarKey) {
+      return res.status(404).send({ message: 'No avatar' });
+    }
+    const { buffer, contentType } = await this.storage.getAvatarBuffer(profile.avatarKey);
+    return res
+      .header('Content-Type', contentType)
+      .header('Cache-Control', 'public, max-age=86400')
+      .send(buffer);
   }
 }

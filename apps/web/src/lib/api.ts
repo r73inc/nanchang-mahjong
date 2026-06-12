@@ -15,6 +15,9 @@ import { useAuthStore } from '../stores/auth.store';
 // In prod, VITE_API_BASE_URL points at the App Runner endpoint (no /api prefix needed there).
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api';
 
+/** Prepend to API-relative paths (e.g. `/users/{sub}/avatar`) to get a browser-loadable URL. */
+export const API_BASE = BASE_URL;
+
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: 15_000,

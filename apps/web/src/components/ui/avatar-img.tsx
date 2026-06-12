@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE } from '../../lib/api';
 
 // Playable tiles, excluding Haku (blank white dragon), Dora variants, and utility tiles.
 const AVATAR_TILES = [
@@ -66,6 +67,10 @@ export function AvatarImg({ avatarUrl, seed, size = 40, className = '' }: Avatar
   const [imgFailed, setImgFailed] = useState(false);
   const tile = seededTile(seed);
 
+  // API returns relative paths like `/users/{sub}/avatar`.
+  // Prepend API_BASE so the browser routes through the Vite proxy (dev) or the prod API host.
+  const resolvedUrl = avatarUrl?.startsWith('/') ? `${API_BASE}${avatarUrl}` : avatarUrl;
+
   return (
     <div
       className={className}
@@ -82,9 +87,9 @@ export function AvatarImg({ avatarUrl, seed, size = 40, className = '' }: Avatar
         background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)',
       }}
     >
-      {avatarUrl && !imgFailed ? (
+      {resolvedUrl && !imgFailed ? (
         <img
-          src={avatarUrl}
+          src={resolvedUrl}
           alt=""
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           onError={() => setImgFailed(true)}

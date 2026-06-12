@@ -140,7 +140,7 @@ export class GameService {
           const res = await this.db.get({ Key: DK.userProfile(userId) });
           const avatarKey = res.Item?.avatarKey as string | undefined;
           if (!avatarKey) return null;
-          return await this.storage.getAvatarUrl(avatarKey);
+          return `/users/${userId}/avatar`;
         } catch (err) {
           this.logger.warn(`Avatar fetch failed for ${userId}: ${String(err)}`);
           return null;
