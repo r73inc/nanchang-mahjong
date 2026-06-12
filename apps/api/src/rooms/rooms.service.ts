@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
+import { StorageService } from '../storage/storage.service';
 import type {
   RoomState,
   RoomSeat,
@@ -65,7 +66,10 @@ export class RoomsService {
   /** Characters used for code generation (no O/0, I/1/L to avoid confusion). */
   private readonly CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
-  constructor(private readonly db: DynamoDBService) {}
+  constructor(
+    private readonly db: DynamoDBService,
+    private readonly storage: StorageService,
+  ) {}
 
   // ── Private helpers ─────────────────────────────────────────────────────────
 
@@ -82,28 +86,39 @@ export class RoomsService {
     return Math.floor(Date.now() / 1000) + this.ROOM_TTL_SECONDS;
   }
 
-  private assembleRoom(meta: RoomMetaItem, seatItems: RoomSeatItem[]): RoomState {
-    const seats: RoomSeat[] = [0, 1, 2, 3].map((idx) => {
-      const s = seatItems.find((si) => si.seatIdx === idx);
-      if (!s) {
+  private async assembleRoom(meta: RoomMetaItem, seatItems: RoomSeatItem[]): Promise<RoomState> {
+    const seats: RoomSeat[] = await Promise.all(
+      [0, 1, 2, 3].map(async (idx) => {
+        const s = seatItems.find((si) => si.seatIdx === idx);
+        if (!s) {
+          return { seatIdx: idx, userId: null, handle: null, ready: false, isHost: false };
+        }
+
+        // Fetch avatar URL for human seats (bots have no profile).
+        // Failures are non-fatal — the room still opens without an avatar.
+        let avatarUrl: string | null = null;
+        if (!s.isBot) {
+          try {
+            const profileRes = await this.db.get({ Key: DK.userProfile(s.userId) });
+            const avatarKey = profileRes?.Item?.avatarKey as string | undefined;
+            if (avatarKey) avatarUrl = await this.storage.getAvatarUrl(avatarKey);
+          } catch {
+            // non-fatal
+          }
+        }
+
         return {
           seatIdx: idx,
-          userId: null,
-          handle: null,
-          ready: false,
-          isHost: false,
+          userId: s.userId,
+          handle: s.handle,
+          ready: s.ready,
+          isHost: s.userId === meta.hostUserId,
+          isBot: s.isBot,
+          botDifficulty: s.botDifficulty,
+          avatarUrl,
         };
-      }
-      return {
-        seatIdx: idx,
-        userId: s.userId,
-        handle: s.handle,
-        ready: s.ready,
-        isHost: s.userId === meta.hostUserId,
-        isBot: s.isBot,
-        botDifficulty: s.botDifficulty,
-      };
-    });
+      }),
+    );
 
     return {
       roomId: meta.roomId,
@@ -132,7 +147,7 @@ export class RoomsService {
       (i) => typeof i.SK === 'string' && i.SK.startsWith('SEAT#'),
     ) as RoomSeatItem[];
 
-    return this.assembleRoom(meta, seatItems);
+    return await this.assembleRoom(meta, seatItems);
   }
 
   /** Refresh the room TTL in META (call after any player activity). */

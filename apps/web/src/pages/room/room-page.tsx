@@ -271,22 +271,43 @@ export function RoomPage() {
                       : '1px solid rgba(var(--felt-ink-rgb),0.1)',
                   }}
                 >
-                  {/* Wind badge */}
-                  <div
-                    className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"
-                    style={{
-                      background: isEmpty
-                        ? 'rgba(var(--felt-ink-rgb),0.04)'
-                        : 'rgba(201,169,97,0.2)',
-                      border: isEmpty
-                        ? '1px dashed rgba(var(--felt-ink-rgb),0.15)'
-                        : '1px solid rgba(201,169,97,0.4)',
-                      color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#c9a961',
-                    }}
-                    aria-hidden="true"
-                  >
-                    {WIND_SYMBOLS[seat.seatIdx]}
-                  </div>
+                  {/* Avatar circle (human) or wind badge (empty / bot) */}
+                  {!isEmpty && !seat.isBot ? (
+                    <div
+                      className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center font-bold text-sm text-mj-slate select-none"
+                      style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
+                      aria-hidden="true"
+                    >
+                      {seat.avatarUrl ? (
+                        <img
+                          src={seat.avatarUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span>{(seat.handle ?? '?').charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"
+                      style={{
+                        background: isEmpty
+                          ? 'rgba(var(--felt-ink-rgb),0.04)'
+                          : 'rgba(90,125,140,0.2)',
+                        border: isEmpty
+                          ? '1px dashed rgba(var(--felt-ink-rgb),0.15)'
+                          : '1px solid rgba(90,125,140,0.4)',
+                        color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#7ab5cc',
+                      }}
+                      aria-hidden="true"
+                    >
+                      {WIND_SYMBOLS[seat.seatIdx]}
+                    </div>
+                  )}
 
                   {/* Name / status */}
                   <div className="flex-1 min-w-0">

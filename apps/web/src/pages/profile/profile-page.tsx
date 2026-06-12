@@ -44,13 +44,13 @@ function AvatarCircle({
   const [imgError, setImgError] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="flex flex-col items-center gap-2">
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
         disabled={uploading}
-        className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center
-                   text-2xl font-bold text-mj-slate select-none relative"
+        className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center
+                   text-3xl font-bold text-mj-slate select-none relative"
         style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
         aria-label={t('profileUploadPhoto')}
       >
@@ -64,12 +64,25 @@ function AvatarCircle({
         ) : (
           <span>{handle.charAt(0).toUpperCase()}</span>
         )}
+        {/* Camera icon overlay — always visible to signal interactivity */}
+        {!uploading && (
+          <div className="absolute inset-0 flex items-end justify-center pb-2" aria-hidden="true">
+            <span
+              className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
+              style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}
+            >
+              {t('profileUploadPhoto')}
+            </span>
+          </div>
+        )}
         {uploading && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <Spinner />
           </div>
         )}
       </button>
+      {/* Size hint */}
+      <p className="text-[11px] text-mj-bone/45 text-center">{t('profileUploadHint')}</p>
       <input
         ref={fileRef}
         type="file"
