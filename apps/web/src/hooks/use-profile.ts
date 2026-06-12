@@ -45,17 +45,27 @@ export function useUploadAvatar() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
-      const resized = await resizeImageToCanvas(file, 1024);
-      const base64 = resized.split(',')[1];
+      const dataUri = await resizeImageToCanvas(file, 1024);
       const contentType = file.type.startsWith('image/png') ? 'image/png' : 'image/jpeg';
+      const blob = dataURItoBlob(dataUri, contentType);
+      const formData = new FormData();
+      formData.append('file', blob, contentType === 'image/png' ? 'avatar.png' : 'avatar.jpg');
       return api
-        .put<{ avatarUrl: string }>('/users/me/avatar', { imageData: base64, contentType })
+        .put<{ avatarUrl: string }>('/users/me/avatar', formData)
         .then((r) => r.data.avatarUrl);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['profile', 'me'] });
     },
   });
+}
+
+function dataURItoBlob(dataURI: string, contentType: string): Blob {
+  const byteString = atob(dataURI.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  return new Blob([ab], { type: contentType });
 }
 
 /** Resize an image File to maxSize×maxSize via canvas, returning a data-URI. */

@@ -41,6 +41,7 @@ function AvatarCircle({
 }) {
   const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className="relative">
@@ -53,8 +54,13 @@ function AvatarCircle({
         style={{ background: 'linear-gradient(135deg, #c9a961 0%, #a07830 100%)' }}
         aria-label={t('profileUploadPhoto')}
       >
-        {avatarUrl ? (
-          <img src={avatarUrl} alt={handle} className="w-full h-full object-cover" />
+        {avatarUrl && !imgError ? (
+          <img
+            src={avatarUrl}
+            alt={handle}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
         ) : (
           <span>{handle.charAt(0).toUpperCase()}</span>
         )}
@@ -71,7 +77,10 @@ function AvatarCircle({
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) onUpload(f);
+          if (f) {
+            setImgError(false);
+            onUpload(f);
+          }
           e.target.value = '';
         }}
       />

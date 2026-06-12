@@ -4,6 +4,7 @@ import {
   Patch,
   Put,
   Body,
+  Req,
   Query,
   UseGuards,
   ParseIntPipe,
@@ -11,9 +12,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { FastifyRequest } from 'fastify';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UploadAvatarDto } from './dto/upload-avatar.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { StorageService } from '../storage/storage.service';
@@ -49,20 +50,24 @@ export class UsersController {
     return this.users.updateProfile(actor.sub, dto);
   }
 
-  /** PUT /users/me/avatar — upload a profile picture (base64-encoded JPEG or PNG). */
+  /** PUT /users/me/avatar — upload a profile picture (multipart/form-data, field "file"). */
   @Put('me/avatar')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
-  async uploadAvatar(@CurrentUser() actor: AuthenticatedUser, @Body() dto: UploadAvatarDto) {
-    let buffer: Buffer;
-    try {
-      buffer = Buffer.from(dto.imageData, 'base64');
-    } catch {
-      throw new BadRequestException('Invalid base64 image data');
+  async uploadAvatar(@CurrentUser() actor: AuthenticatedUser, @Req() req: FastifyRequest) {
+    const data = await req.file();
+    if (!data) throw new BadRequestException('No file uploaded');
+
+    const contentType = data.mimetype;
+    if (!/^image\/(jpeg|png)$/.test(contentType)) {
+      throw new BadRequestException('Only JPEG and PNG images are supported');
     }
+
+    const buffer = await data.toBuffer();
     if (buffer.length > 2_000_000) {
       throw new BadRequestException('Image exceeds 2 MB limit');
     }
-    const key = await this.storage.putAvatar(actor.sub, buffer, dto.contentType);
+
+    const key = await this.storage.putAvatar(actor.sub, buffer, contentType);
     await this.users.updateAvatar(actor.sub, key);
     const avatarUrl = await this.storage.getAvatarUrl(key);
     return { avatarUrl };

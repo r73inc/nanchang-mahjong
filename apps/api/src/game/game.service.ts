@@ -132,13 +132,19 @@ export class GameService {
     });
 
     // Fetch avatar URLs for human seats (bots get null).
+    // Any DDB/S3 failure is non-fatal — the game still starts, seat just has no avatar.
     const seatAvatarUrls = (await Promise.all(
       seatMap.map(async (userId) => {
         if (userId.startsWith('bot-')) return null;
-        const res = await this.db.get({ Key: DK.userProfile(userId) });
-        const avatarKey = res.Item?.avatarKey as string | undefined;
-        if (!avatarKey) return null;
-        return this.storage.getAvatarUrl(avatarKey).catch(() => null);
+        try {
+          const res = await this.db.get({ Key: DK.userProfile(userId) });
+          const avatarKey = res.Item?.avatarKey as string | undefined;
+          if (!avatarKey) return null;
+          return await this.storage.getAvatarUrl(avatarKey);
+        } catch (err) {
+          this.logger.warn(`Avatar fetch failed for ${userId}: ${String(err)}`);
+          return null;
+        }
       }),
     )) as [string | null, string | null, string | null, string | null];
 

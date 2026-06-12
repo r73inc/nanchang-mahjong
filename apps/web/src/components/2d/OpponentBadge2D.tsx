@@ -94,6 +94,9 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
             src={seat.avatarUrl}
             alt=""
             aria-hidden="true"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
             style={{
               width: 20,
               height: 20,

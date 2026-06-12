@@ -78,10 +78,12 @@ export class StorageService implements OnModuleInit {
     return JSON.parse(body) as ReplayGamePayload;
   }
 
-  /** Upload a user avatar image to S3. Returns the object key. */
+  /** Upload a user avatar image to S3. Returns the object key.
+   *  Extension-less key so re-uploads always overwrite the same object (no orphans).
+   *  ContentType is stored as S3 object metadata so browsers render it correctly.
+   */
   async putAvatar(userId: string, buffer: Buffer, contentType: string): Promise<string> {
-    const ext = contentType === 'image/png' ? 'png' : 'jpg';
-    const key = `avatars/${userId}.${ext}`;
+    const key = `avatars/${userId}`;
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
