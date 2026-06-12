@@ -222,7 +222,7 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
               key="result"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.0, duration: 0.25 }}
+              transition={{ delay: 1.0, duration: 2.0, times: [0, 0.125, 1] }}
               exit={{ opacity: 0 }}
               className="text-mj-gold font-bold text-lg"
               onAnimationComplete={onAnimationComplete}
