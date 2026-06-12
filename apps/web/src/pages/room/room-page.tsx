@@ -20,6 +20,9 @@ import type { BotDifficulty, WsRoomStartedPayload } from '@nanchang/shared';
 // Wind symbols in seat-index order (East/South/West/North)
 const WIND_SYMBOLS = ['東', '南', '西', '北'];
 
+// Purely decorative info glyph — constant avoids i18n/no-literal-string lint
+const INFO_GLYPH = 'ⓘ' as const;
+
 // API values for the view-mode toggle — not i18n strings
 const VIEW_MODES = ['3D', '2D'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
@@ -35,6 +38,34 @@ type TerminationOption = (typeof TERMINATION_OPTIONS)[number];
 // Claim window options in seconds (0 = unlimited)
 const CLAIM_WINDOW_OPTIONS = [5, 8, 15, 30, 0] as const;
 type ClaimWindowOption = (typeof CLAIM_WINDOW_OPTIONS)[number];
+
+function InfoButton({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <button
+      onClick={onClick}
+      aria-label={t('settingInfoOpen')}
+      style={{
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
+        color: 'rgba(var(--felt-ink-rgb),0.35)',
+        fontSize: 9,
+        fontWeight: 700,
+        cursor: 'pointer',
+        background: 'none',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        lineHeight: 1,
+      }}
+    >
+      {INFO_GLYPH}
+    </button>
+  );
+}
 
 export function RoomPage() {
   const { t } = useI18n();
@@ -113,6 +144,8 @@ export function RoomPage() {
   // Which empty seat is showing the bot difficulty picker (null = none open)
   const [addingBotToSeat, setAddingBotToSeat] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
+  // Which setting's info modal is open (stores the info i18n key, null = closed)
+  const [infoKey, setInfoKey] = useState<string | null>(null);
 
   async function handleAddBot(seatIdx: number, difficulty: BotDifficulty) {
     if (!room) return;
@@ -424,31 +457,46 @@ export function RoomPage() {
               border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
             }}
           >
+            {/* ── Static read-only rows ─────────────────────────────────── */}
             {[
-              { label: t('settingStyleLabel'), value: t('settingStyle') },
-              { label: t('settingJingLabel'), value: t('settingJingValue') },
+              {
+                label: t('settingStyleLabel'),
+                value: t('settingStyle'),
+                infoK: 'settingStyleInfo',
+              },
+              {
+                label: t('settingJingLabel'),
+                value: t('settingJingValue'),
+                infoK: 'settingJingInfo',
+              },
               {
                 label: t('settingTimerLabel'),
-                value: t('settingTimerValue', String(room.settings.timerSecs)),
+                value: t('settingTimerValueInfinite'),
+                infoK: 'settingTimerInfo',
               },
-              {
-                label: t('settingMinFanLabel'),
-                value: t('settingMinFanValue', String(room.settings.minFan)),
-              },
-            ].map(({ label, value }) => (
+            ].map(({ label, value, infoK }) => (
               <div
                 key={label}
                 className="flex justify-between items-center px-4 py-3 border-b last:border-b-0 text-sm"
                 style={{ borderColor: 'rgba(var(--felt-ink-rgb),0.07)' }}
               >
-                <span className="text-mj-bone/70">{label}</span>
+                <span className="flex items-center gap-1 text-mj-bone/70">
+                  {label}
+                  <InfoButton onClick={() => setInfoKey(infoK)} />
+                </span>
                 <span className="text-mj-gold font-semibold">{value}</span>
               </div>
             ))}
 
-            {/* View mode row — interactive toggle for host, read-only label for others */}
-            <div className="flex justify-between items-center px-4 py-3 text-sm">
-              <span className="text-mj-bone/70">{t('settingViewModeLabel')}</span>
+            {/* ── View mode row ─────────────────────────────────────────── */}
+            <div
+              className="flex justify-between items-center px-4 py-3 text-sm"
+              style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
+            >
+              <span className="flex items-center gap-1 text-mj-bone/70">
+                {t('settingViewModeLabel')}
+                <InfoButton onClick={() => setInfoKey('settingViewModeInfo')} />
+              </span>
               {isHost && room.status === 'waiting' ? (
                 <div className="flex gap-1.5" role="group" aria-label={t('settingViewModeLabel')}>
                   {VIEW_MODES.map((mode: ViewMode) => {
@@ -483,56 +531,15 @@ export function RoomPage() {
               )}
             </div>
 
-            {/* Rounds row — interactive toggle for host, read-only label for others */}
+            {/* ── End Condition row ─────────────────────────────────────── */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
-              <span className="text-mj-bone/70">{t('settingRoundsLabel')}</span>
-              {isHost && room.status === 'waiting' ? (
-                <div className="flex gap-1.5" role="group" aria-label={t('settingRoundsLabel')}>
-                  {ROUNDS_OPTIONS.map((opt: RoundsOption) => {
-                    const active = room.settings.rounds === opt;
-                    return (
-                      <button
-                        key={opt}
-                        onClick={() => updateSettings(room.roomId, { rounds: opt })}
-                        disabled={loading}
-                        className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
-                        style={{
-                          background: active
-                            ? 'rgba(201,169,97,0.25)'
-                            : 'rgba(var(--felt-ink-rgb),0.06)',
-                          border: active
-                            ? '1px solid rgba(201,169,97,0.6)'
-                            : '1px solid rgba(var(--felt-ink-rgb),0.12)',
-                          color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
-                          cursor: loading ? 'not-allowed' : 'pointer',
-                        }}
-                        aria-pressed={active}
-                      >
-                        {t(opt === 'east+south' ? 'settingRoundsEastSouth' : 'settingRoundsEast')}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <span className="text-mj-gold font-semibold">
-                  {t(
-                    room.settings.rounds === 'east+south'
-                      ? 'settingRoundsEastSouth'
-                      : 'settingRoundsEast',
-                  )}
-                </span>
-              )}
-            </div>
-
-            {/* Termination type row — interactive toggle for host, read-only label for others */}
-            <div
-              className="flex justify-between items-center px-4 py-3 text-sm"
-              style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
-            >
-              <span className="text-mj-bone/70">{t('settingTerminationLabel')}</span>
+              <span className="flex items-center gap-1 text-mj-bone/70">
+                {t('settingTerminationLabel')}
+                <InfoButton onClick={() => setInfoKey('settingTerminationInfo')} />
+              </span>
               {isHost && room.status === 'waiting' ? (
                 <div
                   className="flex gap-1.5"
@@ -575,12 +582,64 @@ export function RoomPage() {
               )}
             </div>
 
-            {/* Claim window row */}
+            {/* ── Rounds row — hidden when Bust mode is active ─────────── */}
+            {room.settings.terminationType !== 'bust' && (
+              <div
+                className="flex justify-between items-center px-4 py-3 text-sm"
+                style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
+              >
+                <span className="flex items-center gap-1 text-mj-bone/70">
+                  {t('settingRoundsLabel')}
+                  <InfoButton onClick={() => setInfoKey('settingRoundsInfo')} />
+                </span>
+                {isHost && room.status === 'waiting' ? (
+                  <div className="flex gap-1.5" role="group" aria-label={t('settingRoundsLabel')}>
+                    {ROUNDS_OPTIONS.map((opt: RoundsOption) => {
+                      const active = room.settings.rounds === opt;
+                      return (
+                        <button
+                          key={opt}
+                          onClick={() => updateSettings(room.roomId, { rounds: opt })}
+                          disabled={loading}
+                          className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                          style={{
+                            background: active
+                              ? 'rgba(201,169,97,0.25)'
+                              : 'rgba(var(--felt-ink-rgb),0.06)',
+                            border: active
+                              ? '1px solid rgba(201,169,97,0.6)'
+                              : '1px solid rgba(var(--felt-ink-rgb),0.12)',
+                            color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                          }}
+                          aria-pressed={active}
+                        >
+                          {t(opt === 'east+south' ? 'settingRoundsEastSouth' : 'settingRoundsEast')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-mj-gold font-semibold">
+                    {t(
+                      room.settings.rounds === 'east+south'
+                        ? 'settingRoundsEastSouth'
+                        : 'settingRoundsEast',
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* ── Claim Window row ──────────────────────────────────────── */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
-              <span className="text-mj-bone/70">{t('settingClaimWindowLabel')}</span>
+              <span className="flex items-center gap-1 text-mj-bone/70">
+                {t('settingClaimWindowLabel')}
+                <InfoButton onClick={() => setInfoKey('settingClaimWindowInfo')} />
+              </span>
               {isHost && room.status === 'waiting' ? (
                 <div
                   className="flex gap-1.5"
@@ -588,7 +647,7 @@ export function RoomPage() {
                   aria-label={t('settingClaimWindowLabel')}
                 >
                   {CLAIM_WINDOW_OPTIONS.map((opt: ClaimWindowOption) => {
-                    const active = (room.settings.claimWindowSecs ?? 8) === opt;
+                    const active = (room.settings.claimWindowSecs ?? 0) === opt;
                     const labelKey =
                       opt === 0
                         ? 'settingClaimWindowInfinite'
@@ -625,13 +684,13 @@ export function RoomPage() {
               ) : (
                 <span className="text-mj-gold font-semibold">
                   {t(
-                    (room.settings.claimWindowSecs ?? 8) === 0
+                    (room.settings.claimWindowSecs ?? 0) === 0
                       ? 'settingClaimWindowInfinite'
-                      : (room.settings.claimWindowSecs ?? 8) === 5
+                      : (room.settings.claimWindowSecs ?? 0) === 5
                         ? 'settingClaimWindow5'
-                        : (room.settings.claimWindowSecs ?? 8) === 15
+                        : (room.settings.claimWindowSecs ?? 0) === 15
                           ? 'settingClaimWindow15'
-                          : (room.settings.claimWindowSecs ?? 8) === 30
+                          : (room.settings.claimWindowSecs ?? 0) === 30
                             ? 'settingClaimWindow30'
                             : 'settingClaimWindow8',
                   )}
@@ -639,12 +698,15 @@ export function RoomPage() {
               )}
             </div>
 
-            {/* Opening Spirit Flip toggle */}
+            {/* ── Opening Spirit Flip toggle ────────────────────────────── */}
             <div
               className="flex justify-between items-center px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
-              <span className="text-mj-bone/70">{t('settingTopBottomJingLabel')}</span>
+              <span className="flex items-center gap-1 text-mj-bone/70">
+                {t('settingTopBottomJingLabel')}
+                <InfoButton onClick={() => setInfoKey('settingTopBottomJingInfo')} />
+              </span>
               {isHost && room.status === 'waiting' ? (
                 <button
                   onClick={() =>
@@ -686,6 +748,40 @@ export function RoomPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Setting info modal ────────────────────────────────────────────── */}
+        {infoKey && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
+            onClick={() => setInfoKey(null)}
+          >
+            <div
+              className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-3"
+              style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
+              role="dialog"
+              aria-modal="true"
+              aria-label={t('settingInfoOpen')}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm text-mj-bone/70 leading-relaxed">
+                {t(infoKey as Parameters<typeof t>[0])}
+              </p>
+              <button
+                onClick={() => setInfoKey(null)}
+                className="self-end px-4 py-2 rounded-xl text-xs font-bold"
+                style={{
+                  background: 'rgba(201,169,97,0.15)',
+                  border: '1px solid rgba(201,169,97,0.3)',
+                  color: '#c9a961',
+                  cursor: 'pointer',
+                }}
+              >
+                {t('settingInfoClose')}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Ready toggle (non-host) */}
         {!isHost && mySeat && room.status === 'waiting' && (

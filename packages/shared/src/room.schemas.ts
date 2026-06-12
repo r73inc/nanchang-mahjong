@@ -50,14 +50,14 @@ export const RoomSettingsSchema = z.object({
    * Jing indicator after dealing, triggering an instant payout for players
    * holding the settlement tile. See engine/src/types.ts GameConfig for details.
    */
-  ruleTopBottomJing: z.boolean().default(false),
+  ruleTopBottomJing: z.boolean().default(true),
 
   /**
    * Claim window duration in seconds.
    * How long players have to claim a discarded tile (pung/kong/chow/win).
    * 0 = unlimited (window only closes when all eligible seats respond).
    */
-  claimWindowSecs: z.number().int().min(0).max(60).default(8),
+  claimWindowSecs: z.number().int().min(0).max(60).default(0),
 });
 export type RoomSettings = z.infer<typeof RoomSettingsSchema>;
 

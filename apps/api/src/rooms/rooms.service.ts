@@ -183,8 +183,8 @@ export class RoomsService {
       timerSecs: dto?.settings?.timerSecs ?? 30,
       minFan: dto?.settings?.minFan ?? 1,
       viewMode: dto?.settings?.viewMode ?? '2D',
-      ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? false,
-      claimWindowSecs: dto?.settings?.claimWindowSecs ?? 8,
+      ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? true,
+      claimWindowSecs: dto?.settings?.claimWindowSecs ?? 0,
     };
 
     // Build bot seat items (seats filled from the high end: 3, 2, 1).
