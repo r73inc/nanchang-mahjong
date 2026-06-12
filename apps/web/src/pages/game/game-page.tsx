@@ -2236,7 +2236,7 @@ function TsumoBar({
   const { t } = useI18n();
   return (
     <div
-      className="absolute left-0 right-0 flex flex-col gap-2 px-4 pt-3 pb-4 max-w-viewport mx-auto z-40 animate-call-prompt-enter"
+      className="absolute left-0 right-0 flex flex-col gap-2 px-4 pt-3 pb-4 max-w-viewport mx-auto z-20 animate-call-prompt-enter"
       style={{
         bottom: isMobile ? 'var(--mj-hand-height, 90px)' : 0,
         background: 'rgba(10,10,10,0.92)',
@@ -2716,8 +2716,9 @@ function GameTable({
       {canTsumo && tsumoSuppressed && isMyTurn && !showConcedeSheet && !kongActionPending && (
         <button
           onClick={() => setTsumoSuppressed(false)}
-          className="absolute right-2 z-16 font-bold text-sm px-3 py-2 rounded-xl animate-call-prompt-enter"
+          className="absolute right-2 font-bold text-sm px-3 py-2 rounded-xl animate-call-prompt-enter"
           style={{
+            zIndex: 15,
             bottom: 'calc(var(--mj-hand-height, 80px) + 8px)',
             background: 'rgba(201,169,97,0.18)',
             border: '1px solid rgba(201,169,97,0.5)',
