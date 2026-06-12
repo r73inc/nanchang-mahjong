@@ -542,7 +542,7 @@ export class GameService {
       if (!currentPr || currentPr.purpose !== purpose || currentPr.roller !== roller) return;
       if (!this.sessions.has(session.gameId)) return;
       this.handleRollDiceInternal(session);
-    }, 3000);
+    }, 3500);
   }
 
   /**
