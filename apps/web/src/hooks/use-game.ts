@@ -59,11 +59,11 @@ export function useGame(gameId: string, spectate = false) {
     reset,
   } = useGameStore();
 
-  const { playDiceRoll, playShuffle } = useSound();
+  const { playDiceRoll, playShuffle, playTilePlace } = useSound();
   // Stable ref so event handlers inside useEffect always call the current
   // callback without adding sound deps to the effect dependency array.
-  const soundRef = useRef({ playDiceRoll, playShuffle });
-  soundRef.current = { playDiceRoll, playShuffle };
+  const soundRef = useRef({ playDiceRoll, playShuffle, playTilePlace });
+  soundRef.current = { playDiceRoll, playShuffle, playTilePlace };
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot queue: snapshots received during dice animation are held here and
@@ -125,8 +125,6 @@ export function useGame(gameId: string, spectate = false) {
       // ── Dice roll animation ───────────────────────────────────────────────
       if (event.kind === 'dice_roll') {
         soundRef.current.playDiceRoll();
-        // wall_selection is the first roll of every new hand — also play shuffle sound
-        if (event.purpose === 'wall_selection') soundRef.current.playShuffle();
         isDiceAnimatingRef.current = true;
         setDiceAnimation({
           dice: event.dice as [number, number],
@@ -139,6 +137,11 @@ export function useGame(gameId: string, spectate = false) {
 
       // ── Last-discard tracking ─────────────────────────────────────────────
       if (event.kind === 'discard') {
+        // For opponent/bot discards play the tile-place sound here.
+        // The viewer's own discard is covered by discardWithSound in game-page.tsx
+        // (plays immediately on click rather than waiting for the server echo).
+        const viewerSeat = useGameStore.getState().snapshot?.viewerSeat ?? null;
+        if (event.seat !== viewerSeat) soundRef.current.playTilePlace();
         // A tile has landed in the discard pool — start pulsing it.
         // Kept until the next discard or a claim that removes it.
         setLastDiscard({ seat: event.seat, tile: event.tile });
