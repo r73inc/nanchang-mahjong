@@ -23,6 +23,7 @@ import {
   calculateSpiritSettlement,
   calculateOpeningJingSettlement,
   isWinningHand,
+  decomposeHand,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -1044,7 +1045,10 @@ export class GameService {
     const isTsumo = winType === 'tsumo' && !opts.isRobKong;
 
     // Determine any "extra" winning tile not yet in the winner's hand.
-    // For ron: the pending discard. For rob-kong: the tile from the kong_added event.
+    // Tsumo: _drawFor() adds the drawn tile to hand before this method is called,
+    //   so winnerState.hand already contains the tsumo tile — no extra tile needed.
+    // Ron: the pending discard is not yet in hand — append it.
+    // Rob-kong: the robbed tile from the kong_added event is not in hand — append it.
     let winningTileExtra: TileType[] = [];
     if (!isTsumo && !opts.isRobKong && state.pendingDiscard) {
       winningTileExtra = [state.pendingDiscard];
@@ -1072,11 +1076,33 @@ export class GameService {
     });
     const isTrueGerman = winnerHasNoJing && noOtherPlayerHasJing;
 
-    // Spirit Fishing: tsumo win with 4 open melds while holding at least one Jing.
-    const isSpiritFishing =
-      isTsumo &&
-      winnerState.openMelds.length === 4 &&
-      winnerAllTiles.some((t) => jingTypes.includes(t));
+    // Spirit Fishing (精钓 / Dan Diao Jiang 单吊将): tsumo win where the winning tile
+    // completed the pair in the hand's decomposition, AND the winner holds at least one
+    // Jing tile.  Works for any hand shape — open melds or fully concealed.
+    let isSpiritFishing = false;
+    if (isTsumo && winnerAllTiles.some((t) => jingTypes.includes(t))) {
+      const lastDrawEv = [...session.engine.events]
+        .reverse()
+        .find(
+          (e): e is Extract<GameEvent, { kind: 'draw' }> =>
+            e.kind === 'draw' && e.seat === winnerSeat,
+        );
+      if (lastDrawEv) {
+        const tsumoTile = lastDrawEv.tile;
+        // Build the 14-tile winning hand (normalized open melds + concealed hand).
+        // The concealed hand already includes the tsumo tile (added by _drawFor).
+        const openNorm = winnerState.openMelds.flatMap((m: Meld) =>
+          m.kind === 'kong'
+            ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
+            : (m.tiles as TileType[]),
+        );
+        const winHand14: TileType[] = [...openNorm, ...winnerState.hand];
+        // Dan Diao Jiang: the tsumo tile appears as the pair tile in at least one
+        // valid decomposition of the winning hand.
+        const decomps = decomposeHand(winHand14, jingTypes);
+        isSpiritFishing = decomps.some((d) => d.pair === tsumoTile);
+      }
+    }
 
     try {
       session.engine = session.engine.declareWin(winnerSeat, {
