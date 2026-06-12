@@ -212,7 +212,7 @@
   "settingRoundsInfo": "Number of rounds played before the session ends. East only = 4 hands (one full rotation of dealers). East + South = 8 hands (two full rotations).",
   "settingTerminationInfo": "Fixed Rounds ends the game after the set number of rounds. Bust (Zero) keeps playing until any player's cumulative score drops below zero — the game length is open-ended.",
   "settingClaimWindowInfo": "How long players have to decide whether to claim a discarded tile (pung, kong, chow, or win). ∞ keeps the window open until every player has responded.",
-  "settingTopBottomJingInfo": "At the start of each round the top and bottom tiles of the wall are revealed. Any player holding the matching spirit tile receives an immediate payout before the first draw.",
+  "settingTopBottomJingInfo": "After dealing, dice are rolled to pick a position in the wall. The tile at that position (the settlement tile) triggers an instant payout — each player holding a copy earns 2 pts per copy from all other players. The tile immediately below it is then swapped up to become the Spirit (Jing) indicator for the round. Both tiles stay in the wall and can still be drawn.",
   "toastOpeningSettlement": "Spirit Flip: {{0}}",
   "toastOpeningSettlementYouWin": "You win {{0}} pts",
   "toastOpeningSettlementYouPay": "You pay {{0}} pts",
