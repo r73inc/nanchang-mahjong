@@ -17,21 +17,26 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { StorageService } from '../storage/storage.service';
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
 
 @Controller('users')
 @UseGuards(JwtGuard)
 @Throttle({ default: { ttl: 60_000, limit: 60 } })
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly storage: StorageService,
+  ) {}
 
   /** GET /users/me — full profile for the authenticated user. */
   @Get('me')
   async getMe(@CurrentUser() actor: AuthenticatedUser) {
     const profile = await this.users.getOrThrow(actor.sub);
+    const avatarUrl = profile.avatarKey ? await this.storage.getAvatarUrl(profile.avatarKey) : null;
     return {
       ...profile,
-      avatarUrl: profile.avatarDataUrl ?? null,
+      avatarUrl,
       gamesPlayed: profile.gamesPlayed ?? 0,
       gamesWon: profile.gamesWon ?? 0,
       rating: profile.rating ?? 1500,
@@ -62,9 +67,9 @@ export class UsersController {
       throw new BadRequestException('Image exceeds 2 MB limit');
     }
 
-    // Store as base64 data URI — no browser-to-S3 networking required for display.
-    const avatarUrl = `data:${contentType};base64,${buffer.toString('base64')}`;
-    await this.users.updateAvatarDataUrl(actor.sub, avatarUrl);
+    const key = await this.storage.putAvatar(actor.sub, buffer, contentType);
+    await this.users.updateAvatar(actor.sub, key);
+    const avatarUrl = await this.storage.getAvatarUrl(key);
     return { avatarUrl };
   }
 

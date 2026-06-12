@@ -12,7 +12,6 @@ export interface UserProfile {
   disabled: boolean;
   passwordHash?: string;
   avatarKey?: string;
-  avatarDataUrl?: string;
   gamesPlayed?: number;
   gamesWon?: number;
   rating?: number;
@@ -142,7 +141,7 @@ export class UsersService {
     await this.db.update({
       Key: DK.userProfile(sub),
       UpdateExpression:
-        'SET disabled = :true, deletedAt = :now, updatedAt = :now REMOVE passwordHash, avatarKey, avatarDataUrl',
+        'SET disabled = :true, deletedAt = :now, updatedAt = :now REMOVE passwordHash, avatarKey',
       ExpressionAttributeValues: {
         ':true': true,
         ':now': now,
@@ -212,17 +211,6 @@ export class UsersService {
       Key: DK.userProfile(sub),
       UpdateExpression: 'SET avatarKey = :key, updatedAt = :now',
       ExpressionAttributeValues: { ':key': avatarKey, ':now': now },
-      ConditionExpression: 'attribute_exists(PK)',
-    });
-  }
-
-  /** Store the avatar as a base64 data URI for direct browser display (no S3 URL needed). */
-  async updateAvatarDataUrl(sub: string, dataUrl: string): Promise<void> {
-    const now = new Date().toISOString();
-    await this.db.update({
-      Key: DK.userProfile(sub),
-      UpdateExpression: 'SET avatarDataUrl = :url, updatedAt = :now',
-      ExpressionAttributeValues: { ':url': dataUrl, ':now': now },
       ConditionExpression: 'attribute_exists(PK)',
     });
   }
