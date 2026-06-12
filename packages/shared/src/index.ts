@@ -1,4 +1,5 @@
 export * from './auth.schemas';
+export * from './bot-profiles';
 export * from './room.schemas';
 export * from './game.events';
 export * from './replay.types';

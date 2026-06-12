@@ -22,6 +22,7 @@ import type {
   RoomStatus,
   BotDifficulty,
 } from '@nanchang/shared';
+import { BOT_PROFILES } from '@nanchang/shared';
 import type { CreateRoomDto } from './dto/create-room.dto';
 
 // ── Types stored in DDB ───────────────────────────────────────────────────────
@@ -53,6 +54,8 @@ interface RoomSeatItem {
   joinedAt: string;
   isBot?: boolean;
   botDifficulty?: BotDifficulty;
+  /** Which of the three named bot personas occupies this seat. */
+  botProfileId?: string;
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -90,10 +93,16 @@ export class RoomsService {
           return { seatIdx: idx, userId: null, handle: null, ready: false, isHost: false };
         }
 
-        // Resolve avatar: check if an avatarKey is stored, then return the API proxy path.
-        // The proxy endpoint streams bytes from S3 server-side so the browser never touches MinIO.
+        // Resolve avatar URL:
+        // - Bots: static web asset served from the bot's named profile.
+        // - Humans: API proxy path that streams bytes from S3.
         let avatarUrl: string | null = null;
-        if (!s.isBot) {
+        if (s.isBot) {
+          const profile = s.botProfileId
+            ? BOT_PROFILES.find((p) => p.id === s.botProfileId)
+            : BOT_PROFILES.find((p) => p.name === s.handle);
+          avatarUrl = profile?.avatarPath ?? null;
+        } else {
           try {
             const profileRes = await this.db.get({ Key: DK.userProfile(s.userId) });
             const avatarKey = profileRes?.Item?.avatarKey as string | undefined;
@@ -179,12 +188,14 @@ export class RoomsService {
     };
 
     // Build bot seat items (seats filled from the high end: 3, 2, 1).
+    // Shuffle the three named profiles so different games get different bots.
     // Each bot is pre-marked ready so the host can start without waiting for them.
     const botCount = Math.min(dto?.bots?.count ?? 0, 3);
     const botDifficulty: BotDifficulty = dto?.bots?.difficulty ?? 'easy';
+    const shuffledProfiles = [...BOT_PROFILES].sort(() => Math.random() - 0.5);
     const botSeatPuts = Array.from({ length: botCount }, (_, i) => {
       const seatIdx = 3 - i; // seats 3, 2, 1 for bots 1, 2, 3
-      const botNumber = i + 1;
+      const profile = shuffledProfiles[i];
       return {
         Put: {
           TableName: this.db.tableName,
@@ -193,11 +204,12 @@ export class RoomsService {
             roomId,
             seatIdx,
             userId: `bot-${botDifficulty}-${seatIdx}`,
-            handle: `Bot ${botNumber}`,
+            handle: profile.name,
             ready: true,
             joinedAt: now,
             isBot: true,
             botDifficulty,
+            botProfileId: profile.id,
           },
         },
       };
@@ -422,7 +434,8 @@ export class RoomsService {
 
   /**
    * Host adds a bot to a specific empty seat.
-   * The bot is named "Bot <seatIdx>" so each seat has a deterministic name.
+   * Randomly selects from the three named bot profiles, skipping any that are
+   * already in use so no two bots in the same room share an identity.
    */
   async addBotToSeat(
     roomId: string,
@@ -441,6 +454,15 @@ export class RoomsService {
     if (!seat) throw new BadRequestException('Invalid seat index');
     if (seat.userId !== null) throw new ConflictException('Seat is already occupied');
 
+    // Determine which profiles are already assigned by matching existing bot handles.
+    const usedIds = room.seats
+      .filter((s) => s.isBot && s.handle)
+      .map((s) => BOT_PROFILES.find((p) => p.name === s.handle)?.id)
+      .filter((id): id is string => id !== undefined);
+    const available = BOT_PROFILES.filter((p) => !usedIds.includes(p.id));
+    if (available.length === 0) throw new BadRequestException('No more bot profiles available');
+    const profile = available[Math.floor(Math.random() * available.length)];
+
     const now = new Date().toISOString();
 
     await this.db.transactWrite({
@@ -453,11 +475,12 @@ export class RoomsService {
               roomId,
               seatIdx,
               userId: `bot-${difficulty}-${seatIdx}`,
-              handle: `Bot ${seatIdx}`,
+              handle: profile.name,
               ready: true,
               joinedAt: now,
               isBot: true,
               botDifficulty: difficulty,
+              botProfileId: profile.id,
             },
             ConditionExpression: 'attribute_not_exists(PK)',
           },

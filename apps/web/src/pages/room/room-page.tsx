@@ -272,29 +272,25 @@ export function RoomPage() {
                       : '1px solid rgba(var(--felt-ink-rgb),0.1)',
                   }}
                 >
-                  {/* Avatar circle (human) or wind badge (empty / bot) */}
-                  {!isEmpty && !seat.isBot ? (
-                    <AvatarImg
-                      avatarUrl={seat.avatarUrl}
-                      seed={seat.userId ?? seat.handle ?? ''}
-                      size={36}
-                    />
-                  ) : (
+                  {/* Avatar — human photo, bot profile image, or wind badge for empty seats */}
+                  {isEmpty ? (
                     <div
                       className="w-9 h-9 rounded-[10px] flex items-center justify-center font-serif text-lg font-bold flex-shrink-0"
                       style={{
-                        background: isEmpty
-                          ? 'rgba(var(--felt-ink-rgb),0.04)'
-                          : 'rgba(90,125,140,0.2)',
-                        border: isEmpty
-                          ? '1px dashed rgba(var(--felt-ink-rgb),0.15)'
-                          : '1px solid rgba(90,125,140,0.4)',
-                        color: isEmpty ? 'rgba(var(--felt-ink-rgb),0.3)' : '#7ab5cc',
+                        background: 'rgba(var(--felt-ink-rgb),0.04)',
+                        border: '1px dashed rgba(var(--felt-ink-rgb),0.15)',
+                        color: 'rgba(var(--felt-ink-rgb),0.3)',
                       }}
                       aria-hidden="true"
                     >
                       {WIND_SYMBOLS[seat.seatIdx]}
                     </div>
+                  ) : (
+                    <AvatarImg
+                      avatarUrl={seat.avatarUrl}
+                      seed={seat.userId ?? seat.handle ?? ''}
+                      size={36}
+                    />
                   )}
 
                   {/* Name / status */}

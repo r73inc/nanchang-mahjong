@@ -67,9 +67,9 @@ export function AvatarImg({ avatarUrl, seed, size = 40, className = '' }: Avatar
   const [imgFailed, setImgFailed] = useState(false);
   const tile = seededTile(seed);
 
-  // API returns relative paths like `/users/{sub}/avatar`.
-  // Prepend API_BASE so the browser routes through the Vite proxy (dev) or the prod API host.
-  const resolvedUrl = avatarUrl?.startsWith('/') ? `${API_BASE}${avatarUrl}` : avatarUrl;
+  // API paths (/users/…/avatar) are proxied through the API host.
+  // Static bot avatars (/avatars/bots/…) are served from the web origin directly.
+  const resolvedUrl = avatarUrl?.startsWith('/users/') ? `${API_BASE}${avatarUrl}` : avatarUrl;
 
   return (
     <div
