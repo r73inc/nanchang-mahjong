@@ -126,7 +126,9 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 4. **Image size limit:** Profile pictures should be reduced client-side to a maximum of 1024 × 1024 pixels before uploading to keep storage costs low.
 
-5. **In-game avatar display:**
+5. **Storage:** Profile pictures are stored in S3 (MinIO locally, same bucket/pattern as replay files). The DDB user record stores only the S3 object key or a pre-signed URL; the API generates a fresh pre-signed GET URL when serving user profile data. Reuse the existing `StorageService` (`@Global`) introduced in Phase 9A.
+
+6. **In-game avatar display:**
    - Left opponent: small circle avatar displayed above their info box (on the left edge).
    - Right opponent: small circle avatar displayed above their info box (on the right edge).
    - Top opponent: small circle avatar displayed to the left of their info box.
@@ -136,6 +138,7 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 - `apps/web/src/pages/` — profile/account page, registration flow
 - `apps/api/src/users/` — user schema, profile update endpoint
+- `apps/api/src/storage/storage.service.ts` — existing `StorageService`; add a `putProfilePicture(userId, buffer)` method and bucket/key convention (e.g. `avatars/<userId>.jpg`)
 - `apps/web/src/pages/game/game-page.tsx` — opponent seat info boxes, top banner
 - `packages/shared/src/` — `UserProfile` or equivalent type
 
