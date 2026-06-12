@@ -212,7 +212,7 @@
   "settingRoundsInfo": "游戏结束前的对局数。仅东风=4局（一巡庄），东+南风=8局（两巡庄）。",
   "settingTerminationInfo": "固定轮数：到达设定局数后结束。清零淘汰：持续对局直至任意玩家累计分数低于零，局数不固定。",
   "settingClaimWindowInfo": "玩家决定是否抢牌（碰/杠/吃/胡）的时间窗口。∞表示等到所有玩家响应后才关闭窗口。",
-  "settingTopBottomJingInfo": "发牌后掷骰定位，取牌墙该位置的上层牌作为「结算牌」：手中持有该牌的玩家每张得2分（由其余三家各自支付）。紧接着将其下层牌换上来，作为本局的精牌指示牌。两张牌均留在牌墙中，仍可正常摸取。",
+  "settingTopBottomJingInfo": "关闭：发牌后掷骰定位，该位置的牌直接作为本局精牌指示牌，不触发任何结算。开启：同样掷骰定位，但该位置的上层牌先作为结算牌——手中持有该牌的玩家，每张向其余三家各收2分，所有结算在首次摸牌前完成。之后下层牌换上来，成为本局精牌指示牌。",
   "toastOpeningSettlement": "翻精：{{0}}",
   "toastOpeningSettlementYouWin": "你赢 {{0}} 分",
   "toastOpeningSettlementYouPay": "你输 {{0}} 分",
