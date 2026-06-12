@@ -935,10 +935,20 @@ function Nameplate({
         boxShadow: isActive ? '0 0 8px rgba(201,169,97,0.2)' : 'none',
       }}
     >
-      <span
-        className="w-2 h-2 rounded-full shrink-0"
-        style={{ background: WIND_COLOR[seat.wind] }}
-      />
+      {seat.avatarUrl ? (
+        <img
+          src={seat.avatarUrl}
+          alt=""
+          aria-hidden="true"
+          className="w-4 h-4 rounded-full shrink-0 object-cover"
+          style={{ border: `1px solid ${WIND_COLOR[seat.wind]}` }}
+        />
+      ) : (
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: WIND_COLOR[seat.wind] }}
+        />
+      )}
       <span className="font-semibold text-mj-bone/90 flex-1 min-w-0 truncate">{seat.seatName}</span>
       {isDealer && (
         <span

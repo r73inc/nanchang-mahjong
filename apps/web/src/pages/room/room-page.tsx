@@ -294,11 +294,7 @@ export function RoomPage() {
                       <p className="text-sm font-semibold text-mj-bone truncate">
                         {isEmpty
                           ? t('waiting')
-                          : [
-                              seat.displayName,
-                              isMe && t('youSuffix'),
-                              seat.isHost && t('hostBadge'),
-                            ]
+                          : [seat.handle, isMe && t('youSuffix'), seat.isHost && t('hostBadge')]
                               .filter(Boolean)
                               .join(' ')}
                       </p>
@@ -400,7 +396,7 @@ export function RoomPage() {
                       onClick={() => handleKick(seat.seatIdx)}
                       className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
                       style={{ background: 'rgba(192,57,43,0.12)' }}
-                      aria-label={`Kick ${seat.displayName ?? ''}`}
+                      aria-label={`Kick ${seat.handle ?? ''}`}
                     >
                       {t('kickPlayerBtn')}
                     </button>

@@ -43,7 +43,6 @@ const mockUseRemoveFriend = vi.mocked(useRemoveFriend);
 const acceptedFriend: FriendWithProfile = {
   friendSub: 'bob-sub',
   handle: 'bob',
-  displayName: 'Bob',
   status: 'accepted',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -52,7 +51,6 @@ const acceptedFriend: FriendWithProfile = {
 const incomingFriend: FriendWithProfile = {
   friendSub: 'charlie-sub',
   handle: 'charlie',
-  displayName: 'Charlie',
   status: 'pending_received',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -61,7 +59,6 @@ const incomingFriend: FriendWithProfile = {
 const outgoingFriend: FriendWithProfile = {
   friendSub: 'diana-sub',
   handle: 'diana',
-  displayName: 'Diana',
   status: 'pending_sent',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -70,14 +67,12 @@ const outgoingFriend: FriendWithProfile = {
 const searchResultNoFriend: SearchResult = {
   sub: 'eve-sub',
   handle: 'eve',
-  displayName: 'Eve',
   friendStatus: null,
 };
 
 const searchResultAlreadyFriend: SearchResult = {
   sub: 'bob-sub',
   handle: 'bob',
-  displayName: 'Bob',
   friendStatus: 'accepted',
 };
 
@@ -134,7 +129,6 @@ describe('FriendsPage — friends list', () => {
 
   it('renders accepted friends', () => {
     renderFriendsPage();
-    expect(screen.getByText('Bob')).toBeInTheDocument();
     expect(screen.getByText('@bob')).toBeInTheDocument();
   });
 
@@ -147,7 +141,7 @@ describe('FriendsPage — friends list', () => {
   it('shows loading spinner while fetching', () => {
     mockUseFriends.mockReturnValue({ data: undefined, isLoading: true } as never);
     renderFriendsPage();
-    expect(screen.queryByText('Bob')).not.toBeInTheDocument();
+    expect(screen.queryByText('@bob')).not.toBeInTheDocument();
   });
 
   it('shows Remove button for accepted friend', () => {
@@ -210,7 +204,7 @@ describe('FriendsPage — search', () => {
       target: { value: 'eve' },
     });
 
-    expect(screen.getByText('Eve')).toBeInTheDocument();
+    expect(screen.getByText('@eve')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /add/i })).toBeInTheDocument();
   });
 

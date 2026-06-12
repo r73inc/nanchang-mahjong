@@ -6,6 +6,41 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-022-profile-rework` (2026-06-12)
+
+### IMP-022 · User profile rework — single username, profile picture, circle avatar
+
+**Root cause / motivation:** The app had two parallel name fields — `displayName` (free text) and `handle` (unique slug) — causing confusion and unnecessary complexity in the UI, API, and JWT payload. Profile pictures were entirely absent, so in-game opponents were identified only by text.
+
+**Fix (full stack):**
+
+1. **Single username (`displayName` removed):** Deleted `displayName` from `SignupDto`, `UpdateProfileDto`, all DDB writes, JWT payload (`jwt.strategy.ts`, `ws-auth.adapter.ts`), `RoomSeatItem`, `FriendWithProfile`, and the frontend auth store and all UI components. `handle` is now the sole display name everywhere.
+
+2. **Avatar upload endpoint:** Added `PUT /users/me/avatar` in `UsersController` accepting `{ imageData: string (base64), contentType: string }`. `UsersService.uploadAvatar()` decodes base64, calls `StorageService.putObject()` storing the file at `avatars/<userId>.(jpg|png)`, saves `avatarKey` to the DDB user profile, then returns a fresh pre-signed URL.
+
+3. **Pre-signed URL helper:** Added `StorageService.getAvatarUrl(key)` — returns a pre-signed 3600 s GET URL (with `forcePathStyle` for MinIO compatibility).
+
+4. **Avatar threaded into game snapshots:** `GameSession` gained `seatAvatarUrls: readonly [string|null, string|null, string|null, string|null]`. `GameService.createGame()` does async DDB + S3 lookups for each human seat and populates it. `toClientSnapshot()` forwards the URL into each `ClientSeatState.avatarUrl`.
+
+5. **Profile page rewrite:** `ProfilePage` now has an `AvatarCircle` component — clickable button that opens a hidden file input, shows the live avatar image or the handle initial as fallback, and displays a spinner while uploading. Edit form reduced to the single `handle` field.
+
+6. **Client-side canvas resize:** `resizeImageToCanvas()` in `use-profile.ts` center-crops the selected file to a square then scales to 1024 × 1024 using the Canvas API, returning a data-URI. Base64 portion is extracted before posting.
+
+7. **In-game avatar circles:** `OpponentBadge2D` (mobile table) shows a 20 px circular `<img>` above the wind-dot row when `seat.avatarUrl` is set. The `Nameplate` chip in `game-page.tsx` (desktop SeatHUD) replaces the 8 px wind dot with a 16 px circular avatar image when `seat.avatarUrl` is present.
+
+8. **i18n:** Added `profileUploadPhoto` / `profilePhotoUpdated` keys in EN and ZH.
+
+**Note:** The "random mahjong tile default avatar" from the original spec was deferred — the fallback is the handle initial rendered in CSS, which is simpler and sufficient for the family use case.
+
+**Key learnings:**
+
+- `forbidNonWhitelisted: true` on NestJS `ValidationPipe` means any field not declared in the DTO returns 400 — all test fixtures sending removed fields must be updated simultaneously with the DTO change.
+- Fastify is incompatible with `multer` without `@fastify/multipart`. Base64-in-JSON is a simpler alternative for small files (avatars ≤ 1 MB) that avoids the multipart adapter entirely.
+- Adding a parameter to `toClientSnapshot()` shifts positional parameters in all call sites — existing tests must be updated to add `undefined` in the new slot if they relied on later positional defaults.
+- Pre-signed S3 GET URLs generated in `createGame()` expire in 3600 s. For long-running game sessions or replay pages a refresh mechanism will be needed eventually.
+
+---
+
 ## `feat/imp-023-spirit-label` (2026-06-12)
 
 ### IMP-023 · Remove spirit tile character from status bar previews

@@ -131,6 +131,17 @@ export class GameService {
       config: { ruleTopBottomJing: settings.ruleTopBottomJing },
     });
 
+    // Fetch avatar URLs for human seats (bots get null).
+    const seatAvatarUrls = (await Promise.all(
+      seatMap.map(async (userId) => {
+        if (userId.startsWith('bot-')) return null;
+        const res = await this.db.get({ Key: DK.userProfile(userId) });
+        const avatarKey = res.Item?.avatarKey as string | undefined;
+        if (!avatarKey) return null;
+        return this.storage.getAvatarUrl(avatarKey).catch(() => null);
+      }),
+    )) as [string | null, string | null, string | null, string | null];
+
     const session = new GameSession({
       engine,
       gameId,
@@ -138,6 +149,7 @@ export class GameService {
       settings,
       seatMap,
       seatNames,
+      seatAvatarUrls,
       startedAt: now,
     });
 
@@ -1523,6 +1535,7 @@ export class GameService {
       session.preGamePhase,
       botMeta,
       session.seatNames,
+      session.seatAvatarUrls,
       clientPendingRoll,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
@@ -1571,7 +1584,7 @@ export class GameService {
     const now = new Date().toISOString();
     const ttl = Math.floor(Date.now() / 1000) + 30 * 60;
 
-    // Fetch profiles for seat display info (handle/displayName)
+    // Fetch profiles for seat display info
     const profileResults = await Promise.all(
       session.seatMap.map((sub) => this.db.get({ Key: DK.userProfile(sub) })),
     );
@@ -1612,7 +1625,6 @@ export class GameService {
                   seatIdx: i,
                   userId,
                   handle: (p?.handle as string | undefined) ?? userId,
-                  displayName: (p?.displayName as string | undefined) ?? userId,
                   ready: false,
                   joinedAt: now,
                 },

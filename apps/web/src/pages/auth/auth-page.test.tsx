@@ -51,7 +51,6 @@ describe('AuthPage', () => {
     expect(signupTab).toHaveAttribute('aria-selected', 'true');
     // Sign-up specific fields
     expect(screen.getByLabelText(/invite code/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/display name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/handle/i)).toBeInTheDocument();
   });
 

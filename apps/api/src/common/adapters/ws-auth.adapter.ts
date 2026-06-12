@@ -24,7 +24,6 @@ import type { AppConfig } from '../../config/configuration';
 interface JwtPayload {
   sub: string;
   handle: string;
-  displayName: string;
   role: 'user' | 'admin';
   type?: string;
 }
@@ -32,7 +31,6 @@ interface JwtPayload {
 export interface WsUser {
   sub: string;
   handle: string;
-  displayName: string;
   role: 'user' | 'admin';
 }
 
@@ -73,7 +71,6 @@ export class WsAuthAdapter extends IoAdapter {
         const user: WsUser = {
           sub: payload.sub,
           handle: payload.handle,
-          displayName: payload.displayName,
           role: payload.role,
         };
 

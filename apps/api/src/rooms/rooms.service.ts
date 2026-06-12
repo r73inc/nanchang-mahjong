@@ -49,7 +49,6 @@ interface RoomSeatItem {
   seatIdx: number;
   userId: string;
   handle: string;
-  displayName: string;
   ready: boolean;
   joinedAt: string;
   isBot?: boolean;
@@ -91,7 +90,6 @@ export class RoomsService {
           seatIdx: idx,
           userId: null,
           handle: null,
-          displayName: null,
           ready: false,
           isHost: false,
         };
@@ -100,7 +98,6 @@ export class RoomsService {
         seatIdx: idx,
         userId: s.userId,
         handle: s.handle,
-        displayName: s.displayName,
         ready: s.ready,
         isHost: s.userId === meta.hostUserId,
         isBot: s.isBot,
@@ -153,12 +150,7 @@ export class RoomsService {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
-  async createRoom(
-    hostUserId: string,
-    handle: string,
-    displayName: string,
-    dto?: CreateRoomDto,
-  ): Promise<RoomState> {
+  async createRoom(hostUserId: string, handle: string, dto?: CreateRoomDto): Promise<RoomState> {
     const roomId = randomUUID();
     const code = this.generateCode();
     const now = new Date().toISOString();
@@ -182,7 +174,6 @@ export class RoomsService {
     const botSeatPuts = Array.from({ length: botCount }, (_, i) => {
       const seatIdx = 3 - i; // seats 3, 2, 1 for bots 1, 2, 3
       const botNumber = i + 1;
-      const diffLabel = botDifficulty === 'easy' ? 'Easy' : 'Normal';
       return {
         Put: {
           TableName: this.db.tableName,
@@ -192,7 +183,6 @@ export class RoomsService {
             seatIdx,
             userId: `bot-${botDifficulty}-${seatIdx}`,
             handle: `Bot ${botNumber}`,
-            displayName: `Bot ${botNumber} (${diffLabel})`,
             ready: true,
             joinedAt: now,
             isBot: true,
@@ -233,7 +223,6 @@ export class RoomsService {
               seatIdx: 0,
               userId: hostUserId,
               handle,
-              displayName,
               ready: false,
               joinedAt: now,
             },
@@ -269,12 +258,7 @@ export class RoomsService {
     return this.queryRoom(meta.roomId);
   }
 
-  async joinRoom(
-    code: string,
-    userId: string,
-    handle: string,
-    displayName: string,
-  ): Promise<RoomState> {
+  async joinRoom(code: string, userId: string, handle: string): Promise<RoomState> {
     const room = await this.getRoomByCode(code);
     if (!room) throw new NotFoundException('Room not found');
     if (room.status !== 'waiting')
@@ -304,7 +288,6 @@ export class RoomsService {
               seatIdx: emptySeat.seatIdx,
               userId,
               handle,
-              displayName,
               ready: false,
               joinedAt: now,
             },
@@ -448,7 +431,6 @@ export class RoomsService {
     if (seat.userId !== null) throw new ConflictException('Seat is already occupied');
 
     const now = new Date().toISOString();
-    const diffLabel = difficulty === 'easy' ? 'Easy' : 'Normal';
 
     await this.db.transactWrite({
       TransactItems: [
@@ -461,7 +443,6 @@ export class RoomsService {
               seatIdx,
               userId: `bot-${difficulty}-${seatIdx}`,
               handle: `Bot ${seatIdx}`,
-              displayName: `Bot ${seatIdx} (${diffLabel})`,
               ready: true,
               joinedAt: now,
               isBot: true,

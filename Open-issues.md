@@ -14,7 +14,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 | BUG-09  | TileWall3D needs redesign (3D)               | TileWall removed due to red Back.svg background; needs neutral replacement                                                                            |
 | BUG-045 | Bot dice roll animation not visible          | Bot roll animation and result flash by in under a frame; human roll works correctly                                                                   |
 | BUG-046 | Wildcard / kong rule violations              | Jings can upgrade an open pung to kong (revealed meld wildcard — forbidden); self-discard kong trigger suspected with wildcards in hand               |
-| IMP-022 | User profile rework                          | Single username, profile picture with circle avatar, random tile default, account-screen upload                                                       |
 | IMP-024 | Gameplay sound effects (audio files)         | Dice roll, point transfer, tile discard, round start — each triggers a randomly-picked MP3 from bundled assets                                        |
 | IMP-025 | Standardise in-game popups to centered modal | Bottom-sheet popups (KongActionSheet, JingDiscardConfirmSheet, ConcedeSheet) must be replaced with the centered-dialog style used by the claim window |
 
@@ -111,38 +110,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 ---
 
 ## Open Improvements
-
-### IMP-022 · User profile rework — single username, profile picture, circle avatar
-
-**Current behaviour:** Each user has both a display name and a separate handle/username. Profile pictures are not supported. In gameplay, opponents are identified only by text name chips.
-
-**Desired behaviour:**
-
-1. **Single username:** Replace the current two-field system (display name + handle) with one username field. This is both the display name and the unique identifier.
-
-2. **Profile picture:** Users can upload a profile picture after logging in, via the account/settings screen — NOT during registration. Profile pictures are displayed as circles throughout the app.
-
-3. **Default avatar:** Users without a profile picture get a randomly assigned mahjong tile face as their avatar (any tile except the blank white dragon tile). The tile assignment should be consistent per user (e.g. seeded by user ID) so the same tile appears across sessions.
-
-4. **Image size limit:** Profile pictures should be reduced client-side to a maximum of 1024 × 1024 pixels before uploading to keep storage costs low.
-
-5. **Storage:** Profile pictures are stored in S3 (MinIO locally, same bucket/pattern as replay files). The DDB user record stores only the S3 object key or a pre-signed URL; the API generates a fresh pre-signed GET URL when serving user profile data. Reuse the existing `StorageService` (`@Global`) introduced in Phase 9A.
-
-6. **In-game avatar display:**
-   - Left opponent: small circle avatar displayed above their info box (on the left edge).
-   - Right opponent: small circle avatar displayed above their info box (on the right edge).
-   - Top opponent: small circle avatar displayed to the left of their info box.
-   - Active player (viewer): small circle avatar displayed in the top banner next to the logged-in player's name.
-
-**Where to look:**
-
-- `apps/web/src/pages/` — profile/account page, registration flow
-- `apps/api/src/users/` — user schema, profile update endpoint
-- `apps/api/src/storage/storage.service.ts` — existing `StorageService`; add a `putProfilePicture(userId, buffer)` method and bucket/key convention (e.g. `avatars/<userId>.jpg`)
-- `apps/web/src/pages/game/game-page.tsx` — opponent seat info boxes, top banner
-- `packages/shared/src/` — `UserProfile` or equivalent type
-
----
 
 ### IMP-024 · Gameplay sound effects using audio files
 

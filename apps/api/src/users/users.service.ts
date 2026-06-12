@@ -6,12 +6,12 @@ import type { UserRole } from '../common/interfaces/authenticated-user.interface
 export interface UserProfile {
   sub: string;
   handle: string;
-  displayName: string;
   role: UserRole;
   createdAt: string;
   updatedAt: string;
   disabled: boolean;
   passwordHash?: string;
+  avatarKey?: string;
   gamesPlayed?: number;
   gamesWon?: number;
   rating?: number;
@@ -29,13 +29,12 @@ export interface GameHistoryItem {
 export interface PublicProfile {
   sub: string;
   handle: string;
-  displayName: string;
+  avatarUrl?: string | null;
 }
 
 export interface CreateProfileInput {
   sub: string;
   handle: string;
-  displayName: string;
   role: UserRole;
   passwordHash: string;
 }
@@ -50,7 +49,6 @@ export class UsersService {
       ...DK.userProfile(input.sub),
       sub: input.sub,
       handle: input.handle.toLowerCase(),
-      displayName: input.displayName,
       role: input.role,
       passwordHash: input.passwordHash,
       createdAt: now,
@@ -143,9 +141,8 @@ export class UsersService {
     await this.db.update({
       Key: DK.userProfile(sub),
       UpdateExpression:
-        'SET displayName = :anon, disabled = :true, deletedAt = :now, updatedAt = :now REMOVE passwordHash',
+        'SET disabled = :true, deletedAt = :now, updatedAt = :now REMOVE passwordHash, avatarKey',
       ExpressionAttributeValues: {
-        ':anon': `deleted-${sub}`,
         ':true': true,
         ':now': now,
       },
@@ -159,22 +156,16 @@ export class UsersService {
   }
 
   /**
-   * Update a user's mutable profile fields (displayName and/or handle).
-   * Handle changes require swapping the handle-lock item atomically.
+   * Update a user's handle (username). Swaps the handle-lock item atomically.
    */
-  async updateProfile(
-    sub: string,
-    data: { displayName?: string; handle?: string },
-  ): Promise<UserProfile> {
+  async updateProfile(sub: string, data: { handle?: string }): Promise<UserProfile> {
     const profile = await this.getOrThrow(sub);
     const now = new Date().toISOString();
 
     const handleChanged = data.handle && data.handle.toLowerCase() !== profile.handle.toLowerCase();
     const newHandle = data.handle?.toLowerCase() ?? profile.handle;
-    const newDisplayName = data.displayName ?? profile.displayName;
 
     if (handleChanged) {
-      // Atomically: create new handle lock + delete old one + update profile.
       try {
         await this.db.transactWrite({
           TransactItems: [
@@ -195,8 +186,8 @@ export class UsersService {
               Update: {
                 TableName: this.db.tableName,
                 Key: DK.userProfile(sub),
-                UpdateExpression: 'SET handle = :h, displayName = :dn, updatedAt = :now',
-                ExpressionAttributeValues: { ':h': newHandle, ':dn': newDisplayName, ':now': now },
+                UpdateExpression: 'SET handle = :h, updatedAt = :now',
+                ExpressionAttributeValues: { ':h': newHandle, ':now': now },
                 ConditionExpression: 'attribute_exists(PK)',
               },
             },
@@ -204,20 +195,24 @@ export class UsersService {
         });
       } catch (err) {
         if (err instanceof TransactionCanceledException) {
-          throw new ConflictException('Handle is already taken');
+          throw new ConflictException('Username is already taken');
         }
         throw err;
       }
-    } else {
-      await this.db.update({
-        Key: DK.userProfile(sub),
-        UpdateExpression: 'SET displayName = :dn, updatedAt = :now',
-        ExpressionAttributeValues: { ':dn': newDisplayName, ':now': now },
-        ConditionExpression: 'attribute_exists(PK)',
-      });
     }
 
-    return { ...profile, handle: newHandle, displayName: newDisplayName, updatedAt: now };
+    return { ...profile, handle: newHandle, updatedAt: now };
+  }
+
+  /** Store the S3 key for a user's avatar. */
+  async updateAvatar(sub: string, avatarKey: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.db.update({
+      Key: DK.userProfile(sub),
+      UpdateExpression: 'SET avatarKey = :key, updatedAt = :now',
+      ExpressionAttributeValues: { ':key': avatarKey, ':now': now },
+      ConditionExpression: 'attribute_exists(PK)',
+    });
   }
 
   /**
@@ -267,13 +262,12 @@ export class UsersService {
     const res = await this.db.scan({
       FilterExpression: 'begins_with(PK, :pkPrefix) AND SK = :sk AND contains(handle, :q)',
       ExpressionAttributeValues: { ':pkPrefix': 'USER#', ':sk': 'PROFILE', ':q': q },
-      ProjectionExpression: '#sub, handle, displayName',
+      ProjectionExpression: '#sub, handle',
       ExpressionAttributeNames: { '#sub': 'sub' },
     });
     return (res.Items ?? []).map((item) => ({
       sub: item.sub as string,
       handle: item.handle as string,
-      displayName: item.displayName as string,
     }));
   }
 

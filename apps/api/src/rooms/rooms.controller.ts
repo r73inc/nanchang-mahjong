@@ -44,7 +44,7 @@ export class RoomsController {
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async createRoom(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateRoomDto) {
-    const room = await this.service.createRoom(user.sub, user.handle, user.displayName, dto);
+    const room = await this.service.createRoom(user.sub, user.handle, dto);
     return room;
   }
 
@@ -66,7 +66,7 @@ export class RoomsController {
   @Post(':code/join')
   @Throttle({ default: { ttl: 30_000, limit: 10 } })
   async joinRoom(@CurrentUser() user: AuthenticatedUser, @Param('code') code: string) {
-    const room = await this.service.joinRoom(code, user.sub, user.handle, user.displayName);
+    const room = await this.service.joinRoom(code, user.sub, user.handle);
     this.gateway.broadcastRoomUpdate(room.roomId, room);
     return room;
   }
@@ -162,7 +162,7 @@ export class RoomsController {
       (i) => room.seats.find((s) => s.seatIdx === i)!.userId!,
     ) as [string, string, string, string];
     const seatNames = ([0, 1, 2, 3] as const).map(
-      (i) => room.seats.find((s) => s.seatIdx === i)!.displayName,
+      (i) => room.seats.find((s) => s.seatIdx === i)!.handle ?? seatMap[i],
     ) as [string, string, string, string];
 
     // Create the in-memory GameSession using the room's pre-assigned gameId.

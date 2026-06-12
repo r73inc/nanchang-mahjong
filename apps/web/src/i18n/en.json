@@ -73,6 +73,8 @@
   "profileStreak": "Streak",
   "profileEdit": "Edit Profile",
   "profileSave": "Save",
+  "profileUploadPhoto": "Upload photo",
+  "profilePhotoUpdated": "Photo updated.",
   "profileSaving": "Saving…",
   "profileUpdated": "Profile updated.",
   "profileHandleTaken": "That handle is already taken.",

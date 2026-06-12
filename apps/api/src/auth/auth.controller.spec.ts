@@ -19,7 +19,6 @@ const mockAuth = {
 const mockUser: AuthenticatedUser = {
   sub: 'sub-123',
   handle: 'alice',
-  displayName: 'Alice',
   role: 'user',
 };
 
@@ -47,7 +46,6 @@ describe('AuthController', () => {
       const dto: SignupDto = {
         password: 'Password1',
         handle: 'alice',
-        displayName: 'Alice',
         inviteCode: 'INVITE01',
       };
       mockAuth.signup.mockResolvedValue({ accessToken: 'at', refreshToken: 'rt' });

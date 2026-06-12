@@ -7,6 +7,7 @@ import {
   CreateBucketCommand,
   HeadBucketCommand,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { AppConfig } from '../config/configuration';
 import type { ReplayGamePayload } from '@nanchang/shared';
 
@@ -75,5 +76,27 @@ export class StorageService implements OnModuleInit {
     const body = await res.Body?.transformToString('utf-8');
     if (!body) throw new Error(`Empty replay body for game ${gameId}`);
     return JSON.parse(body) as ReplayGamePayload;
+  }
+
+  /** Upload a user avatar image to S3. Returns the object key. */
+  async putAvatar(userId: string, buffer: Buffer, contentType: string): Promise<string> {
+    const ext = contentType === 'image/png' ? 'png' : 'jpg';
+    const key = `avatars/${userId}.${ext}`;
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
+    return key;
+  }
+
+  /** Generate a pre-signed GET URL for an avatar (1 hour expiry). */
+  async getAvatarUrl(key: string): Promise<string> {
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: 3600,
+    });
   }
 }

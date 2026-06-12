@@ -28,8 +28,7 @@ export function HomeStubPage() {
         {/* Welcome banner */}
         <div className="mb-8">
           <p className="text-sm text-mj-bone/60 mb-0.5">{t('welcomeBack')}</p>
-          <h2 className="text-2xl font-bold text-mj-bone">{user?.displayName ?? '—'}</h2>
-          <p className="text-sm text-mj-bone/50 mt-0.5">@{user?.handle}</p>
+          <h2 className="text-2xl font-bold text-mj-bone">@{user?.handle ?? '—'}</h2>
           {user?.role === 'admin' && (
             <span
               className="inline-block mt-2 px-2.5 py-0.5 rounded-md text-[11px] font-bold

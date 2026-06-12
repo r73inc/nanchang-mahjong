@@ -60,7 +60,7 @@ describe('FriendsService', () => {
     });
 
     it('creates two edge items via transactWrite', async () => {
-      mockUsers.findBySub.mockResolvedValue({ sub: BOB, handle: 'bob', displayName: 'Bob' });
+      mockUsers.findBySub.mockResolvedValue({ sub: BOB, handle: 'bob' });
       mockDb.transactWrite.mockResolvedValue({});
       await service.sendRequest(ALICE, BOB);
       expect(mockDb.transactWrite).toHaveBeenCalledTimes(1);
@@ -150,10 +150,9 @@ describe('FriendsService', () => {
       mockDb.query.mockResolvedValue({
         Items: [{ friendSub: BOB, status: 'accepted', createdAt: 'x', updatedAt: 'x' }],
       });
-      mockUsers.findBySub.mockResolvedValue({ sub: BOB, handle: 'bob', displayName: 'Bob' });
+      mockUsers.findBySub.mockResolvedValue({ sub: BOB, handle: 'bob' });
       const result = await service.listFriends(ALICE);
       expect(result[0].handle).toBe('bob');
-      expect(result[0].displayName).toBe('Bob');
     });
   });
 
@@ -162,8 +161,8 @@ describe('FriendsService', () => {
   describe('searchUsers', () => {
     it('excludes self from results', async () => {
       mockUsers.searchPublic.mockResolvedValue([
-        { sub: ALICE, handle: 'alice', displayName: 'Alice' },
-        { sub: BOB, handle: 'bob', displayName: 'Bob' },
+        { sub: ALICE, handle: 'alice' },
+        { sub: BOB, handle: 'bob' },
       ]);
       mockDb.get.mockResolvedValue({ Item: null }); // no friendship
       const results = await service.searchUsers(ALICE, 'a');
@@ -171,7 +170,7 @@ describe('FriendsService', () => {
     });
 
     it('includes friendStatus in each result', async () => {
-      mockUsers.searchPublic.mockResolvedValue([{ sub: BOB, handle: 'bob', displayName: 'Bob' }]);
+      mockUsers.searchPublic.mockResolvedValue([{ sub: BOB, handle: 'bob' }]);
       mockDb.get.mockResolvedValue({ Item: { status: 'accepted' } });
       const results = await service.searchUsers(ALICE, 'bob');
       expect(results[0].friendStatus).toBe('accepted');

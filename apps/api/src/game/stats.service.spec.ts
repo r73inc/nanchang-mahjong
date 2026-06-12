@@ -18,7 +18,6 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
     sub: 'u1',
     email: 'a@test.com',
     handle: 'player1',
-    displayName: 'P1',
     role: 'user',
     createdAt: '2025-01-01T00:00:00.000Z',
     updatedAt: '2025-01-01T00:00:00.000Z',

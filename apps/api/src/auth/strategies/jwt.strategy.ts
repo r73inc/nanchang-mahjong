@@ -9,7 +9,6 @@ import type { AuthenticatedUser } from '../../common/interfaces/authenticated-us
 interface JwtPayload {
   sub: string;
   handle: string;
-  displayName: string;
   role: 'user' | 'admin';
   type?: 'access' | 'refresh';
 }
@@ -41,7 +40,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     return {
       sub: payload.sub,
       handle: payload.handle,
-      displayName: payload.displayName,
       role: payload.role,
     };
   }

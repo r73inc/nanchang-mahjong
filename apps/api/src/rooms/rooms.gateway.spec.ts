@@ -17,7 +17,7 @@ function makeSocket(dataOverrides: Record<string, unknown> = {}): FakeSocket {
   return {
     id: 'socket-1',
     data: {
-      user: { sub: 'u1', handle: 'player1', displayName: 'Player 1', role: 'user' },
+      user: { sub: 'u1', handle: 'player1', role: 'user' },
       ...dataOverrides,
     },
     join: jest.fn().mockResolvedValue(undefined),
@@ -32,10 +32,10 @@ const SAMPLE_ROOM: RoomState = {
   hostUserId: 'u1',
   status: 'waiting',
   seats: [
-    { seatIdx: 0, userId: 'u1', handle: 'player1', displayName: 'P1', ready: false, isHost: true },
-    { seatIdx: 1, userId: null, handle: null, displayName: null, ready: false, isHost: false },
-    { seatIdx: 2, userId: null, handle: null, displayName: null, ready: false, isHost: false },
-    { seatIdx: 3, userId: null, handle: null, displayName: null, ready: false, isHost: false },
+    { seatIdx: 0, userId: 'u1', handle: 'player1', ready: false, isHost: true },
+    { seatIdx: 1, userId: null, handle: null, ready: false, isHost: false },
+    { seatIdx: 2, userId: null, handle: null, ready: false, isHost: false },
+    { seatIdx: 3, userId: null, handle: null, ready: false, isHost: false },
   ],
   settings: {
     rounds: 'east+south',

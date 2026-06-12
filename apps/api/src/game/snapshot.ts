@@ -59,6 +59,7 @@ export function toClientSnapshot(
   preGamePhase: 'dealing' | 'hands' | 'settlement' | 'jing' | null = null,
   botMeta?: readonly [SeatBotMeta, SeatBotMeta, SeatBotMeta, SeatBotMeta],
   seatNames?: readonly [string, string, string, string],
+  seatAvatarUrls?: readonly [string | null, string | null, string | null, string | null],
   pendingRoll: {
     purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
     roller: 0 | 1 | 2 | 3;
@@ -78,6 +79,7 @@ export function toClientSnapshot(
       handCount: seat.hand.length,
       ...(bot?.isBot ? { isBot: true, botDifficulty: bot.botDifficulty } : {}),
       seatName: seatNames?.[i] ?? seat.wind,
+      avatarUrl: seatAvatarUrls?.[i] ?? null,
     };
   }) as [ClientSeatState, ClientSeatState, ClientSeatState, ClientSeatState];
 

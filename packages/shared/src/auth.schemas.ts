@@ -13,7 +13,6 @@ const handleSchema = z
 
 export const SignupSchema = z.object({
   password: passwordSchema,
-  displayName: z.string().min(1).max(50),
   handle: handleSchema,
   inviteCode: z.string().min(1, 'Invite code is required'),
 });

@@ -17,8 +17,8 @@ const mockUseGameStore = vi.mocked(useGameStore);
 vi.mock('../../stores/auth.store', () => ({
   useAuthStore: vi
     .fn()
-    .mockImplementation((sel: (s: { user: { displayName: string } | null }) => unknown) =>
-      sel({ user: { displayName: 'TestPlayer' } }),
+    .mockImplementation((sel: (s: { user: { handle: string } | null }) => unknown) =>
+      sel({ user: { handle: 'TestPlayer' } }),
     ),
 }));
 

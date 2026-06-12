@@ -2,31 +2,40 @@ import {
   Controller,
   Get,
   Patch,
+  Put,
   Body,
   Query,
   UseGuards,
   ParseIntPipe,
   DefaultValuePipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UploadAvatarDto } from './dto/upload-avatar.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { StorageService } from '../storage/storage.service';
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
 
 @Controller('users')
 @UseGuards(JwtGuard)
 @Throttle({ default: { ttl: 60_000, limit: 60 } })
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly storage: StorageService,
+  ) {}
 
   /** GET /users/me — full profile for the authenticated user. */
   @Get('me')
   async getMe(@CurrentUser() actor: AuthenticatedUser) {
     const profile = await this.users.getOrThrow(actor.sub);
+    const avatarUrl = profile.avatarKey ? await this.storage.getAvatarUrl(profile.avatarKey) : null;
     return {
       ...profile,
+      avatarUrl,
       gamesPlayed: profile.gamesPlayed ?? 0,
       gamesWon: profile.gamesWon ?? 0,
       rating: profile.rating ?? 1500,
@@ -34,10 +43,29 @@ export class UsersController {
     };
   }
 
-  /** PATCH /users/me — update displayName and/or handle. */
+  /** PATCH /users/me — update username (handle). */
   @Patch('me')
   async updateMe(@CurrentUser() actor: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
     return this.users.updateProfile(actor.sub, dto);
+  }
+
+  /** PUT /users/me/avatar — upload a profile picture (base64-encoded JPEG or PNG). */
+  @Put('me/avatar')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async uploadAvatar(@CurrentUser() actor: AuthenticatedUser, @Body() dto: UploadAvatarDto) {
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(dto.imageData, 'base64');
+    } catch {
+      throw new BadRequestException('Invalid base64 image data');
+    }
+    if (buffer.length > 2_000_000) {
+      throw new BadRequestException('Image exceeds 2 MB limit');
+    }
+    const key = await this.storage.putAvatar(actor.sub, buffer, dto.contentType);
+    await this.users.updateAvatar(actor.sub, key);
+    const avatarUrl = await this.storage.getAvatarUrl(key);
+    return { avatarUrl };
   }
 
   /** GET /users/me/games — paginated game history for the authenticated user. */
@@ -53,7 +81,7 @@ export class UsersController {
 
   /**
    * GET /users/search?q=<query> — search users by handle substring.
-   * Returns only public fields (sub, handle, displayName) — no email.
+   * Returns only public fields (sub, handle) — no email.
    */
   @Get('search')
   async search(@Query('q') q: string) {

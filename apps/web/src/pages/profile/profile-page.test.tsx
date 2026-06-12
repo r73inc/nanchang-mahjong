@@ -12,20 +12,20 @@ const mockMutateAsync = vi.fn();
 vi.mock('../../hooks/use-profile', () => ({
   useMyProfile: vi.fn(),
   useUpdateProfile: vi.fn(),
+  useUploadAvatar: vi.fn(),
 }));
 
-import { useMyProfile, useUpdateProfile } from '../../hooks/use-profile';
+import { useMyProfile, useUpdateProfile, useUploadAvatar } from '../../hooks/use-profile';
 
 const mockUseMyProfile = vi.mocked(useMyProfile);
 const mockUseUpdateProfile = vi.mocked(useUpdateProfile);
+const mockUseUploadAvatar = vi.mocked(useUploadAvatar);
 
 // ── Fixture ───────────────────────────────────────────────────────────────────
 
 const sampleProfile = {
   sub: 'alice-sub',
-  email: 'alice@example.com',
   handle: 'alice',
-  displayName: 'Alice',
   role: 'user' as const,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -57,6 +57,7 @@ function renderProfilePage() {
 function setupDefaultMocks() {
   mockUseMyProfile.mockReturnValue({ data: sampleProfile, isLoading: false } as never);
   mockUseUpdateProfile.mockReturnValue({ mutateAsync: mockMutateAsync, isPending: false } as never);
+  mockUseUploadAvatar.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -67,9 +68,8 @@ describe('ProfilePage', () => {
     setupDefaultMocks();
   });
 
-  it('renders the display name and handle', () => {
+  it('renders the handle', () => {
     renderProfilePage();
-    expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('@alice')).toBeInTheDocument();
   });
 
@@ -84,13 +84,12 @@ describe('ProfilePage', () => {
   it('shows a spinner while loading', () => {
     mockUseMyProfile.mockReturnValue({ data: undefined, isLoading: true } as never);
     renderProfilePage();
-    expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+    expect(screen.queryByText('@alice')).not.toBeInTheDocument();
   });
 
   it('shows edit form when "Edit Profile" is clicked', () => {
     renderProfilePage();
     fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
-    expect(screen.getByDisplayValue('Alice')).toBeInTheDocument();
     expect(screen.getByDisplayValue('alice')).toBeInTheDocument();
   });
 
@@ -99,23 +98,13 @@ describe('ProfilePage', () => {
     renderProfilePage();
 
     fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
-
-    const displayNameInput = screen.getByDisplayValue('Alice');
-    fireEvent.change(displayNameInput, { target: { value: 'Alice Updated' } });
-
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
-    await waitFor(() =>
-      expect(mockMutateAsync).toHaveBeenCalledWith({
-        displayName: 'Alice Updated',
-        handle: 'alice',
-      }),
-    );
+    await waitFor(() => expect(mockMutateAsync).toHaveBeenCalledWith({ handle: 'alice' }));
     await waitFor(() => expect(screen.getByText('Profile updated.')).toBeInTheDocument());
   });
 
   it('shows an error message when updateProfile fails', async () => {
-    // Axios isAxiosError checks for the `isAxiosError` flag on the object
     mockMutateAsync.mockRejectedValue({
       isAxiosError: true,
       response: { data: { message: 'Handle is already taken' } },
@@ -136,7 +125,7 @@ describe('ProfilePage', () => {
     fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
     expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(screen.queryByDisplayValue('Alice')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('alice')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /edit profile/i })).toBeInTheDocument();
   });
 });

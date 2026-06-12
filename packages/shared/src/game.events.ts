@@ -130,8 +130,10 @@ export interface ClientSeatState {
   isBot?: boolean;
   /** Bot difficulty — only set when isBot is true. */
   botDifficulty?: import('./room.schemas').BotDifficulty;
-  /** Display name for this seat — player's displayName or bot's generated name. */
+  /** Display name for this seat — player's handle or bot's generated name. */
   seatName: string;
+  /** Pre-signed avatar URL; null for bots and players without a photo. */
+  avatarUrl?: string | null;
 }
 
 /**
