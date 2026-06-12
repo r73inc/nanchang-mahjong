@@ -4,6 +4,7 @@ import {
   canPung,
   canKongFromDiscard,
   concealedKongOptions,
+  addToKongOptions,
   chowOptions,
   isTenpai,
   tenpaiTiles,
@@ -186,14 +187,20 @@ describe('canKongFromDiscard', () => {
     expect(canKongFromDiscard(hand, '9p', NO_JINGS)).toBe(false);
   });
 
-  it('can kong with 2 naturals + 1 jing', () => {
+  it('cannot kong with 2 naturals + 1 jing (wildcards forbidden in kongs, rules §3.2)', () => {
     const hand: TileType[] = ['9p', '9p', JING, '1m'];
-    expect(canKongFromDiscard(hand, '9p', JINGS)).toBe(true);
+    expect(canKongFromDiscard(hand, '9p', JINGS)).toBe(false);
   });
 
-  it('can kong with 0 naturals + 3 jings (discard is natural anchor)', () => {
+  it('cannot kong with 0 naturals + 3 jings (wildcards forbidden in kongs, rules §3.2)', () => {
     const hand: TileType[] = [JING, JING, JING, '1m'];
-    expect(canKongFromDiscard(hand, '9p', JINGS)).toBe(true);
+    expect(canKongFromDiscard(hand, '9p', JINGS)).toBe(false);
+  });
+
+  it('can Spirit Kong: discard is a jing type and player holds 3 copies of it', () => {
+    // Discarding a jing tile — player holds 3 exact copies → Spirit Kong (杠精)
+    const hand: TileType[] = [JING, JING, JING, '1m'];
+    expect(canKongFromDiscard(hand, JING, JINGS)).toBe(true);
   });
 });
 
@@ -240,7 +247,7 @@ describe('concealedKongOptions', () => {
     expect(concealedKongOptions(hand, NO_JINGS)).toHaveLength(0);
   });
 
-  it('identifies kong with 3 naturals + 1 jing', () => {
+  it('does NOT allow concealed kong with 3 naturals + 1 jing (wildcards forbidden in kongs, rules §3.2)', () => {
     const hand: TileType[] = [
       '7p',
       '7p',
@@ -258,7 +265,7 @@ describe('concealedKongOptions', () => {
       'east',
     ];
     const opts = concealedKongOptions(hand, JINGS);
-    expect(opts).toContain('7p');
+    expect(opts).not.toContain('7p');
   });
 
   it('works for a player with open melds (hand shorter than 14 tiles)', () => {
@@ -268,21 +275,52 @@ describe('concealedKongOptions', () => {
     expect(opts).toContain('7p');
   });
 
-  it('identifies kong with 2 naturals + 2 jings', () => {
+  it('does NOT allow concealed kong with 2 naturals + 2 jings (wildcards forbidden in kongs, rules §3.2)', () => {
     const JING1: TileType = '5m';
     const JING2: TileType = '6m';
     const hand: TileType[] = ['7p', '7p', JING1, JING2, '1m', '2m', '3m', '4m'];
     const opts = concealedKongOptions(hand, [JING1, JING2]);
-    expect(opts).toContain('7p');
+    expect(opts).not.toContain('7p');
   });
 
-  it('identifies kong with 1 natural + 3 jings', () => {
+  it('does NOT allow concealed kong with 1 natural + 3 jings (wildcards forbidden in kongs, rules §3.2)', () => {
     const JING1: TileType = '5m';
     const JING2: TileType = '6m';
-    // jingCount = 3: two JING1 copies + one JING2
     const hand: TileType[] = ['7p', JING1, JING1, JING2, '1m', '2m', '3m'];
     const opts = concealedKongOptions(hand, [JING1, JING2]);
-    expect(opts).toContain('7p');
+    expect(opts).not.toContain('7p');
+  });
+
+  it('allows Spirit Kong (杠精): 4 copies of the same jing tile type', () => {
+    // All 4 copies of the jing tile itself — this is Spirit Kong, not wildcard substitution
+    const hand: TileType[] = [JING, JING, JING, JING, '1m', '2m', '3m', '4m', '5p'];
+    const opts = concealedKongOptions(hand, JINGS);
+    expect(opts).toContain(JING);
+  });
+});
+
+// ── addToKongOptions ──────────────────────────────────────────────────────────
+
+describe('addToKongOptions', () => {
+  it('returns the natural tile when player holds the exact match', () => {
+    const hand: TileType[] = ['3m', '3m', '7p', '8p'];
+    expect(addToKongOptions(hand, '3m', NO_JINGS)).toEqual(['3m']);
+  });
+
+  it('returns empty when player only has a jing (wildcards forbidden in open kong upgrade)', () => {
+    const hand: TileType[] = [JING, '7p', '8p'];
+    expect(addToKongOptions(hand, '3m', JINGS)).toHaveLength(0);
+  });
+
+  it('returns empty when player has neither natural nor jing', () => {
+    const hand: TileType[] = ['7p', '8p', '9p'];
+    expect(addToKongOptions(hand, '3m', NO_JINGS)).toHaveLength(0);
+  });
+
+  it('allows Spirit Pung upgrade: player holds 4th jing tile matching an open jing pung', () => {
+    // Open pung is of JING tiles; player draws the 4th → Spirit Kong (杠精)
+    const hand: TileType[] = [JING, '7p', '8p'];
+    expect(addToKongOptions(hand, JING, JINGS)).toEqual([JING]);
   });
 });
 
