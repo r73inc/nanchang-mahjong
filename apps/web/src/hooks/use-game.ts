@@ -15,6 +15,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { getSocket } from '../lib/socket';
 import { useGameStore } from '../stores/game.store';
+import { useSound } from './use-sound';
 import type { TileType, ClientGameState } from '@nanchang/shared';
 
 // Delay before showing the reconnecting overlay (PLAN §7.5: 1.5s)
@@ -57,6 +58,12 @@ export function useGame(gameId: string, spectate = false) {
     setLastDiscard,
     reset,
   } = useGameStore();
+
+  const { playDiceRoll, playShuffle } = useSound();
+  // Stable ref so event handlers inside useEffect always call the current
+  // callback without adding sound deps to the effect dependency array.
+  const soundRef = useRef({ playDiceRoll, playShuffle });
+  soundRef.current = { playDiceRoll, playShuffle };
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot queue: snapshots received during dice animation are held here and
@@ -117,6 +124,9 @@ export function useGame(gameId: string, spectate = false) {
 
       // ── Dice roll animation ───────────────────────────────────────────────
       if (event.kind === 'dice_roll') {
+        soundRef.current.playDiceRoll();
+        // wall_selection is the first roll of every new hand — also play shuffle sound
+        if (event.purpose === 'wall_selection') soundRef.current.playShuffle();
         isDiceAnimatingRef.current = true;
         setDiceAnimation({
           dice: event.dice as [number, number],
