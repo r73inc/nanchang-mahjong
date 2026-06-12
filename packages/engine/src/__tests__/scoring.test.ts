@@ -57,14 +57,14 @@ function assertZeroSum(result: ReturnType<typeof calculateWinPayout>) {
 // ── Standard Ron payment structure (§6.3) ────────────────────────────────────
 
 describe('Engine·scoring-ron-base', () => {
-  it('standard ron: discarder pays ×2, each other non-winner pays ×1', () => {
-    // base=1, no multipliers: discarder pays 2, others pay 1 each
+  it('standard ron: discarder pays ×2, non-discarder non-dealer pays ×1, dealer-as-non-discarder pays ×2', () => {
+    // base=1, no multipliers. winner=1, discarder=0, dealer=3.
+    // Dealer (seat 3) is a non-discarder payer → pays ×2 under dealer-loss rule.
     const r = calculateWinPayout(baseCtx());
-    // winner=1, discarder=0 (east dealer), others=2,3
-    expect(r.scoreDelta[1]).toBe(4); // wins: 2 + 1 + 1
     expect(r.scoreDelta[0]).toBe(-2); // discarder pays ×2
-    expect(r.scoreDelta[2]).toBe(-1); // non-winner pays ×1
-    expect(r.scoreDelta[3]).toBe(-1); // non-winner pays ×1
+    expect(r.scoreDelta[2]).toBe(-1); // non-dealer non-discarder pays ×1
+    expect(r.scoreDelta[3]).toBe(-2); // dealer non-discarder pays ×2 (dealer-loss)
+    expect(r.scoreDelta[1]).toBe(5); // wins: 2 + 1 + 2
     assertZeroSum(r);
   });
 
@@ -74,15 +74,15 @@ describe('Engine·scoring-ron-base', () => {
 });
 
 describe('Engine·scoring-tsumo-base', () => {
-  it('standard tsumo: each loser pays ×2', () => {
-    // base=1, tsumo, winner is seat 1 (not dealer=3): each pays 2, winner gets 6
+  it('standard tsumo: non-dealer losers pay ×2, dealer-loser pays ×4', () => {
+    // base=1, tsumo, winner=1, dealer=3. Dealer (seat 3) is a loser → pays ×4.
     const r = calculateWinPayout(
       baseCtx({ winType: 'tsumo', winnerSeat: 1, discarderSeat: undefined }),
     );
-    expect(r.scoreDelta[1]).toBe(6); // wins from 3 losers × 2 = 6
-    expect(r.scoreDelta[0]).toBe(-2);
-    expect(r.scoreDelta[2]).toBe(-2);
-    expect(r.scoreDelta[3]).toBe(-2);
+    expect(r.scoreDelta[0]).toBe(-2); // non-dealer loser ×2
+    expect(r.scoreDelta[2]).toBe(-2); // non-dealer loser ×2
+    expect(r.scoreDelta[3]).toBe(-4); // dealer-loser ×4
+    expect(r.scoreDelta[1]).toBe(8); // wins: 2 + 2 + 4
     assertZeroSum(r);
   });
 });
@@ -115,16 +115,60 @@ describe('Engine·scoring-dealer-win', () => {
     assertZeroSum(r);
   });
 
-  it('Engine·dealer-doubles: dealer loss as discarder pays extra', () => {
-    // Non-dealer wins ron, but the discarder IS the dealer → dealer pays ×2 extra
-    // winner=1, dealerSeat=0, discarderSeat=0: discarder pays ×2×2=×4, others(2,3) pay ×1
+  it('Engine·dealer-doubles: dealer loss as discarder pays ×4', () => {
+    // winner=1, dealer=0, discarder=0: dealer-as-discarder pays ×4, non-dealers pay ×1
     const r = calculateWinPayout(
       baseCtx({ winType: 'ron', winnerSeat: 1, dealerSeat: 0, discarderSeat: 0 }),
     );
-    expect(r.scoreDelta[0]).toBe(-4); // dealer-loss: base×2 × dealer×2 = 4
-    expect(r.scoreDelta[2]).toBe(-1);
+    expect(r.scoreDelta[0]).toBe(-4); // dealer-discarder: ×2 × ×2 = ×4
+    expect(r.scoreDelta[2]).toBe(-1); // non-dealer non-discarder ×1
     expect(r.scoreDelta[3]).toBe(-1);
-    expect(r.scoreDelta[1]).toBe(6); // 4 + 1 + 1
+    expect(r.scoreDelta[1]).toBe(6);
+    assertZeroSum(r);
+  });
+
+  it('Engine·dealer-loss-non-discarder: dealer as side payer on ron pays ×2', () => {
+    // winner=2, dealer=1 (non-discarder, non-winner), discarder=0.
+    // Dealer (seat 1) is a non-discarder payer → pays ×2 instead of ×1.
+    const r = calculateWinPayout(
+      baseCtx({ winType: 'ron', winnerSeat: 2, dealerSeat: 1, discarderSeat: 0 }),
+    );
+    expect(r.scoreDelta[0]).toBe(-2); // discarder ×2 (not dealer)
+    expect(r.scoreDelta[1]).toBe(-2); // dealer non-discarder ×2
+    expect(r.scoreDelta[3]).toBe(-1); // non-dealer non-discarder ×1
+    expect(r.scoreDelta[2]).toBe(5); // 2+2+1
+    assertZeroSum(r);
+  });
+
+  it('Engine·dealer-loss-tsumo: dealer as loser pays ×4', () => {
+    // winner=2, dealer=0 (losing payer). Non-dealer payers (1,3) pay ×2; dealer (0) pays ×4.
+    const r = calculateWinPayout(
+      baseCtx({ winType: 'tsumo', winnerSeat: 2, dealerSeat: 0, discarderSeat: undefined }),
+    );
+    expect(r.scoreDelta[0]).toBe(-4); // dealer-loser ×4
+    expect(r.scoreDelta[1]).toBe(-2); // non-dealer ×2
+    expect(r.scoreDelta[3]).toBe(-2);
+    expect(r.scoreDelta[2]).toBe(8); // 4+2+2
+    assertZeroSum(r);
+  });
+
+  it('Rob Kong with dealer-as-konger: entire konger payment doubled', () => {
+    // winner=2, kong=0, dealer=0 (konger IS the dealer). kongerRate=4 (dealer-loss doubling).
+    // kongerPays = 1×4×3 + 0 = 12.
+    const r = calculateWinPayout(
+      baseCtx({
+        winType: 'tsumo',
+        winnerSeat: 2,
+        dealerSeat: 0,
+        discarderSeat: undefined,
+        kongSeat: 0,
+        isRobKong: true,
+      }),
+    );
+    expect(r.scoreDelta[2]).toBe(12);
+    expect(r.scoreDelta[0]).toBe(-12);
+    expect(r.scoreDelta[1]).toBe(0);
+    expect(r.scoreDelta[3]).toBe(0);
     assertZeroSum(r);
   });
 });
@@ -133,6 +177,7 @@ describe('Engine·scoring-dealer-win', () => {
 
 describe('Engine·scoring-hand-types', () => {
   it('Seven Pairs ×2', () => {
+    // winner=1, dealer=3. Non-dealer payers (0,2): (2×2)=4. Dealer-loser (3): (2×4)=8.
     const r = calculateWinPayout(
       baseCtx({
         winType: 'tsumo',
@@ -141,9 +186,10 @@ describe('Engine·scoring-hand-types', () => {
         handType: 'seven_pairs',
       }),
     );
-    // base×2(hand)×2(tsumo) = 4 per loser
-    // winner is not dealer so no extra dealer multiplier
-    expect(r.scoreDelta[1]).toBe(12);
+    expect(r.scoreDelta[0]).toBe(-4);
+    expect(r.scoreDelta[2]).toBe(-4);
+    expect(r.scoreDelta[3]).toBe(-8); // dealer-loser: (2×4)=8
+    expect(r.scoreDelta[1]).toBe(16); // 4+4+8
     expect(r.items.some((i) => i.name === 'Seven Pairs')).toBe(true);
     assertZeroSum(r);
   });
@@ -190,10 +236,12 @@ describe('Engine·scoring-hand-types', () => {
   });
 });
 
-// ── German / True German (§6.4) ───────────────────────────────────────────────
+// ── German / True German (§2.4) ───────────────────────────────────────────────
 
 describe('Engine·scoring-german', () => {
-  it('German ×2 + flat +5 per loser', () => {
+  it('German: flat +5 per loser only — no ×2 stacking multiplier', () => {
+    // winner=1, dealer=3. German adds flat +5, NOT a ×2 multiplier.
+    // Non-dealer payers (0,2): (1×2)+5=7. Dealer-loser (3): (1×4)+5=9.
     const r = calculateWinPayout(
       baseCtx({
         winType: 'tsumo',
@@ -202,17 +250,19 @@ describe('Engine·scoring-german', () => {
         isGerman: true,
       }),
     );
-    // German ×2: each loser pays (1×2×2) + 5 = 9; winner gets 27
-    expect(r.scoreDelta[1]).toBe(27);
-    expect(r.scoreDelta[0]).toBe(-9);
-    expect(r.scoreDelta[2]).toBe(-9);
-    expect(r.scoreDelta[3]).toBe(-9);
+    expect(r.scoreDelta[0]).toBe(-7);
+    expect(r.scoreDelta[2]).toBe(-7);
+    expect(r.scoreDelta[3]).toBe(-9); // dealer-loser: (1×4)+5=9
+    expect(r.scoreDelta[1]).toBe(23); // 7+7+9
+    expect(r.totalMultiplier).toBe(1); // no extra multiplier from German
     expect(r.items.some((i) => i.name === 'German')).toBe(true);
     expect(r.flatBonusPerLoser).toBe(5);
     assertZeroSum(r);
   });
 
-  it('True German ×4 + flat +5 per loser (supersedes German)', () => {
+  it('True German: ×2 additional multiplier + flat +5 per loser (supersedes German)', () => {
+    // True German adds ×2 to stack. winner=1, dealer=3.
+    // Non-dealer payers: (1×2×2)+5=9. Dealer-loser: (1×2×4)+5=13.
     const r = calculateWinPayout(
       baseCtx({
         winType: 'tsumo',
@@ -222,15 +272,37 @@ describe('Engine·scoring-german', () => {
         isTrueGerman: true,
       }),
     );
-    // True German ×4: each loser pays (1×4×2) + 5 = 13; winner gets 39
-    expect(r.scoreDelta[1]).toBe(39);
+    expect(r.scoreDelta[0]).toBe(-9);
+    expect(r.scoreDelta[2]).toBe(-9);
+    expect(r.scoreDelta[3]).toBe(-13); // dealer-loser: (2×4)+5=13
+    expect(r.scoreDelta[1]).toBe(31); // 9+9+13
+    expect(r.totalMultiplier).toBe(2);
     expect(r.items.some((i) => i.name === 'True German')).toBe(true);
     expect(r.items.some((i) => i.name === 'German')).toBe(false); // superseded
     assertZeroSum(r);
   });
 
+  it('German ron: flat +5 applied to discarder and side payers separately', () => {
+    // winner=1, discarder=0, dealer=2 (non-discarder payer who is dealer).
+    // discarder (0): not dealer → (1×2)+5=7. dealer non-discarder (2): (1×2)+5=7.
+    // non-dealer non-discarder (3): (1×1)+5=6.
+    const r = calculateWinPayout(
+      baseCtx({
+        winType: 'ron',
+        winnerSeat: 1,
+        discarderSeat: 0,
+        dealerSeat: 2,
+        isGerman: true,
+      }),
+    );
+    expect(r.scoreDelta[0]).toBe(-7); // discarder ×2 + flat
+    expect(r.scoreDelta[2]).toBe(-7); // dealer non-discarder ×2 + flat
+    expect(r.scoreDelta[3]).toBe(-6); // non-dealer non-discarder ×1 + flat
+    expect(r.scoreDelta[1]).toBe(20); // 7+7+6
+    assertZeroSum(r);
+  });
+
   it('Engine·scoring-clean-win: isGerman true when jingsUsed is 0', () => {
-    // The 'German' condition is exactly jingsUsed === 0, confirmed in scoring context
     const ctx = baseCtx({ isGerman: true, jingsUsed: 0 });
     expect(ctx.isGerman).toBe(true);
   });
@@ -273,6 +345,23 @@ describe('Engine·scoring-heavenly-earthly', () => {
     assertZeroSum(r);
   });
 
+  it('Heavenly Win + Spirit Fishing: flat 40 from each, winner gets 120', () => {
+    const r = calculateWinPayout(
+      baseCtx({
+        winType: 'tsumo',
+        winnerSeat: 0,
+        discarderSeat: undefined,
+        isHeavenlyWin: true,
+        isSpiritFishing: true,
+      }),
+    );
+    expect(r.scoreDelta[0]).toBe(120);
+    expect(r.scoreDelta[1]).toBe(-40);
+    expect(r.scoreDelta[2]).toBe(-40);
+    expect(r.scoreDelta[3]).toBe(-40);
+    assertZeroSum(r);
+  });
+
   it('Earthly Win: flat 20 from each, overrides multipliers', () => {
     const r = calculateWinPayout(
       baseCtx({
@@ -280,10 +369,27 @@ describe('Engine·scoring-heavenly-earthly', () => {
         winnerSeat: 1,
         discarderSeat: 0,
         isEarthlyWin: true,
-        isGerman: true, // would be ×2 normally — earthly overrides
+        isGerman: true, // flat +5 normally — earthly overrides
       }),
     );
     expect(r.scoreDelta[1]).toBe(60);
+    assertZeroSum(r);
+  });
+
+  it('Earthly Win + Spirit Fishing: flat 40 from each, winner gets 120', () => {
+    const r = calculateWinPayout(
+      baseCtx({
+        winType: 'ron',
+        winnerSeat: 1,
+        discarderSeat: 0,
+        isEarthlyWin: true,
+        isSpiritFishing: true,
+      }),
+    );
+    expect(r.scoreDelta[1]).toBe(120);
+    expect(r.scoreDelta[0]).toBe(-40);
+    expect(r.scoreDelta[2]).toBe(-40);
+    expect(r.scoreDelta[3]).toBe(-40);
     assertZeroSum(r);
   });
 });
@@ -313,8 +419,9 @@ describe('Engine·scoring-rob-kong', () => {
 // ── Multiplier stacking ───────────────────────────────────────────────────────
 
 describe('Engine·scoring-multiplier-stacking', () => {
-  it('Seven Pairs + German tsumo: multipliers stack', () => {
-    // Seven Pairs ×2, German ×2 = ×4; each loser pays (1×4×2)+5 = 13; winner gets 39
+  it('Seven Pairs + German tsumo: Seven Pairs ×2, German flat +5 only', () => {
+    // German no longer adds ×2; totalMultiplier = 2 (Seven Pairs only).
+    // winner=1, dealer=3. Non-dealer (0,2): (2×2)+5=9. Dealer-loser (3): (2×4)+5=13.
     const r = calculateWinPayout(
       baseCtx({
         winType: 'tsumo',
@@ -324,12 +431,16 @@ describe('Engine·scoring-multiplier-stacking', () => {
         isGerman: true,
       }),
     );
-    expect(r.totalMultiplier).toBe(4);
-    expect(r.scoreDelta[1]).toBe(39); // 3 × 13
+    expect(r.totalMultiplier).toBe(2); // Seven Pairs ×2, no German ×2
+    expect(r.scoreDelta[0]).toBe(-9);
+    expect(r.scoreDelta[2]).toBe(-9);
+    expect(r.scoreDelta[3]).toBe(-13); // dealer-loser (2×4)+5=13
+    expect(r.scoreDelta[1]).toBe(31); // 9+9+13
     assertZeroSum(r);
   });
 
   it('Dealer Seven Pairs tsumo: Seven Pairs ×2 + Dealer ×2 = ×4', () => {
+    // winner=0=dealer, no dealer-loss penalty on payers.
     const r = calculateWinPayout(
       baseCtx({
         winType: 'tsumo',
@@ -340,6 +451,46 @@ describe('Engine·scoring-multiplier-stacking', () => {
       }),
     );
     expect(r.totalMultiplier).toBe(4);
+    assertZeroSum(r);
+  });
+
+  it('Kong Bloom tsumo: ×2 additional multiplier (×4 total with tsumo ×2)', () => {
+    // isAfterKong adds ×2 to stack. winner=0=dealer (no dealer-loss), so all payers equal.
+    const r = calculateWinPayout(
+      baseCtx({
+        winType: 'tsumo',
+        winnerSeat: 0,
+        discarderSeat: undefined,
+        dealerSeat: 0,
+        isAfterKong: true,
+      }),
+    );
+    // Dealer win ×2, Kong Bloom ×2 → multiplier=4. Each payer: (4×2)=8.
+    expect(r.totalMultiplier).toBe(4);
+    expect(r.scoreDelta[1]).toBe(-8);
+    expect(r.scoreDelta[2]).toBe(-8);
+    expect(r.scoreDelta[3]).toBe(-8);
+    expect(r.scoreDelta[0]).toBe(24);
+    expect(r.items.some((i) => i.name === 'Kong Bloom')).toBe(true);
+    assertZeroSum(r);
+  });
+
+  it('Kong Bloom non-dealer tsumo: standard payers ×4, dealer-loser ×8', () => {
+    // winner=1 (not dealer), dealer=3. Kong Bloom ×2 → multiplier=2.
+    // Non-dealer (0,2): (2×2)=4. Dealer-loser (3): (2×4)=8.
+    const r = calculateWinPayout(
+      baseCtx({
+        winType: 'tsumo',
+        winnerSeat: 1,
+        discarderSeat: undefined,
+        isAfterKong: true,
+      }),
+    );
+    expect(r.totalMultiplier).toBe(2);
+    expect(r.scoreDelta[0]).toBe(-4);
+    expect(r.scoreDelta[2]).toBe(-4);
+    expect(r.scoreDelta[3]).toBe(-8);
+    expect(r.scoreDelta[1]).toBe(16); // 4+4+8
     assertZeroSum(r);
   });
 });

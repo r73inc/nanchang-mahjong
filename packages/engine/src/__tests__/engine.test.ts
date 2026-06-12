@@ -1354,3 +1354,117 @@ describe('Engine·BUG-038-regression', () => {
     expect(finished.events.some((e: GameEvent) => e.kind === 'win')).toBe(true);
   });
 });
+
+// ── Sacking the Dealer (踢庄) ─────────────────────────────────────────────────
+// When all four players discard the same tile in the first round (no claims),
+// the dealer pays 5 pts to each of the other three players (−15 total).
+
+describe('Engine·sacking-dealer', () => {
+  it('emits sacking_dealer event and updates scores when all four first discards match', () => {
+    const g = startedGame(42);
+
+    // Inject a state where seat 3 is about to make the 4th discard of '1m'.
+    // Events already contain 3 discard events ('1m') and 3 draw events — no claims.
+    const sackTile: TileType = '1m';
+    const startScore = 0;
+    const patchedSeats = g.state.seats.map((s, i) => ({
+      ...s,
+      hand:
+        i === 3
+          ? [sackTile, '2m', '3m', '4p', '5p', '6p', '7s', '8s', '9s', '1m', '2m', '3m', 'east']
+          : s.hand,
+      score: startScore,
+    })) as [SeatState, SeatState, SeatState, SeatState];
+
+    const priorEvents: GameEvent[] = [
+      { kind: 'discard', seat: 0, tile: sackTile },
+      { kind: 'draw', seat: 1, tile: '2m', fromBack: false },
+      { kind: 'discard', seat: 1, tile: sackTile },
+      { kind: 'draw', seat: 2, tile: '3m', fromBack: false },
+      { kind: 'discard', seat: 2, tile: sackTile },
+      { kind: 'draw', seat: 3, tile: '4m', fromBack: false },
+    ];
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing' as const,
+        currentSeat: 3 as const,
+        dealerSeat: 0 as const,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      priorEvents,
+    );
+
+    const after = engine.discard(sackTile);
+
+    const sackEv = after.events.find((e: GameEvent) => e.kind === 'sacking_dealer') as
+      | { kind: 'sacking_dealer'; tile: TileType; scoreDelta: [number, number, number, number] }
+      | undefined;
+    expect(sackEv).toBeDefined();
+    expect(sackEv!.tile).toBe(sackTile);
+
+    // Zero-sum invariant
+    const sum = sackEv!.scoreDelta.reduce((acc, v) => acc + v, 0);
+    expect(sum).toBe(0);
+
+    // Dealer (seat 0) loses 15; each other player gains 5
+    expect(sackEv!.scoreDelta[0]).toBe(-15);
+    expect(sackEv!.scoreDelta[1]).toBe(5);
+    expect(sackEv!.scoreDelta[2]).toBe(5);
+    expect(sackEv!.scoreDelta[3]).toBe(5);
+
+    // Scores updated on state
+    expect(after.state.seats[0].score).toBe(startScore - 15);
+    expect(after.state.seats[1].score).toBe(startScore + 5);
+    expect(after.state.seats[2].score).toBe(startScore + 5);
+    expect(after.state.seats[3].score).toBe(startScore + 5);
+  });
+
+  it('does NOT emit sacking_dealer when tiles do not all match', () => {
+    const g = startedGame(42);
+
+    const patchedSeats = g.state.seats.map((s, i) => ({
+      ...s,
+      hand:
+        i === 3
+          ? ['2m', '2m', '3m', '4p', '5p', '6p', '7s', '8s', '9s', '1m', '2m', '3m', 'east']
+          : s.hand,
+      score: 0,
+    })) as [SeatState, SeatState, SeatState, SeatState];
+
+    const priorEvents: GameEvent[] = [
+      { kind: 'discard', seat: 0, tile: '1m' },
+      { kind: 'draw', seat: 1, tile: '2m', fromBack: false },
+      { kind: 'discard', seat: 1, tile: '1m' },
+      { kind: 'draw', seat: 2, tile: '3m', fromBack: false },
+      { kind: 'discard', seat: 2, tile: '1m' },
+      { kind: 'draw', seat: 3, tile: '4m', fromBack: false },
+    ];
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing' as const,
+        currentSeat: 3 as const,
+        dealerSeat: 0 as const,
+        jingPrimary: 'zhong',
+        jingSecondary: 'fa',
+        seats: patchedSeats,
+      },
+      priorEvents,
+    );
+
+    // Seat 3 discards '2m' — breaks the match
+    const after = engine.discard('2m');
+    expect(after.events.some((e: GameEvent) => e.kind === 'sacking_dealer')).toBe(false);
+    // Scores unchanged
+    for (let i = 0; i < 4; i++) {
+      expect(after.state.seats[i].score).toBe(0);
+    }
+  });
+});
