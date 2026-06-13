@@ -6,6 +6,40 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-051-052-jing-meld-display` (2026-06-13)
+
+### BUG-051 · Jing/wildcard tiles silently transformed in the hand reveal meld display
+
+**Root cause:** `tryMelds` and `tryChow` in `packages/engine/src/hand.ts` record every meld's tile positions as the natural target tile, even when a jing wildcard filled that slot. For example, a pung of `2m` where one position was filled by the primary jing tile records `[2m, 2m, 2m]` — the jing's actual type is never stored. `decomposeConcealed` (display-only, not scoring) inherits this; the returned `Decomposition.melds[].tiles` arrays contain only natural tile types.
+
+`HandRevealScreen` used `decomp.melds[i].tiles` directly to render each meld group. Because no tile in the array matched `jingPrimary`/`jingSecondary`, the `isJing()` check returned `false` for every tile, the jing tile's actual identity was completely replaced by the natural tile, and no gold border/glow was applied — both identity and the wildcard indicator were lost.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+Added a `reconstructMeldTiles(decomp, hand, jingTypes)` helper (placed after `greedyGroupHand`). After calling `decomposeConcealed`, it reconstructs the actual tile identities by pool-matching from the original hand (which still holds real jing tile types). For each meld position with natural target `T`: if `T` is available in the pool, take it (it was actually `T`); otherwise a jing tile must have been used — take the first available jing from the pool. The same logic handles the pair, with `jingPair` from the decomposition indicating whether one slot was a wildcard. The winner decomposition path now calls `reconstructMeldTiles` instead of using `decomp.melds.map(m => m.tiles)` directly.
+
+**Key learnings:**
+
+- The engine's `tryMelds`/`tryChow` record melds as all-natural-tile arrays for algorithmic simplicity. Any display layer that needs to show actual tile identities (including wildcard tiles) must reconstruct them from the original hand, not the decomposition tile arrays.
+- A greedy pool-reconstruction algorithm is sufficient for the end-screen hand reveal: which of two `2m` positions is natural vs. jing may be ambiguous, but both wildcard positions are shown correctly and the gold glow highlights the right number of wildcards. Exact physical tile tracking would require engine-level wildcard position storage (deferred until animated replay).
+- Once tile types are correctly preserved, `isJing(tile)` returns `true` automatically for jing tiles, and the `MahjongTile2D` gold treatment works with no additional changes.
+
+---
+
+### BUG-052 · 精 label below jing tiles breaks vertical alignment in meld groups on mobile
+
+**Root cause:** `MahjongTile2D` renders the `精` character in a `flex-column` beneath the tile face when `isJing={true}` and `showJingLabel={true}` (the default). This adds extra height to the jing tile's container. Inside the meld rows in `HandRevealScreen` (`<div className="flex gap-0.5">`), this taller jing container misaligned adjacent tiles on mobile where tile sizes are small and the label's pixel height is significant relative to tile height.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+Passed `showJingLabel={false}` to all `MahjongTile2D` calls inside the hand reveal meld groups (grouped tiles and ungrouped remainder). The gold border + glow from `isJing={true}` clearly identifies wildcards without the label. The fix was made possible by BUG-051 being resolved first — once wildcards display as their actual jing tile type (with gold treatment), the `精` label is redundant.
+
+**Key learnings:**
+
+- `showJingLabel` defaults to `true` for contexts where the label adds useful identity information (e.g. when a tile is shown in isolation). In dense meld groups where the gold glow already identifies wildcards, suppress it with `showJingLabel={false}` to keep tile rows vertically aligned.
+
+---
+
 ## `fix/bug-047-imp-027-thirteen-misfits-seven-pairs` (2026-06-13)
 
 ### BUG-047 · Thirteen Misfits (十三烂) unwinnable when a Jing tile overlaps the pattern

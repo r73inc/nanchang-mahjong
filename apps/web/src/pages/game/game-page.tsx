@@ -408,6 +408,53 @@ function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: T
   return { groups, ungrouped: sortTypes([...bag]) };
 }
 
+// ── reconstructMeldTiles ──────────────────────────────────────────────────────
+// Re-derives the actual tile identities in each decomposed meld group by
+// matching from the original hand pool (which still holds real jing tile types).
+// The engine's decomposeConcealed fills every meld position with the natural
+// target tile, so the actual jing tile identity is lost. This function restores
+// it: for each position, prefer the natural tile from the pool; if it's absent,
+// a jing tile must have been used — take one from the pool instead.
+function reconstructMeldTiles(
+  decomp: { pair: TileType; melds: Meld[]; jingPair: boolean },
+  hand: TileType[],
+  jingTypes: TileType[],
+): { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] }[] {
+  const pool: TileType[] = [...hand];
+
+  const takeFromPool = (natural: TileType): TileType => {
+    const natIdx = pool.indexOf(natural);
+    if (natIdx !== -1) {
+      pool.splice(natIdx, 1);
+      return natural;
+    }
+    // Natural not in pool — a jing tile filled this position
+    for (const jt of jingTypes) {
+      const ji = pool.indexOf(jt);
+      if (ji !== -1) {
+        pool.splice(ji, 1);
+        return jt;
+      }
+    }
+    return natural; // unreachable for valid decompositions
+  };
+
+  const groups: { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] }[] = [];
+
+  for (const meld of decomp.melds) {
+    groups.push({
+      kind: meld.kind as 'pung' | 'chow',
+      tiles: meld.tiles.map((t) => takeFromPool(t)),
+    });
+  }
+
+  const pairNatural = takeFromPool(decomp.pair);
+  const pairSecond = takeFromPool(decomp.pair);
+  groups.push({ kind: 'pair', tiles: [pairNatural, pairSecond] });
+
+  return groups;
+}
+
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
 // Full-screen post-hand reveal. Shows all hands, spirit settlement, and
 // payment breakdown.
@@ -641,14 +688,7 @@ function HandRevealScreen({
                     if (isWinner) {
                       const decomps = decomposeConcealed(hand, jingTypes);
                       if (decomps.length > 0) {
-                        const decomp = decomps[0];
-                        groups = [
-                          ...decomp.melds.map((m) => ({
-                            kind: m.kind as 'pung' | 'chow',
-                            tiles: [...m.tiles],
-                          })),
-                          { kind: 'pair' as const, tiles: [decomp.pair, decomp.pair] },
-                        ];
+                        groups = reconstructMeldTiles(decomps[0], hand, jingTypes);
                         ungrouped = [];
                       } else {
                         // Seven pairs, thirteen misfits, or edge cases — greedy fallback
@@ -687,6 +727,7 @@ function HandRevealScreen({
                                   size="xs"
                                   interactive={false}
                                   isJing={isJing(tile)}
+                                  showJingLabel={false}
                                 />
                               ))}
                             </div>
@@ -705,6 +746,7 @@ function HandRevealScreen({
                                 size="xs"
                                 interactive={false}
                                 isJing={isJing(tile)}
+                                showJingLabel={false}
                               />
                             ))}
                           </div>
