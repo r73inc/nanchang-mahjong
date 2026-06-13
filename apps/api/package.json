@@ -10,7 +10,8 @@
     "test:watch": "jest --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "setup:local": "ts-node -r tsconfig-paths/register scripts/setup-local.ts",
-    "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register scripts/seed.ts",
+    "seed:prod": "ts-node -r tsconfig-paths/register scripts/prod-seed.ts"
   },
   "dependencies": {
     "@nanchang/engine": "workspace:*",
