@@ -214,19 +214,97 @@ This reconstruction is purely a display-layer concern and does not affect game l
 
 ---
 
-### IMP-031 · Rank players by points gained and add a per-player score breakdown
+### IMP-031 · Unified sorted hand-result table with full per-player score breakdown
 
-**Request:** In the end-of-round detail screen, list players in descending order by points gained that round (most points on top). Add a per-player expandable score breakdown showing where each player's points came from and why, including where they had to pay points away and why.
+**Request:** Replace the current two-table layout (hand score summary + separate spirit settlement table) with a single unified table. Sort all four players by their total net change this hand (most gained → top). Each row expands to show a full, human-readable breakdown of exactly where every point came from and where every point was paid away to, and why — including which multipliers applied, which players held how many spirit tiles, and what kongs contributed.
 
 **Status:** OPEN
 
-**Where to look:**
+**This is a high-value feature.** The scoring model is non-obvious to new players; a clear breakdown turns every hand into a teaching moment and builds confidence in the game's integrity.
 
-- `apps/web/src/pages/game/game-page.tsx:473-515` — score summary maps `handReveal.handNetDeltas` in seat order; needs sorting by delta desc.
-- `apps/web/src/pages/game/game-page.tsx` `HandRevealScreen` — add an expandable breakdown per row (mirror the `SettlementPreview` expand/collapse pattern).
-- `HandRevealPayload` shape (`@nanchang/shared`) — confirm whether per-source breakdown data (base × multipliers, spirit deltas, who-paid-whom) is already present; if not, the payload/engine may need to surface a structured score breakdown. This likely requires a backend/shared change in a separate PR per PR-scope discipline.
+---
 
-**Notes:** The locked scoring is Base(1) × Multipliers (no additive fan), plus spirit settlement — the breakdown should reflect that structure. Verify what data the reveal payload exposes before scoping; sorting alone is FE-only, but a full "where points came from / went to" breakdown may need engine/payload support.
+**Unified table design (collapsed row)**
+
+Each player gets one row showing:
+
+- Wind character + name (with winner badge if applicable)
+- Single signed total: `handNetDeltas[i]` (= win payment + kong payout + spirit settlement combined)
+- A chevron if the row has any breakdown content
+
+Sort rows descending by `handNetDeltas[i]`. The viewer's own row keeps its gold highlight. No separate spirit table — it is folded into the expanded breakdown per row.
+
+---
+
+**Expanded breakdown — three sections per player**
+
+**Section 1 — Win payment** (only when `result === 'win'`; skip for draw/concede)
+
+_For the winner:_
+
+- Header: `Won by [Tsumo / Ron]` — with hand type badge if not standard (e.g. "Seven Pairs", "All Triplets", "Thirteen Misfits", "Seven Star Thirteen Misfits")
+- Multiplier chain — one chip per item in `winPayment.items`:
+  `Base 1 × [Seven Pairs ×2] × [Dealer ×2] → Total ×4`
+  Each chip shows the EN name and the ZH name below it.
+  German/True German flat bonus shown separately: `+5 flat per loser`
+- Payment received line per loser:
+  `[PlayerB]: +8` (tsumo: multiplier × 2 + flat; ron-discarder: multiplier × 2 + flat; ron-bystander: multiplier × 1 + flat)
+- Total received: `+[winnerTotal]`
+
+_For a loser:_
+
+- Header: `[Win type: Tsumo / Discard / Bystander]` — "Discard" only when `discarderSeat === this seat`; "Bystander" when ron but this seat did not discard.
+  _(requires `discarderSeat` added to `HandRevealPayload` — see backend note below)_
+- Win formula as a single line: `[WinnerName]: paid [amount]` with the reason:
+  `Self-draw: ×4 (multiplier ×2 × dealer-loser ×2)` or `Discarded: ×8 (…)` or `Bystander: ×4 (…)`
+- Concede case: `Conceded — paid [amount] (flat settlement)`
+
+**Section 2 — Spirit settlement** (shown for every seat; omit section entirely only when all four `spiritDeltas` are 0)
+
+- For each other player that has non-zero effective spirit score, show one line:
+  `[PlayerA]: [±amount]` with the cause:
+  `Primary ×N (×2 each) + Secondary ×N (×1 each) → effective [E] → paid/received [amount]`
+  Special cases noted inline: `Explosive (raw≥5: raw×(raw−3))` and `Indomitable (only holder, ×2)`.
+- Net spirit total for this seat: `Spirit net: [±spiritDelta]`
+
+_These amounts are fully frontend-derivable from `spiritCounts[i]` (already in the payload) using the same formula as `calculateSpiritSettlement` in `packages/engine/src/scoring.ts:290-323`. No backend change needed for spirit attribution._
+
+**Section 3 — Kongs** (only when `kongDelta[i] !== 0`)
+
+- `Kong payouts: [±amount]`
+- Explanation: `Declared [N] concealed kong(s) (+2 each) / open kong(s) (+1 each)` or `Paid [N] kongs to [PlayerX]`
+- _Kong delta is frontend-derivable: `handNetDeltas[i] − (winPayment?.scoreDelta[i] ?? 0) − spiritDeltas[i]`._
+- The per-kong direction (who declared, which type) is not granularly available in the payload — show the net with an explanation of the sign. A future payload enhancement could break this down per kong event.
+
+---
+
+**Backend additions required (shared + API, scope to a separate PR)**
+
+One new field needed on `HandRevealPayload` in `packages/shared/src/game.events.ts`:
+
+```ts
+/** Seat that discarded the winning tile (ron only; undefined for tsumo/rob-kong). */
+discarderSeat?: 0 | 1 | 2 | 3;
+/** True when the win was a rob-kong (抢杠). */
+isRobKong?: boolean;
+/** The seat whose kong was robbed (present when isRobKong is true). */
+kongSeat?: 0 | 1 | 2 | 3;
+```
+
+In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed, populate these from the `ScoringContext` already computed at win time. The engine already tracks `discarderSeat`, `isRobKong`, and `kongSeat` in `ScoringContext` — this is a plumbing change only, no engine logic needed.
+
+---
+
+**Frontend implementation notes**
+
+- `apps/web/src/pages/game/game-page.tsx:473-515` — replace the current score summary with the new unified sorted table.
+- `apps/web/src/pages/game/game-page.tsx:517-565` — remove the separate spirit settlement section; fold it into the per-row breakdown.
+- Add a `buildHandBreakdown(seat, handReveal, snapshot)` helper function near the other helpers (around line 343) to keep the IIFE clean. This function returns the three sections above as structured data, not JSX, so it is testable.
+- Mirror the expand/collapse UX from `SettlementPreview` (`apps/web/src/components/game/SettlementPreview.tsx:120-124`) — one `useState<number | null>` for the expanded seat.
+- Spirit effective-score calculation should be extracted into a shared helper or duplicated from `packages/engine/src/scoring.ts:295-313` — do NOT import the scoring function directly from the engine into the frontend; re-derive it in a small frontend utility or add it to `@nanchang/shared` exports.
+- **i18n:** All multiplier item names already have `name` (EN) and `nameZh` (ZH) in `MultiplierItem`. All new breakdown labels need EN + ZH keys added to `apps/web/src/i18n/en.json` and `zh.json`.
+- Keep the existing `MahjongTile2D` tile rendering for spirit tiles in the expanded section.
+- **PR scope:** Sort-only change is FE-only and can ship independently. The full breakdown is a larger PR touching shared types, API, and FE — keep it as one PR per scope discipline, not split across three.
 
 ---
 
