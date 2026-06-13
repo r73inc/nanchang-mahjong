@@ -1,42 +1,36 @@
-# ─── Stage 1: install all workspace deps (dev + prod) ────────────────────────
-# Separate layer so source changes don't bust the npm install cache.
-FROM node:22-alpine AS deps
-RUN corepack enable && corepack prepare pnpm@10 --activate
-WORKDIR /app
-
-# Copy only the manifests needed for pnpm install
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY packages/engine/package.json ./packages/engine/
-COPY packages/shared/package.json ./packages/shared/
-COPY apps/api/package.json ./apps/api/
-
-RUN pnpm install --frozen-lockfile
-
-# ─── Stage 2: build workspace packages + API ─────────────────────────────────
+# ─── Stage 1: install deps + build ───────────────────────────────────────────
+# Single stage so pnpm workspace symlinks stay intact throughout.
+# Dev deps are present here but are NOT carried into the final image.
 FROM node:22-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 
-# Re-use the installed node_modules from the deps stage
-COPY --from=deps /app/node_modules ./node_modules
-# Copy full source (package.json files already present from node_modules copy,
-# but COPY . . refreshes them and adds src/)
+# Copy full monorepo source (node_modules excluded via .dockerignore)
 COPY . .
 
-# Build workspace dependencies in order, then the API
+# Install all workspace deps (dev + prod) in one go so symlinks are correct
+RUN pnpm install --frozen-lockfile
+
+# Build workspace packages in dependency order, then the API
 RUN pnpm --filter @nanchang/engine run build \
     && pnpm --filter @nanchang/shared run build \
     && pnpm --filter @nanchang/api run build
 
-# pnpm deploy copies the API's production deps + dereferences workspace packages.
-# It respects .gitignore and will skip the dist/ directories, so we patch them
-# back in immediately after.
-RUN pnpm --filter @nanchang/api deploy --prod /standalone \
+# pnpm deploy creates a self-contained production directory.
+# It copies the API's prod deps + materialises workspace packages,
+# but skips gitignored dist/ directories — patch them back in after.
+RUN pnpm --filter @nanchang/api deploy --legacy --prod /standalone \
     && cp -r apps/api/dist /standalone/dist \
-    && cp -r packages/engine/dist /standalone/node_modules/@nanchang/engine/dist \
-    && cp -r packages/shared/dist /standalone/node_modules/@nanchang/shared/dist
+    && rm -rf /standalone/node_modules/@nanchang/engine \
+       /standalone/node_modules/@nanchang/shared \
+    && mkdir -p /standalone/node_modules/@nanchang/engine \
+    && cp -r packages/engine/dist /standalone/node_modules/@nanchang/engine/ \
+    && cp packages/engine/package.json /standalone/node_modules/@nanchang/engine/ \
+    && mkdir -p /standalone/node_modules/@nanchang/shared \
+    && cp -r packages/shared/dist /standalone/node_modules/@nanchang/shared/ \
+    && cp packages/shared/package.json /standalone/node_modules/@nanchang/shared/
 
-# ─── Stage 3: minimal production image ───────────────────────────────────────
+# ─── Stage 2: minimal production image ───────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
 
