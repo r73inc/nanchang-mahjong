@@ -131,6 +131,26 @@ describe('MobileDiscardPool2D Â· BUG-020 last-discard pulse', () => {
 
     expect(screen.queryByTestId('last-discard-pulse')).not.toBeInTheDocument();
   });
+
+  it('BUG-053: pulses only the last tile when the same type appears twice in a seat', () => {
+    act(() => {
+      useGameStore.getState().setSnapshot(
+        makeSnapshot({
+          seats: [
+            makeSeat({ wind: 'east', discards: [] as TileType[] }),
+            makeSeat({ wind: 'south', discards: ['5s', '5s'] as TileType[] }),
+            makeSeat({ wind: 'west' }),
+            makeSeat({ wind: 'north' }),
+          ],
+        }),
+      );
+      useGameStore.getState().setLastDiscard({ seat: 1, tile: '5s' as TileType });
+    });
+
+    renderPool('mobile');
+
+    expect(screen.getAllByTestId('last-discard-pulse')).toHaveLength(1);
+  });
 });
 
 // â”€â”€ CombinedDiscardPool2D (desktop 2D) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -158,6 +178,26 @@ describe('CombinedDiscardPool2D Â· BUG-020 last-discard pulse', () => {
     renderPool('desktop');
 
     expect(screen.queryByTestId('last-discard-pulse')).not.toBeInTheDocument();
+  });
+
+  it('BUG-053: pulses only the last tile when the same type appears twice in a seat', () => {
+    act(() => {
+      useGameStore.getState().setSnapshot(
+        makeSnapshot({
+          seats: [
+            makeSeat({ wind: 'east', discards: [] as TileType[] }),
+            makeSeat({ wind: 'south', discards: ['5s', '5s'] as TileType[] }),
+            makeSeat({ wind: 'west' }),
+            makeSeat({ wind: 'north' }),
+          ],
+        }),
+      );
+      useGameStore.getState().setLastDiscard({ seat: 1, tile: '5s' as TileType });
+    });
+
+    renderPool('desktop');
+
+    expect(screen.getAllByTestId('last-discard-pulse')).toHaveLength(1);
   });
 });
 

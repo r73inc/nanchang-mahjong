@@ -106,8 +106,10 @@ export function MobileDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Exact coordinate match: seat + tile value (same as CombinedDiscardPool2D).
-          const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
+          // Seat + position uniquely identifies the last discard — no tile-type
+          // comparison needed (fixed BUG-053: type-only match lit up duplicates).
+          const isPulse =
+            lastDiscard?.seat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
 
           const isViewerLastDiscard =
             seatIdx === viewerSeat && posInSeat === viewerDiscardCount - 1;
