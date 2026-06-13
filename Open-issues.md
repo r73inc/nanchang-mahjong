@@ -105,6 +105,10 @@ After calling `decomposeConcealed(hand, jingTypes)`, reconstruct each meld's til
 
 This reconstruction is purely a display-layer concern and does not affect game logic, scoring, or the engine.
 
+**Known limitation — greedy matching:** The pool-reconstruction algorithm is greedy: it assigns natural tiles from the pool to meld positions in the order melds are processed. This means that in a hand containing two overlapping melds — for example `[2m, 3m, 4m]` and `[2m, Jing, 4m]` — the algorithm will arbitrarily assign the actual `2m` tile to whichever meld is processed first, rather than guaranteeing the semantically "correct" assignment. The jing tile will appear in the correct meld (whichever is left without a natural tile to fill), but which of the two `2m` positions is natural and which is the wildcard may be swapped relative to the engine's internal decomposition.
+
+This is **visually and functionally acceptable for the end-screen hand reveal** — both melds are displayed correctly, both wildcard positions show the actual jing tile, and the gold glow highlights the right number of wildcards. However, this ambiguity must be documented here in case we ever implement **animated tile-tracking replays** that need to trace the exact physical tile identity through each move step. At that point a more precise reconstruction (or engine-level wildcard position tracking) would be required.
+
 **Where to change:**
 
 - `apps/web/src/pages/game/game-page.tsx:641–651` — replace the direct `decomp.melds.map(m => ({ tiles: [...m.tiles] }))` with the reconstruction function above.
@@ -160,7 +164,9 @@ This reconstruction is purely a display-layer concern and does not affect game l
 
 - `apps/web/src/components/game/SettlementPreview.tsx` — `buildTransferLines()` (lines 45-104) builds the expanded per-player rows; the expanded block (lines 246-263) already renders one `MahjongTile2D` per transfer line.
 
-**Notes:** Today the dropdown shows transfer _lines_ (received/paid amounts) with one tile per line. The request is a per-player at-a-glance count of held settlement tiles — i.e. render the player's `seatCounts` / `nextTileSeatCounts` as repeated tile glyphs (or a tile + count). Decide whether this augments the main (collapsed) row or the expanded block. Use `MahjongTile2D` (size `xs`).
+**Notes:** Today the dropdown shows transfer _lines_ (received/paid amounts) with one tile per line. The request is a per-player at-a-glance count of held settlement tiles.
+
+**Implementation constraint — do NOT repeat SVG glyphs.** Rendering one `MahjongTile2D` per copy held (e.g. 7 tiles in a row) will break the mobile flex container and cause horizontal scrolling on narrow viewports. The count must always be displayed as a **"Tile + Count" format**: one `MahjongTile2D` (size `xs`) followed by a `×N` label. For example: `[2m tile] ×4` and `[3m tile] ×2`. This applies regardless of how many copies a player holds. Decide whether this augments the main (collapsed) row or the expanded block.
 
 ---
 
@@ -219,8 +225,8 @@ _For the winner:_
 
 _For a loser:_
 
-- Header: `[Win type: Tsumo / Discard / Bystander]` — "Discard" only when `discarderSeat === this seat`; "Bystander" when ron but this seat did not discard.
-  _(requires `discarderSeat` added to `HandRevealPayload` — see backend note below)_
+- Header: `[Win type: Tsumo / Discard / Bystander]` — "Discard" only when `liableSeat === this seat`; "Bystander" when ron but this seat did not discard.
+  _(requires `liableSeat` added to `HandRevealPayload` — see backend note below)_
 - Win formula as a single line: `[WinnerName]: paid [amount]` with the reason:
   `Self-draw: ×4 (multiplier ×2 × dealer-loser ×2)` or `Discarded: ×8 (…)` or `Bystander: ×4 (…)`
 - Concede case: `Conceded — paid [amount] (flat settlement)`
@@ -249,15 +255,22 @@ _These amounts are fully frontend-derivable from `spiritCounts[i]` (already in t
 One new field needed on `HandRevealPayload` in `packages/shared/src/game.events.ts`:
 
 ```ts
-/** Seat that discarded the winning tile (ron only; undefined for tsumo/rob-kong). */
-discarderSeat?: 0 | 1 | 2 | 3;
-/** True when the win was a rob-kong (抢杠). */
+/**
+ * The single seat liable for the full win payment.
+ * - Ron: the seat that discarded the winning tile.
+ * - Rob-kong: the seat whose promoted kong was robbed (mechanically identical
+ *   to a discard — the rob-konger pays all three shares as if they discarded).
+ * - Tsumo: undefined (all losers share payment; no single liable seat).
+ */
+liableSeat?: 0 | 1 | 2 | 3;
+/** True when the win was a rob-kong (抢杠). Used for UI labeling only — does
+ *  not change payment logic; liableSeat already points to the konger. */
 isRobKong?: boolean;
-/** The seat whose kong was robbed (present when isRobKong is true). */
-kongSeat?: 0 | 1 | 2 | 3;
 ```
 
-In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed, populate these from the `ScoringContext` already computed at win time. The engine already tracks `discarderSeat`, `isRobKong`, and `kongSeat` in `ScoringContext` — this is a plumbing change only, no engine logic needed.
+Using a single `liableSeat` rather than separate `discarderSeat` / `kongSeat` fields keeps the frontend simple: the breakdown UI only needs to check `liableSeat === thisSeat` to know whether this player is the primary payer. There is no defensive branching required to handle the rob-kong case separately. `isRobKong` is retained solely so the UI can label the win type as "Rob Kong" instead of "Discard."
+
+In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed, derive `liableSeat` from the `ScoringContext` already computed at win time: `liableSeat = ctx.isRobKong ? ctx.kongSeat : ctx.discarderSeat`. This is a plumbing change only — no engine logic needed.
 
 ---
 
