@@ -86,6 +86,7 @@ jobs:
             --tag "$SHA_TAG" \
             --tag "$LATEST_TAG" \
             --cache-from "$LATEST_TAG" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             .
 
           docker push "$SHA_TAG"
@@ -126,22 +127,20 @@ jobs:
         run: |
           BUCKET="${{ secrets.WEB_BUCKET_NAME }}"
 
-          # Hashed assets — safe to cache for 1 year
+          # dist/assets/ only — Vite content-hashes every filename here,
+          # so these are safe to cache permanently in the browser and CDN.
+          aws s3 sync apps/web/dist/assets/ "s3://${BUCKET}/assets/" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable"
+
+          # Everything else (index.html, sw.js, and all Vite public/ pass-throughs
+          # such as textures, models, sounds, avatars, manifest.json, icons).
+          # None of these filenames are content-hashed, so they must always be
+          # re-validated by the browser on every load.
           aws s3 sync apps/web/dist/ "s3://${BUCKET}/" \
             --delete \
-            --cache-control "public,max-age=31536000,immutable" \
-            --exclude "index.html" \
-            --exclude "sw.js"
-
-          # index.html — must always be fresh (entry point for the SPA)
-          aws s3 cp apps/web/dist/index.html "s3://${BUCKET}/index.html" \
-            --cache-control "no-cache,no-store,must-revalidate"
-
-          # sw.js — service worker must never be stale
-          if [ -f apps/web/dist/sw.js ]; then
-            aws s3 cp apps/web/dist/sw.js "s3://${BUCKET}/sw.js" \
-              --cache-control "no-cache,no-store,must-revalidate"
-          fi
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --exclude "assets/*"
 
       # ── Web: invalidate CloudFront edge cache ───────────────────────────────
       - name: Invalidate CloudFront cache
