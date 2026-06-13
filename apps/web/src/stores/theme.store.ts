@@ -27,7 +27,7 @@ export const useThemeStore = create<ThemeState>()(
     (set) => ({
       felt: 'jade',
       tilePalette: 'classic',
-      soundEnabled: false,
+      soundEnabled: true,
       setFelt: (felt) => set({ felt }),
       setTilePalette: (tilePalette) => set({ tilePalette }),
       setSoundEnabled: (soundEnabled) => set({ soundEnabled }),

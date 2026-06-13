@@ -7,6 +7,7 @@ import { AvatarImg } from '../../components/ui/avatar-img';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
+import { useThemeStore } from '../../stores/theme.store';
 
 // Defined outside JSX so the no-literal-string rule doesn't flag path strings.
 const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
@@ -24,6 +25,8 @@ export function HomeStubPage() {
   const { data: profile } = useMyProfile();
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
     usePushNotifications();
+  const soundEnabled = useThemeStore((s) => s.soundEnabled);
+  const setSoundEnabled = useThemeStore((s) => s.setSoundEnabled);
 
   return (
     <ScreenShell title={t('homeTitle')}>
@@ -134,6 +137,37 @@ export function HomeStubPage() {
 
         {/* Settings actions */}
         <div className="space-y-2 mb-6">
+          {/* Sound effects toggle */}
+          <div
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px]"
+            style={{
+              background: 'rgba(var(--felt-ink-rgb),0.06)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
+            }}
+          >
+            <div className="flex-1 min-w-0 mr-3">
+              <p className="text-sm text-mj-bone">{t('soundEffects')}</p>
+              <p className="text-[11px] text-mj-bone/40 mt-0.5">{t('soundEffectsDesc')}</p>
+            </div>
+            <button
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              aria-pressed={soundEnabled}
+              className="relative w-11 h-6 rounded-full transition-colors shrink-0"
+              style={{
+                background: soundEnabled ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.15)',
+                border: soundEnabled ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.2)',
+              }}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+                style={{
+                  transform: soundEnabled ? 'translateX(20px)' : 'translateX(0)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                }}
+              />
+            </button>
+          </div>
+
           {/* Push notification toggle — only shown when browser supports it */}
           {isSupported && (
             <div
