@@ -57,6 +57,10 @@ export {
   buildWall,
 } from './tiles';
 
+// ── Domain errors ─────────────────────────────────────────────────────────────
+
+export { GameRuleError } from './errors';
+
 // ── PRNG ──────────────────────────────────────────────────────────────────────
 
 export { mulberry32, seededShuffle } from './prng';
