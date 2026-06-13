@@ -26,7 +26,7 @@ export function ForcedLandscapeWrapper({ active, children }: ForcedLandscapeWrap
   const { t } = useI18n();
 
   if (!active) {
-    return <div className="w-full h-full">{children}</div>;
+    return <div className="w-full h-dvh">{children}</div>;
   }
 
   return (

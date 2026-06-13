@@ -6,6 +6,30 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-048-landscape-overlay-rotation` (2026-06-13)
+
+### BUG-048 · Side-seat text and overlays render in portrait orientation on mobile landscape (css-landscape mode)
+
+**Root cause:** `ForcedLandscapeWrapper` was only wrapping `GameTable2D` (the canvas) inside `MobileLandscapeGate`. CSS `position: fixed` overlays (status bar, `SideRail` minimized chip, `MobileJingButton` overlay, `GameHistoryPanel` bottom sheet) and `position: absolute` overlays (ActionToast, TsumoBar, ClaimWindow, etc.) in `GameTable` were rendered OUTSIDE the rotated wrapper. In `css-landscape` mode (iOS Safari and devices where the Fullscreen API is rejected), the game canvas rotated 90° CW but all overlay text remained in physical portrait coordinates — players saw the status bar, score strip, and game action text sideways while the board itself appeared landscape.
+
+CSS `transform` on an element creates a new containing block for descendant `position: fixed` elements. Moving `ForcedLandscapeWrapper` to wrap the entire `GameTable` return exploits this property: all `fixed inset-0` overlays (history panel, jing overlay, etc.) are now fixed to the landscape canvas rather than the viewport.
+
+**Fix:**
+
+1. **`ForcedLandscapeWrapper.tsx`** — changed the inactive passthrough case from `className="w-full h-full"` to `className="w-full h-dvh"` so `mj-game-surface` (now `h-full`) retains full viewport height in non-css-landscape modes.
+
+2. **`MobileLandscapeGate.tsx`** — removed the `css-landscape` → `ForcedLandscapeWrapper` branch. The gate now passes children through for all non-`needs-gesture` modes; the landscape rotation is handled at the `GameTable` level.
+
+3. **`game-page.tsx`** (`GameTable` inner component) — imported `ForcedLandscapeWrapper` and wrapped the entire `mj-game-surface` div in it (`active={landscapeMode === 'css-landscape'}`). Changed `h-dvh` → `h-full` on `mj-game-surface`.
+
+**Key learnings:**
+
+- An element with a `transform` property becomes a new containing block for all `position: fixed` descendants — even through arbitrary levels of DOM nesting. This means wrapping the entire game surface (not just the canvas) in the landscape `rotate(90deg)` wrapper automatically fixes every overlay that uses `fixed inset-0` or `fixed top/right` positioning.
+- `ForcedLandscapeWrapper` must be the containing block for ALL game UI or none of it — partial wrapping (canvas only) creates a split-coordinate system where the canvas and overlays live on different axes.
+- The passthrough case of `ForcedLandscapeWrapper` must provide an explicit height (`h-dvh`) so inner elements using `h-full` have a valid reference — a pure `h-full` passthrough collapses if the parent chain lacks explicit height.
+
+---
+
 ## `feat/imp-025-centered-modals` (2026-06-12)
 
 ### IMP-025 · Standardise in-game popups to centered modal style

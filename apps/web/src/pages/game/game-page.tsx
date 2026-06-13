@@ -46,7 +46,7 @@ import type {
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
-import { GameTable2D, MahjongTile2D } from '../../components/2d';
+import { GameTable2D, MahjongTile2D, ForcedLandscapeWrapper } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
 import { DiceRollOverlay } from '../../components/2d/DiceRollOverlay';
 import { GameWinnerPopup } from '../../components/game/GameWinnerPopup';
@@ -2569,318 +2569,320 @@ function GameTable({
   };
 
   return (
-    <div className="mj-game-surface relative w-full h-dvh overflow-hidden bg-black">
-      {/* ── Table renderer — fills entire screen ──────────────────────────── */}
-      {/* Branched on snapshot.viewMode set by the host before game start.    */}
-      {/* All overlays (z-10+) are identical in both modes.                   */}
-      <div className="absolute inset-0" aria-hidden="true">
-        {snapshot.viewMode === '2D' || isMobile ? (
-          // 2D mode or any mobile device (phones always use the touch-optimised 2D layout
-          // regardless of the host's viewMode setting — the 3D canvas has no mobile handling).
-          <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
-            <GameTable2D
-              onDiscard={handleDiscardOrKong}
-              isMobile={isMobile}
-              isCssLandscape={landscapeMode === 'css-landscape'}
-            />
-          </MobileLandscapeGate>
-        ) : (
-          <GameCanvas />
+    <ForcedLandscapeWrapper active={landscapeMode === 'css-landscape'}>
+      <div className="mj-game-surface relative w-full h-full overflow-hidden bg-black">
+        {/* ── Table renderer — fills entire screen ──────────────────────────── */}
+        {/* Branched on snapshot.viewMode set by the host before game start.    */}
+        {/* All overlays (z-10+) are identical in both modes.                   */}
+        <div className="absolute inset-0" aria-hidden="true">
+          {snapshot.viewMode === '2D' || isMobile ? (
+            // 2D mode or any mobile device (phones always use the touch-optimised 2D layout
+            // regardless of the host's viewMode setting — the 3D canvas has no mobile handling).
+            <MobileLandscapeGate mode={landscapeMode} onRequestNative={requestNativeLandscape}>
+              <GameTable2D
+                onDiscard={handleDiscardOrKong}
+                isMobile={isMobile}
+                isCssLandscape={landscapeMode === 'css-landscape'}
+              />
+            </MobileLandscapeGate>
+          ) : (
+            <GameCanvas />
+          )}
+        </div>
+
+        {/* ── Active-turn border glow — transparent overlay, above the table ── */}
+        {/* Applied ABOVE FeltSurface2D (which would cover an inset box-shadow   */}
+        {/* applied directly to the root div). pointer-events:none so no clicks  */}
+        {/* are intercepted. z-5 sits between the game table (z-auto) and the    */}
+        {/* status bar (z-10).                                                    */}
+        {isMyTurn && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none mj-turn-border-glow"
+            style={{ zIndex: 5 }}
+          />
         )}
-      </div>
 
-      {/* ── Active-turn border glow — transparent overlay, above the table ── */}
-      {/* Applied ABOVE FeltSurface2D (which would cover an inset box-shadow   */}
-      {/* applied directly to the root div). pointer-events:none so no clicks  */}
-      {/* are intercepted. z-5 sits between the game table (z-auto) and the    */}
-      {/* status bar (z-10).                                                    */}
-      {isMyTurn && (
+        {/* ── Status bar ─────────────────────────────────────────────────────── */}
         <div
-          aria-hidden="true"
-          className="absolute inset-0 pointer-events-none mj-turn-border-glow"
-          style={{ zIndex: 5 }}
-        />
-      )}
-
-      {/* ── Status bar ─────────────────────────────────────────────────────── */}
-      <div
-        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between"
-        style={{
-          background: 'rgba(10,10,10,0.7)',
-          borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.08)',
-          height: isMobile ? 32 : undefined,
-          padding: isMobile ? 'var(--mj-safe-top, 0px) 8px 0' : undefined,
-          paddingLeft: isMobile ? 8 : undefined,
-          paddingRight: isMobile ? 8 : undefined,
-          paddingTop: isMobile ? 'var(--mj-safe-top, 0px)' : undefined,
-          paddingBottom: isMobile ? 0 : undefined,
-          // Desktop padding via className below — here we only override for mobile.
-          ...(!isMobile && { padding: '8px 16px' }),
-        }}
-      >
-        {/* Round wind + Jing indicator */}
-        <div className="flex items-center gap-2">
-          <span
-            className="font-bold font-serif"
-            style={{ color: WIND_COLOR[snapshot.roundWind], fontSize: isMobile ? 13 : 12 }}
-          >
-            {WIND_CHAR[snapshot.roundWind]}
-            {!isMobile && <> {t('gameRound')}</>}
-          </span>
-          {isMobile ? (
-            // Mobile: compact "节" button → taps to show full spirit tile overlay
-            <MobileJingButton snapshot={snapshot} />
-          ) : (
-            // Desktop: always-visible xs tile chips in the status bar
-            snapshot.jingPrimary && (
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
-                <JingTileChip tile={snapshot.jingPrimary} />
-                {snapshot.jingSecondary && <JingTileChip tile={snapshot.jingSecondary} />}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* Wall count + viewer score (desktop) */}
-        <div className="flex items-center gap-3">
-          <span className="text-mj-bone/50" style={{ fontSize: isMobile ? 10 : 10 }}>
-            {isMobile ? snapshot.wallCount : `${t('gameWallLeft')} ${snapshot.wallCount}`}
-          </span>
-          {!isMobile && (
-            <span className="font-mono tabular-nums" style={{ fontSize: 10, color: '#c9a961' }}>
-              {snapshot.seats[viewerSeat].seatName}
-              {SCORE_SEP}
-              {snapshot.seats[viewerSeat].score}
-            </span>
-          )}
-        </div>
-
-        {/* Right-side controls */}
-        <div className="flex items-center gap-2">
-          {/* Language toggle — available at all times during gameplay */}
-          <LangToggle />
-
-          {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
-          {isMobile && (
-            <button
-              onClick={() => setHistoryOpen((o) => !o)}
-              className="flex items-center justify-center"
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 4,
-                border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-                color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
-                fontSize: 12,
-                background: 'transparent',
-              }}
-              aria-label={t('gameHistoryTitle')}
-              aria-pressed={historyOpen}
-            >
-              {ICON_HISTORY}
-            </button>
-          )}
-
-          {/* Concede button */}
-          {isMobile ? (
-            <button
-              onClick={() => setShowConcedeSheet(true)}
-              className="flex items-center justify-center"
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 4,
-                border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-                color: 'rgba(var(--felt-ink-rgb),0.4)',
-                fontSize: 12,
-                background: 'transparent',
-              }}
-              aria-label={t('gameConcede')}
-            >
-              {ICON_CLOSE}
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowConcedeSheet(true)}
-              className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
-              style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
-            >
-              {t('gameConcede')}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Seat HUD — corner nameplates (desktop/3D only) ─────────────────── */}
-      {/* Hidden on mobile: the 2D game table renders OpponentBadge2D and      */}
-      {/* MobilePlayerBadge2D for player info. SeatHUD would also escape the   */}
-      {/* MobileJingButton overlay's stacking context and paint on top of it.  */}
-      {!isMobile && <SeatHUD snapshot={snapshot} />}
-
-      {/* ── Turn indicator ────────────────────────────────────────────────── */}
-      {/* Hidden on mobile: the viewport-wide glow (mj-turn-border-glow) is   */}
-      {/* the turn signal for mobile players. The bottom pill at bottom-2      */}
-      {/* would sit directly on top of the hand tile row.                      */}
-      {/* 3D: bottom-40 sits above the ViewerHandHUD (~80 px gradient).        */}
-      {/* 2D: bottom-2 sits inside the board's own bottom zone.                */}
-      {!isMobile && (
-        <div
-          className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
-        >
-          <span
-            className={`text-[11px] font-bold px-3 py-1 rounded-full${isMyTurn ? ' mj-your-turn-pill' : ''}`}
-            style={{
-              background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(var(--felt-ink-rgb),0.07)',
-              color: isMyTurn ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.6)',
-              border: isMyTurn
-                ? '1px solid rgba(201,169,97,0.5)'
-                : '1px solid rgba(var(--felt-ink-rgb),0.1)',
-            }}
-          >
-            {isMyTurn
-              ? t('gameYourTurn')
-              : `${WIND_CHAR[snapshot.seats[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
-          </span>
-          {!isMyTurn && snapshot.viewerSeat !== null && (
-            <span className="text-[9px] text-mj-bone/30">
-              {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
-      {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
-      {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
-      {/* Kept visible when canTsumo is true so the hand remains visible while  */}
-      {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
-      {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
-        <ViewerHandHUD
-          hand={viewerHand}
-          selectedTileIdx={selectedTileIdx}
-          onSelect={onSelect}
-          onDiscard={handleDiscardOrKong}
-          isMyTurn={isMyTurn && !canTsumo}
-          jingTypes={jingTypes}
-          pendingMove={pendingMove}
-        />
-      )}
-
-      {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
-      {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
-      {/* HUD and lets them re-open the win prompt at any time before discarding.*/}
-      {canTsumo && tsumoSuppressed && isMyTurn && !showConcedeSheet && !kongActionPending && (
-        <button
-          onClick={() => setTsumoSuppressed(false)}
-          className="absolute right-2 font-bold text-sm px-3 py-2 rounded-xl animate-call-prompt-enter"
+          className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between"
           style={{
-            zIndex: 15,
-            bottom: 'calc(var(--mj-hand-height, 80px) + 8px)',
-            background: 'rgba(201,169,97,0.18)',
-            border: '1px solid rgba(201,169,97,0.5)',
-            color: '#c9a961',
-            backdropFilter: 'blur(8px)',
+            background: 'rgba(10,10,10,0.7)',
+            borderBottom: '1px solid rgba(var(--felt-ink-rgb),0.08)',
+            height: isMobile ? 32 : undefined,
+            padding: isMobile ? 'var(--mj-safe-top, 0px) 8px 0' : undefined,
+            paddingLeft: isMobile ? 8 : undefined,
+            paddingRight: isMobile ? 8 : undefined,
+            paddingTop: isMobile ? 'var(--mj-safe-top, 0px)' : undefined,
+            paddingBottom: isMobile ? 0 : undefined,
+            // Desktop padding via className below — here we only override for mobile.
+            ...(!isMobile && { padding: '8px 16px' }),
           }}
         >
-          {t('tsumoDeclare')}
-        </button>
-      )}
+          {/* Round wind + Jing indicator */}
+          <div className="flex items-center gap-2">
+            <span
+              className="font-bold font-serif"
+              style={{ color: WIND_COLOR[snapshot.roundWind], fontSize: isMobile ? 13 : 12 }}
+            >
+              {WIND_CHAR[snapshot.roundWind]}
+              {!isMobile && <> {t('gameRound')}</>}
+            </span>
+            {isMobile ? (
+              // Mobile: compact "节" button → taps to show full spirit tile overlay
+              <MobileJingButton snapshot={snapshot} />
+            ) : (
+              // Desktop: always-visible xs tile chips in the status bar
+              snapshot.jingPrimary && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] text-mj-gold/50">{t('gameSpirit')}</span>
+                  <JingTileChip tile={snapshot.jingPrimary} />
+                  {snapshot.jingSecondary && <JingTileChip tile={snapshot.jingSecondary} />}
+                </div>
+              )
+            )}
+          </div>
 
-      {/* ── Accessible hand — sr-only DOM buttons for a11y + tests ─────────── */}
-      <AccessibleHand
-        hand={viewerHand}
-        selectedTileIdx={pendingMove ? null : selectedTileIdx}
-        onSelect={onSelect}
-        onDiscard={handleDiscardOrKong}
-        isMyTurn={isMyTurn && !pendingMove && !canTsumo}
-      />
+          {/* Wall count + viewer score (desktop) */}
+          <div className="flex items-center gap-3">
+            <span className="text-mj-bone/50" style={{ fontSize: isMobile ? 10 : 10 }}>
+              {isMobile ? snapshot.wallCount : `${t('gameWallLeft')} ${snapshot.wallCount}`}
+            </span>
+            {!isMobile && (
+              <span className="font-mono tabular-nums" style={{ fontSize: 10, color: '#c9a961' }}>
+                {snapshot.seats[viewerSeat].seatName}
+                {SCORE_SEP}
+                {snapshot.seats[viewerSeat].score}
+              </span>
+            )}
+          </div>
 
-      {/* ── Collapsible history panel ──────────────────────────────────────── */}
-      {!showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-        <GameHistoryPanel
-          entries={historyEntries}
-          isOpen={historyOpen}
-          onToggle={() => setHistoryOpen((o) => !o)}
-          snapshot={snapshot}
-          isMobile={isMobile}
+          {/* Right-side controls */}
+          <div className="flex items-center gap-2">
+            {/* Language toggle — available at all times during gameplay */}
+            <LangToggle />
+
+            {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
+            {isMobile && (
+              <button
+                onClick={() => setHistoryOpen((o) => !o)}
+                className="flex items-center justify-center"
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+                  color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
+                  fontSize: 12,
+                  background: 'transparent',
+                }}
+                aria-label={t('gameHistoryTitle')}
+                aria-pressed={historyOpen}
+              >
+                {ICON_HISTORY}
+              </button>
+            )}
+
+            {/* Concede button */}
+            {isMobile ? (
+              <button
+                onClick={() => setShowConcedeSheet(true)}
+                className="flex items-center justify-center"
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+                  color: 'rgba(var(--felt-ink-rgb),0.4)',
+                  fontSize: 12,
+                  background: 'transparent',
+                }}
+                aria-label={t('gameConcede')}
+              >
+                {ICON_CLOSE}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowConcedeSheet(true)}
+                className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
+                style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
+              >
+                {t('gameConcede')}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Seat HUD — corner nameplates (desktop/3D only) ─────────────────── */}
+        {/* Hidden on mobile: the 2D game table renders OpponentBadge2D and      */}
+        {/* MobilePlayerBadge2D for player info. SeatHUD would also escape the   */}
+        {/* MobileJingButton overlay's stacking context and paint on top of it.  */}
+        {!isMobile && <SeatHUD snapshot={snapshot} />}
+
+        {/* ── Turn indicator ────────────────────────────────────────────────── */}
+        {/* Hidden on mobile: the viewport-wide glow (mj-turn-border-glow) is   */}
+        {/* the turn signal for mobile players. The bottom pill at bottom-2      */}
+        {/* would sit directly on top of the hand tile row.                      */}
+        {/* 3D: bottom-40 sits above the ViewerHandHUD (~80 px gradient).        */}
+        {/* 2D: bottom-2 sits inside the board's own bottom zone.                */}
+        {!isMobile && (
+          <div
+            className={`absolute ${snapshot.viewMode === '2D' ? 'bottom-2' : 'bottom-40'} left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-0.5 pointer-events-none`}
+          >
+            <span
+              className={`text-[11px] font-bold px-3 py-1 rounded-full${isMyTurn ? ' mj-your-turn-pill' : ''}`}
+              style={{
+                background: isMyTurn ? 'rgba(201,169,97,0.25)' : 'rgba(var(--felt-ink-rgb),0.07)',
+                color: isMyTurn ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.6)',
+                border: isMyTurn
+                  ? '1px solid rgba(201,169,97,0.5)'
+                  : '1px solid rgba(var(--felt-ink-rgb),0.1)',
+              }}
+            >
+              {isMyTurn
+                ? t('gameYourTurn')
+                : `${WIND_CHAR[snapshot.seats[snapshot.currentSeat].wind]} ${t('gameWaitingTurn')}`}
+            </span>
+            {!isMyTurn && snapshot.viewerSeat !== null && (
+              <span className="text-[9px] text-mj-bone/30">
+                {t('gameTurnsAway', String((snapshot.viewerSeat - snapshot.currentSeat + 4) % 4))}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
+        {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
+        {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
+        {/* Kept visible when canTsumo is true so the hand remains visible while  */}
+        {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
+        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
+          <ViewerHandHUD
+            hand={viewerHand}
+            selectedTileIdx={selectedTileIdx}
+            onSelect={onSelect}
+            onDiscard={handleDiscardOrKong}
+            isMyTurn={isMyTurn && !canTsumo}
+            jingTypes={jingTypes}
+            pendingMove={pendingMove}
+          />
+        )}
+
+        {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
+        {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
+        {/* HUD and lets them re-open the win prompt at any time before discarding.*/}
+        {canTsumo && tsumoSuppressed && isMyTurn && !showConcedeSheet && !kongActionPending && (
+          <button
+            onClick={() => setTsumoSuppressed(false)}
+            className="absolute right-2 font-bold text-sm px-3 py-2 rounded-xl animate-call-prompt-enter"
+            style={{
+              zIndex: 15,
+              bottom: 'calc(var(--mj-hand-height, 80px) + 8px)',
+              background: 'rgba(201,169,97,0.18)',
+              border: '1px solid rgba(201,169,97,0.5)',
+              color: '#c9a961',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            {t('tsumoDeclare')}
+          </button>
+        )}
+
+        {/* ── Accessible hand — sr-only DOM buttons for a11y + tests ─────────── */}
+        <AccessibleHand
+          hand={viewerHand}
+          selectedTileIdx={pendingMove ? null : selectedTileIdx}
+          onSelect={onSelect}
+          onDiscard={handleDiscardOrKong}
+          isMyTurn={isMyTurn && !pendingMove && !canTsumo}
         />
-      )}
 
-      {/* ── Action toast ───────────────────────────────────────────────────── */}
-      {toast && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-        <ActionToast toast={toast} snapshot={snapshot} />
-      )}
-
-      {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
-      {yourTurnFlash &&
-        !claimWindow &&
-        !showConcedeSheet &&
-        !jingDiscardPending &&
-        !kongActionPending && <YourTurnBanner />}
-
-      {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
-      {snapshot.phase === 'awaiting_claims' &&
-        !claimWindow &&
-        !showConcedeSheet &&
-        !jingDiscardPending &&
-        !kongActionPending && <WaitingForClaimIndicator isMobile={isMobile} />}
-
-      {/* ── Claim window rail ──────────────────────────────────────────────── */}
-      {claimWindow && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-        <SideRail
-          claimWindow={claimWindow}
-          pendingDiscard={snapshot.pendingDiscard}
-          onClaim={onClaim}
-          onPass={onPass}
-          isMobile={isMobile}
-        />
-      )}
-
-      {/* ── Concede sheet ──────────────────────────────────────────────────── */}
-      {showConcedeSheet && !jingDiscardPending && (
-        <ConcedeSheet onConfirm={handleConcede} onCancel={() => setShowConcedeSheet(false)} />
-      )}
-
-      {/* ── Jing discard confirmation sheet ────────────────────────────────── */}
-      {jingDiscardPending && (
-        <JingDiscardConfirmSheet
-          tile={jingDiscardPending}
-          onConfirm={handleJingDiscardConfirm}
-          onCancel={handleJingDiscardCancel}
-        />
-      )}
-
-      {/* ── Kong action sheet ──────────────────────────────────────────────── */}
-      {kongActionPending && !jingDiscardPending && (
-        <KongActionSheet
-          pending={kongActionPending}
-          onKong={handleKongAction}
-          onDiscard={handleKongActionDiscard}
-        />
-      )}
-
-      {/* ── Tsumo bar (IMP-020) ─────────────────────────────────────────────── */}
-      {/* Non-blocking compact bar — does NOT cover the hand/canvas.            */}
-      {/* Dismissed → shows persistent "Declare Win" button instead (above).    */}
-      {canTsumo &&
-        isMyTurn &&
-        !tsumoSuppressed &&
-        !showConcedeSheet &&
-        !jingDiscardPending &&
-        !kongActionPending && (
-          <TsumoBar
-            onDeclare={onDeclareTsumo}
-            onDismiss={() => setTsumoSuppressed(true)}
+        {/* ── Collapsible history panel ──────────────────────────────────────── */}
+        {!showConcedeSheet && !jingDiscardPending && !kongActionPending && (
+          <GameHistoryPanel
+            entries={historyEntries}
+            isOpen={historyOpen}
+            onToggle={() => setHistoryOpen((o) => !o)}
+            snapshot={snapshot}
             isMobile={isMobile}
           />
         )}
 
-      {/* ── A11y live region ───────────────────────────────────────────────── */}
-      <div aria-live="polite" aria-atomic="true" className="sr-only" id="game-live-region">
-        {isMyTurn ? t('gameYourTurn') : ''}
+        {/* ── Action toast ───────────────────────────────────────────────────── */}
+        {toast && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
+          <ActionToast toast={toast} snapshot={snapshot} />
+        )}
+
+        {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
+        {yourTurnFlash &&
+          !claimWindow &&
+          !showConcedeSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && <YourTurnBanner />}
+
+        {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
+        {snapshot.phase === 'awaiting_claims' &&
+          !claimWindow &&
+          !showConcedeSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && <WaitingForClaimIndicator isMobile={isMobile} />}
+
+        {/* ── Claim window rail ──────────────────────────────────────────────── */}
+        {claimWindow && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
+          <SideRail
+            claimWindow={claimWindow}
+            pendingDiscard={snapshot.pendingDiscard}
+            onClaim={onClaim}
+            onPass={onPass}
+            isMobile={isMobile}
+          />
+        )}
+
+        {/* ── Concede sheet ──────────────────────────────────────────────────── */}
+        {showConcedeSheet && !jingDiscardPending && (
+          <ConcedeSheet onConfirm={handleConcede} onCancel={() => setShowConcedeSheet(false)} />
+        )}
+
+        {/* ── Jing discard confirmation sheet ────────────────────────────────── */}
+        {jingDiscardPending && (
+          <JingDiscardConfirmSheet
+            tile={jingDiscardPending}
+            onConfirm={handleJingDiscardConfirm}
+            onCancel={handleJingDiscardCancel}
+          />
+        )}
+
+        {/* ── Kong action sheet ──────────────────────────────────────────────── */}
+        {kongActionPending && !jingDiscardPending && (
+          <KongActionSheet
+            pending={kongActionPending}
+            onKong={handleKongAction}
+            onDiscard={handleKongActionDiscard}
+          />
+        )}
+
+        {/* ── Tsumo bar (IMP-020) ─────────────────────────────────────────────── */}
+        {/* Non-blocking compact bar — does NOT cover the hand/canvas.            */}
+        {/* Dismissed → shows persistent "Declare Win" button instead (above).    */}
+        {canTsumo &&
+          isMyTurn &&
+          !tsumoSuppressed &&
+          !showConcedeSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && (
+            <TsumoBar
+              onDeclare={onDeclareTsumo}
+              onDismiss={() => setTsumoSuppressed(true)}
+              isMobile={isMobile}
+            />
+          )}
+
+        {/* ── A11y live region ───────────────────────────────────────────────── */}
+        <div aria-live="polite" aria-atomic="true" className="sr-only" id="game-live-region">
+          {isMyTurn ? t('gameYourTurn') : ''}
+        </div>
       </div>
-    </div>
+    </ForcedLandscapeWrapper>
   );
 }
 
