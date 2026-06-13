@@ -49,22 +49,20 @@ export class NanchangStack extends cdk.Stack {
     // PK / SK primary key. GSI1 covers:
     //   - invitesByStatus: gsi1pk = INVITE_STATUS#<status>
     //   - roomByCode:      gsi1pk = ROOM_CODE#<code>, gsi1sk = META
-    const table = new dynamodb.TableV2(this, 'MainTable', {
+    const table = new dynamodb.Table(this, 'MainTable', {
       tableName: 'nanchang_main',
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
-      billing: dynamodb.Billing.onDemand(),
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
       timeToLiveAttribute: 'ttl',
       removalPolicy: cdk.RemovalPolicy.RETAIN,
-      globalSecondaryIndexes: [
-        {
-          indexName: 'gsi1',
-          partitionKey: { name: 'gsi1pk', type: dynamodb.AttributeType.STRING },
-          sortKey: { name: 'gsi1sk', type: dynamodb.AttributeType.STRING },
-          projectionType: dynamodb.ProjectionType.ALL,
-        },
-      ],
+    });
+    table.addGlobalSecondaryIndex({
+      indexName: 'gsi1',
+      partitionKey: { name: 'gsi1pk', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'gsi1sk', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // ── S3 Buckets ─────────────────────────────────────────────────────────────
