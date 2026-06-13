@@ -8,14 +8,14 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID      | Name                                                            | Summary                                                                                      |
-| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| BUG-08  | Viewer discards invisible (3D)                                  | Viewer's own discard pile not visible on the 3D table                                        |
-| BUG-09  | TileWall3D needs redesign (3D)                                  | TileWall removed due to red Back.svg background; needs neutral replacement                   |
-| BUG-045 | Bot dice roll animation not visible                             | Bot roll animation and result flash by in under a frame; human roll works correctly          |
-| BUG-047 | Thirteen Misfits (十三烂) unwinnable when jing overlaps pattern | Engine rejects any 13-misfits hand containing a jing tile; needs rules verification          |
-| IMP-026 | Side-seat tiles & text rotated / hard to read                   | Left/right/top seats' tiles, names and score text are CSS-rotated; testers want them upright |
-| IMP-027 | Thirteen Misfits eligibility hint                               | Surface the concealed / self-draw / no-jing requirements in-game to reduce confusion         |
+| ID      | Name                                                            | Summary                                                                                                                    |
+| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| BUG-08  | Viewer discards invisible (3D)                                  | Viewer's own discard pile not visible on the 3D table                                                                      |
+| BUG-09  | TileWall3D needs redesign (3D)                                  | TileWall removed due to red Back.svg background; needs neutral replacement                                                 |
+| BUG-045 | Bot dice roll animation not visible                             | Bot roll animation and result flash by in under a frame; human roll works correctly                                        |
+| BUG-047 | Thirteen Misfits (十三烂) unwinnable when jing overlaps pattern | Engine rejects any 13-misfits hand containing a jing tile; needs rules verification                                        |
+| BUG-048 | Side-seat text/tiles render in portrait orientation on mobile   | In landscape game mode the left/right/top seats' text and tiles are rotated to portrait orientation; should read landscape |
+| IMP-027 | Thirteen Misfits eligibility hint                               | Surface the concealed / self-draw / no-jing requirements in-game to reduce confusion                                       |
 
 ---
 
@@ -103,33 +103,29 @@ The tester chose **1 & 2 Bamboo as the jing**. The canonical Thirteen Misfits ba
 
 ---
 
-## Open Improvements
+### BUG-048 · Side-seat text and tiles render in portrait orientation while the game is in landscape mode — mobile
 
-### IMP-026 · Side-seat tiles, names and score text are rotated — hard to read
+**Reported by:** Playtest #1 (2026-06-13), the most-emphasised feedback ("I have to tilt my neck to see it"; "if the side text could be adjusted to look the same as when looking at your own tiles, it would be perfect"). Overall sentiment was extremely positive (100/100), but this orientation problem stood out as the one clear defect on phones. Reclassified from IMP-026 → BUG-048: this is broken rendering, not a UX preference.
 
-**Reported by:** Playtest #1 (2026-06-13), the most-emphasised UI feedback ("I have to tilt my neck to see it"; "if the side text could be adjusted to look the same as when looking at your own tiles, it would be perfect"). Overall sentiment was extremely positive (100/100) — this is the single concrete UI ask.
+**Symptom:** On phones the game runs in landscape mode, but the left, right and top seats' tiles, player names, bot/dealer badges and the spirit-score text (e.g. "ww: 16分") render rotated to **portrait orientation** — the characters read vertically/sideways instead of horizontally. All on-screen text should read in landscape orientation, the same as the viewer's own hand. See playtest screenshots: the seat names, score text and side discards run vertically rather than across.
 
-**Symptom:** For the left, right and top seats, the tiles, player names, bot/dealer badges and the spirit-score text (e.g. "ww: 16分") are rotated 90°/180° following the physical table orientation, so the characters read sideways/upside-down. Testers want all on-screen text and tiles oriented upright toward the viewer, the same as their own hand.
+**Status:** OPEN — confirmed bug
 
-**Status:** OPEN — UX improvement
-
-**Mechanism:** Seat zones are CSS-rotated as whole containers via `CONTAINER_TRANSFORMS` in `apps/web/src/components/2d/layout-2d.ts:81-83` (`right: rotateZ(-90deg)`, `top: rotateZ(180deg)`, `left: rotateZ(90deg)`). The rotation is applied to the entire zone, so both tiles and any text inside rotate with it. On portrait phones the whole board is additionally rotated 90° by `ForcedLandscapeWrapper`, compounding the effect.
+**Mechanism:** Seat zones are CSS-rotated as whole containers via `CONTAINER_TRANSFORMS` in `apps/web/src/components/2d/layout-2d.ts:81-83` (`right: rotateZ(-90deg)`, `top: rotateZ(180deg)`, `left: rotateZ(90deg)`). The rotation is applied to the entire zone, so the text and tiles inside rotate with it — landing the glyphs in portrait orientation even though the board itself is landscape. On phones that fall back to `css-landscape` mode the whole board is additionally rotated 90° by `ForcedLandscapeWrapper`, compounding the effect. The fix must keep text reading horizontally (landscape) regardless of which seat zone it lives in.
 
 **Where to look:**
 
 - `apps/web/src/components/2d/layout-2d.ts` — `CONTAINER_TRANSFORMS`, `seatConfig()`
 - `apps/web/src/components/2d/GameTable2D.tsx` / `DesktopGameTable2D.tsx` / `MobileGameTable2D.tsx` — where `containerTransform` is applied to each seat zone
-- `apps/web/src/components/2d/SeatLabel2D.tsx`, `OpponentBadge2D.tsx`, `MobilePlayerBadge2D.tsx` — nameplate/score text (note: BUG-042 already moved seat labels out of the rotated zone into a `SeatHUD` overlay; confirm the playtest build predates that and that names/scores are now upright)
+- `apps/web/src/components/2d/ForcedLandscapeWrapper.tsx` + `apps/web/src/hooks/use-orientation.ts` — the `css-landscape` rotate(90deg) fallback and mode detection
+- `apps/web/src/components/2d/SeatLabel2D.tsx`, `OpponentBadge2D.tsx`, `MobilePlayerBadge2D.tsx` — nameplate/score text (note: BUG-042 already moved seat labels out of the rotated zone into a `SeatHUD` overlay; confirm the playtest build predates that and whether names/scores are now upright)
 - `apps/web/src/components/2d/DiscardPool2D.tsx`, `MahjongTile2D.tsx` — discard tiles inherit the zone rotation
 
-**Approach options (pick after a design decision):**
-
-- Counter-rotate text-bearing elements inside each rotated zone so glyphs stay upright while tile _positions_ keep the table feel, or
-- Render side-seat discards/tiles upright (no per-seat rotation), accepting a less "physical table" look in exchange for readability — which is what the testers explicitly asked for.
-
-**Trade-off:** Rotation gives a realistic around-the-table feel; the testers prioritise readability. Recommend defaulting to upright text at minimum; consider upright tiles too.
+**Approach:** Counter-rotate text-bearing elements inside each rotated seat zone so glyphs always read horizontally (landscape), while tile _positions_ can keep the around-the-table layout. At minimum all text (names, scores, badges, spirit-score) must be landscape-oriented; evaluate whether side-seat tile faces should also be de-rotated.
 
 ---
+
+## Open Improvements
 
 ### IMP-027 · Thirteen Misfits eligibility hint in rules / gameplay
 
