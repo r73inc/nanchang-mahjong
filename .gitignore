@@ -45,6 +45,8 @@ test-results/
 # ── AWS CDK ─────────────────────────────────────────────────
 cdk.out/
 cdk.context.json
+# Context file must be committed so CDK can synth without live AWS creds
+!infra/aws/cdk.context.json
 .cdk.staging/
 
 # ── Terraform (in case we ever) ─────────────────────────────

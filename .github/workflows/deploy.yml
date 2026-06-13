@@ -1,0 +1,153 @@
+name: Deploy
+
+# Runs on every push to main (after CI passes on the PR).
+# Requires these GitHub Actions secrets to be set (see docs/DEPLOYMENT.md):
+#   AWS_ACCESS_KEY_ID          — IAM deploy user access key
+#   AWS_SECRET_ACCESS_KEY      — IAM deploy user secret key
+#   WEB_BUCKET_NAME            — S3 bucket for the React SPA (from CDK output)
+#   CLOUDFRONT_DISTRIBUTION_ID — CloudFront distribution (from CDK output)
+#
+# ECS Fargate cluster and service names are hardcoded (nanchang / nanchang-api).
+# The deploy step is skipped when AWS credentials are absent (before Phase 2 CDK deploy).
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-east-1
+  ECR_REPO_NAME: nanchang-api
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Detect which secrets are available ──────────────────────────────────
+      # Steps that need specific AWS resources are skipped when their secret is
+      # absent — safe to run on the very first deploy before CDK has completed.
+      - name: Check available secrets
+        id: secrets
+        run: |
+          [ -n "$AWS_KEY" ]    && echo "has_aws=true" >> "$GITHUB_OUTPUT" || true
+          [ -n "$WEB_BUCKET" ] && echo "has_s3=true"  >> "$GITHUB_OUTPUT" || true
+          [ -n "$CF_DIST_ID" ] && echo "has_cf=true"  >> "$GITHUB_OUTPUT" || true
+        env:
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          WEB_BUCKET: ${{ secrets.WEB_BUCKET_NAME }}
+          CF_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+
+      # ── AWS credentials (all subsequent AWS steps depend on this) ───────────
+      - name: Configure AWS credentials
+        if: steps.secrets.outputs.has_aws == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── API: build Docker image and push to ECR ─────────────────────────────
+      - name: Login to ECR
+        if: steps.secrets.outputs.has_aws == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API Docker image
+        if: steps.secrets.outputs.has_aws == 'true'
+        id: docker
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          SHA_TAG="${ECR_REGISTRY}/${ECR_REPO_NAME}:${GITHUB_SHA}"
+          LATEST_TAG="${ECR_REGISTRY}/${ECR_REPO_NAME}:latest"
+
+          docker build \
+            --file apps/api/Dockerfile \
+            --tag "$SHA_TAG" \
+            --tag "$LATEST_TAG" \
+            --cache-from "$LATEST_TAG" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            .
+
+          docker push "$SHA_TAG"
+          docker push "$LATEST_TAG"
+
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+      # ── API: trigger ECS Fargate redeployment ──────────────────────────────
+      # ECS does not auto-redeploy when a new :latest image is pushed to ECR.
+      # force-new-deployment stops the running task and starts a new one with
+      # the freshly-pushed :latest image.
+      # Skipped when AWS credentials are absent (before CDK Phase 2 deploy).
+      - name: Deploy API via ECS Fargate
+        if: steps.secrets.outputs.has_aws == 'true'
+        run: |
+          aws ecs update-service \
+            --cluster nanchang \
+            --service nanchang-api \
+            --force-new-deployment \
+            --region "${{ env.AWS_REGION }}" \
+          && echo "ECS Fargate redeployment triggered." \
+          || echo "ECS service not found yet (pre-Phase-2 deploy) — skipping."
+
+      # ── Web: build the React SPA ────────────────────────────────────────────
+      # VITE_API_BASE_URL is intentionally not set — the app uses the default '/api'
+      # which CloudFront routes to App Runner (same origin, no CORS needed).
+      - name: Build web app
+        run: pnpm --filter @nanchang/web run build
+
+      # ── Web: sync to S3 ─────────────────────────────────────────────────────
+      # Strategy:
+      #   - Hashed assets (JS/CSS with content hash in filename): long-lived cache
+      #   - index.html + sw.js: no cache (always serve the latest shell/worker)
+      - name: Upload web assets to S3
+        if: >-
+          steps.secrets.outputs.has_aws == 'true' &&
+          steps.secrets.outputs.has_s3 == 'true'
+        run: |
+          BUCKET="${{ secrets.WEB_BUCKET_NAME }}"
+
+          # dist/assets/ only — Vite content-hashes every filename here,
+          # so these are safe to cache permanently in the browser and CDN.
+          aws s3 sync apps/web/dist/assets/ "s3://${BUCKET}/assets/" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable"
+
+          # Everything else (index.html, sw.js, and all Vite public/ pass-throughs
+          # such as textures, models, sounds, avatars, manifest.json, icons).
+          # None of these filenames are content-hashed, so they must always be
+          # re-validated by the browser on every load.
+          aws s3 sync apps/web/dist/ "s3://${BUCKET}/" \
+            --delete \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --exclude "assets/*"
+
+      # ── Web: invalidate CloudFront edge cache ───────────────────────────────
+      - name: Invalidate CloudFront cache
+        if: >-
+          steps.secrets.outputs.has_aws == 'true' &&
+          steps.secrets.outputs.has_cf == 'true'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"
