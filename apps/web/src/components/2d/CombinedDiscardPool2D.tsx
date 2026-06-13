@@ -107,13 +107,10 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Position + tile-type match: the last discard is always the final
-          // entry in that seat's array. Checking type alone caused BUG-053 —
-          // every earlier tile of the same type also lit up.
+          // Seat + position uniquely identifies the last discard — no tile-type
+          // comparison needed (fixed BUG-053: type-only match lit up duplicates).
           const isPulse =
-            lastDiscard?.seat === seatIdx &&
-            lastDiscard?.tile === tile &&
-            posInSeat === seats[seatIdx].discards.length - 1;
+            lastDiscard?.seat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =

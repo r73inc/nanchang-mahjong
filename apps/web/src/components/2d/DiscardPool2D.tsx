@@ -88,16 +88,12 @@ export function DiscardPool2D({ seatIdx, role, tileRole }: DiscardPool2DProps) {
     >
       <AnimatePresence>
         {discards.map((tile, i) => {
-          // Position + tile-type match: the last discard is always the final
-          // entry in the array. Checking type alone caused BUG-053 — every
-          // earlier tile of the same type also lit up.
-          const isPulse =
-            lastDiscard?.seat === seatIdx &&
-            lastDiscard?.tile === tile &&
-            i === discards.length - 1;
           // Assign discard-flight layoutId only to the most recently added tile
           // (last index) of the viewer's own pool.
           const isLast = i === discards.length - 1;
+          // Seat + position uniquely identifies the last discard — no tile-type
+          // comparison needed (fixed BUG-053: type-only match lit up duplicates).
+          const isPulse = lastDiscard?.seat === seatIdx && isLast;
           const tileLayoutId = isLast && isViewerSeat ? flightLayoutId : undefined;
 
           // Encoding isPulse in the key forces React to unmount+remount this wrapper
