@@ -20,18 +20,24 @@ import { useI18n } from '../../i18n';
 export interface ForcedLandscapeWrapperProps {
   active: boolean;
   children: React.ReactNode;
+  /** Applied to the wrapper div in both active and inactive states. Defaults to "w-full h-full". */
+  className?: string;
 }
 
-export function ForcedLandscapeWrapper({ active, children }: ForcedLandscapeWrapperProps) {
+export function ForcedLandscapeWrapper({
+  active,
+  children,
+  className,
+}: ForcedLandscapeWrapperProps) {
   const { t } = useI18n();
 
   if (!active) {
-    return <div className="w-full h-dvh">{children}</div>;
+    return <div className={className ?? 'w-full h-full'}>{children}</div>;
   }
 
   return (
     <div
-      className="mj-landscape-wrapper"
+      className={`mj-landscape-wrapper${className ? ` ${className}` : ''}`}
       aria-label={t('gameLandscapeMode')}
       style={
         {

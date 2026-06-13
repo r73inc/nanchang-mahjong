@@ -2569,7 +2569,10 @@ function GameTable({
   };
 
   return (
-    <ForcedLandscapeWrapper active={landscapeMode === 'css-landscape'}>
+    <ForcedLandscapeWrapper
+      active={landscapeMode === 'css-landscape'}
+      className={landscapeMode === 'css-landscape' ? 'w-full h-full' : 'w-full h-dvh'}
+    >
       <div className="mj-game-surface relative w-full h-full overflow-hidden bg-black">
         {/* ── Table renderer — fills entire screen ──────────────────────────── */}
         {/* Branched on snapshot.viewMode set by the host before game start.    */}
