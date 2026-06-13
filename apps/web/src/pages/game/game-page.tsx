@@ -448,21 +448,8 @@ function reconstructMeldTiles(
     });
   }
 
-  // Pair — one natural tile, optionally one jing tile
   const pairNatural = takeFromPool(decomp.pair);
-  let pairSecond: TileType = decomp.pair;
-  if (decomp.jingPair) {
-    for (const jt of jingTypes) {
-      const ji = pool.indexOf(jt);
-      if (ji !== -1) {
-        pool.splice(ji, 1);
-        pairSecond = jt;
-        break;
-      }
-    }
-  } else {
-    pairSecond = takeFromPool(decomp.pair);
-  }
+  const pairSecond = takeFromPool(decomp.pair);
   groups.push({ kind: 'pair', tiles: [pairNatural, pairSecond] });
 
   return groups;
