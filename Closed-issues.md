@@ -6,6 +6,36 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/last-discard-duplicate-pulse` (2026-06-13)
+
+### BUG-053 · Last-discard red outline highlights multiple tiles when the same tile type appears more than once in a seat's discards
+
+**Root cause:** All three discard pool components (`DiscardPool2D`, `CombinedDiscardPool2D`, `MobileDiscardPool2D`) identified the "last discarded tile" using only `seat + tile type`:
+
+```ts
+const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
+```
+
+During a `discards.map()` / `entries.map()` pass, this matched every occurrence of that tile type in the discard array — not just the most recently added one. When a player discarded the same tile type as a previous discard in their own pile, every earlier matching tile also received the pulse outline.
+
+**Fix (`apps/web/src/components/2d/DiscardPool2D.tsx`, `CombinedDiscardPool2D.tsx`, `MobileDiscardPool2D.tsx`):**
+
+Added a position guard — the last discarded tile is always the final entry in the discard array:
+
+- `DiscardPool2D`: `&& i === discards.length - 1`
+- `CombinedDiscardPool2D` / `MobileDiscardPool2D`: `&& posInSeat === seats[seatIdx].discards.length - 1`
+
+The tile-type check is retained as a fast-path guard; the position check ensures only the actual last tile is highlighted regardless of duplicates.
+
+**Tests added:** Two regression tests in `last-discard-pulse.test.tsx` — one for `MobileDiscardPool2D` and one for `CombinedDiscardPool2D` — verify that exactly one pulse appears when the same tile type has been discarded twice.
+
+**Key learnings:**
+
+- Matching by tile type alone is insufficient as a unique tile identifier in a discard pool — the same type can appear multiple times. Always combine type with position (last index) to identify the most recently discarded tile.
+- The existing BUG-020 tests only covered unique tile types per seat, so this variant slipped through. Future regression tests for visual state selectors should include duplicate-tile scenarios.
+
+---
+
 ## `fix/bug-051-052-jing-meld-display` (2026-06-13)
 
 ### BUG-051 · Jing/wildcard tiles silently transformed in the hand reveal meld display

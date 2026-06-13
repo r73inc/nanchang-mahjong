@@ -106,8 +106,13 @@ export function MobileDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Exact coordinate match: seat + tile value (same as CombinedDiscardPool2D).
-          const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
+          // Position + tile-type match: the last discard is always the final
+          // entry in that seat's array. Checking type alone caused BUG-053 —
+          // every earlier tile of the same type also lit up.
+          const isPulse =
+            lastDiscard?.seat === seatIdx &&
+            lastDiscard?.tile === tile &&
+            posInSeat === seats[seatIdx].discards.length - 1;
 
           const isViewerLastDiscard =
             seatIdx === viewerSeat && posInSeat === viewerDiscardCount - 1;
