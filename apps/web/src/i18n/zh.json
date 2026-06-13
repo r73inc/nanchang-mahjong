@@ -420,6 +420,8 @@
   "replayEventConcede": "认输",
   "replayEventDrawGame": "荒牌",
 
+  "soundEffects": "音效",
+  "soundEffectsDesc": "出牌音效、掷骰音效和胡牌提示音",
   "pushNotifications": "出牌提醒",
   "pushNotificationsDesc": "轮到你出牌时收到通知",
   "pushEnable": "开启",

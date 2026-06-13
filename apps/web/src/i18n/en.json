@@ -419,6 +419,8 @@
   "replayEventConcede": "conceded",
   "replayEventDrawGame": "draw",
 
+  "soundEffects": "Sound Effects",
+  "soundEffectsDesc": "Tile clack, dice roll, and win chime",
   "pushNotifications": "Turn Notifications",
   "pushNotificationsDesc": "Get notified when it's your turn",
   "pushEnable": "Enable",

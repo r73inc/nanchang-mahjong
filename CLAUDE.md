@@ -4,22 +4,22 @@
 
 Private family Nanchang Mahjong web app. Four human players connect to a private room, play a full session (East or East+South rounds, or bust mode), and accumulate ELO ratings over time. Server-authoritative; engine is the single source of truth for rules. GitHub: `r73inc/nanchang-mahjong`.
 
-**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize) → 12A (Push Backend) → 3D UI (PRs #32–40, merged). **Phase 12B (Push Frontend + A11y) is next. Two 3D bugs remain open (BUG-08 viewer discards invisible, BUG-09 TileWall redesign) — tracked in `3D-BUG-LOG.md`, deferred post-12B.**
+**Phases shipped:** 0 (scaffold) → 1 (auth/invites) → 2 (i18n EN+ZH) → 3 (admin) → 4 (profile/friends) → 5 (engine) → 6 (rooms/lobby) → 7 (real-time gameplay) → 8 (ELO/history) → 9 (replay BE+FE) → 10 (Learn/Tutorial) → 11 (Customize) → 12A (Push Backend) → 3D UI (PRs #32–40, merged) → 13 (Production deployment to AWS ap-east-1, PR #129, merged). **Phase 12B (Push Frontend + A11y) is next. Two 3D bugs remain open (BUG-08 viewer discards invisible, BUG-09 TileWall redesign) — tracked in `3D-BUG-LOG.md`, deferred post-12B.**
 
 ---
 
 ## 2. Tech Stack & Environment
 
-| Layer    | Stack                                                                                       |
-| -------- | ------------------------------------------------------------------------------------------- |
-| Monorepo | pnpm workspaces, TypeScript throughout                                                      |
-| Engine   | `packages/engine` — pure TS, no deps, Vitest (248 tests)                                    |
-| Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                               |
-| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (220 tests)           |
-| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (165 tests) |
-| 3D       | `three ^0.165`, `@react-three/fiber ^8.17`, `@react-three/drei ^9.109` — game table only    |
-| Infra    | AWS App Runner, DynamoDB, CDK in `infra/`                                                   |
-| CI       | GitHub Actions: lint + typecheck + test on every PR                                         |
+| Layer    | Stack                                                                                                     |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| Monorepo | pnpm workspaces, TypeScript throughout                                                                    |
+| Engine   | `packages/engine` — pure TS, no deps, Vitest (248 tests)                                                  |
+| Shared   | `packages/shared` — Zod schemas, socket event types, tile-map                                             |
+| API      | `apps/api` — NestJS + Fastify, Socket.IO, DynamoDB single-table, Jest (220 tests)                         |
+| Web      | `apps/web` — React 18, Vite, Zustand, TanStack Query, react-i18next, Vitest+RTL (165 tests)               |
+| 3D       | `three ^0.165`, `@react-three/fiber ^8.17`, `@react-three/drei ^9.109` — game table only                  |
+| Infra    | AWS ECS Fargate + ALB, CloudFront, DynamoDB, S3, ECR, CDK in `infra/` — deployed to ap-east-1 (Hong Kong) |
+| CI       | GitHub Actions: lint + typecheck + test on every PR                                                       |
 
 **Key files:**
 
@@ -33,18 +33,28 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 
 ### Branching & PR Workflow
 
-- **All work branches off `main`.** Unless explicitly told otherwise, create all branches from `main`, not off other feature branches. Do not create nested branches.
-- **Complete work and raise a PR.** Complete the work in a single branch, ensure all tests pass and type checking is clean, then raise a PR for review.
+**Two-branch model: `pre-prod` (integration) → `main` (production)**
+
+- `main` deploys directly to production (AWS ap-east-1) on every push. It is GitHub-protected and locked.
+- `pre-prod` is the integration branch — all development flows through here. It is also protected from direct commits.
+
+**Rules:**
+
+- **All work branches off `pre-prod`.** Unless explicitly told otherwise, create all branches from `pre-prod`, not off `main` or other feature branches. Do not create nested branches.
+- **All PRs target `pre-prod`.** Never raise a PR targeting `main` — the only merge into `main` is a `pre-prod` → `main` promotion, done manually by a human when ready to release to production.
+- **NEVER commit directly to `pre-prod` or `main`.** Both branches are protected. Every change — including documentation, issue tracking, and single-line fixes — must go through a feature branch and a PR. No exceptions.
+- **`main` is completely off-limits.** No commits, no branches, no PRs targeting `main` under any circumstance — except in an extreme emergency where a human explicitly overrides this rule in the conversation. Even then, confirm before acting.
+- **Complete work and raise a PR.** Complete the work in a single branch, ensure all tests pass and type checking is clean, then raise a PR targeting `pre-prod` for review.
 - **One PR at a time, always.** Open one PR and stop. Do not open a second PR, do not start a second branch, and do not write additional code until:
   1. The first PR has been reviewed
   2. Any requested changes have been addressed and committed
-  3. The PR is confirmed merged into `main`
+  3. The PR is confirmed merged into `pre-prod`
   - **Never branch a PR off another unmerged PR** — if the base PR changes, the dependent branch becomes wasted or broken work.
   - **Exception:** If the user explicitly asks for a stacked PR approach, ask first before doing it; even then, proceed only with explicit confirmation.
 
 ### Code Guidelines
 
-- **`main` is protected. NEVER commit directly to `main`.** All changes must go through a branch and a PR. This applies to every change without exception — including documentation, issue tracking, and single-line fixes. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
+- **`pre-prod` and `main` are both protected. NEVER commit directly to either. NEVER raise a PR targeting `main`.** All feature work goes through a branch → PR → `pre-prod`. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
 - **Engine is immutable.** Every `GameEngine` method returns a new instance. Never mutate state directly.
 - **Scoring: locked rules only.** Base(1) × Multipliers system. No additive fan. Zero-sum invariant must hold on every hand.
 - **Server is authoritative.** `game:snapshot` always replaces client state wholesale. No client-side game logic.
