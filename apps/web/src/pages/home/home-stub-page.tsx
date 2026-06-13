@@ -17,6 +17,60 @@ const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
   { key: 'customizeLink', path: '/customize', icon: '🎨' },
 ];
 
+interface SettingToggleRowProps {
+  title: string;
+  description: string;
+  isToggled: boolean;
+  onToggle: () => void;
+  show?: boolean;
+  disabled?: boolean;
+}
+
+const SettingToggleRow = ({
+  title,
+  description,
+  isToggled,
+  onToggle,
+  show = true,
+  disabled = false,
+}: SettingToggleRowProps) => {
+  if (!show) return null;
+  return (
+    <div
+      className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px]"
+      style={{
+        background: 'rgba(var(--felt-ink-rgb),0.06)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
+      }}
+    >
+      <div className="flex-1 min-w-0 mr-3">
+        <p className="text-sm text-mj-bone">{title}</p>
+        <p className="text-[11px] text-mj-bone/40 mt-0.5">{description}</p>
+      </div>
+      <button
+        onClick={onToggle}
+        disabled={disabled}
+        aria-label={title}
+        role="switch"
+        aria-checked={isToggled}
+        className="relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50"
+        style={{
+          background: isToggled ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.15)',
+          border: isToggled ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.2)',
+        }}
+      >
+        <span
+          className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
+          style={{
+            transform: isToggled ? 'translateX(20px)' : 'translateX(0)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          }}
+        />
+      </button>
+    </div>
+  );
+};
+
 export function HomeStubPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -137,78 +191,21 @@ export function HomeStubPage() {
 
         {/* Settings actions */}
         <div className="space-y-2 mb-6">
-          {/* Sound effects toggle */}
-          <div
-            className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px]"
-            style={{
-              background: 'rgba(var(--felt-ink-rgb),0.06)',
-              border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
-            }}
-          >
-            <div className="flex-1 min-w-0 mr-3">
-              <p className="text-sm text-mj-bone">{t('soundEffects')}</p>
-              <p className="text-[11px] text-mj-bone/40 mt-0.5">{t('soundEffectsDesc')}</p>
-            </div>
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              aria-pressed={soundEnabled}
-              className="relative w-11 h-6 rounded-full transition-colors shrink-0"
-              style={{
-                background: soundEnabled ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.15)',
-                border: soundEnabled ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.2)',
-              }}
-            >
-              <span
-                className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-                style={{
-                  transform: soundEnabled ? 'translateX(20px)' : 'translateX(0)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                }}
-              />
-            </button>
-          </div>
+          <SettingToggleRow
+            title={t('soundEffects')}
+            description={t('soundEffectsDesc')}
+            isToggled={soundEnabled}
+            onToggle={() => setSoundEnabled(!soundEnabled)}
+          />
 
-          {/* Push notification toggle — only shown when browser supports it */}
-          {isSupported && (
-            <div
-              className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px]"
-              style={{
-                background: 'rgba(var(--felt-ink-rgb),0.06)',
-                border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
-              }}
-            >
-              <div className="flex-1 min-w-0 mr-3">
-                <p className="text-sm text-mj-bone">{t('pushNotifications')}</p>
-                {permission === 'denied' ? (
-                  <p className="text-[11px] text-mj-loss-light/80 mt-0.5">{t('pushDenied')}</p>
-                ) : (
-                  <p className="text-[11px] text-mj-bone/40 mt-0.5">{t('pushNotificationsDesc')}</p>
-                )}
-              </div>
-              {permission === 'denied' ? (
-                <span className="text-[11px] text-mj-bone/30 shrink-0">{t('pushDenied')}</span>
-              ) : (
-                <button
-                  onClick={() => void (isSubscribed ? unsubscribe() : subscribe())}
-                  disabled={isLoading}
-                  aria-pressed={isSubscribed}
-                  className="relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50"
-                  style={{
-                    background: isSubscribed ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.15)',
-                    border: isSubscribed ? 'none' : '1px solid rgba(var(--felt-ink-rgb),0.2)',
-                  }}
-                >
-                  <span
-                    className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform"
-                    style={{
-                      transform: isSubscribed ? 'translateX(20px)' : 'translateX(0)',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                    }}
-                  />
-                </button>
-              )}
-            </div>
-          )}
+          <SettingToggleRow
+            title={t('pushNotifications')}
+            description={permission === 'denied' ? t('pushDenied') : t('pushNotificationsDesc')}
+            isToggled={isSubscribed}
+            onToggle={() => void (isSubscribed ? unsubscribe() : subscribe())}
+            show={isSupported}
+            disabled={isLoading || permission === 'denied'}
+          />
 
           <button
             onClick={() => navigate('/account')}
