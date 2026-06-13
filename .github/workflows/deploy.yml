@@ -1,0 +1,150 @@
+name: Deploy
+
+# Runs on every push to main (after CI passes on the PR).
+# Requires these GitHub Actions secrets to be set (see docs/DEPLOYMENT.md):
+#   AWS_ACCESS_KEY_ID          — IAM deploy user access key
+#   AWS_SECRET_ACCESS_KEY      — IAM deploy user secret key
+#   WEB_BUCKET_NAME            — S3 bucket for the React SPA (from CDK output)
+#   CLOUDFRONT_DISTRIBUTION_ID — CloudFront distribution (from CDK output)
+#   APP_RUNNER_SERVICE_ARN     — App Runner service ARN (from CDK output, set after Phase 2 deploy)
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-east-1
+  ECR_REPO_NAME: nanchang-api
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Detect which secrets are available ──────────────────────────────────
+      # Steps that need specific AWS resources are skipped when their secret is
+      # absent — safe to run on the very first deploy before CDK has completed.
+      - name: Check available secrets
+        id: secrets
+        run: |
+          [ -n "$AWS_KEY" ]         && echo "has_aws=true"       >> "$GITHUB_OUTPUT" || true
+          [ -n "$APP_RUNNER_ARN" ]  && echo "has_apprunner=true" >> "$GITHUB_OUTPUT" || true
+          [ -n "$WEB_BUCKET" ]      && echo "has_s3=true"        >> "$GITHUB_OUTPUT" || true
+          [ -n "$CF_DIST_ID" ]      && echo "has_cf=true"        >> "$GITHUB_OUTPUT" || true
+        env:
+          AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          APP_RUNNER_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
+          WEB_BUCKET: ${{ secrets.WEB_BUCKET_NAME }}
+          CF_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+
+      # ── AWS credentials (all subsequent AWS steps depend on this) ───────────
+      - name: Configure AWS credentials
+        if: steps.secrets.outputs.has_aws == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── API: build Docker image and push to ECR ─────────────────────────────
+      - name: Login to ECR
+        if: steps.secrets.outputs.has_aws == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API Docker image
+        if: steps.secrets.outputs.has_aws == 'true'
+        id: docker
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          SHA_TAG="${ECR_REGISTRY}/${ECR_REPO_NAME}:${GITHUB_SHA}"
+          LATEST_TAG="${ECR_REGISTRY}/${ECR_REPO_NAME}:latest"
+
+          docker build \
+            --file apps/api/Dockerfile \
+            --tag "$SHA_TAG" \
+            --tag "$LATEST_TAG" \
+            --cache-from "$LATEST_TAG" \
+            .
+
+          docker push "$SHA_TAG"
+          docker push "$LATEST_TAG"
+
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+      # ── API: trigger App Runner deployment ──────────────────────────────────
+      # App Runner pulls the :latest tag we just pushed.
+      # Skipped until APP_RUNNER_SERVICE_ARN is set (after CDK Phase 2 deploy).
+      - name: Deploy API via App Runner
+        if: >-
+          steps.secrets.outputs.has_aws == 'true' &&
+          steps.secrets.outputs.has_apprunner == 'true'
+        run: |
+          aws apprunner start-deployment \
+            --service-arn "${{ secrets.APP_RUNNER_SERVICE_ARN }}"
+          echo "App Runner deployment triggered — service will restart with new image."
+
+      # ── Web: build the React SPA ────────────────────────────────────────────
+      # VITE_API_BASE_URL is intentionally not set — the app uses the default '/api'
+      # which CloudFront routes to App Runner (same origin, no CORS needed).
+      - name: Build web app
+        run: pnpm --filter @nanchang/web run build
+
+      # ── Web: sync to S3 ─────────────────────────────────────────────────────
+      # Strategy:
+      #   - Hashed assets (JS/CSS with content hash in filename): long-lived cache
+      #   - index.html + sw.js: no cache (always serve the latest shell/worker)
+      - name: Upload web assets to S3
+        if: >-
+          steps.secrets.outputs.has_aws == 'true' &&
+          steps.secrets.outputs.has_s3 == 'true'
+        run: |
+          BUCKET="${{ secrets.WEB_BUCKET_NAME }}"
+
+          # Hashed assets — safe to cache for 1 year
+          aws s3 sync apps/web/dist/ "s3://${BUCKET}/" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "index.html" \
+            --exclude "sw.js"
+
+          # index.html — must always be fresh (entry point for the SPA)
+          aws s3 cp apps/web/dist/index.html "s3://${BUCKET}/index.html" \
+            --cache-control "no-cache,no-store,must-revalidate"
+
+          # sw.js — service worker must never be stale
+          if [ -f apps/web/dist/sw.js ]; then
+            aws s3 cp apps/web/dist/sw.js "s3://${BUCKET}/sw.js" \
+              --cache-control "no-cache,no-store,must-revalidate"
+          fi
+
+      # ── Web: invalidate CloudFront edge cache ───────────────────────────────
+      - name: Invalidate CloudFront cache
+        if: >-
+          steps.secrets.outputs.has_aws == 'true' &&
+          steps.secrets.outputs.has_cf == 'true'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

@@ -1,0 +1,54 @@
+# Node
+node_modules
+.pnpm-store
+.pnp.*
+
+# Build artifacts — Dockerfile copies dist/ explicitly after pnpm deploy
+dist
+build
+out
+
+# Test / coverage
+coverage
+.nyc_output
+playwright-report
+test-results
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+.secrets
+
+# AWS CDK
+cdk.out
+cdk.context.json
+.cdk.staging
+
+# Dev tooling
+.git
+.gitignore
+.dockerignore
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local dev infra
+docker-compose*.yml
+.docker-data
+.localstack
+shared-local-instance.db
+
+# Logs
+logs
+*.log
+
+# Not needed for API build
+apps/web
+infra
