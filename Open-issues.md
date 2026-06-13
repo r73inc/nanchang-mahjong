@@ -8,13 +8,11 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID      | Name                                                            | Summary                                                                              |
-| ------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| BUG-08  | Viewer discards invisible (3D)                                  | Viewer's own discard pile not visible on the 3D table                                |
-| BUG-09  | TileWall3D needs redesign (3D)                                  | TileWall removed due to red Back.svg background; needs neutral replacement           |
-| BUG-045 | Bot dice roll animation not visible                             | Bot roll animation and result flash by in under a frame; human roll works correctly  |
-| BUG-047 | Thirteen Misfits (十三烂) unwinnable when jing overlaps pattern | Engine rejects any 13-misfits hand containing a jing tile; needs rules verification  |
-| IMP-027 | Thirteen Misfits eligibility hint                               | Surface the concealed / self-draw / no-jing requirements in-game to reduce confusion |
+| ID      | Name                                | Summary                                                                             |
+| ------- | ----------------------------------- | ----------------------------------------------------------------------------------- |
+| BUG-08  | Viewer discards invisible (3D)      | Viewer's own discard pile not visible on the 3D table                               |
+| BUG-09  | TileWall3D needs redesign (3D)      | TileWall removed due to red Back.svg background; needs neutral replacement          |
+| BUG-045 | Bot dice roll animation not visible | Bot roll animation and result flash by in under a frame; human roll works correctly |
 
 ---
 
@@ -67,57 +65,5 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 - `apps/api/src/game/game.service.ts` — `doBotRollIfNeeded` timing (currently 3500ms)
 
 **Suspected cause:** The `onDiceAnimationComplete` guard (`if (!isDiceAnimatingRef.current) return`) may not be sufficient. A bot roll that arrives while the previous `setDiceAnimation(null)` and snapshot-flush are mid-flight in the React render cycle may result in `diceAnimation` being cleared in the same render batch. Consider replacing the `onAnimationComplete`-driven approach with an explicit `setTimeout` in the `dice_roll` event handler keyed to the animation duration.
-
----
-
-### BUG-047 · Thirteen Misfits (十三烂) cannot be won when a jing tile overlaps the pattern — needs rules verification
-
-**Reported by:** Playtest #1 (2026-06-13), two separate testers. One tester held what they believed was a valid Thirteen Misfits hand with 1 & 2 Bamboo set as the spirit (jing) tiles and could not declare a win over many rounds. The tester self-resolved by reading the in-app rules screen and concluded "it was just me who didn't win" — but the engine behaviour below means the hand may have been genuinely unwinnable for a non-obvious reason, so this needs a developer decision.
-
-**Symptom:** A hand that looks like a valid Thirteen Misfits (same-suit numbers spaced > 2 apart + unique honors) is never offered as a win / cannot be declared.
-
-**Status:** OPEN — needs rules clarification, then verification
-
-**Most likely cause (engine):** `checkThirteenMisfits` in `packages/engine/src/hand.ts:226` rejects the hand if **any** jing is present:
-
-```ts
-if (jingCount > 0) return false; // wildcards cannot be used in Thirteen Misfits
-```
-
-The tester chose **1 & 2 Bamboo as the jing**. The canonical Thirteen Misfits bamboo run is 1/4/7條 — so the moment the tester holds a 1條, that tile is counted as a jing wildcard (`separateJing`), `jingCount` becomes > 0, and the hand is disqualified. With 1/2條 as jing, drawing into a "clean" 13-misfits shape is effectively impossible.
-
-**Open rules question (resolve first):** `docs/final-nanchang-mahjong-rules.md` §5.2 only states Thirteen Misfits "must be concealed" — it does **not** explicitly say jing tiles are disallowed. The in-app rules screen (ZH) says 必须全程自摸 (must be entirely self-drawn). Neither source clearly justifies the engine's "zero jing" rule. Decide whether:
-
-1. A jing tile sitting in a valid misfit position should count as a natural for 13-misfits purposes (relax the engine check), or
-2. The "no jing at all" rule is correct and the UI must explain it (see IMP-027).
-
-**Where to look:**
-
-- `packages/engine/src/hand.ts` — `checkThirteenMisfits` (jing rejection), `separateJing` usage
-- `packages/engine/src/engine.ts:700` — `isWinningHand(winningHand, this.jingTypes)` win gate
-- `packages/engine/src/__tests__/hand.test.ts` — add a case: 13-misfits shape where one tile type is also the jing
-- `docs/final-nanchang-mahjong-rules.md` §5.2 — authoritative rule text
-
-**Secondary note:** `isWinningHand` does not appear to enforce the "must be self-drawn" requirement for Thirteen Misfits (a ron would pass the tile-composition check). The implicit concealment guarantee comes from open-meld tiles being folded into `winningHand` (a chow/pung can never satisfy the gap-> 2 / unique-honor constraints). Confirm whether self-draw must be enforced explicitly for this hand type.
-
----
-
-## Open Improvements
-
-### IMP-027 · Thirteen Misfits eligibility hint in rules / gameplay
-
-**Reported by:** Playtest #1 (2026-06-13) — a tester spent several rounds unable to win a Thirteen Misfits hand and was unsure whether the app even supported it (it does). They eventually resolved their confusion by reading the in-app rules, which is a good signal that the rules screen is discoverable — but a targeted hint would have saved the frustration.
-
-**Symptom:** Thirteen Misfits is a complex, easy-to-misjudge hand. Players don't realise it must be fully concealed (no chow/pung/kong), the same-suit gap must be > 2, and — pending the BUG-047 decision — that jing tiles may not count toward it.
-
-**Status:** OPEN — instructional improvement (depends on BUG-047 outcome for the jing wording)
-
-**Suggested change:** Add a short tip/callout on the Learn page's Hands/Hu (胡牌) section and/or a one-line note near the Thirteen Misfits example reminding players of the eligibility constraints (concealed, gap > 2, unique honors, and the jing rule once confirmed). Keep EN/ZH key parity. Reference the existing Learn page tile examples.
-
-**Where to look:**
-
-- `apps/web/src/pages/learn/` — Hands / Hu (胡牌) tab content
-- `apps/web/src/i18n/en.json` + `zh.json` — add paired keys
-- `docs/final-nanchang-mahjong-rules.md` §5.2 — source wording
 
 ---

@@ -185,8 +185,11 @@ function tryMelds(
 /**
  * Check if `hand` can form Seven Pairs. Allows at most ONE Jing pair.
  * Each pair must otherwise have 2 natural tiles (or 1 natural + 1 Jing).
+ *
+ * Exported so engine.ts can use it in detectHandType (a hand with consecutive
+ * pairs may also have a valid standard chow decomposition — we prefer Seven Pairs).
  */
-function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
+export function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
   if (naturals.length + jingCount !== 14) return false;
 
   const counts = new Map<TileType, number>();
@@ -215,23 +218,27 @@ function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
 // ── Thirteen Misfits (十三烂) ─────────────────────────────────────────────────
 
 /**
- * Check if the hand qualifies as Thirteen Misfits (十三烂):
- *   - Must be fully natural (no Jing wildcards).
- *   - All honor tiles must be unique (no duplicate wind or dragon types).
+ * Check if the hand qualifies as Thirteen Misfits (十三烂).
+ *
+ * Checks tile face values directly — Jing tiles sitting in valid misfit positions
+ * count as their natural type, not as wildcards. Nanchang rules do not prohibit
+ * Jing tiles from appearing in a Thirteen Misfits hand.
+ *
+ * Requirements:
+ *   - All honor tiles must be unique (no duplicate winds or dragons).
  *   - Within each suit, adjacent tile ranks (when sorted) must have a gap > 2.
- *     Example: 1, 4, 7 is valid (gaps of 3); 1, 3, 5 is not (gap of 2).
+ *     Example: 1, 4, 7 is valid (gaps of 3); 1, 3, 5 is invalid (gap of 2).
  */
-function checkThirteenMisfits(naturals: TileType[], jingCount: number): boolean {
-  if (naturals.length + jingCount !== 14) return false;
-  if (jingCount > 0) return false; // wildcards cannot be used in Thirteen Misfits
+function checkThirteenMisfits(hand: TileType[]): boolean {
+  if (hand.length !== 14) return false;
 
   // All honor tiles must be unique
-  const honors = naturals.filter(isHonor);
+  const honors = hand.filter(isHonor);
   if (honors.length !== new Set(honors).size) return false;
 
   // Within each suit, sorted adjacent ranks must have gap > 2
   for (const suit of ['m', 'p', 's'] as const) {
-    const ranks = naturals
+    const ranks = hand
       .filter((t) => !isHonor(t) && t[1] === suit)
       .map((t) => getRank(t)!)
       .sort((a, b) => a - b);
@@ -328,12 +335,13 @@ export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean 
   // Standard decomposition
   if (decomposeHand(hand, jingTypes).length > 0) return true;
 
-  // Seven Pairs
+  // Seven Pairs (jing-aware: wildcards can complete the 7th pair)
   const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (checkSevenPairs(naturals, jingCount)) return true;
 
-  // Thirteen Misfits
-  if (checkThirteenMisfits(naturals, jingCount)) return true;
+  // Thirteen Misfits — checked against raw tile face values; Jing tiles count as
+  // their natural type, so a Jing sitting in a valid misfit position is not disqualifying.
+  if (checkThirteenMisfits(hand)) return true;
 
   return false;
 }

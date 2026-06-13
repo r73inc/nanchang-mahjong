@@ -273,6 +273,28 @@ describe('Engine·hand-eval — non-winning hands', () => {
     expect(isWinningHand(hand, NO_JINGS)).toBe(false);
   });
 
+  it('rejects thirteen misfits where jing tile creates a gap of exactly 2', () => {
+    // jing = '3m'. Face value gives 1m,3m — gap is 2, not > 2 → invalid
+    const JING3M: TileType = '3m';
+    const hand: TileType[] = [
+      '1m',
+      '3m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s',
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      'bai',
+    ];
+    expect(isWinningHand(hand, [JING3M])).toBe(false);
+  });
+
   it('rejects thirteen misfits with duplicate honor', () => {
     // duplicate east → not valid thirteen misfits
     const hand: TileType[] = [
@@ -446,6 +468,75 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
     // 1m1m1m pung ✓; 2p3p4p chow ✓; 5s6s7s chow ✓; north+jing+jing = north north north pung ✓; pair = north+jing ✓
     // So: jingsUsed = 3 (1 in pair + 2 in last pung). Total = 14. ✓
     expect(isWinningHand(hand, ['3m', '4m'])).toBe(true);
+  });
+
+  it('thirteen misfits wins when a jing tile sits in a valid misfit position', () => {
+    // jing = '4m'. The classic 1m/4m/7m bamboo run includes 4m as the jing.
+    // Old engine rejected this because jingCount > 0. New engine checks face values → valid.
+    // m: 1,4,7 (gaps 3,3 ✓); p: 2,6 (gap 4 ✓); s: 3,7 (gap 4 ✓); all 7 honors ✓
+    const JING4M: TileType = '4m';
+    const hand: TileType[] = [
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s',
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      'bai',
+    ];
+    expect(isWinningHand(hand, [JING4M])).toBe(true);
+  });
+
+  it('seven-star thirteen misfits wins when a jing tile sits in a valid misfit position', () => {
+    // jing = '1s'. Hand includes 1s at face value in a valid gap position.
+    // m: 1,7 (gap 6 ✓); p: 3,8 (gap 5 ✓); s: 1,5,9 (gaps 4,4 ✓); all 7 honors ✓ — 14 tiles
+    const JING1S: TileType = '1s';
+    const hand: TileType[] = [
+      '1m',
+      '7m',
+      '3p',
+      '8p',
+      '1s',
+      '5s',
+      '9s',
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      'bai',
+    ];
+    expect(isWinningHand(hand, [JING1S])).toBe(true);
+  });
+
+  it('seven pairs wins when a jing completes the 7th pair', () => {
+    // 6 natural pairs + 1 pair where the 7th natural pairs with a jing
+    const JING9S: TileType = '9s';
+    const hand: TileType[] = [
+      '1m',
+      '1m',
+      '3m',
+      '3m',
+      '5m',
+      '5m',
+      '7m',
+      '7m',
+      '1p',
+      '1p',
+      '3p',
+      '3p',
+      'west', // natural — needs jing to make pair
+      JING9S, // jing wildcard completes the west pair
+    ];
+    expect(isWinningHand(hand, [JING9S])).toBe(true);
   });
 });
 

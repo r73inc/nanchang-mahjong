@@ -372,6 +372,12 @@ function HandsSection() {
       </HandCard>
       <HandCard title={t('learnHandsThirteenTitle')} desc={t('learnHandsThirteenDesc')}>
         <TileRow tiles={THIRTEEN_HAND.slice(0, 9)} />
+        <div
+          className="mt-2 rounded-lg px-2.5 py-2 text-xs text-mj-gold/80 leading-snug"
+          style={{ background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)' }}
+        >
+          {t('learnHandsThirteenTip')}
+        </div>
       </HandCard>
       <HandCard title={t('learnHandsSevenStarTitle')} desc={t('learnHandsSevenStarDesc')}>
         <TileRow tiles={[...WINDS, ...DRAGS]} />

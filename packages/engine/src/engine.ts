@@ -24,7 +24,7 @@ import {
   swapStackTiles,
 } from './wall';
 import { jingTypesFromIndicator, separateJing } from './jing';
-import { isWinningHand, decomposeHand } from './hand';
+import { isWinningHand, decomposeHand, checkSevenPairs } from './hand';
 import {
   canPung,
   canKongFromDiscard,
@@ -313,20 +313,26 @@ export class GameEngine {
         );
         if (allPungsDecomp) return 'all_triplets';
       }
+
+      // Seven Pairs (小七对): a concealed hand with 7 distinct pairs may also admit a
+      // standard chow decomposition (e.g. two pairs of consecutive tiles). Prefer
+      // 'seven_pairs' (×2) over 'standard' (×1) when the hand qualifies.
+      if (openMelds.length === 0) {
+        const { naturals, jingCount } = separateJing(fullHand, this.jingTypes);
+        if (checkSevenPairs(naturals, jingCount)) return 'seven_pairs';
+      }
+
       return 'standard';
     }
 
-    // No standard decomposition → Seven Pairs or Thirteen Misfits
-    const counts = new Map<TileType, number>();
-    for (const t of fullHand) counts.set(t, (counts.get(t) ?? 0) + 1);
+    // No standard decomposition → Seven Pairs, Thirteen Misfits, or Seven Star Thirteen Misfits.
+    // Use the proper jing-aware check (checkSevenPairs handles jing wildcards completing a pair).
+    const { naturals, jingCount } = separateJing(fullHand, this.jingTypes);
+    if (checkSevenPairs(naturals, jingCount)) return 'seven_pairs';
 
-    // Seven Pairs: at least 7 tile types each appearing ≥2 times
-    const pairCombos = [...counts.values()].filter((c) => c >= 2).length;
-    if (pairCombos >= 7) return 'seven_pairs';
-
-    // Thirteen Misfits: check for Seven Star variant (all 7 unique honors present)
-    const honors: TileType[] = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai'];
-    const hasAllHonors = honors.every((h) => fullHand.includes(h));
+    // Must be Thirteen Misfits — check for Seven Star variant (all 7 unique honors present)
+    const HONORS: TileType[] = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai'];
+    const hasAllHonors = HONORS.every((h) => fullHand.includes(h));
     return hasAllHonors ? 'seven_star_thirteen' : 'thirteen_misfits';
   }
 
@@ -705,7 +711,10 @@ export class GameEngine {
     const handType = this.detectHandType(decompositions, winnerSeat.openMelds, winningHand);
 
     const { jingCount: winJings } = separateJing(winningHand, this.jingTypes);
-    const isGerman = winJings === 0;
+    // Thirteen Misfits always qualifies as German: Jing tiles sit at face value in the
+    // misfit pattern — no tile acts as a wildcard, so jingsUsed = 0 by definition.
+    const isGerman =
+      handType === 'thirteen_misfits' || handType === 'seven_star_thirteen' ? true : winJings === 0;
 
     // Heavenly Win: tsumo before any discard or draw has occurred
     const isHeavenlyWin =
