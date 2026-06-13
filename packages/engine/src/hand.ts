@@ -183,11 +183,11 @@ function tryMelds(
 // ── Seven Pairs ───────────────────────────────────────────────────────────────
 
 /**
- * Check if `hand` can form Seven Pairs. Allows at most ONE Jing pair.
- * Each pair must otherwise have 2 natural tiles (or 1 natural + 1 Jing).
+ * Check if `hand` can form Seven Pairs (小七对).
  *
- * Exported so engine.ts can use it in detectHandType (a hand with consecutive
- * pairs may also have a valid standard chow decomposition — we prefer Seven Pairs).
+ * Nanchang rules: 4 identical tiles count as 2 pairs. No "distinct pairs"
+ * restriction. Jing tiles fill singletons as wildcards; pure-jing pairs also
+ * count. Exported so engine.ts prefers Seven Pairs over standard decomposition.
  */
 export function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
   if (naturals.length + jingCount !== 14) return false;
@@ -198,15 +198,13 @@ export function checkSevenPairs(naturals: TileType[], jingCount: number): boolea
   let pairs = 0;
   let singles = 0;
   for (const cnt of counts.values()) {
-    // Seven Pairs requires 7 DISTINCT pairs — each tile type contributes at most 1 pair.
-    // 3+ copies of the same type wastes the extras and makes Seven Pairs impossible.
-    if (cnt > 2) return false;
-    pairs += Math.floor(cnt / 2); // 2 → 1 pair; 1 → 0 pairs
-    singles += cnt % 2; // 1 → 1 single; 2 → 0 singles
+    // Nanchang rule: 4 identical tiles count as 2 pairs (floor(4/2)=2).
+    // No "distinct pairs" restriction — that is a Japanese Chiitoitsu rule.
+    pairs += Math.floor(cnt / 2);
+    singles += cnt % 2;
   }
 
   // Each single natural tile needs 1 jing to become a pair
-  // We also allow at most 1 "full jing pair" (both tiles are jing)
   if (jingCount < singles) return false;
   const jingsForSingles = singles;
   const jingsLeft = jingCount - jingsForSingles;

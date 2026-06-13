@@ -478,7 +478,7 @@
   "learnHandsStandardTitle": "Standard Hand",
   "learnHandsStandardDesc": "4 melds (Chow, Pung, or Kong) plus 1 pair. The most common winning shape.",
   "learnHandsSevenPairsTitle": "Small Seven Pairs (小七对)",
-  "learnHandsSevenPairsDesc": "Exactly 7 distinct pairs (each tile type used at most twice). Must be fully concealed — no melds. ×2 multiplier.",
+  "learnHandsSevenPairsDesc": "Exactly 7 pairs — four identical tiles count as 2 pairs. Must be fully concealed — no melds. ×2 multiplier.",
   "learnHandsBigSevenPairsTitle": "All Triplets (大七对)",
   "learnHandsBigSevenPairsDesc": "4 triplets or Kongs plus 1 pair. ×2 multiplier.",
   "learnHandsThirteenTitle": "Thirteen Misfits (十三烂)",

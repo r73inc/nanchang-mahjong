@@ -479,7 +479,7 @@
   "learnHandsStandardTitle": "普通胡牌",
   "learnHandsStandardDesc": "4 组面子（顺子、刻子或杠）加 1 对将。最常见的胡牌形式。",
   "learnHandsSevenPairsTitle": "小七对",
-  "learnHandsSevenPairsDesc": "恰好 7 对不同的牌（每种牌最多用两张），必须全程自摸（不可吃碰）。×2 倍率。",
+  "learnHandsSevenPairsDesc": "恰好 7 对牌——四张相同的牌算作两对。必须全程自摸（不可吃碰）。×2 倍率。",
   "learnHandsBigSevenPairsTitle": "大七对（碰碰胡）",
   "learnHandsBigSevenPairsDesc": "4 组刻子或杠加 1 对将。×2 倍率。",
   "learnHandsThirteenTitle": "十三烂",

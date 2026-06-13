@@ -337,12 +337,11 @@ describe('Engine·hand-eval — non-winning hands', () => {
     expect(isWinningHand(hand, NO_JINGS)).toBe(false);
   });
 
-  it('seven pairs rejects hand with 4 copies of the same tile (distinct pairs required)', () => {
-    // 4×east + 2 each of south/west/north/zhong/fa = 14 honor tiles.
-    // Cannot form a standard 4-meld+pair (only 2 copies of each non-east honor → no pungs;
-    // honor chows consume tiles in ways that always leave a leftover).
-    // Old checkSevenPairs code would count 4×east as 2 pairs → accept.
-    // Fixed code rejects because east count > 2.
+  it('Nanchang rule: 4 identical tiles count as 2 pairs in Seven Pairs (小七对)', () => {
+    // 4×east (= 2 pairs) + 2 each of south/west/north/zhong/fa (= 5 pairs) = 7 pairs total.
+    // No standard 4-meld+pair decomposition exists for this hand (2 copies of each
+    // non-east honor cannot form pungs; honor chows always leave leftovers).
+    // Nanchang does NOT impose the Japanese Chiitoitsu "distinct pairs" restriction.
     const hand: TileType[] = [
       'east',
       'east',
@@ -359,7 +358,7 @@ describe('Engine·hand-eval — non-winning hands', () => {
       'fa',
       'fa',
     ];
-    expect(isWinningHand(hand, NO_JINGS)).toBe(false);
+    expect(isWinningHand(hand, NO_JINGS)).toBe(true);
   });
 });
 

@@ -710,11 +710,33 @@ export class GameEngine {
     const decompositions = decomposeHand(winningHand, this.jingTypes);
     const handType = this.detectHandType(decompositions, winnerSeat.openMelds, winningHand);
 
-    const { jingCount: winJings } = separateJing(winningHand, this.jingTypes);
-    // Thirteen Misfits always qualifies as German: Jing tiles sit at face value in the
-    // misfit pattern — no tile acts as a wildcard, so jingsUsed = 0 by definition.
-    const isGerman =
-      handType === 'thirteen_misfits' || handType === 'seven_star_thirteen' ? true : winJings === 0;
+    // Nanchang rule: Thirteen Misfits (十三烂) must be won by self-draw only.
+    if (
+      (handType === 'thirteen_misfits' || handType === 'seven_star_thirteen') &&
+      winType !== 'tsumo'
+    ) {
+      throw new Error('Thirteen Misfits must be won by self-draw (自摸) — ron is not allowed');
+    }
+
+    const { naturals: winNaturals, jingCount: winJings } = separateJing(
+      winningHand,
+      this.jingTypes,
+    );
+
+    let isGerman: boolean;
+    if (handType === 'thirteen_misfits' || handType === 'seven_star_thirteen') {
+      // Face-value pattern — no tile acts as a wildcard by definition.
+      isGerman = true;
+    } else if (handType === 'seven_pairs') {
+      // German if no Jing was used as a wildcard to complete a natural singleton.
+      // Pure-jing pairs (both tiles are the Jing at face value) are NOT wildcard use.
+      const naturalCounts = new Map<TileType, number>();
+      for (const t of winNaturals) naturalCounts.set(t, (naturalCounts.get(t) ?? 0) + 1);
+      const singles = [...naturalCounts.values()].reduce((sum, c) => sum + (c % 2), 0);
+      isGerman = singles === 0;
+    } else {
+      isGerman = winJings === 0;
+    }
 
     // Heavenly Win: tsumo before any discard or draw has occurred
     const isHeavenlyWin =
