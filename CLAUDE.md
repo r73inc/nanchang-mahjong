@@ -36,12 +36,13 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 **Two-branch model: `pre-prod` (integration) → `main` (production)**
 
 - `main` deploys directly to production (AWS ap-east-1) on every push. It is GitHub-protected and locked.
-- `pre-prod` is the integration branch — all development flows through here.
+- `pre-prod` is the integration branch — all development flows through here. It is also protected from direct commits.
 
 **Rules:**
 
 - **All work branches off `pre-prod`.** Unless explicitly told otherwise, create all branches from `pre-prod`, not off `main` or other feature branches. Do not create nested branches.
 - **All PRs target `pre-prod`.** Never raise a PR targeting `main` — the only merge into `main` is a `pre-prod` → `main` promotion, done manually by a human when ready to release to production.
+- **NEVER commit directly to `pre-prod` or `main`.** Both branches are protected. Every change — including documentation, issue tracking, and single-line fixes — must go through a feature branch and a PR. No exceptions.
 - **`main` is completely off-limits.** No commits, no branches, no PRs targeting `main` under any circumstance — except in an extreme emergency where a human explicitly overrides this rule in the conversation. Even then, confirm before acting.
 - **Complete work and raise a PR.** Complete the work in a single branch, ensure all tests pass and type checking is clean, then raise a PR targeting `pre-prod` for review.
 - **One PR at a time, always.** Open one PR and stop. Do not open a second PR, do not start a second branch, and do not write additional code until:
@@ -53,7 +54,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 
 ### Code Guidelines
 
-- **`main` is protected. NEVER commit directly to `main`. NEVER raise a PR targeting `main`.** All feature work goes through `pre-prod`. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
+- **`pre-prod` and `main` are both protected. NEVER commit directly to either. NEVER raise a PR targeting `main`.** All feature work goes through a branch → PR → `pre-prod`. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
 - **Engine is immutable.** Every `GameEngine` method returns a new instance. Never mutate state directly.
 - **Scoring: locked rules only.** Base(1) × Multipliers system. No additive fan. Zero-sum invariant must hold on every hand.
 - **Server is authoritative.** `game:snapshot` always replaces client state wholesale. No client-side game logic.
