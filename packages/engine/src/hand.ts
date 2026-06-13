@@ -326,8 +326,17 @@ export function decomposeConcealed(hand: TileType[], jingTypes: TileType[]): Dec
 /**
  * True if `hand` (exactly 14 TileTypes) is a winning hand.
  * Handles: standard 4-meld+pair, Seven Pairs, Thirteen Misfits.
+ *
+ * @param isSelfDraw - Pass `true` when evaluating a self-drawn tile (tsumo).
+ *   Thirteen Misfits (十三烂) is only a valid winning hand by self-draw —
+ *   passing `false` (or omitting) correctly excludes it from ron evaluations
+ *   so the "Hu" button is never offered when an opponent discards.
  */
-export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean {
+export function isWinningHand(
+  hand: TileType[],
+  jingTypes: TileType[],
+  isSelfDraw = false,
+): boolean {
   if (hand.length !== 14) return false;
 
   // Standard decomposition
@@ -337,9 +346,10 @@ export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean 
   const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (checkSevenPairs(naturals, jingCount)) return true;
 
-  // Thirteen Misfits — checked against raw tile face values; Jing tiles count as
-  // their natural type, so a Jing sitting in a valid misfit position is not disqualifying.
-  if (checkThirteenMisfits(hand)) return true;
+  // Thirteen Misfits — self-draw only (Nanchang rule).
+  // Checked against raw tile face values so Jing tiles at valid misfit
+  // positions count naturally rather than as wildcards.
+  if (isSelfDraw && checkThirteenMisfits(hand)) return true;
 
   return false;
 }
@@ -353,8 +363,9 @@ export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean 
 export function shantenNumber(hand: TileType[], jingTypes: TileType[]): number {
   if (hand.length < 13) return 8;
 
-  // Winning?
-  if (hand.length === 14 && isWinningHand(hand, jingTypes)) return -1;
+  // Winning? Shanten is a theoretical property of the hand shape, so Thirteen
+  // Misfits qualifies as -1 regardless of win mechanism (pass isSelfDraw=true).
+  if (hand.length === 14 && isWinningHand(hand, jingTypes, true)) return -1;
 
   const { naturals, jingCount } = separateJing(hand, jingTypes);
 

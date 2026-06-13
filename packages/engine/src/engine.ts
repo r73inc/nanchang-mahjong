@@ -25,6 +25,7 @@ import {
 } from './wall';
 import { jingTypesFromIndicator, separateJing } from './jing';
 import { isWinningHand, decomposeHand, checkSevenPairs } from './hand';
+import { GameRuleError } from './errors';
 import {
   canPung,
   canKongFromDiscard,
@@ -703,19 +704,24 @@ export class GameEngine {
       ...(isRobKong && robTile ? [robTile] : []),
     ];
 
-    if (!isWinningHand(winningHand, this.jingTypes)) {
+    if (!isWinningHand(winningHand, this.jingTypes, isTsumo)) {
       throw new Error('Hand is not a winning hand');
     }
 
     const decompositions = decomposeHand(winningHand, this.jingTypes);
     const handType = this.detectHandType(decompositions, winnerSeat.openMelds, winningHand);
 
-    // Nanchang rule: Thirteen Misfits (十三烂) must be won by self-draw only.
+    // Defense-in-depth: isWinningHand already excludes Thirteen Misfits for non-tsumo
+    // evaluations, so this branch is only reachable via a direct engine call that bypasses
+    // the normal claim-window flow. Use GameRuleError so the API layer can reply to the
+    // client with a structured error instead of absorbing a generic exception.
     if (
       (handType === 'thirteen_misfits' || handType === 'seven_star_thirteen') &&
       winType !== 'tsumo'
     ) {
-      throw new Error('Thirteen Misfits must be won by self-draw (自摸) — ron is not allowed');
+      throw new GameRuleError(
+        'Thirteen Misfits (十三烂) must be won by self-draw — ron is not allowed',
+      );
     }
 
     const { naturals: winNaturals, jingCount: winJings } = separateJing(
