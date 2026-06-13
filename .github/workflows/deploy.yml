@@ -6,7 +6,9 @@ name: Deploy
 #   AWS_SECRET_ACCESS_KEY      — IAM deploy user secret key
 #   WEB_BUCKET_NAME            — S3 bucket for the React SPA (from CDK output)
 #   CLOUDFRONT_DISTRIBUTION_ID — CloudFront distribution (from CDK output)
-#   APP_RUNNER_SERVICE_ARN     — App Runner service ARN (from CDK output, set after Phase 2 deploy)
+#
+# ECS Fargate cluster and service names are hardcoded (nanchang / nanchang-api).
+# The deploy step is skipped when AWS credentials are absent (before Phase 2 CDK deploy).
 
 on:
   push:
@@ -47,13 +49,11 @@ jobs:
       - name: Check available secrets
         id: secrets
         run: |
-          [ -n "$AWS_KEY" ]         && echo "has_aws=true"       >> "$GITHUB_OUTPUT" || true
-          [ -n "$APP_RUNNER_ARN" ]  && echo "has_apprunner=true" >> "$GITHUB_OUTPUT" || true
-          [ -n "$WEB_BUCKET" ]      && echo "has_s3=true"        >> "$GITHUB_OUTPUT" || true
-          [ -n "$CF_DIST_ID" ]      && echo "has_cf=true"        >> "$GITHUB_OUTPUT" || true
+          [ -n "$AWS_KEY" ]    && echo "has_aws=true" >> "$GITHUB_OUTPUT" || true
+          [ -n "$WEB_BUCKET" ] && echo "has_s3=true"  >> "$GITHUB_OUTPUT" || true
+          [ -n "$CF_DIST_ID" ] && echo "has_cf=true"  >> "$GITHUB_OUTPUT" || true
         env:
           AWS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          APP_RUNNER_ARN: ${{ secrets.APP_RUNNER_SERVICE_ARN }}
           WEB_BUCKET: ${{ secrets.WEB_BUCKET_NAME }}
           CF_DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
 
@@ -93,17 +93,21 @@ jobs:
 
           echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
 
-      # ── API: trigger App Runner deployment ──────────────────────────────────
-      # App Runner pulls the :latest tag we just pushed.
-      # Skipped until APP_RUNNER_SERVICE_ARN is set (after CDK Phase 2 deploy).
-      - name: Deploy API via App Runner
-        if: >-
-          steps.secrets.outputs.has_aws == 'true' &&
-          steps.secrets.outputs.has_apprunner == 'true'
+      # ── API: trigger ECS Fargate redeployment ──────────────────────────────
+      # ECS does not auto-redeploy when a new :latest image is pushed to ECR.
+      # force-new-deployment stops the running task and starts a new one with
+      # the freshly-pushed :latest image.
+      # Skipped when AWS credentials are absent (before CDK Phase 2 deploy).
+      - name: Deploy API via ECS Fargate
+        if: steps.secrets.outputs.has_aws == 'true'
         run: |
-          aws apprunner start-deployment \
-            --service-arn "${{ secrets.APP_RUNNER_SERVICE_ARN }}"
-          echo "App Runner deployment triggered — service will restart with new image."
+          aws ecs update-service \
+            --cluster nanchang \
+            --service nanchang-api \
+            --force-new-deployment \
+            --region "${{ env.AWS_REGION }}" \
+          && echo "ECS Fargate redeployment triggered." \
+          || echo "ECS service not found yet (pre-Phase-2 deploy) — skipping."
 
       # ── Web: build the React SPA ────────────────────────────────────────────
       # VITE_API_BASE_URL is intentionally not set — the app uses the default '/api'

@@ -24,13 +24,12 @@ cdk bootstrap aws://123456789012/ap-east-1
 
 ---
 
-## §2 — Phase 1 CDK Deploy (infrastructure, no App Runner yet)
+## §2 — Phase 1 CDK Deploy (infrastructure, no ECS Fargate yet)
 
-This creates all infrastructure **except** the App Runner service, which requires a Docker image in ECR first.
+This creates all infrastructure **except** the ECS Fargate service, which requires a Docker image in ECR first.
 
 ```bash
-cd infra/aws
-npx cdk deploy NanchangProd
+pnpm --filter @nanchang/infra run cdk deploy NanchangProd
 ```
 
 Note the CloudFormation **Outputs** — you'll need them in §4 and §6:
@@ -84,23 +83,29 @@ docker push "${ECR_URI}:latest"
 
 ---
 
-## §5 — Phase 2 CDK Deploy (add App Runner + CloudFront API behaviors)
+## §5 — Phase 2 CDK Deploy (add ECS Fargate + CloudFront API behaviors)
 
-Now that ECR has an image, deploy the App Runner service:
+Now that ECR has an image, deploy the ECS Fargate service:
 
 ```bash
-cd infra/aws
-npx cdk deploy NanchangProd --context deployApi=true
+pnpm --filter @nanchang/infra run cdk deploy NanchangProd --context deployApi=true
 ```
+
+This creates:
+
+- ECS cluster `nanchang` in the default VPC
+- Fargate task definition (0.5 vCPU / 1 GB) with secrets injected from Secrets Manager
+- Application Load Balancer with HTTP listener on port 80
+- CloudFront behaviors for `/api/*` and `/socket.io*` pointing at the ALB
 
 Additional outputs appear:
 
-| Output key            | Used for                                                   |
-| --------------------- | ---------------------------------------------------------- |
-| `AppRunnerServiceArn` | GitHub secret `APP_RUNNER_SERVICE_ARN`                     |
-| `AppRunnerServiceUrl` | Direct API URL (debug only — use CloudFront URL for users) |
+| Output key             | Description                                                        |
+| ---------------------- | ------------------------------------------------------------------ |
+| `EcsFargateServiceArn` | ECS service ARN (for reference)                                    |
+| `AlbEndpoint`          | ALB DNS name — debug only, use CloudFront URL for all user traffic |
 
-Wait ~3 minutes for App Runner to start and pass its health check at `/health`.
+Wait ~3 minutes for the Fargate task to start and pass its health check at `/health`.
 
 ---
 
@@ -110,7 +115,7 @@ Wait ~3 minutes for App Runner to start and pass its health check at `/health`.
 # Create the user
 aws iam create-user --user-name nanchang-github-deploy
 
-# Attach a policy (inline — adjust as needed)
+# Attach a policy
 aws iam put-user-policy \
   --user-name nanchang-github-deploy \
   --policy-name NanchangDeploy \
@@ -133,8 +138,8 @@ aws iam put-user-policy \
       },
       {
         "Effect": "Allow",
-        "Action": ["apprunner:StartDeployment"],
-        "Resource": "<AppRunnerServiceArn from CDK output>"
+        "Action": ["ecs:UpdateService", "ecs:DescribeServices"],
+        "Resource": "arn:aws:ecs:ap-east-1:*:service/nanchang/nanchang-api"
       },
       {
         "Effect": "Allow",
@@ -169,17 +174,16 @@ In GitHub → repo → Settings → Secrets and variables → Actions → New re
 | `AWS_SECRET_ACCESS_KEY`      | From §6 `create-access-key` output |
 | `WEB_BUCKET_NAME`            | From CDK output                    |
 | `CLOUDFRONT_DISTRIBUTION_ID` | From CDK output                    |
-| `APP_RUNNER_SERVICE_ARN`     | From CDK output (Phase 2)          |
+
+The ECS cluster (`nanchang`) and service (`nanchang-api`) names are hardcoded in the workflow — no ARN secret needed.
 
 ---
 
 ## §8 — Seed the database (first admin user)
 
-```bash
-# SSH is not available on App Runner directly.
-# Run the seed script locally against production DynamoDB.
-# Ensure your local AWS credentials have DynamoDB write access to the prod table.
+Run the seed script locally against production DynamoDB. Your local AWS credentials need DynamoDB write access to the prod table.
 
+```bash
 AWS_REGION=ap-east-1 \
 DYNAMODB_TABLE_NAME=nanchang_main \
 NODE_ENV=development \
@@ -189,7 +193,6 @@ NODE_ENV=development \
 The seed script creates:
 
 - One admin invite code (printed to stdout — save it!)
-- (Optional) Initial admin user
 
 ---
 
@@ -207,21 +210,25 @@ The seed script creates:
 Every push to `main` triggers the GitHub Actions `deploy.yml` workflow automatically:
 
 1. Builds and pushes the Docker image to ECR
-2. Triggers App Runner to redeploy with the new image
+2. Calls `aws ecs update-service --force-new-deployment` — ECS stops the running task and starts a new one using the fresh `:latest` image
 3. Builds the React SPA with Vite
 4. Syncs to S3 and invalidates CloudFront
 
-Infrastructure changes (DynamoDB schema, new S3 buckets, etc.) still require a manual `cdk deploy`.
+Infrastructure changes (DynamoDB schema, new S3 buckets, CDK stack updates) still require a manual `cdk deploy`.
 
 ---
 
 ## Cost estimate (ap-east-1, <50 users)
 
-| Service                                      | Estimated monthly cost           |
-| -------------------------------------------- | -------------------------------- |
-| App Runner (0.5 vCPU / 1 GB, min 1 instance) | ~$12–18                          |
-| DynamoDB on-demand                           | ~$0 (free tier covers <50 users) |
-| S3 + CloudFront                              | ~$1–3                            |
-| Secrets Manager                              | ~$0.40 (4 secrets)               |
-| ECR                                          | ~$0.10                           |
-| **Total**                                    | **~$15–25 / month**              |
+| Service                                    | Estimated monthly cost           |
+| ------------------------------------------ | -------------------------------- |
+| ECS Fargate (0.5 vCPU / 1 GB, 1 task 24/7) | ~$14–18                          |
+| Application Load Balancer                  | ~$18 (LCU + hourly)              |
+| DynamoDB on-demand                         | ~$0 (free tier covers <50 users) |
+| S3 + CloudFront                            | ~$1–3                            |
+| Secrets Manager                            | ~$0.40 (4 secrets)               |
+| ECR                                        | ~$0.10                           |
+| CloudWatch Logs (30-day retention)         | ~$0.50                           |
+| **Total**                                  | **~$35–42 / month**              |
+
+Note: The ALB has a ~$18/month base cost. For a private family app with infrequent access, this is the dominant cost. The Fargate task itself is approximately $14/month at 0.5 vCPU / 1 GB.

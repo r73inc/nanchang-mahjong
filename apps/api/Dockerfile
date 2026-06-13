@@ -16,19 +16,16 @@ RUN pnpm --filter @nanchang/engine run build \
     && pnpm --filter @nanchang/shared run build \
     && pnpm --filter @nanchang/api run build
 
-# pnpm deploy creates a self-contained production directory.
-# It copies the API's prod deps + materialises workspace packages,
-# but skips gitignored dist/ directories — patch them back in after.
+# pnpm deploy --legacy creates a self-contained production directory.
+# Because @nanchang/engine, @nanchang/shared, and zod are declared in
+# apps/api/package.json, pnpm includes them and all their transitive npm deps
+# (e.g. zod) in /standalone/node_modules.
+# In --legacy mode pnpm hard-links workspace package files (including already-
+# built dist/) directly, so no manual cp of shared/engine dirs is needed.
+# Only the API's own dist (gitignored, not part of the package deploy) needs
+# to be added manually.
 RUN pnpm --filter @nanchang/api deploy --legacy --prod /standalone \
-    && cp -r apps/api/dist /standalone/dist \
-    && rm -rf /standalone/node_modules/@nanchang/engine \
-       /standalone/node_modules/@nanchang/shared \
-    && mkdir -p /standalone/node_modules/@nanchang/engine \
-    && cp -r packages/engine/dist /standalone/node_modules/@nanchang/engine/ \
-    && cp packages/engine/package.json /standalone/node_modules/@nanchang/engine/ \
-    && mkdir -p /standalone/node_modules/@nanchang/shared \
-    && cp -r packages/shared/dist /standalone/node_modules/@nanchang/shared/ \
-    && cp packages/shared/package.json /standalone/node_modules/@nanchang/shared/
+    && cp -r apps/api/dist /standalone/dist
 
 # ─── Stage 2: minimal production image ───────────────────────────────────────
 FROM node:22-alpine AS runner

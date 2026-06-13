@@ -2,8 +2,12 @@ import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as ecsPatterns from 'aws-cdk-lib/aws-ecs-patterns';
+import * as elb2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as apprunner from 'aws-cdk-lib/aws-apprunner';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -12,9 +16,11 @@ import { Construct } from 'constructs';
 /**
  * NanchangStack — full production infrastructure for ap-east-1 (Hong Kong).
  *
+ * REQUIREMENT: This app MUST be deployed in ap-east-1 (Hong Kong). No other region.
+ *
  * Deploy in two phases to avoid the ECR chicken-and-egg problem:
  *
- *   Phase 1 — infrastructure only (no App Runner, ECR repo created):
+ *   Phase 1 — infrastructure only (ECS Fargate service not yet created):
  *     cdk deploy
  *
  *   Phase 2 — after pushing the first Docker image to ECR:
@@ -29,18 +35,18 @@ import { Construct } from 'constructs';
  *   - S3 web bucket (private, served via CloudFront OAC)
  *   - ECR repository for the NestJS API Docker image
  *   - Secrets Manager (JWT secrets auto-generated; VAPID keys require manual update)
- *   - App Runner service (only when deployApi=true context is set)
+ *   - ECS Fargate service behind an HTTP ALB (only when deployApi=true)
  *   - CloudFront distribution:
  *       /* → S3 web bucket (SPA, serves index.html on 403/404)
- *       /api/* → App Runner (CloudFront Function strips /api prefix)
- *       /socket.io* → App Runner (WebSocket capable)
- *   - IAM roles: ECR access role + App Runner instance role
+ *       /api/* → ECS Fargate ALB (CloudFront Function strips /api prefix)
+ *       /socket.io* → ECS Fargate ALB (WebSocket capable)
+ *   - IAM roles: ECS execution role + task role
  */
 export class NanchangStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Whether to create the App Runner service + API CloudFront behaviors.
+    // Whether to create the ECS Fargate service + API CloudFront behaviors.
     // Set to false on first deploy (ECR image doesn't exist yet).
     // Set to true after pushing the first Docker image: cdk deploy --context deployApi=true
     const deployApi = this.node.tryGetContext('deployApi') === 'true';
@@ -54,7 +60,7 @@ export class NanchangStack extends cdk.Stack {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecovery: true,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
       timeToLiveAttribute: 'ttl',
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
@@ -147,7 +153,7 @@ export class NanchangStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
-    // VAPID keys must be generated externally and stored here before App Runner starts.
+    // VAPID keys must be generated externally and stored here before ECS Fargate starts.
     // Generate with: npx web-push generate-vapid-keys
     // Then update this secret in the AWS console with a JSON object:
     //   { "publicKey": "...", "privateKey": "..." }
@@ -167,39 +173,36 @@ export class NanchangStack extends cdk.Stack {
 
     // ── IAM Roles ─────────────────────────────────────────────────────────────
 
-    // ECR access role — used by the App Runner control plane to pull images
-    // and to inject Secrets Manager values at container startup.
-    const ecrAccessRole = new iam.Role(this, 'AppRunnerEcrRole', {
-      roleName: 'nanchang-apprunner-ecr-access',
-      assumedBy: new iam.ServicePrincipal('build.apprunner.amazonaws.com'),
+    // ECS Task Execution Role — used by ECS to pull images from ECR and inject
+    // Secrets Manager values at container startup.
+    const executionRole = new iam.Role(this, 'EcsExecutionRole', {
+      roleName: 'nanchang-ecs-execution',
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          'service-role/AWSAppRunnerServicePolicyForECRAccess',
-        ),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'),
       ],
     });
-    // Secrets Manager reads are done by the App Runner service on startup,
-    // using the ECR access role (not the instance role).
-    jwtSecret.grantRead(ecrAccessRole);
-    jwtRefreshSecret.grantRead(ecrAccessRole);
-    vapidKeys.grantRead(ecrAccessRole);
+    ecrRepo.grantPull(executionRole);
+    jwtSecret.grantRead(executionRole);
+    jwtRefreshSecret.grantRead(executionRole);
+    vapidKeys.grantRead(executionRole);
 
-    // Instance role — assumed by the running Node.js process inside App Runner
-    const instanceRole = new iam.Role(this, 'AppRunnerInstanceRole', {
-      roleName: 'nanchang-apprunner-instance',
-      assumedBy: new iam.ServicePrincipal('tasks.apprunner.amazonaws.com'),
+    // ECS Task Role — assumed by the running Node.js process inside the container.
+    const taskRole = new iam.Role(this, 'EcsTaskRole', {
+      roleName: 'nanchang-ecs-task',
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
-    table.grantReadWriteData(instanceRole);
-    replayBucket.grantReadWrite(instanceRole);
-    avatarBucket.grantReadWrite(instanceRole);
+    table.grantReadWriteData(taskRole);
+    replayBucket.grantReadWrite(taskRole);
+    avatarBucket.grantReadWrite(taskRole);
 
     // ── CloudFront Function: strip /api prefix ─────────────────────────────────
     // The NestJS API routes live at /auth/..., /users/..., etc. — no /api prefix.
-    // The React app calls /api/... which CloudFront routes to App Runner.
+    // The React app calls /api/... which CloudFront routes to the Fargate ALB.
     // This function rewrites /api/foo → /foo before the request reaches the origin.
     const stripApiPrefixFn = new cloudfront.Function(this, 'StripApiPrefix', {
       functionName: 'nanchang-strip-api-prefix',
-      comment: 'Strips the /api prefix from requests destined for App Runner',
+      comment: 'Strips the /api prefix from requests destined for ECS Fargate',
       code: cloudfront.FunctionCode.fromInline(
         [
           'function handler(event) {',
@@ -217,83 +220,103 @@ export class NanchangStack extends cdk.Stack {
 
     // ── CloudFront Distribution ────────────────────────────────────────────────
     // Default behavior: S3 (static SPA). Additional behaviors for API traffic
-    // are added only when deployApi=true (App Runner URL becomes available).
+    // are added only when deployApi=true (ALB endpoint becomes available).
 
     const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {};
 
-    let appRunnerServiceUrl: string | undefined;
-    let apiService: apprunner.CfnService | undefined;
+    let fargateService: ecsPatterns.ApplicationLoadBalancedFargateService | undefined;
 
     if (deployApi) {
-      apiService = new apprunner.CfnService(this, 'ApiService', {
-        serviceName: 'nanchang-api',
-        sourceConfiguration: {
-          authenticationConfiguration: {
-            accessRoleArn: ecrAccessRole.roleArn,
-          },
-          // GitHub Actions triggers explicit deployments; we don't want ECR push
-          // events to auto-deploy (it would race with the frontend S3 sync).
-          autoDeploymentsEnabled: false,
-          imageRepository: {
-            imageIdentifier: `${ecrRepo.repositoryUri}:latest`,
-            imageRepositoryType: 'ECR',
-            imageConfiguration: {
-              port: '3001',
-              runtimeEnvironmentVariables: [
-                { name: 'NODE_ENV', value: 'production' },
-                { name: 'PORT', value: '3001' },
-                { name: 'AWS_REGION', value: this.region },
-                { name: 'DYNAMODB_TABLE_NAME', value: table.tableName },
-                { name: 'S3_REPLAY_BUCKET', value: replayBucket.bucketName },
-                { name: 'S3_AVATAR_BUCKET', value: avatarBucket.bucketName },
-                { name: 'JWT_EXPIRES_IN', value: '1h' },
-                { name: 'JWT_REFRESH_EXPIRES_IN', value: '30d' },
-                // Update to your real contact email post-deploy
-                { name: 'VAPID_SUBJECT', value: 'mailto:admin@example.com' },
-              ],
-              runtimeEnvironmentSecrets: [
-                { name: 'JWT_SECRET', value: jwtSecret.secretArn },
-                { name: 'JWT_REFRESH_SECRET', value: jwtRefreshSecret.secretArn },
-                // JSON key syntax: <secret-arn>:<json-key>::
-                { name: 'VAPID_PUBLIC_KEY', value: `${vapidKeys.secretArn}:publicKey::` },
-                { name: 'VAPID_PRIVATE_KEY', value: `${vapidKeys.secretArn}:privateKey::` },
-              ],
-            },
-          },
+      // Look up the default VPC — all subnets are public (routes to IGW).
+      // CDK caches the lookup result in cdk.context.json; commit that file.
+      const vpc = ec2.Vpc.fromLookup(this, 'DefaultVpc', { isDefault: true });
+
+      const cluster = new ecs.Cluster(this, 'NanchangCluster', {
+        vpc,
+        clusterName: 'nanchang',
+      });
+
+      const logGroup = new logs.LogGroup(this, 'ApiLogGroup', {
+        logGroupName: '/ecs/nanchang-api',
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      });
+
+      const taskDefinition = new ecs.FargateTaskDefinition(this, 'ApiTaskDef', {
+        cpu: 512,
+        memoryLimitMiB: 1024,
+        executionRole,
+        taskRole,
+      });
+
+      taskDefinition.addContainer('api', {
+        image: ecs.ContainerImage.fromEcrRepository(ecrRepo, 'latest'),
+        portMappings: [{ containerPort: 3001 }],
+        environment: {
+          NODE_ENV: 'production',
+          PORT: '3001',
+          AWS_REGION: this.region,
+          DYNAMODB_TABLE_NAME: table.tableName,
+          S3_REPLAY_BUCKET: replayBucket.bucketName,
+          S3_AVATAR_BUCKET: avatarBucket.bucketName,
+          JWT_EXPIRES_IN: '1h',
+          JWT_REFRESH_EXPIRES_IN: '30d',
+          VAPID_SUBJECT: 'mailto:r73inc@gmail.com',
         },
-        instanceConfiguration: {
-          // 0.5 vCPU / 1 GB — comfortable headroom for NestJS + Socket.IO under low load
-          cpu: '0.5 vCPU',
-          memory: '1 GB',
-          instanceRoleArn: instanceRole.roleArn,
+        secrets: {
+          JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
+          JWT_REFRESH_SECRET: ecs.Secret.fromSecretsManager(jwtRefreshSecret),
+          VAPID_PUBLIC_KEY: ecs.Secret.fromSecretsManager(vapidKeys, 'publicKey'),
+          VAPID_PRIVATE_KEY: ecs.Secret.fromSecretsManager(vapidKeys, 'privateKey'),
         },
-        autoScalingConfigurationArn: undefined, // uses App Runner default (max 25)
-        healthCheckConfiguration: {
-          path: '/health',
-          protocol: 'HTTP',
-          interval: 10,
-          timeout: 5,
-          healthyThreshold: 1,
-          unhealthyThreshold: 5,
-        },
-        networkConfiguration: {
-          // 1 = always keep at least one instance warm (avoids cold starts for WS)
-          ingressConfiguration: { isPubliclyAccessible: true },
+        logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'api', logGroup }),
+        healthCheck: {
+          command: ['CMD-SHELL', 'wget -qO- http://localhost:3001/health || exit 1'],
+          interval: cdk.Duration.seconds(10),
+          timeout: cdk.Duration.seconds(5),
+          retries: 3,
+          startPeriod: cdk.Duration.seconds(30),
         },
       });
 
-      // App Runner returns the URL as "https://xyz.ap-east-1.awsapprunner.com"
-      // CloudFront HttpOrigin needs just the hostname (no protocol).
-      appRunnerServiceUrl = cdk.Fn.select(1, cdk.Fn.split('://', apiService.attrServiceUrl));
+      // HTTP ALB + Fargate in public subnets with public IPs (no NAT gateway cost).
+      // CloudFront sits in front and handles HTTPS termination.
+      fargateService = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'ApiService', {
+        cluster,
+        taskDefinition,
+        serviceName: 'nanchang-api',
+        desiredCount: 1,
+        publicLoadBalancer: true,
+        assignPublicIp: true,
+        taskSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+        listenerPort: 80,
+        protocol: elb2.ApplicationProtocol.HTTP,
+        circuitBreaker: { rollback: true },
+        healthCheckGracePeriod: cdk.Duration.seconds(60),
+        minHealthyPercent: 100,
+        maxHealthyPercent: 200,
+      });
 
-      const apiOrigin = new origins.HttpOrigin(appRunnerServiceUrl, {
-        protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+      fargateService.targetGroup.configureHealthCheck({
+        path: '/health',
+        protocol: elb2.Protocol.HTTP,
+        port: '3001',
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 3,
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(10),
+      });
+
+      // CloudFront → ALB via HTTP (CloudFront handles the HTTPS leg to clients).
+      const apiOrigin = new origins.HttpOrigin(fargateService.loadBalancer.loadBalancerDnsName, {
+        protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+        httpPort: 80,
       });
 
       const apiCachePolicy = cloudfront.CachePolicy.CACHING_DISABLED;
       // ALL_VIEWER_EXCEPT_HOST_HEADER forwards all viewer headers (including the
       // Upgrade/Connection headers needed for WebSocket handshakes) while replacing
-      // Host with the origin hostname so App Runner doesn't reject the request.
+      // Host with the origin hostname so the ALB doesn't reject the request.
       const apiRequestPolicy = cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER;
 
       additionalBehaviors['/api/*'] = {
@@ -357,7 +380,7 @@ export class NanchangStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'CloudFrontUrl', {
       value: `https://${distribution.distributionDomainName}`,
-      description: 'Primary app URL (set as VITE_API_BASE_URL if needed)',
+      description: 'Primary app URL',
     });
 
     new cdk.CfnOutput(this, 'CloudFrontDistributionId', {
@@ -377,7 +400,7 @@ export class NanchangStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'DynamoTableName', {
       value: table.tableName,
-      description: 'DynamoDB table (already set in App Runner env vars)',
+      description: 'DynamoDB table name',
     });
 
     new cdk.CfnOutput(this, 'VapidKeysSecretArn', {
@@ -385,15 +408,16 @@ export class NanchangStack extends cdk.Stack {
       description: 'Update this secret with real VAPID keys before enabling push',
     });
 
-    if (apiService) {
-      new cdk.CfnOutput(this, 'AppRunnerServiceArn', {
-        value: apiService.attrServiceArn,
-        description: 'GitHub secret: APP_RUNNER_SERVICE_ARN',
+    if (fargateService) {
+      new cdk.CfnOutput(this, 'EcsFargateServiceArn', {
+        value: fargateService.service.serviceArn,
+        description:
+          'ECS Fargate service ARN — use cluster=nanchang service=nanchang-api for updates',
       });
 
-      new cdk.CfnOutput(this, 'AppRunnerServiceUrl', {
-        value: apiService.attrServiceUrl,
-        description: 'Direct API URL (not needed — traffic goes through CloudFront)',
+      new cdk.CfnOutput(this, 'AlbEndpoint', {
+        value: fargateService.loadBalancer.loadBalancerDnsName,
+        description: 'ALB DNS name — traffic goes through CloudFront, not here directly',
       });
     }
   }
