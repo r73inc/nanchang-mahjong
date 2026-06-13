@@ -8,22 +8,24 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## Quick Reference
 
-| ID      | Name                                  | Summary                                                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-08  | Viewer discards invisible (3D)        | Viewer's own discard pile not visible on the 3D table                                 |
-| BUG-09  | TileWall3D needs redesign (3D)        | TileWall removed due to red Back.svg background; needs neutral replacement            |
-| BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC)   | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph      | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-028 | Drop "You" labels everywhere          | Highlight already identifies the viewer; redundant "You" tags should be removed       |
-| IMP-029 | Settlement tiles in dropdown          | Show a tile glyph per settlement tile each player holds in the expanded breakdown     |
-| IMP-030 | Use winner name as detail heading     | Replace generic "Someone Won!" title with the actual winning player's name            |
-| IMP-031 | Rank + score breakdown at hand end    | Sort players by points gained (desc) and add a per-player score breakdown dropdown    |
-| IMP-032 | Global sound toggle                   | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-033 | Learn page: textures + content audit  | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
-| IMP-034 | Customize page: texture tile preview  | Tile palette preview strip still uses legacy text tiles; migrate to MahjongTile2D     |
-| IMP-035 | Replay page: migrate to tile textures | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
-| IMP-036 | History & replays are undiscoverable  | History page is not linked from any in-app navigation; players cannot find replays    |
+| ID      | Name                                   | Summary                                                                               |
+| ------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
+| BUG-08  | Viewer discards invisible (3D)         | Viewer's own discard pile not visible on the 3D table                                 |
+| BUG-09  | TileWall3D needs redesign (3D)         | TileWall removed due to red Back.svg background; needs neutral replacement            |
+| BUG-045 | Bot dice roll animation not visible    | Bot roll animation and result flash by in under a frame; human roll works correctly   |
+| BUG-049 | Hand not visible in settlement (PC)    | On desktop, the player cannot see their own hand during the settlement phase          |
+| BUG-050 | Spirit settlement uses old glyph       | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
+| IMP-028 | Drop "You" labels everywhere           | Highlight already identifies the viewer; redundant "You" tags should be removed       |
+| IMP-029 | Settlement tiles in dropdown           | Show a tile glyph per settlement tile each player holds in the expanded breakdown     |
+| IMP-030 | Use winner name as detail heading      | Replace generic "Someone Won!" title with the actual winning player's name            |
+| IMP-031 | Rank + score breakdown at hand end     | Sort players by points gained (desc) and add a per-player score breakdown dropdown    |
+| IMP-032 | Global sound toggle                    | Add an always-available sound on/off toggle next to the language toggle               |
+| IMP-033 | Learn page: textures + content audit   | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
+| IMP-034 | Customize page: texture tile preview   | Tile palette preview strip still uses legacy text tiles; migrate to MahjongTile2D     |
+| IMP-035 | Replay page: migrate to tile textures  | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
+| IMP-036 | History & replays are undiscoverable   | History page is not linked from any in-app navigation; players cannot find replays    |
+| BUG-051 | Jing tiles transformed in hand reveal  | Wildcards silently replaced by the tile they substituted; must never be transformed   |
+| BUG-052 | 精 label misaligns jing tiles (mobile) | Jing label adds height below tile, breaking flex alignment in meld groups on mobile   |
 
 ---
 
@@ -110,6 +112,57 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 - `apps/web/src/pages/game/game-page.tsx:543-544` — spirit-count rows rendering `${JING_CHAR}${MULT_CHAR}${counts.primary}` etc.
 
 **Fix needed:** Remove the `节` glyph entirely (it is incorrect). Render the spirit tile itself as `MahjongTile2D` (size `xs`, `isJing`) followed by the `×N` count, matching the tile-texture treatment used in the rest of the reveal screen. Per CLAUDE.md, all tiles must use `MahjongTile2D`. The `JING_CHAR` constant can be retired once it has no remaining usages.
+
+---
+
+### BUG-051 · Jing/wildcard tiles silently transformed in the hand reveal meld display
+
+**Symptom:** In the end-of-round hand reveal screen, when a wildcard (jing) tile completed a meld, that tile is displayed as the natural tile it substituted rather than as its actual identity. For example, if a primary jing tile completed a pung of `2m`, the meld renders three `2m` tiles — the wildcard tile has vanished. Tiles must **never** be transformed in any way in this game. The wildcard must be shown as what it actually is.
+
+**Status:** OPEN
+
+**Root cause — engine:** `tryMelds` in `packages/engine/src/hand.ts` fills wildcard positions by writing the target natural tile into the meld's `tiles` array. Pung wildcards at lines 120–125 and 131–135 produce `[first, first, first]` regardless of how many actual jing tiles were used; chow wildcards in `tryChow` (line 75) produce `[t1, t2, t3]` (the natural sequence). The wildcard tile's type identity is never recorded. `decomposeConcealed` (called from `game-page.tsx:642`) inherits this — the returned `Decomposition.melds[].tiles` arrays contain only natural tile types.
+
+**Root cause — display:** `HandRevealScreen` in `apps/web/src/pages/game/game-page.tsx:641–651` uses `decomp.melds[i].tiles` directly to render each group. The `isJing()` check (line 632–633) tests whether a tile's type matches the jing primary/secondary types; since the substituted tiles are natural types, the check returns `false` and the tiles get no gold treatment either — both the identity and the wildcard indicator are lost.
+
+**Fix required — display level (preferred, no engine change):**
+
+After calling `decomposeConcealed(hand, jingTypes)`, reconstruct each meld's tile array by matching from the **original hand** (which contains the actual jing tile types). Algorithm:
+
+1. Copy `hand` into a mutable pool: `let pool = [...hand]`.
+2. For each meld in `decomp.melds`:
+   - For each tile position in `meld.tiles` (the substituted/natural version):
+     - If that natural tile exists in `pool` AND is not a jing type → take it from `pool`.
+     - Otherwise → take a jing tile from `pool` (primary first, then secondary).
+   - Collect the resulting tile types as the rendered meld tiles.
+3. Apply the same logic to the pair: `[decomp.pair, decomp.pair]` → match from remaining `pool`, replacing one slot with a jing tile when `decomp.jingPair === true`.
+
+This reconstruction is purely a display-layer concern and does not affect game logic, scoring, or the engine.
+
+**Where to change:**
+
+- `apps/web/src/pages/game/game-page.tsx:641–651` — replace the direct `decomp.melds.map(m => ({ tiles: [...m.tiles] }))` with the reconstruction function above.
+- Add a helper `reconstructMeldTiles(decomp, hand, jingTypes)` near the `greedyGroupHand` helper (around line 343) so the IIFE stays readable.
+
+**Note:** Once tiles are correctly preserved, `isJing(tile)` will return `true` for jing tiles in the correct positions and the gold border/glow treatment (`MahjongTile2D` `isJing` prop) will work automatically without any additional changes.
+
+---
+
+### BUG-052 · 精 label below jing tiles breaks vertical alignment in meld groups on mobile
+
+**Symptom:** On mobile (narrow viewport), in the end-of-round hand reveal screen, when a meld contains a jing (wildcard) tile, the tiles within the meld group do not line up correctly. The jing tile sits lower or the row height is uneven compared to adjacent natural tiles.
+
+**Status:** OPEN
+
+**Root cause:** `MahjongTile2D` renders the `精` character in a `flex-column` beneath the tile face when `isJing={true}` and `showJingLabel={true}` (the default) — see `apps/web/src/components/2d/MahjongTile2D.tsx:308–321`. This adds extra height to the jing tile's container. Inside the meld row (`<div className="flex gap-0.5">` in `game-page.tsx:682`), this taller container misaligns tiles on mobile where tile sizes are small and the label's pixel height is significant relative to tile height.
+
+**Fix options (pick one):**
+
+1. **Suppress the label in meld context (simplest):** Pass `showJingLabel={false}` to all `MahjongTile2D` calls inside the hand reveal meld groups (lines 684–691 and 702–709 of `game-page.tsx`). The gold border + glow from `isJing={true}` still clearly identifies wildcards. This is the recommended fix — the label is redundant when the tile's own gold treatment makes it obvious.
+
+2. **Absolutely position the label:** In `MahjongTile2D.tsx:308–321`, change the `精` span to `position: absolute; bottom: calc(100% + 2px)` (or below) so it floats outside the tile's flow height and does not contribute to the container's layout dimensions. This fixes alignment globally but risks the label being clipped by ancestor `overflow: hidden` containers.
+
+**Dependency:** Fix BUG-051 first — once wildcards display as actual jing tiles, the gold glow alone is sufficient to identify them. Option 1 (suppress label) is then the right call and BUG-052 is trivially resolved by passing `showJingLabel={false}` in the meld context.
 
 ---
 
