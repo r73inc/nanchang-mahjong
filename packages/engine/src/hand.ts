@@ -183,10 +183,13 @@ function tryMelds(
 // ── Seven Pairs ───────────────────────────────────────────────────────────────
 
 /**
- * Check if `hand` can form Seven Pairs. Allows at most ONE Jing pair.
- * Each pair must otherwise have 2 natural tiles (or 1 natural + 1 Jing).
+ * Check if `hand` can form Seven Pairs (小七对).
+ *
+ * Nanchang rules: 4 identical tiles count as 2 pairs. No "distinct pairs"
+ * restriction. Jing tiles fill singletons as wildcards; pure-jing pairs also
+ * count. Exported so engine.ts prefers Seven Pairs over standard decomposition.
  */
-function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
+export function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
   if (naturals.length + jingCount !== 14) return false;
 
   const counts = new Map<TileType, number>();
@@ -195,15 +198,13 @@ function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
   let pairs = 0;
   let singles = 0;
   for (const cnt of counts.values()) {
-    // Seven Pairs requires 7 DISTINCT pairs — each tile type contributes at most 1 pair.
-    // 3+ copies of the same type wastes the extras and makes Seven Pairs impossible.
-    if (cnt > 2) return false;
-    pairs += Math.floor(cnt / 2); // 2 → 1 pair; 1 → 0 pairs
-    singles += cnt % 2; // 1 → 1 single; 2 → 0 singles
+    // Nanchang rule: 4 identical tiles count as 2 pairs (floor(4/2)=2).
+    // No "distinct pairs" restriction — that is a Japanese Chiitoitsu rule.
+    pairs += Math.floor(cnt / 2);
+    singles += cnt % 2;
   }
 
   // Each single natural tile needs 1 jing to become a pair
-  // We also allow at most 1 "full jing pair" (both tiles are jing)
   if (jingCount < singles) return false;
   const jingsForSingles = singles;
   const jingsLeft = jingCount - jingsForSingles;
@@ -215,23 +216,27 @@ function checkSevenPairs(naturals: TileType[], jingCount: number): boolean {
 // ── Thirteen Misfits (十三烂) ─────────────────────────────────────────────────
 
 /**
- * Check if the hand qualifies as Thirteen Misfits (十三烂):
- *   - Must be fully natural (no Jing wildcards).
- *   - All honor tiles must be unique (no duplicate wind or dragon types).
+ * Check if the hand qualifies as Thirteen Misfits (十三烂).
+ *
+ * Checks tile face values directly — Jing tiles sitting in valid misfit positions
+ * count as their natural type, not as wildcards. Nanchang rules do not prohibit
+ * Jing tiles from appearing in a Thirteen Misfits hand.
+ *
+ * Requirements:
+ *   - All honor tiles must be unique (no duplicate winds or dragons).
  *   - Within each suit, adjacent tile ranks (when sorted) must have a gap > 2.
- *     Example: 1, 4, 7 is valid (gaps of 3); 1, 3, 5 is not (gap of 2).
+ *     Example: 1, 4, 7 is valid (gaps of 3); 1, 3, 5 is invalid (gap of 2).
  */
-function checkThirteenMisfits(naturals: TileType[], jingCount: number): boolean {
-  if (naturals.length + jingCount !== 14) return false;
-  if (jingCount > 0) return false; // wildcards cannot be used in Thirteen Misfits
+function checkThirteenMisfits(hand: TileType[]): boolean {
+  if (hand.length !== 14) return false;
 
   // All honor tiles must be unique
-  const honors = naturals.filter(isHonor);
+  const honors = hand.filter(isHonor);
   if (honors.length !== new Set(honors).size) return false;
 
   // Within each suit, sorted adjacent ranks must have gap > 2
   for (const suit of ['m', 'p', 's'] as const) {
-    const ranks = naturals
+    const ranks = hand
       .filter((t) => !isHonor(t) && t[1] === suit)
       .map((t) => getRank(t)!)
       .sort((a, b) => a - b);
@@ -321,19 +326,30 @@ export function decomposeConcealed(hand: TileType[], jingTypes: TileType[]): Dec
 /**
  * True if `hand` (exactly 14 TileTypes) is a winning hand.
  * Handles: standard 4-meld+pair, Seven Pairs, Thirteen Misfits.
+ *
+ * @param isSelfDraw - Pass `true` when evaluating a self-drawn tile (tsumo).
+ *   Thirteen Misfits (十三烂) is only a valid winning hand by self-draw —
+ *   passing `false` (or omitting) correctly excludes it from ron evaluations
+ *   so the "Hu" button is never offered when an opponent discards.
  */
-export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean {
+export function isWinningHand(
+  hand: TileType[],
+  jingTypes: TileType[],
+  isSelfDraw = false,
+): boolean {
   if (hand.length !== 14) return false;
 
   // Standard decomposition
   if (decomposeHand(hand, jingTypes).length > 0) return true;
 
-  // Seven Pairs
+  // Seven Pairs (jing-aware: wildcards can complete the 7th pair)
   const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (checkSevenPairs(naturals, jingCount)) return true;
 
-  // Thirteen Misfits
-  if (checkThirteenMisfits(naturals, jingCount)) return true;
+  // Thirteen Misfits — self-draw only (Nanchang rule).
+  // Checked against raw tile face values so Jing tiles at valid misfit
+  // positions count naturally rather than as wildcards.
+  if (isSelfDraw && checkThirteenMisfits(hand)) return true;
 
   return false;
 }
@@ -347,8 +363,9 @@ export function isWinningHand(hand: TileType[], jingTypes: TileType[]): boolean 
 export function shantenNumber(hand: TileType[], jingTypes: TileType[]): number {
   if (hand.length < 13) return 8;
 
-  // Winning?
-  if (hand.length === 14 && isWinningHand(hand, jingTypes)) return -1;
+  // Winning? Shanten is a theoretical property of the hand shape, so Thirteen
+  // Misfits qualifies as -1 regardless of win mechanism (pass isSelfDraw=true).
+  if (hand.length === 14 && isWinningHand(hand, jingTypes, true)) return -1;
 
   const { naturals, jingCount } = separateJing(hand, jingTypes);
 

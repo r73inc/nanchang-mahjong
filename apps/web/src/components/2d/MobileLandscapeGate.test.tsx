@@ -48,11 +48,14 @@ describe('MobileLandscapeGate', () => {
     expect(onRequestNative).toHaveBeenCalledTimes(1);
   });
 
-  it('Gate·css-landscape: renders children inside ForcedLandscapeWrapper when css-landscape', () => {
+  it('Gate·css-landscape: renders children as passthrough when css-landscape', () => {
+    // ForcedLandscapeWrapper is now applied at the GameTable level (game-page.tsx)
+    // so all overlays rotate together with the game surface. MobileLandscapeGate
+    // is a plain passthrough for css-landscape.
     renderGate('css-landscape');
     expect(screen.getByTestId('game-content')).toBeInTheDocument();
-    // The wrapper div should carry the landscape class.
+    expect(screen.queryByTestId('mobile-tap-to-play-overlay')).not.toBeInTheDocument();
     const container = screen.getByTestId('game-content').parentElement;
-    expect(container?.className).toContain('mj-landscape-wrapper');
+    expect(container?.className).not.toContain('mj-landscape-wrapper');
   });
 });

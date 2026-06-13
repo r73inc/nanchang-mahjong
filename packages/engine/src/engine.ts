@@ -24,7 +24,8 @@ import {
   swapStackTiles,
 } from './wall';
 import { jingTypesFromIndicator, separateJing } from './jing';
-import { isWinningHand, decomposeHand } from './hand';
+import { isWinningHand, decomposeHand, checkSevenPairs } from './hand';
+import { GameRuleError } from './errors';
 import {
   canPung,
   canKongFromDiscard,
@@ -313,20 +314,26 @@ export class GameEngine {
         );
         if (allPungsDecomp) return 'all_triplets';
       }
+
+      // Seven Pairs (小七对): a concealed hand with 7 distinct pairs may also admit a
+      // standard chow decomposition (e.g. two pairs of consecutive tiles). Prefer
+      // 'seven_pairs' (×2) over 'standard' (×1) when the hand qualifies.
+      if (openMelds.length === 0) {
+        const { naturals, jingCount } = separateJing(fullHand, this.jingTypes);
+        if (checkSevenPairs(naturals, jingCount)) return 'seven_pairs';
+      }
+
       return 'standard';
     }
 
-    // No standard decomposition → Seven Pairs or Thirteen Misfits
-    const counts = new Map<TileType, number>();
-    for (const t of fullHand) counts.set(t, (counts.get(t) ?? 0) + 1);
+    // No standard decomposition → Seven Pairs, Thirteen Misfits, or Seven Star Thirteen Misfits.
+    // Use the proper jing-aware check (checkSevenPairs handles jing wildcards completing a pair).
+    const { naturals, jingCount } = separateJing(fullHand, this.jingTypes);
+    if (checkSevenPairs(naturals, jingCount)) return 'seven_pairs';
 
-    // Seven Pairs: at least 7 tile types each appearing ≥2 times
-    const pairCombos = [...counts.values()].filter((c) => c >= 2).length;
-    if (pairCombos >= 7) return 'seven_pairs';
-
-    // Thirteen Misfits: check for Seven Star variant (all 7 unique honors present)
-    const honors: TileType[] = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai'];
-    const hasAllHonors = honors.every((h) => fullHand.includes(h));
+    // Must be Thirteen Misfits — check for Seven Star variant (all 7 unique honors present)
+    const HONORS: TileType[] = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai'];
+    const hasAllHonors = HONORS.every((h) => fullHand.includes(h));
     return hasAllHonors ? 'seven_star_thirteen' : 'thirteen_misfits';
   }
 
@@ -697,15 +704,45 @@ export class GameEngine {
       ...(isRobKong && robTile ? [robTile] : []),
     ];
 
-    if (!isWinningHand(winningHand, this.jingTypes)) {
+    if (!isWinningHand(winningHand, this.jingTypes, isTsumo)) {
       throw new Error('Hand is not a winning hand');
     }
 
     const decompositions = decomposeHand(winningHand, this.jingTypes);
     const handType = this.detectHandType(decompositions, winnerSeat.openMelds, winningHand);
 
-    const { jingCount: winJings } = separateJing(winningHand, this.jingTypes);
-    const isGerman = winJings === 0;
+    // Defense-in-depth: isWinningHand already excludes Thirteen Misfits for non-tsumo
+    // evaluations, so this branch is only reachable via a direct engine call that bypasses
+    // the normal claim-window flow. Use GameRuleError so the API layer can reply to the
+    // client with a structured error instead of absorbing a generic exception.
+    if (
+      (handType === 'thirteen_misfits' || handType === 'seven_star_thirteen') &&
+      winType !== 'tsumo'
+    ) {
+      throw new GameRuleError(
+        'Thirteen Misfits (十三烂) must be won by self-draw — ron is not allowed',
+      );
+    }
+
+    const { naturals: winNaturals, jingCount: winJings } = separateJing(
+      winningHand,
+      this.jingTypes,
+    );
+
+    let isGerman: boolean;
+    if (handType === 'thirteen_misfits' || handType === 'seven_star_thirteen') {
+      // Face-value pattern — no tile acts as a wildcard by definition.
+      isGerman = true;
+    } else if (handType === 'seven_pairs') {
+      // German if no Jing was used as a wildcard to complete a natural singleton.
+      // Pure-jing pairs (both tiles are the Jing at face value) are NOT wildcard use.
+      const naturalCounts = new Map<TileType, number>();
+      for (const t of winNaturals) naturalCounts.set(t, (naturalCounts.get(t) ?? 0) + 1);
+      const singles = [...naturalCounts.values()].reduce((sum, c) => sum + (c % 2), 0);
+      isGerman = singles === 0;
+    } else {
+      isGerman = winJings === 0;
+    }
 
     // Heavenly Win: tsumo before any discard or draw has occurred
     const isHeavenlyWin =

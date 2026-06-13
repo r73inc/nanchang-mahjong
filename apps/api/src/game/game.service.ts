@@ -31,6 +31,7 @@ import {
   rollDice,
   diceSum,
   DICE_SALT,
+  GameRuleError,
 } from '@nanchang/engine';
 import type { BotClaimOption } from '@nanchang/engine';
 import type {
@@ -643,7 +644,7 @@ export class GameService {
       );
       const fullHand = [...openMeldTiles, ...seatState.hand];
 
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
+      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes, true)) {
         this.logger.log(
           `Can-tsumo: seat ${activeSeat} has a complete hand after kong (game ${session.gameId})`,
         );
@@ -709,7 +710,7 @@ export class GameService {
           : ([...m.tiles] as TileType[]),
       );
       const fullHand = [...openMeldTiles, ...seatState.hand];
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes)) {
+      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes, true)) {
         this.logger.log(`Bot auto-tsumo: seat ${seat} (game ${session.gameId})`);
         this.applyWinClaim(session, seat, 'tsumo', { isRobKong: false });
         return;
@@ -1100,9 +1101,26 @@ export class GameService {
       });
       session.moveLog.push(...getNewEvents(session));
     } catch (err) {
-      this.logger.error(
-        `declareWin failed for seat ${winnerSeat} in game ${session.gameId}: ${err}`,
-      );
+      if (err instanceof GameRuleError) {
+        // Structured rule violation — reply to the claiming seat so the client
+        // can surface the rejection rather than silently ignoring the claim.
+        const socketId = session.socketIdForSeat(winnerSeat);
+        if (socketId && this.server) {
+          this.server
+            .to(socketId)
+            .emit('game:error', {
+              code: 'RULE_VIOLATION',
+              message: (err as GameRuleError).message,
+            });
+        }
+        this.logger.warn(
+          `Rule violation in declareWin seat ${winnerSeat} game ${session.gameId}: ${err.message}`,
+        );
+      } else {
+        this.logger.error(
+          `Unexpected error in declareWin seat ${winnerSeat} game ${session.gameId}: ${err}`,
+        );
+      }
       return;
     }
 

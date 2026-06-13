@@ -286,9 +286,10 @@ describe('Engine·kong-concealed', () => {
 describe('Engine·win', () => {
   it('Engine·illegal-moves: cannot win with non-winning hand (tsumo)', () => {
     const g = startedGame(42);
-    // East has 14 tiles, almost certainly not winning immediately
+    // East has 14 tiles, almost certainly not winning immediately.
+    // Pass isSelfDraw=true: initial deal is a tsumo (heavenly win) context.
     const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
-    if (!isWinningHand(g.state.seats[0].hand, jts)) {
+    if (!isWinningHand(g.state.seats[0].hand, jts, true)) {
       expect(() => g.declareWin(0)).toThrow();
     } else {
       expect(true).toBe(true); // very rare immediate win
@@ -304,7 +305,7 @@ describe('Engine·win', () => {
       const g = GameEngine.create(seed).deal().revealJing();
       const hand = g.state.seats[0].hand;
       const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
-      if (isWinningHand(hand, jts)) {
+      if (isWinningHand(hand, jts, true)) {
         const finished = g.declareWin(0);
         expect(finished.state.phase).toBe('finished');
         expect(finished.events.some((e) => e.kind === 'win')).toBe(true);
@@ -327,7 +328,7 @@ describe('Engine·win', () => {
       const g = GameEngine.create(seed).deal().revealJing();
       const hand = g.state.seats[0].hand;
       const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
-      if (isWinningHand(hand, jts)) {
+      if (isWinningHand(hand, jts, true)) {
         const startingScore = g.state.seats[0].score;
         const finished = g.declareWin(0);
         const winEvent = finished.events.find((e: { kind: string }) => e.kind === 'win') as
@@ -390,7 +391,7 @@ describe('Engine·declareWin-hand-completeness', () => {
       const g = GameEngine.create(seed).deal().revealJing();
       const hand = g.state.seats[0].hand;
       const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
-      if (isWinningHand(hand, jts)) {
+      if (isWinningHand(hand, jts, true)) {
         const finished = g.declareWin(0);
         expect(finished.state.seats[0].hand).toHaveLength(14);
         foundWin = true;
@@ -899,7 +900,7 @@ describe('Engine·win-locked-rules-scoring', () => {
     for (let seed = 0; seed < 10000; seed++) {
       const g = GameEngine.create(seed).deal().revealJing();
       const jts: TileType[] = [g.state.jingPrimary!, g.state.jingSecondary!];
-      if (isWinningHand(g.state.seats[0].hand, jts)) {
+      if (isWinningHand(g.state.seats[0].hand, jts, true)) {
         const finished = g.declareWin(0);
         const winEv = finished.events.find((e) => e.kind === 'win') as
           | { kind: 'win'; paymentResult: { scoreDelta: number[] } }

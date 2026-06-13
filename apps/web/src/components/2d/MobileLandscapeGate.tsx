@@ -3,16 +3,15 @@
  *
  * Renders differently based on the current LandscapeMode:
  *
- *   'desktop' | 'native-landscape'
+ *   'desktop' | 'native-landscape' | 'css-landscape'
  *     → transparent passthrough div; children render normally.
+ *       For 'css-landscape' the ForcedLandscapeWrapper is applied at the
+ *       GameTable level (game-page.tsx) so ALL overlays rotate together.
  *
  *   'needs-gesture'
  *     → MobileTapToPlayOverlay (portal to document.body) only.
  *       Children are NOT rendered — avoids mounting a heavy game tree before
  *       the user has consented to the orientation change.
- *
- *   'css-landscape'
- *     → ForcedLandscapeWrapper (active=true) wrapping children.
  *
  * The overlay is rendered as a React Portal so it escapes any aria-hidden
  * ancestor (e.g. the `<div aria-hidden="true">` table renderer wrapper in
@@ -21,7 +20,6 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { ForcedLandscapeWrapper } from './ForcedLandscapeWrapper';
 import type { LandscapeMode } from '../../hooks/use-orientation';
 import { useI18n } from '../../i18n';
 
@@ -155,10 +153,8 @@ export function MobileLandscapeGate({ mode, onRequestNative, children }: MobileL
     return <MobileTapToPlayOverlay onEnter={onRequestNative} />;
   }
 
-  if (mode === 'css-landscape') {
-    return <ForcedLandscapeWrapper active={true}>{children}</ForcedLandscapeWrapper>;
-  }
-
-  // 'desktop' | 'native-landscape' — passthrough
+  // 'desktop' | 'native-landscape' | 'css-landscape' — passthrough.
+  // For 'css-landscape' the ForcedLandscapeWrapper is applied at the GameTable
+  // level in game-page.tsx so the status bar and ALL overlays rotate together.
   return <div className="w-full h-full">{children}</div>;
 }

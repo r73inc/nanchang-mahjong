@@ -28,10 +28,11 @@ export function canWin(
   tile: TileType,
   jingTypes: TileType[],
   openMeldTiles: TileType[] = [],
+  isSelfDraw = false,
 ): boolean {
   const fullHand = [...openMeldTiles, ...hand, tile];
   if (fullHand.length !== 14) return false;
-  return isWinningHand(fullHand, jingTypes);
+  return isWinningHand(fullHand, jingTypes, isSelfDraw);
 }
 
 // ── Pung ──────────────────────────────────────────────────────────────────────
@@ -223,7 +224,9 @@ export function tenpaiTiles(hand: TileType[], jingTypes: TileType[]): TileType[]
 
   const winning: TileType[] = [];
   for (const candidate of TILE_TYPES) {
-    if (canWin(hand, candidate, jingTypes)) {
+    // Tenpai is evaluated as a self-draw scenario: "if I drew this tile, would I win?"
+    // This correctly includes Thirteen Misfits completions for tenpai/shanten purposes.
+    if (canWin(hand, candidate, jingTypes, [], true)) {
       winning.push(candidate);
     }
   }

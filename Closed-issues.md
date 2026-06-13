@@ -6,6 +6,77 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-047-imp-027-thirteen-misfits-seven-pairs` (2026-06-13)
+
+### BUG-047 · Thirteen Misfits (十三烂) unwinnable when a Jing tile overlaps the pattern
+
+**Root cause:** `checkThirteenMisfits` in `packages/engine/src/hand.ts` called `separateJing` before checking the hand, then immediately returned `false` if `jingCount > 0`. This meant that if any tile in the player's 14-tile hand happened to be a Jing type (primary or secondary spirit), it was silently stripped from the naturals array before the misfit gap check ran — making the hand undetectable as Thirteen Misfits regardless of how valid the pattern was.
+
+The Nanchang rules (§5.2) say Thirteen Misfits "must be concealed." There is no rule against Jing tiles appearing in the hand at face value. The restriction was an incorrect implementation assumption introduced when the check was first written.
+
+**Fix (`packages/engine/src/hand.ts`):**
+
+- Changed `checkThirteenMisfits` to accept the raw 14-tile hand (`hand: TileType[]`) instead of post-separated `(naturals, jingCount)`.
+- Removed the `if (jingCount > 0) return false` guard entirely.
+- The check now reads tile face values directly — a Jing tile sitting at a valid misfit position (gap > 2 from its neighbours in the same suit) counts as its natural type.
+- Updated `isWinningHand` to pass the raw hand: `checkThirteenMisfits(hand)`.
+
+**Fix (`packages/engine/src/engine.ts`):**
+
+- `detectHandType` — the no-standard-decomposition branch previously used a raw pair-count heuristic (`pairCombos >= 7`) to distinguish Seven Pairs from Thirteen Misfits, which silently mis-classified Seven Pairs hands where a Jing wildcard completed the 7th pair (the raw count doesn't show ≥2 for a jing-completed pair). Replaced with `checkSevenPairs(naturals, jingCount)` using the proper jing-aware logic.
+- Added a Seven Pairs check in the _has-decompositions_ path: a concealed hand whose consecutive pairs can also form standard chows was being classified as `'standard'` (×1) instead of `'seven_pairs'` (×2). The new code prefers `seven_pairs` when the full hand qualifies.
+- `isGerman` — Thirteen Misfits never uses Jing tiles as wildcards (every tile sits at face value). Changed `isGerman = winJings === 0` to `true` for `thirteen_misfits` / `seven_star_thirteen` hand types so players holding Jing tiles at face value in their misfit hand correctly qualify for German.
+
+**Key learnings:**
+
+- `separateJing` must NOT be called before `checkThirteenMisfits`. Thirteen Misfits is a face-value pattern check, not a wildcard decomposition.
+- `detectHandType` must use the exported `checkSevenPairs` (with jing handling) for Seven Pairs classification, not a raw tile-count heuristic.
+- A Seven Pairs hand can produce valid standard chow decompositions (e.g. two pairs of consecutive tiles become a double chow). `detectHandType` must always prefer `seven_pairs` over `standard` when the hand qualifies and is fully concealed.
+- `isGerman` should reflect "zero wildcards used," not "zero Jing tiles held." Thirteen Misfits uses zero wildcards by definition, so German applies even when the player holds Jing tiles.
+
+---
+
+### IMP-027 · Thirteen Misfits eligibility hint on Learn page
+
+**Fix (`apps/web/src/pages/learn/learn-page.tsx`):** Added a gold-tinted callout under the Thirteen Misfits card in the Hands tab explaining that Spirit tiles count at face value and do not disqualify the hand.
+
+**Fix (`apps/web/src/i18n/en.json` + `zh.json`):**
+
+- Updated `learnHandsThirteenDesc` to clarify: each suit's tiles must be spaced > 2 apart, all 7 honor types must appear exactly once, and it is self-draw only.
+- Updated `learnHandsSevenPairsDesc` to say "7 distinct pairs" (making the uniqueness constraint explicit).
+- Added `learnHandsThirteenTip` (EN + ZH) for the new callout about Spirit tiles.
+
+**Key learnings:**
+
+- Eligibility hints belong directly on the hand's card in the Learn page — players read it while confused, not in advance.
+- "Spirit tiles count at face value" is the single most important clarification for Thirteen Misfits: without it players assume any Jing in their hand voids the win.
+
+---
+
+## `fix/bug-048-landscape-overlay-rotation` (2026-06-13)
+
+### BUG-048 · Side-seat text and overlays render in portrait orientation on mobile landscape (css-landscape mode)
+
+**Root cause:** `ForcedLandscapeWrapper` was only wrapping `GameTable2D` (the canvas) inside `MobileLandscapeGate`. CSS `position: fixed` overlays (status bar, `SideRail` minimized chip, `MobileJingButton` overlay, `GameHistoryPanel` bottom sheet) and `position: absolute` overlays (ActionToast, TsumoBar, ClaimWindow, etc.) in `GameTable` were rendered OUTSIDE the rotated wrapper. In `css-landscape` mode (iOS Safari and devices where the Fullscreen API is rejected), the game canvas rotated 90° CW but all overlay text remained in physical portrait coordinates — players saw the status bar, score strip, and game action text sideways while the board itself appeared landscape.
+
+CSS `transform` on an element creates a new containing block for descendant `position: fixed` elements. Moving `ForcedLandscapeWrapper` to wrap the entire `GameTable` return exploits this property: all `fixed inset-0` overlays (history panel, jing overlay, etc.) are now fixed to the landscape canvas rather than the viewport.
+
+**Fix:**
+
+1. **`ForcedLandscapeWrapper.tsx`** — changed the inactive passthrough case from `className="w-full h-full"` to `className="w-full h-dvh"` so `mj-game-surface` (now `h-full`) retains full viewport height in non-css-landscape modes.
+
+2. **`MobileLandscapeGate.tsx`** — removed the `css-landscape` → `ForcedLandscapeWrapper` branch. The gate now passes children through for all non-`needs-gesture` modes; the landscape rotation is handled at the `GameTable` level.
+
+3. **`game-page.tsx`** (`GameTable` inner component) — imported `ForcedLandscapeWrapper` and wrapped the entire `mj-game-surface` div in it (`active={landscapeMode === 'css-landscape'}`). Changed `h-dvh` → `h-full` on `mj-game-surface`.
+
+**Key learnings:**
+
+- An element with a `transform` property becomes a new containing block for all `position: fixed` descendants — even through arbitrary levels of DOM nesting. This means wrapping the entire game surface (not just the canvas) in the landscape `rotate(90deg)` wrapper automatically fixes every overlay that uses `fixed inset-0` or `fixed top/right` positioning.
+- `ForcedLandscapeWrapper` must be the containing block for ALL game UI or none of it — partial wrapping (canvas only) creates a split-coordinate system where the canvas and overlays live on different axes.
+- The passthrough case of `ForcedLandscapeWrapper` must provide an explicit height (`h-dvh`) so inner elements using `h-full` have a valid reference — a pure `h-full` passthrough collapses if the parent chain lacks explicit height.
+
+---
+
 ## `feat/imp-025-centered-modals` (2026-06-12)
 
 ### IMP-025 · Standardise in-game popups to centered modal style
