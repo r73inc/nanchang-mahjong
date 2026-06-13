@@ -37,7 +37,7 @@ export function ForcedLandscapeWrapper({
 
   return (
     <div
-      className={`mj-landscape-wrapper${className ? ` ${className}` : ''}`}
+      className={['mj-landscape-wrapper', className].filter(Boolean).join(' ')}
       aria-label={t('gameLandscapeMode')}
       style={
         {

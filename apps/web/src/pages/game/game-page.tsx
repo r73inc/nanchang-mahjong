@@ -2329,6 +2329,40 @@ function TsumoBar({
   );
 }
 
+// ── Mobile status-bar icon button ────────────────────────────────────────────
+
+function MobileHeaderButton({
+  onClick,
+  icon,
+  isActive,
+  ariaLabel,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  isActive?: boolean;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center"
+      style={{
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+        color: isActive ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
+        fontSize: 12,
+        background: 'transparent',
+      }}
+      aria-label={ariaLabel}
+      aria-pressed={isActive !== undefined ? isActive : undefined}
+    >
+      {icon}
+    </button>
+  );
+}
+
 // ── Game Table ────────────────────────────────────────────────────────────────
 
 /**
@@ -2667,43 +2701,21 @@ function GameTable({
 
             {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
             {isMobile && (
-              <button
+              <MobileHeaderButton
                 onClick={() => setHistoryOpen((o) => !o)}
-                className="flex items-center justify-center"
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 4,
-                  border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-                  color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
-                  fontSize: 12,
-                  background: 'transparent',
-                }}
-                aria-label={t('gameHistoryTitle')}
-                aria-pressed={historyOpen}
-              >
-                {ICON_HISTORY}
-              </button>
+                icon={ICON_HISTORY}
+                isActive={historyOpen}
+                ariaLabel={t('gameHistoryTitle')}
+              />
             )}
 
             {/* Concede button */}
             {isMobile ? (
-              <button
+              <MobileHeaderButton
                 onClick={() => setShowConcedeSheet(true)}
-                className="flex items-center justify-center"
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 4,
-                  border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-                  color: 'rgba(var(--felt-ink-rgb),0.4)',
-                  fontSize: 12,
-                  background: 'transparent',
-                }}
-                aria-label={t('gameConcede')}
-              >
-                {ICON_CLOSE}
-              </button>
+                icon={ICON_CLOSE}
+                ariaLabel={t('gameConcede')}
+              />
             ) : (
               <button
                 onClick={() => setShowConcedeSheet(true)}
