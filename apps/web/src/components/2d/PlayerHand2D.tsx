@@ -217,13 +217,17 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Track the last hand key to detect server-driven hand changes
+  // Track hand content and toggle state for change detection.
+  // Both are checked: a toggle change mid-hand must re-sort immediately
+  // without waiting for the next draw.
   const prevHandKeyRef = useRef<string>(viewerHand.join(','));
+  const prevToggleRef = useRef<boolean>(autoSortDrawnTile);
 
   useEffect(() => {
     const key = viewerHand.join(',');
-    if (key === prevHandKeyRef.current) return;
+    if (key === prevHandKeyRef.current && prevToggleRef.current === autoSortDrawnTile) return;
     prevHandKeyRef.current = key;
+    prevToggleRef.current = autoSortDrawnTile;
 
     // Functional setter guarantees we operate on the latest committed state,
     // avoiding stale-closure issues present in the ref-based approach.

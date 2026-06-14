@@ -1717,40 +1717,62 @@ function ViewerHandHUD({
   const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const prevLenRef = useRef(hand.length);
+  // Content-based detection mirrors PlayerHand2D's prevHandKeyRef pattern.
+  // prevToggleRef ensures a settings change mid-hand re-sorts immediately.
+  const prevHandKeyRef = useRef<string>(hand.join(','));
+  const prevToggleRef = useRef<boolean>(autoSortDrawnTile);
 
-  // Sync displayOrder when hand length changes (new draw or discard confirmation).
+  // Sync displayOrder on hand changes or auto-sort toggle changes.
   useEffect(() => {
-    const prev = prevLenRef.current;
+    const key = hand.join(',');
+    const handUnchanged = key === prevHandKeyRef.current;
+    const toggleUnchanged = prevToggleRef.current === autoSortDrawnTile;
+
+    if (handUnchanged && toggleUnchanged) return;
+
+    const prevLen = prevLenRef.current;
+    prevHandKeyRef.current = key;
+    prevToggleRef.current = autoSortDrawnTile;
     prevLenRef.current = hand.length;
 
-    if (hand.length === prev) return;
+    if (hand.length < prevLen) {
+      // Tile discarded — reset to natural order.
+      setDisplayOrder(hand.map((_, i) => i));
+      return;
+    }
 
-    if (hand.length > prev) {
+    if (hand.length > prevLen) {
+      // Tile drawn — server always appends at the end of the hand array.
       const newHandIdx = hand.length - 1;
       if (autoSortDrawnTile) {
-        // Insert the drawn tile at its canonical sorted position among existing tiles.
-        // Sort the extended displayOrder array by tile type using the engine's canonical
-        // ordering so the drawn tile slots into the correct visual position.
         setDisplayOrder((order) => {
           const extended = [...order, newHandIdx];
           return extended.sort((a, b) => {
             const ta = hand[a];
             const tb = hand[b];
             const sorted = sortTypes([ta, tb]);
-            // When ta === tb the two tiles compare equal; preserve relative order.
             return sorted[0] === sorted[1] ? 0 : sorted[0] === ta ? -1 : 1;
           });
         });
       } else {
-        // Default: append the drawn tile at the right end of the display.
         setDisplayOrder((order) => [...order, newHandIdx]);
       }
-    } else {
-      // A tile was discarded — we can't cheaply determine which index was
-      // removed, so reset to natural order for the new hand.
-      setDisplayOrder(hand.map((_, i) => i));
+      return;
     }
-  }, [hand.length, autoSortDrawnTile]);
+
+    // Same hand length: toggle changed mid-hand. Apply the new setting immediately.
+    if (autoSortDrawnTile) {
+      setDisplayOrder((order) =>
+        [...order].sort((a, b) => {
+          const ta = hand[a];
+          const tb = hand[b];
+          const sorted = sortTypes([ta, tb]);
+          return sorted[0] === sorted[1] ? 0 : sorted[0] === ta ? -1 : 1;
+        }),
+      );
+    }
+    // Disabling: keep the current user-arranged order unchanged.
+  }, [hand, autoSortDrawnTile]);
 
   // Report displayOrder to the parent whenever it changes so AccessibleHand can
   // mirror the exact visual order without recomputing it independently.
