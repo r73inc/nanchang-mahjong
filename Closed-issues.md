@@ -6,6 +6,32 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp031-unified-hand-result-table` (2026-06-13)
+
+### IMP-031 · Unified sorted hand-result table with full per-player score breakdown
+
+**Request:** Replace the two-table layout (score summary + separate spirit section) with a single unified table sorted by net gain this hand, where every row expands to show a full breakdown — win payment, spirit settlement, and kong payouts.
+
+**Fix:**
+
+- **`packages/shared/src/game.events.ts`:** Added `liableSeat?: 0 | 1 | 2 | 3` and `isRobKong?: boolean` to `HandRevealPayload`. `liableSeat` identifies the primary paying seat (ron discarder or rob-kong seat). These are UI-only fields — no scoring changes.
+- **`apps/api/src/game/game.service.ts`:** `applyWinClaim` captures the discarder/kong seat before calling `declareWin` (which clears the relevant state). `handleHandEnd` receives and forwards these to the payload.
+- **`apps/web/src/pages/game/game-page.tsx`:**
+  - Removed the old score summary table and separate spirit section.
+  - Added `computeEffectiveSpiritScores()` helper (mirrors engine's `calculateSpiritSettlement` formula without importing it).
+  - `HandRevealScreen` now renders a single sorted unified table (most gained → top) using `useState<number | null>` for expand/collapse per row.
+  - Expanded rows show three sections: (1) Win payment — winner sees multiplier chain + per-loser payments; loser sees their role (Self-Draw / Discarded / Bystander) and amount paid. (2) Spirit — tile icons, explosive/indomitable badges, effective score, net delta. (3) Kong payouts net.
+  - Hand type badge (Seven Pairs / All Triplets / Thirteen Misfits / Seven Star Thirteen) shows in the winner's collapsed row and expanded win header.
+- **i18n:** 18 new EN + ZH keys added for all breakdown labels and hand type names.
+
+**Key learnings:**
+
+- Capturing `discardedBySeat` / `kongSeat` must happen BEFORE calling `declareWin` — the engine clears these from state as part of the phase transition to `'finished'`.
+- The spirit effective-score formula must be re-derived in the frontend (not imported from the engine) to keep the web bundle clean. The formula is small enough to duplicate safely.
+- Kong delta is frontend-derivable: `handNetDeltas[i] − (winPayment?.scoreDelta[i] ?? 0) − spiritDeltas[i]`. This cleanly separates the three contributors to each seat's net change.
+
+---
+
 ## `feat/imp-037-038-tile-size-autosort` (2026-06-13)
 
 ### IMP-037 · Adjustable hand tile size in Customize page ⚠️ HIGH PRIORITY

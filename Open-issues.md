@@ -8,20 +8,20 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                  | Summary                                                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC)   | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph      | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-028 | Drop "You" labels everywhere          | Highlight already identifies the viewer; redundant "You" tags should be removed       |
-| IMP-029 | Settlement tiles in dropdown          | Show a tile glyph per settlement tile each player holds in the expanded breakdown     |
-| IMP-030 | Use winner name as detail heading     | Replace generic "Someone Won!" title with the actual winning player's name            |
-| IMP-031 | Rank + score breakdown at hand end    | Sort players by points gained (desc) and add a per-player score breakdown dropdown    |
-| IMP-032 | Global sound toggle                   | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-033 | Learn page: textures + content audit  | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
-| IMP-035 | Replay page: migrate to tile textures | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
-| IMP-036 | History & replays are undiscoverable  | History page is not linked from any in-app navigation; players cannot find replays    |
-| IMP-038 | Auto-sort drawn tile — not working    | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
+| ID          | Name                                   | Summary                                                                               |
+| ----------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
+| BUG-045     | Bot dice roll animation not visible    | Bot roll animation and result flash by in under a frame; human roll works correctly   |
+| BUG-049     | Hand not visible in settlement (PC)    | On desktop, the player cannot see their own hand during the settlement phase          |
+| BUG-050     | Spirit settlement uses old glyph       | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
+| IMP-028     | Drop "You" labels everywhere           | Highlight already identifies the viewer; redundant "You" tags should be removed       |
+| IMP-029     | Settlement tiles in dropdown           | Show a tile glyph per settlement tile each player holds in the expanded breakdown     |
+| IMP-030     | Use winner name as detail heading      | Replace generic "Someone Won!" title with the actual winning player's name            |
+| ~~IMP-031~~ | ~~Rank + score breakdown at hand end~~ | ~~Closed — see Closed-issues.md~~                                                     |
+| IMP-032     | Global sound toggle                    | Add an always-available sound on/off toggle next to the language toggle               |
+| IMP-033     | Learn page: textures + content audit   | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
+| IMP-035     | Replay page: migrate to tile textures  | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
+| IMP-036     | History & replays are undiscoverable   | History page is not linked from any in-app navigation; players cannot find replays    |
+| IMP-038     | Auto-sort drawn tile — not working     | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
 
 ---
 
@@ -172,107 +172,6 @@ The sort effect in `PlayerHand2D.tsx` is not producing a visible reorder when a 
 - i18n keys `handRevealResultWin` ("Someone Won!"), `handRevealWinner` ("{{0}} wins this hand").
 
 **Notes:** For a win, promote the winner's name (and/or a "{name} wins!" string) to the `<h1>`. Preserve the concede/draw cases, which have no single winner. Keep EN/ZH parity.
-
----
-
-### IMP-031 · Unified sorted hand-result table with full per-player score breakdown
-
-**Request:** Replace the current two-table layout (hand score summary + separate spirit settlement table) with a single unified table. Sort all four players by their total net change this hand (most gained → top). Each row expands to show a full, human-readable breakdown of exactly where every point came from and where every point was paid away to, and why — including which multipliers applied, which players held how many spirit tiles, and what kongs contributed.
-
-**Status:** OPEN
-
-**This is a high-value feature.** The scoring model is non-obvious to new players; a clear breakdown turns every hand into a teaching moment and builds confidence in the game's integrity.
-
----
-
-**Unified table design (collapsed row)**
-
-Each player gets one row showing:
-
-- Wind character + name (with winner badge if applicable)
-- Single signed total: `handNetDeltas[i]` (= win payment + kong payout + spirit settlement combined)
-- A chevron if the row has any breakdown content
-
-Sort rows descending by `handNetDeltas[i]`. The viewer's own row keeps its gold highlight. No separate spirit table — it is folded into the expanded breakdown per row.
-
----
-
-**Expanded breakdown — three sections per player**
-
-**Section 1 — Win payment** (only when `result === 'win'`; skip for draw/concede)
-
-_For the winner:_
-
-- Header: `Won by [Tsumo / Ron]` — with hand type badge if not standard (e.g. "Seven Pairs", "All Triplets", "Thirteen Misfits", "Seven Star Thirteen Misfits")
-- Multiplier chain — one chip per item in `winPayment.items`:
-  `Base 1 × [Seven Pairs ×2] × [Dealer ×2] → Total ×4`
-  Each chip shows the EN name and the ZH name below it.
-  German/True German flat bonus shown separately: `+5 flat per loser`
-- Payment received line per loser:
-  `[PlayerB]: +8` (tsumo: multiplier × 2 + flat; ron-discarder: multiplier × 2 + flat; ron-bystander: multiplier × 1 + flat)
-- Total received: `+[winnerTotal]`
-
-_For a loser:_
-
-- Header: `[Win type: Tsumo / Discard / Bystander]` — "Discard" only when `liableSeat === this seat`; "Bystander" when ron but this seat did not discard.
-  _(requires `liableSeat` added to `HandRevealPayload` — see backend note below)_
-- Win formula as a single line: `[WinnerName]: paid [amount]` with the reason:
-  `Self-draw: ×4 (multiplier ×2 × dealer-loser ×2)` or `Discarded: ×8 (…)` or `Bystander: ×4 (…)`
-- Concede case: `Conceded — paid [amount] (flat settlement)`
-
-**Section 2 — Spirit settlement** (shown for every seat; omit section entirely only when all four `spiritDeltas` are 0)
-
-- For each other player that has non-zero effective spirit score, show one line:
-  `[PlayerA]: [±amount]` with the cause:
-  `Primary ×N (×2 each) + Secondary ×N (×1 each) → effective [E] → paid/received [amount]`
-  Special cases noted inline: `Explosive (raw≥5: raw×(raw−3))` and `Indomitable (only holder, ×2)`.
-- Net spirit total for this seat: `Spirit net: [±spiritDelta]`
-
-_These amounts are fully frontend-derivable from `spiritCounts[i]` (already in the payload) using the same formula as `calculateSpiritSettlement` in `packages/engine/src/scoring.ts:290-323`. No backend change needed for spirit attribution._
-
-**Section 3 — Kongs** (only when `kongDelta[i] !== 0`)
-
-- `Kong payouts: [±amount]`
-- Explanation: `Declared [N] concealed kong(s) (+2 each) / open kong(s) (+1 each)` or `Paid [N] kongs to [PlayerX]`
-- _Kong delta is frontend-derivable: `handNetDeltas[i] − (winPayment?.scoreDelta[i] ?? 0) − spiritDeltas[i]`._
-- The per-kong direction (who declared, which type) is not granularly available in the payload — show the net with an explanation of the sign. A future payload enhancement could break this down per kong event.
-
----
-
-**Backend additions required (shared + API, scope to a separate PR)**
-
-One new field needed on `HandRevealPayload` in `packages/shared/src/game.events.ts`:
-
-```ts
-/**
- * The single seat liable for the full win payment.
- * - Ron: the seat that discarded the winning tile.
- * - Rob-kong: the seat whose promoted kong was robbed (mechanically identical
- *   to a discard — the rob-konger pays all three shares as if they discarded).
- * - Tsumo: undefined (all losers share payment; no single liable seat).
- */
-liableSeat?: 0 | 1 | 2 | 3;
-/** True when the win was a rob-kong (抢杠). Used for UI labeling only — does
- *  not change payment logic; liableSeat already points to the konger. */
-isRobKong?: boolean;
-```
-
-Using a single `liableSeat` rather than separate `discarderSeat` / `kongSeat` fields keeps the frontend simple: the breakdown UI only needs to check `liableSeat === thisSeat` to know whether this player is the primary payer. There is no defensive branching required to handle the rob-kong case separately. `isRobKong` is retained solely so the UI can label the win type as "Rob Kong" instead of "Discard."
-
-In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed, derive `liableSeat` from the `ScoringContext` already computed at win time: `liableSeat = ctx.isRobKong ? ctx.kongSeat : ctx.discarderSeat`. This is a plumbing change only — no engine logic needed.
-
----
-
-**Frontend implementation notes**
-
-- `apps/web/src/pages/game/game-page.tsx:473-515` — replace the current score summary with the new unified sorted table.
-- `apps/web/src/pages/game/game-page.tsx:517-565` — remove the separate spirit settlement section; fold it into the per-row breakdown.
-- Add a `buildHandBreakdown(seat, handReveal, snapshot)` helper function near the other helpers (around line 343) to keep the IIFE clean. This function returns the three sections above as structured data, not JSX, so it is testable.
-- Mirror the expand/collapse UX from `SettlementPreview` (`apps/web/src/components/game/SettlementPreview.tsx:120-124`) — one `useState<number | null>` for the expanded seat.
-- Spirit effective-score calculation should be extracted into a shared helper or duplicated from `packages/engine/src/scoring.ts:295-313` — do NOT import the scoring function directly from the engine into the frontend; re-derive it in a small frontend utility or add it to `@nanchang/shared` exports.
-- **i18n:** All multiplier item names already have `name` (EN) and `nameZh` (ZH) in `MultiplierItem`. All new breakdown labels need EN + ZH keys added to `apps/web/src/i18n/en.json` and `zh.json`.
-- Keep the existing `MahjongTile2D` tile rendering for spirit tiles in the expanded section.
-- **PR scope:** Sort-only change is FE-only and can ship independently. The full breakdown is a larger PR touching shared types, API, and FE — keep it as one PR per scope discipline, not split across three.
 
 ---
 

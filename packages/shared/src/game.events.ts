@@ -285,6 +285,15 @@ export interface HandRevealPayload {
    * spirit settlement. Zero-sum; useful for "you gained/lost N this hand" display.
    */
   handNetDeltas: [number, number, number, number];
+  /**
+   * The single seat liable for the full win payment.
+   * - Ron: the seat that discarded the winning tile.
+   * - Rob-kong: the seat whose promoted kong was robbed (pays all three shares).
+   * - Tsumo: undefined (all losers share payment equally).
+   */
+  liableSeat?: 0 | 1 | 2 | 3;
+  /** True when the win was a rob-kong (抢杠). UI label only — does not change payment logic. */
+  isRobKong?: boolean;
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */

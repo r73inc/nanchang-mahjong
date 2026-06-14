@@ -1093,6 +1093,13 @@ export class GameService {
       }
     }
 
+    // Capture the liable seat before declareWin clears pendingDiscard / discardedBySeat.
+    const liableSeatForDisplay: Seat4 | undefined = opts.isRobKong
+      ? opts.robKongSeat
+      : winType === 'ron'
+        ? (state.discardedBySeat ?? undefined)
+        : undefined;
+
     try {
       session.engine = session.engine.declareWin(winnerSeat, {
         isTrueGerman,
@@ -1106,12 +1113,10 @@ export class GameService {
         // can surface the rejection rather than silently ignoring the claim.
         const socketId = session.socketIdForSeat(winnerSeat);
         if (socketId && this.server) {
-          this.server
-            .to(socketId)
-            .emit('game:error', {
-              code: 'RULE_VIOLATION',
-              message: (err as GameRuleError).message,
-            });
+          this.server.to(socketId).emit('game:error', {
+            code: 'RULE_VIOLATION',
+            message: (err as GameRuleError).message,
+          });
         }
         this.logger.warn(
           `Rule violation in declareWin seat ${winnerSeat} game ${session.gameId}: ${err.message}`,
@@ -1138,7 +1143,17 @@ export class GameService {
     });
     this.broadcastSnapshots(session);
 
-    this.handleHandEnd(session, winnerSeat, 'win', payment, winType, handType);
+    this.handleHandEnd(
+      session,
+      winnerSeat,
+      'win',
+      payment,
+      winType,
+      handType,
+      undefined,
+      liableSeatForDisplay,
+      opts.isRobKong,
+    );
   }
 
   private applyRobKongResolution(
@@ -1283,6 +1298,8 @@ export class GameService {
     winType?: WinType,
     handType?: HandType,
     concedeSeat?: Seat4,
+    liableSeat?: Seat4,
+    isRobKong?: boolean,
   ): void {
     session.clearAfkTimers();
     session.closeClaimWindow();
@@ -1349,6 +1366,8 @@ export class GameService {
       isLastHand,
       nextDealerSeat: isLastHand ? undefined : nextDealerInfo.dealerSeat,
       handNetDeltas,
+      liableSeat,
+      isRobKong,
     };
 
     // ── Store pending state, emit hand-reveal, and pause ──────────────────────

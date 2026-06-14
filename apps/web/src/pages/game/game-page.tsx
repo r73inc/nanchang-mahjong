@@ -71,9 +71,11 @@ const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '
 // Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
 const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
-const JING_CHAR = '节' as const;
-const MULT_CHAR = '×' as const;
 const SCORE_SEP = ': ' as const;
+const MULT_CHAR = '×' as const;
+const CHEVRON_UP = '▲' as const;
+const CHEVRON_DOWN = '▼' as const;
+const ARROW_RIGHT = '→ ' as const;
 
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
@@ -456,6 +458,25 @@ function reconstructMeldTiles(
   return groups;
 }
 
+// ── Spirit effective score helper ─────────────────────────────────────────────
+// Re-derives the effective spirit score per seat from SpiritCount data for the
+// expanded breakdown display. Mirrors calculateSpiritSettlement in the engine.
+function computeEffectiveSpiritScores(
+  spiritCounts: HandRevealPayload['spiritCounts'],
+): [number, number, number, number] {
+  const rawScores = spiritCounts.map((c) => {
+    const raw = c.primary * 2 + c.secondary + c.spiritKongs * 10;
+    return raw >= 5 ? raw * (raw - 3) : raw;
+  });
+  const playersWithSpirits = rawScores.filter((s) => s > 0).length;
+  return rawScores.map((s) => (playersWithSpirits === 1 ? s * 2 : s)) as [
+    number,
+    number,
+    number,
+    number,
+  ];
+}
+
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
 // Full-screen post-hand reveal. Shows all hands, spirit settlement, and
 // payment breakdown.
@@ -483,12 +504,33 @@ function HandRevealScreen({
   const { t } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
 
+  const [expandedSeat, setExpandedSeat] = useState<number | null>(null);
+
   const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
     pung: t('gamePung'),
     chow: t('gameChow'),
     kong: t('gameKong'),
   };
   const PAIR_LABEL = t('handPair');
+
+  const effectiveSpiritScores = computeEffectiveSpiritScores(handReveal.spiritCounts);
+  const spiritHasAny =
+    handReveal.spiritDeltas.some((d) => d !== 0) &&
+    (handReveal.jingPrimary !== null || handReveal.jingSecondary !== null);
+  const sortedSeats = ([0, 1, 2, 3] as const)
+    .slice()
+    .sort((a, b) => handReveal.handNetDeltas[b] - handReveal.handNetDeltas[a]);
+
+  const handTypeLabel =
+    (handReveal.handType ?? 'standard') !== 'standard'
+      ? handReveal.handType === 'seven_pairs'
+        ? t('handTypeSevenPairs')
+        : handReveal.handType === 'all_triplets'
+          ? t('handTypeAllTriplets')
+          : handReveal.handType === 'thirteen_misfits'
+            ? t('handTypeThirteenMisfits')
+            : t('handTypeSevenStarThirteen')
+      : null;
 
   const resultLabel =
     handReveal.result === 'win'
@@ -518,100 +560,301 @@ function HandRevealScreen({
           )}
         </div>
 
-        {/* ── Score summary ────────────────────────────────────────────────── */}
+        {/* ── Unified sorted results table ─────────────────────────────────── */}
         <div className="flex flex-col gap-2 w-full">
-          {handReveal.handNetDeltas.map((delta, i) => {
-            const wind = snapshot.seats[i].wind;
-            const isViewer = i === viewerSeat;
-            const isWinner = i === handReveal.winnerSeat;
+          {sortedSeats.map((seat) => {
+            const wind = snapshot.seats[seat].wind;
+            const seatName = snapshot.seats[seat].seatName;
+            const isViewer = seat === viewerSeat;
+            const isWinner = seat === handReveal.winnerSeat;
+            const delta = handReveal.handNetDeltas[seat];
+            const isExp = expandedSeat === seat;
+
+            const winPayDelta = handReveal.winPayment?.scoreDelta[seat] ?? 0;
+            const spiritDelta = handReveal.spiritDeltas[seat];
+            const kongDelta = delta - winPayDelta - spiritDelta;
+            const hasWinSection =
+              handReveal.result === 'win' && handReveal.winPayment !== undefined;
+            const hasBreakdown = hasWinSection || spiritHasAny || kongDelta !== 0;
+
             return (
               <div
-                key={i}
-                className={`flex items-center justify-between px-4 py-2.5 rounded-xl ${
+                key={seat}
+                className={`rounded-xl overflow-hidden ${
                   isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: WIND_COLOR[wind] }}
-                  />
-                  <span
-                    className="text-base font-bold max-w-[120px] truncate"
-                    style={{ color: WIND_COLOR[wind] }}
-                  >
-                    {snapshot.seats[i].seatName}
-                  </span>
-                  {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
-                  {isWinner && (
-                    <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
-                      {t('handRevealWinnerBadge')}
-                    </span>
-                  )}
-                </div>
-                <span
-                  className={`text-base font-bold tabular-nums ${
-                    delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-mj-bone/40'
-                  }`}
+                {/* ── Collapsed row ── */}
+                <button
+                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  onClick={() => hasBreakdown && setExpandedSeat(isExp ? null : seat)}
+                  aria-expanded={hasBreakdown ? isExp : undefined}
                 >
-                  {delta > 0 ? '+' : ''}
-                  {delta}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── Spirit settlement breakdown ──────────────────────────────────── */}
-        {(handReveal.jingPrimary || handReveal.jingSecondary) && (
-          <div className="w-full">
-            <p className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase mb-2 text-center">
-              {t('handRevealSpiritSection')}
-            </p>
-            <div className="flex flex-col gap-1.5 w-full">
-              {handReveal.spiritDeltas.map((delta, i) => {
-                const wind = snapshot.seats[i].wind;
-                const counts = handReveal.spiritCounts[i];
-                const isViewer = i === viewerSeat;
-                if (delta === 0 && counts.primary === 0 && counts.secondary === 0) return null;
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${
-                      isViewer ? 'bg-mj-gold/10' : 'bg-white/4'
-                    }`}
-                  >
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="text-sm font-bold max-w-[100px] truncate"
+                      className="text-sm font-bold shrink-0"
                       style={{ color: WIND_COLOR[wind] }}
                     >
-                      {snapshot.seats[i].seatName}
-                    </span>
-                    <span className="text-xs text-mj-bone/50">
-                      {counts.primary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.primary} `}
-                      {counts.secondary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.secondary}`}
+                      {WIND_CHAR[wind]}
                     </span>
                     <span
-                      className={`text-sm font-bold tabular-nums ${
+                      className="text-sm font-bold truncate"
+                      style={{ color: WIND_COLOR[wind] }}
+                    >
+                      {seatName}
+                    </span>
+                    {isWinner && (
+                      <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide shrink-0">
+                        {t('handRevealWinnerBadge')}
+                      </span>
+                    )}
+                    {handTypeLabel && isWinner && (
+                      <span className="text-[10px] bg-mj-gold/10 text-mj-gold/70 px-1.5 py-0.5 rounded shrink-0">
+                        {handTypeLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`text-base font-bold tabular-nums ${
                         delta > 0
                           ? 'text-emerald-400'
                           : delta < 0
                             ? 'text-red-400'
-                            : 'text-mj-bone/30'
+                            : 'text-mj-bone/40'
                       }`}
                     >
-                      {delta > 0
-                        ? t('settlementReceived', String(delta))
-                        : delta < 0
-                          ? t('settlementPaid', String(Math.abs(delta)))
-                          : t('settlementEven')}
+                      {delta > 0 ? '+' : ''}
+                      {delta}
                     </span>
+                    {hasBreakdown && (
+                      <span className="text-mj-bone/30 text-[10px]" aria-hidden>
+                        {isExp ? CHEVRON_UP : CHEVRON_DOWN}
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                </button>
+
+                {/* ── Expanded breakdown ── */}
+                {isExp && (
+                  <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3">
+                    {/* Section 1 — Win payment */}
+                    {hasWinSection &&
+                      handReveal.winPayment &&
+                      (() => {
+                        const wp = handReveal.winPayment!;
+                        if (isWinner) {
+                          const winTypeLabel = handReveal.isRobKong
+                            ? t('handRevealBreakdownWinRobKong')
+                            : handReveal.winType === 'tsumo'
+                              ? t('handRevealBreakdownWinTsumo')
+                              : t('handRevealBreakdownWinRon');
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold bg-emerald-400/15 text-emerald-400 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                  {winTypeLabel}
+                                </span>
+                                {handTypeLabel && (
+                                  <span className="text-[10px] font-bold bg-mj-gold/15 text-mj-gold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                    {handTypeLabel}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Multiplier chain */}
+                              <div className="flex flex-wrap items-center gap-1 text-[11px] text-mj-bone/50">
+                                <span>{t('handRevealBreakdownBase')}</span>
+                                {wp.items.map((item, ii) => (
+                                  <span key={ii} className="flex items-center gap-1">
+                                    <span className="text-mj-bone/30">{MULT_CHAR}</span>
+                                    <span className="bg-white/8 px-1.5 py-0.5 rounded text-mj-bone/70">
+                                      {item.name} {MULT_CHAR}
+                                      {item.multiplier}
+                                    </span>
+                                  </span>
+                                ))}
+                                <span className="text-mj-bone/70 font-bold">
+                                  {ARROW_RIGHT}
+                                  {t('handRevealBreakdownTotalMult', String(wp.totalMultiplier))}
+                                </span>
+                              </div>
+                              {wp.flatBonusPerLoser > 0 && (
+                                <p className="text-[11px] text-mj-bone/40">
+                                  {t(
+                                    'handRevealBreakdownFlatPerPlayer',
+                                    String(wp.flatBonusPerLoser),
+                                  )}
+                                </p>
+                              )}
+                              {/* Payments received from each loser */}
+                              {([0, 1, 2, 3] as const)
+                                .filter((s) => s !== seat)
+                                .map((loser) => {
+                                  const received = -wp.scoreDelta[loser];
+                                  if (received === 0) return null;
+                                  return (
+                                    <p key={loser} className="text-[12px] text-emerald-400/80">
+                                      {t(
+                                        'handRevealBreakdownReceivedFrom',
+                                        String(received),
+                                        snapshot.seats[loser].seatName,
+                                      )}
+                                    </p>
+                                  );
+                                })}
+                              <p className="text-sm font-bold text-emerald-400">
+                                {t('handRevealBreakdownWinTotal', String(wp.winnerTotal))}
+                              </p>
+                            </div>
+                          );
+                        } else {
+                          const loseTypeLabel =
+                            handReveal.winType === 'tsumo'
+                              ? t('handRevealBreakdownLoseTsumo')
+                              : handReveal.liableSeat === seat
+                                ? handReveal.isRobKong
+                                  ? t('handRevealBreakdownWinRobKong')
+                                  : t('handRevealBreakdownLoseDiscard')
+                                : t('handRevealBreakdownLoseBystander');
+                          const paid = Math.abs(wp.scoreDelta[seat]);
+                          const winnerName =
+                            handReveal.winnerSeat !== undefined
+                              ? snapshot.seats[handReveal.winnerSeat].seatName
+                              : '';
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-[10px] font-bold bg-red-400/15 text-red-400 px-1.5 py-0.5 rounded uppercase tracking-wide self-start">
+                                {loseTypeLabel}
+                              </span>
+                              {paid > 0 && (
+                                <p className="text-[12px] text-red-400/80">
+                                  {t('handRevealBreakdownPaidWinner', winnerName, String(paid))}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                      })()}
+
+                    {/* Section 2 — Spirit settlement */}
+                    {spiritHasAny &&
+                      (() => {
+                        const counts = handReveal.spiritCounts[seat];
+                        const effScore = effectiveSpiritScores[seat];
+                        const rawScore =
+                          counts.primary * 2 + counts.secondary + counts.spiritKongs * 10;
+                        const isExplosive = rawScore >= 5;
+                        const playersWithSpirits = effectiveSpiritScores.filter(
+                          (s) => s > 0,
+                        ).length;
+                        const isIndomitable = playersWithSpirits === 1 && effScore > 0;
+                        const sDelta = handReveal.spiritDeltas[seat];
+                        return (
+                          <div className="flex flex-col gap-1.5">
+                            <p className="text-[10px] font-bold tracking-widest text-mj-gold/50 uppercase">
+                              {t('handRevealBreakdownSpiritHeader')}
+                            </p>
+                            {/* Tile icons + holdings */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {handReveal.jingPrimary && counts.primary > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <MahjongTile2D
+                                    tile={handReveal.jingPrimary}
+                                    size="xs"
+                                    interactive={false}
+                                    isJing
+                                    showJingLabel={false}
+                                  />
+                                  <span className="text-[11px] text-mj-bone/60">
+                                    {MULT_CHAR}
+                                    {counts.primary}
+                                  </span>
+                                </span>
+                              )}
+                              {handReveal.jingSecondary && counts.secondary > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <MahjongTile2D
+                                    tile={handReveal.jingSecondary}
+                                    size="xs"
+                                    interactive={false}
+                                    showJingLabel={false}
+                                  />
+                                  <span className="text-[11px] text-mj-bone/60">
+                                    {MULT_CHAR}
+                                    {counts.secondary}
+                                  </span>
+                                </span>
+                              )}
+                              {counts.spiritKongs > 0 && (
+                                <span className="text-[11px] text-mj-bone/60">
+                                  {t('handRevealBreakdownSpiritKongs', String(counts.spiritKongs))}
+                                </span>
+                              )}
+                              {counts.primary === 0 &&
+                                counts.secondary === 0 &&
+                                counts.spiritKongs === 0 && (
+                                  <span className="text-[11px] text-mj-bone/30">—</span>
+                                )}
+                            </div>
+                            {effScore > 0 && (
+                              <div className="flex flex-wrap gap-1 text-[11px]">
+                                {isExplosive && (
+                                  <span className="bg-orange-400/15 text-orange-400 px-1.5 py-0.5 rounded">
+                                    {t('handRevealBreakdownSpiritExplosive')}
+                                  </span>
+                                )}
+                                {isIndomitable && (
+                                  <span className="bg-purple-400/15 text-purple-400 px-1.5 py-0.5 rounded">
+                                    {t('handRevealBreakdownSpiritIndomitable')}
+                                  </span>
+                                )}
+                                <span className="text-mj-bone/50">
+                                  {t('handRevealBreakdownSpiritEffective', String(effScore))}
+                                </span>
+                              </div>
+                            )}
+                            <p
+                              className={`text-sm font-bold tabular-nums ${
+                                sDelta > 0
+                                  ? 'text-emerald-400'
+                                  : sDelta < 0
+                                    ? 'text-red-400'
+                                    : 'text-mj-bone/40'
+                              }`}
+                            >
+                              {t(
+                                'handRevealBreakdownSpiritNet',
+                                sDelta > 0 ? `+${sDelta}` : String(sDelta),
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })()}
+
+                    {/* Section 3 — Kong payouts */}
+                    {kongDelta !== 0 && (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] font-bold tracking-widest text-mj-gold/50 uppercase">
+                          {t('handRevealBreakdownKongHeader')}
+                        </p>
+                        <p
+                          className={`text-sm font-bold tabular-nums ${
+                            kongDelta > 0 ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
+                          {t(
+                            'handRevealBreakdownKongNet',
+                            kongDelta > 0 ? `+${kongDelta}` : String(kongDelta),
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
         {/* ── All four hands ───────────────────────────────────────────────── */}
         <div className="w-full">
