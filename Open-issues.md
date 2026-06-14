@@ -8,20 +8,22 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                  | Summary                                                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC)   | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph      | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-028 | Drop "You" labels everywhere          | Highlight already identifies the viewer; redundant "You" tags should be removed       |
-| IMP-029 | Settlement tiles in dropdown          | Show a tile glyph per settlement tile each player holds in the expanded breakdown     |
-| IMP-030 | Use winner name as detail heading     | Replace generic "Someone Won!" title with the actual winning player's name            |
-| IMP-031 | Rank + score breakdown at hand end    | Sort players by points gained (desc) and add a per-player score breakdown dropdown    |
-| IMP-032 | Global sound toggle                   | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-033 | Learn page: textures + content audit  | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
-| IMP-034 | Customize page: texture tile preview  | Tile palette preview strip still uses legacy text tiles; migrate to MahjongTile2D     |
-| IMP-035 | Replay page: migrate to tile textures | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
-| IMP-036 | History & replays are undiscoverable  | History page is not linked from any in-app navigation; players cannot find replays    |
+| ID      | Name                                  | Summary                                                                                                                                                                          |
+| ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly                                                                                              |
+| BUG-049 | Hand not visible in settlement (PC)   | On desktop, the player cannot see their own hand during the settlement phase                                                                                                     |
+| BUG-050 | Spirit settlement uses old glyph      | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile                                                                                            |
+| IMP-028 | Drop "You" labels everywhere          | Highlight already identifies the viewer; redundant "You" tags should be removed                                                                                                  |
+| IMP-029 | Settlement tiles in dropdown          | Show a tile glyph per settlement tile each player holds in the expanded breakdown                                                                                                |
+| IMP-030 | Use winner name as detail heading     | Replace generic "Someone Won!" title with the actual winning player's name                                                                                                       |
+| IMP-031 | Rank + score breakdown at hand end    | Sort players by points gained (desc) and add a per-player score breakdown dropdown                                                                                               |
+| IMP-032 | Global sound toggle                   | Add an always-available sound on/off toggle next to the language toggle                                                                                                          |
+| IMP-033 | Learn page: textures + content audit  | Migrate all tiles to MahjongTile2D and audit content for accuracy                                                                                                                |
+| IMP-034 | Customize page: texture tile preview  | Tile palette preview strip still uses legacy text tiles; migrate to MahjongTile2D                                                                                                |
+| IMP-035 | Replay page: migrate to tile textures | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels                                                                                             |
+| IMP-036 | History & replays are undiscoverable  | History page is not linked from any in-app navigation; players cannot find replays                                                                                               |
+| IMP-037 | Adjustable hand tile size (Customize) | Older players with large OS font settings find hand tiles overflow off screen on mobile; add a tile-size slider/selector in Customize — **HIGH PRIORITY VIP playtester request** |
+| IMP-038 | Auto-sort drawn tile into hand        | Drawn tile always appends to the right end of the hand; players want it inserted in its sorted position — **HIGH PRIORITY VIP playtester request**                               |
 
 ---
 
@@ -316,5 +318,60 @@ In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed
 2. **Game end screen** — after a session ends, the `GameEndScreen` component (`apps/web/src/pages/game/game-page.tsx`, search for `GameEndScreen`) shows results and a rematch button. Add a secondary "View Replay" link/button that navigates to `/replay/${gameId}` so players can jump straight to the replay of the session they just finished without having to go via History. The `gameId` is available from the game store at that point.
 
 **i18n:** `historyTitle` already exists (`apps/web/src/i18n/en.json`). A new `historyLink` key (short label for the nav grid) may be needed in both EN and ZH if `historyTitle` is too long for the 4-column grid chip. Check against `profileLink`, `friendsLink` etc. for the expected label length.
+
+---
+
+### IMP-037 · Adjustable hand tile size in Customize page ⚠️ HIGH PRIORITY — VIP playtester request
+
+**Request (verbatim, translated):** "If the mahjong tiles could be made smaller, it would be more convenient for us to play. Our eyesight is blurry from age and we normally set the phone text large. Yesterday when we were playing mahjong the tiles didn't fit; we had to turn the phone font size down to make them fit."
+
+**Context:** An older playtester has the system-level OS font size increased (common accessibility setting on iOS/Android). This causes the hand tiles to overflow the viewport on mobile — they either get clipped or the player is forced to shrink their OS font, which degrades their general phone usability. The ask is for an in-app tile size control so the player can reduce tile size independently of their OS font without losing their accessibility settings everywhere else.
+
+**Status:** OPEN — HIGH PRIORITY
+
+**Proposed solution:** Add a tile size selector to the Customize page with at least four levels: Small / Default / Large / X-Large. Store the chosen size in the `ThemeStore` (persisted to `localStorage`) and apply it as a CSS custom property (`--tile-scale` or a concrete `--tile-size-px` set) so all hand tile renderers pick it up automatically without prop drilling. The control should primarily affect the player's own hand in the game (the biggest pain point), but applying it globally to all `MahjongTile2D` instances (melds, discard pool) is acceptable as a first pass.
+
+**Where to look:**
+
+- `apps/web/src/stores/theme.store.ts` — add `tileSize: 'sm' | 'md' | 'lg' | 'xl'` (default `'md'`) alongside the existing `felt` and `tilePalette` fields. Add it to the `applyTheme()` call if theme vars are written there, or write a separate `applyTileSize()` helper.
+- `apps/web/src/pages/customize/customize-page.tsx` — add a size-selector row, modelled on the felt colour swatches. Four labelled options with a visual preview of how tile size changes. EN + ZH labels required.
+- `apps/web/src/components/2d/MahjongTile2D.tsx` — the `size` prop currently accepts `'xs' | 'sm' | 'md' | 'lg'`; confirm what pixel widths those map to and how a global CSS var could scale them (e.g. wrapping with a `transform: scale(var(--tile-scale))` or adjusting the passed `size` prop based on the store value).
+- `apps/web/src/pages/game/game-page.tsx` — wherever the viewer's hand tile row is rendered; this is the highest-impact location and should be the primary test surface.
+- `apps/web/src/i18n/en.json` + `zh.json` — add keys for the size-selector labels (e.g. `customizeTileSize`, `customizeTileSizeSm`, `customizeTileSizeMd`, `customizeTileSizeLg`, `customizeTileSizeXl`).
+
+**Implementation notes:**
+
+- A CSS `transform: scale()` approach lets the tile DOM size stay fixed (avoiding layout reflow in flex containers) at the cost of potential clipping at container edges — test carefully on narrow viewports.
+- Alternatively, the store value could directly map to a wider range of `size` prop values passed down the component tree; simpler but requires touching every call site.
+- The selector should appear in the Customize page only (not the Home settings section, which is already getting a sound toggle via IMP-032). The persisted value takes effect immediately on every page via the CSS var.
+- For Phase 12B, confirm this doesn't conflict with the `prefers-reduced-motion` work already planned.
+
+---
+
+### IMP-038 · Auto-sort drawn tile into its correct position in the hand ⚠️ HIGH PRIORITY — VIP playtester request
+
+**Request (verbatim, translated):** "I have a suggestion: when you draw a tile it should go into its category/group, so it's easier to see your hand and play. Yesterday when playing mahjong the drawn tile could only be placed off to the side, and it was very tiring to look through all the tiles to find matches."
+
+**Context:** In physical mahjong (and the current app) the tile you just drew always sits at the far right of your hand, separate from your sorted tiles. This makes sense in physical play (it's the tile you're deciding whether to discard) but on a small mobile screen it is disorienting — the player has to mentally re-scan their whole hand to assess the new tile's fit. Older players with any visual fatigue find this especially taxing. The request is for the drawn tile to be inserted at the correct sorted position automatically.
+
+**Status:** OPEN — HIGH PRIORITY
+
+**Proposed solution:** When rendering the viewer's hand tiles, instead of appending the drawn tile at the right end (index N), compute its correct sorted position and render it inline. Sorting should match the existing tile-ordering convention used elsewhere in the engine (`packages/engine/src/utils.ts` or wherever the canonical sort is defined) — suit order (bamboo → circles → characters → honours) then rank ascending within suit. This is a **display-only, client-side change** — the server never needs to know about the visual sort order, and the "last drawn tile" identity (needed for discard, for highlighting, for accessibility) must still be trackable even after being visually reordered.
+
+**Where to look:**
+
+- `apps/web/src/pages/game/game-page.tsx` — look for where the viewer's hand array is assembled before being passed to the hand renderer. The `drawnTile` (or equivalent last-drawn tracking) is likely kept separate from `concealedTiles`; the fix is to merge and sort them into one array before rendering, keeping a reference to which tile is the drawn one so it can still be highlighted.
+- `apps/web/src/components/3d/TileHand3D.tsx` — the 3D hand renderer; how it receives and lays out hand tiles. The drawn tile may already be passed as a separate prop (`drawnTile`?) that gets appended — change the layout logic so it is inserted at its sorted index instead.
+- `apps/web/src/hooks/use-game.ts` — where `tile_drawn` socket events are handled; confirm what state is updated and how the drawn tile is made available to the hand renderer.
+- `apps/web/src/stores/game.store.ts` — confirm whether `drawnTile` is stored separately or merged into the hand array. If it is stored separately, the sort merge can be done in a selector/computed value derived in `use-game.ts` rather than in the component.
+- `packages/engine/src/utils.ts` (or equivalent) — find the canonical `compareTiles` / `sortHand` function so the client-side display sort matches the engine's tile ordering exactly.
+
+**Implementation notes:**
+
+- The "drawn tile" highlight (the visual indicator showing which tile you just drew) must still work after the tile is re-positioned. Track the drawn tile by its identity (tile type value), not by array index, since the index will change after sorting.
+- If two tiles of the same type exist in the hand (e.g. you draw a second 2-bamboo), insert the new one adjacent to the existing one — prefer inserting at the rightmost position among same-type tiles so the "just drawn" one is visually distinguishable.
+- Ensure the accessibility hand (`AccessibleHand` sr-only buttons) also reflects the sorted order, so keyboard/screen-reader users benefit equally.
+- The discard action must continue to send the correct tile identity to the server regardless of visual order — confirm that the tile's `TileType` value is passed, not its visual index.
+- No backend changes required for this feature.
 
 ---
