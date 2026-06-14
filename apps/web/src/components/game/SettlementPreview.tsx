@@ -216,7 +216,7 @@ export function SettlementPreview({
                       </span>
                     </div>
                   )}
-                  {settlementPreview.nextTileSeatCounts[seat] > 0 && (
+                  {settlementPreview.nextTileSeatCounts[seat] > 0 && settlementPreview.nextTile && (
                     <div className="flex items-center gap-0.5 shrink-0">
                       <MahjongTile2D
                         tile={settlementPreview.nextTile}

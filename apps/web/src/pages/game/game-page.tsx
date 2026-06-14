@@ -514,9 +514,12 @@ function HandRevealScreen({
             : t('handTypeSevenStarThirteen')
       : null;
 
+  if (handReveal.result === 'win' && handReveal.winnerSeat === undefined) {
+    throw new Error('Invalid domain state: Win condition missing winnerSeat');
+  }
   const headingLabel =
-    handReveal.result === 'win' && handReveal.winnerSeat !== undefined
-      ? t('handRevealWinsHeading', snapshot.seats[handReveal.winnerSeat].seatName)
+    handReveal.result === 'win'
+      ? t('handRevealWinsHeading', snapshot.seats[handReveal.winnerSeat!].seatName)
       : handReveal.result === 'concede'
         ? t('handRevealResultConcede')
         : t('handRevealResultDraw');
