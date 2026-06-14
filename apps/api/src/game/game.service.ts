@@ -1335,7 +1335,7 @@ export class GameService {
       state.jingSecondary,
     );
 
-    // ── Net hand delta per seat (win + kong payouts + spirit vs. starting score) ─
+    // ── Net hand delta per seat (win + kong payouts + opening jing + spirit) ─────
     const handMeta = session.handLog[session.handLog.length - 1];
     const handStarting =
       handMeta?.startingScores ?? ([0, 0, 0, 0] as [number, number, number, number]);
@@ -1345,6 +1345,19 @@ export class GameService {
       number,
       number,
     ];
+
+    // Opening jing settlement delta (ruleTopBottomJing only) — tracked separately
+    // so the UI can label it "Bonus Tile" instead of lumping it into "Kong Payouts".
+    const openingJingEvent = session.engine.events.find(
+      (e) => e.kind === 'opening_jing_settlement',
+    ) as
+      | {
+          kind: 'opening_jing_settlement';
+          settlementTile: TileType;
+          scoreDelta: [number, number, number, number];
+        }
+      | undefined;
+    const openingJingDelta = openingJingEvent?.scoreDelta;
 
     // ── Build hand-reveal payload ──────────────────────────────────────────────
     const handReveal: HandRevealPayload = {
@@ -1368,6 +1381,7 @@ export class GameService {
       isLastHand,
       nextDealerSeat: isLastHand ? undefined : nextDealerInfo.dealerSeat,
       handNetDeltas,
+      openingJingDelta,
       liableSeat,
       isRobKong,
     };

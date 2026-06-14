@@ -551,10 +551,12 @@ function HandRevealScreen({
 
             const winPayDelta = handReveal.winPayment?.scoreDelta[seat] ?? 0;
             const spiritDelta = handReveal.spiritDeltas[seat];
-            const kongDelta = delta - winPayDelta - spiritDelta;
+            const bonusTileDelta = handReveal.openingJingDelta?.[seat] ?? 0;
+            const kongDelta = delta - winPayDelta - spiritDelta - bonusTileDelta;
             const hasWinSection =
               handReveal.result === 'win' && handReveal.winPayment !== undefined;
-            const hasBreakdown = hasWinSection || spiritHasAny || kongDelta !== 0;
+            const hasBreakdown =
+              hasWinSection || spiritHasAny || kongDelta !== 0 || bonusTileDelta !== 0;
 
             return (
               <div
@@ -824,6 +826,25 @@ function HandRevealScreen({
                           {t(
                             'handRevealBreakdownKongNet',
                             kongDelta > 0 ? `+${kongDelta}` : String(kongDelta),
+                          )}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Section 4 — Bonus tile (opening jing settlement) */}
+                    {bonusTileDelta !== 0 && (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] font-bold tracking-widest text-mj-gold/50 uppercase">
+                          {t('handRevealBreakdownBonusTileHeader')}
+                        </p>
+                        <p
+                          className={`text-sm font-bold tabular-nums ${
+                            bonusTileDelta > 0 ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
+                          {t(
+                            'handRevealBreakdownBonusTileNet',
+                            bonusTileDelta > 0 ? `+${bonusTileDelta}` : String(bonusTileDelta),
                           )}
                         </p>
                       </div>

@@ -362,6 +362,8 @@
   "handRevealBreakdownSpiritNet": "精牌合计: {{0}}",
   "handRevealBreakdownKongHeader": "杠牌",
   "handRevealBreakdownKongNet": "合计: {{0}}",
+  "handRevealBreakdownBonusTileHeader": "下精",
+  "handRevealBreakdownBonusTileNet": "合计: {{0}}",
   "handTypeSevenPairs": "七对子",
   "handTypeAllTriplets": "大七对",
   "handTypeThirteenMisfits": "十三烂",

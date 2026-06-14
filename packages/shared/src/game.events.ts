@@ -281,10 +281,17 @@ export interface HandRevealPayload {
   /** Dealer seat for the next hand (undefined when isLastHand). */
   nextDealerSeat?: 0 | 1 | 2 | 3;
   /**
-   * Net score change per seat this hand: includes win payment, kong payouts, and
-   * spirit settlement. Zero-sum; useful for "you gained/lost N this hand" display.
+   * Net score change per seat this hand: includes win payment, kong payouts,
+   * opening jing settlement, and spirit settlement. Zero-sum.
    */
   handNetDeltas: [number, number, number, number];
+  /**
+   * Opening jing settlement delta per seat (ruleTopBottomJing only).
+   * Omitted when the rule is off or no settlement occurred this hand.
+   * Already included in handNetDeltas — tracked separately so the UI can
+   * display it as "Bonus Tile" rather than lumping it into "Kong Payouts".
+   */
+  openingJingDelta?: [number, number, number, number];
   /**
    * The single seat liable for the full win payment.
    * - Ron: the seat that discarded the winning tile.
