@@ -217,6 +217,11 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Assigned every render so the effect reads current committed state synchronously
+  // without adding localOrder to the effect deps (which would cause infinite loops).
+  const localOrderRef = useRef<LocalEntry[]>(localOrder);
+  localOrderRef.current = localOrder;
+
   // Track hand content and toggle state for change detection.
   // Both are checked: a toggle change mid-hand must re-sort immediately
   // without waiting for the next draw.
@@ -229,26 +234,23 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
     prevHandKeyRef.current = key;
     prevToggleRef.current = autoSortDrawnTile;
 
-    // Functional setter guarantees we operate on the latest committed state,
-    // avoiding stale-closure issues present in the ref-based approach.
-    setLocalOrder((prev) => {
-      const merged = mergeLocalOrder(prev, viewerHand);
-      if (!autoSortDrawnTile) {
-        // Clear any stale isJustDrawn flags from a previous auto-sort session.
-        return merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
-      }
-      // Tag newly appended entries (those whose stable UUID wasn't in the previous
-      // order) as isJustDrawn so the gold dot follows the drawn tile.
+    const prev = localOrderRef.current;
+    const merged = mergeLocalOrder(prev, viewerHand);
+
+    let nextOrder: LocalEntry[];
+    if (!autoSortDrawnTile) {
+      nextOrder = merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
+    } else {
       const prevIds = new Set(prev.map((e) => e.id));
       const tagged = merged.map((e) => ({ ...e, isJustDrawn: !prevIds.has(e.id) }));
-      // Sort entry objects directly — serverIndex is already embedded on each entry,
-      // so no secondary multiset match is needed.
-      return [...tagged].sort((a, b) => {
-        if (a.tile === b.tile) return 0; // same type: preserve relative order (stable sort)
+      nextOrder = [...tagged].sort((a, b) => {
+        if (a.tile === b.tile) return 0;
         const [first] = sortTypes([a.tile, b.tile]);
         return first === a.tile ? -1 : 1;
       });
-    });
+    }
+
+    setLocalOrder(nextOrder);
     setSelectedId(null);
   }, [viewerHand, autoSortDrawnTile]);
 
