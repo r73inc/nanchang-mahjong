@@ -1085,31 +1085,26 @@ function AccessibleHand({
   onSelect,
   onDiscard,
   isMyTurn,
-  autoSort = false,
+  displayOrder,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
   isMyTurn: boolean;
-  autoSort?: boolean;
+  /** Maps display position → server hand index. Mirrors ViewerHandHUD's display
+   *  order so screen-reader buttons stay in sync with the visual tile positions.
+   *  Pass `hand.map((_, i) => i)` for natural order (2D mode / no auto-sort). */
+  displayOrder: number[];
 }) {
   const { lang } = useI18n();
 
-  // Build display entries: { tile, serverIdx } pairs. When autoSort is on, sort by
-  // canonical tile order. serverIdx is the index in the server hand array — it must
-  // be forwarded to onSelect/onDiscard so the server receives the correct tile identity
-  // regardless of display order. Uses a multiset match to handle duplicate tile types.
-  const entries = (() => {
-    if (!autoSort) return hand.map((tile, serverIdx) => ({ tile, serverIdx }));
-    const sortedTiles = sortTypes([...hand]);
-    const pool = hand.map((tile, idx) => ({ tile, idx, used: false }));
-    return sortedTiles.map((tile) => {
-      const entry = pool.find((e) => e.tile === tile && !e.used)!;
-      entry.used = true;
-      return { tile, serverIdx: entry.idx };
-    });
-  })();
+  // Derive entries directly from displayOrder — serverIdx is permanently baked in,
+  // no multiset match needed. Entries whose serverIdx is out of range are skipped
+  // (transient during hand transitions).
+  const entries = displayOrder
+    .filter((serverIdx) => serverIdx < hand.length)
+    .map((serverIdx) => ({ tile: hand[serverIdx], serverIdx }));
 
   return (
     <div className="sr-only" role="group" aria-label="Your hand">
@@ -1703,6 +1698,7 @@ function ViewerHandHUD({
   isMyTurn,
   jingTypes,
   pendingMove,
+  onDisplayOrderChange,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
@@ -1711,6 +1707,9 @@ function ViewerHandHUD({
   isMyTurn: boolean;
   jingTypes: Set<string>;
   pendingMove: boolean;
+  /** Called whenever the internal displayOrder changes so the parent can mirror
+   *  it in AccessibleHand (keeping sr-only buttons in sync with visual order). */
+  onDisplayOrderChange?: (order: number[]) => void;
 }) {
   const { t } = useI18n();
   const { autoSortDrawnTile } = useThemeStore();
@@ -1752,6 +1751,12 @@ function ViewerHandHUD({
       setDisplayOrder(hand.map((_, i) => i));
     }
   }, [hand.length, autoSortDrawnTile]);
+
+  // Report displayOrder to the parent whenever it changes so AccessibleHand can
+  // mirror the exact visual order without recomputing it independently.
+  useEffect(() => {
+    onDisplayOrderChange?.(displayOrder);
+  }, [displayOrder, onDisplayOrderChange]);
 
   const handleDragStart = (displayIdx: number) => {
     setDragFrom(displayIdx);
@@ -2550,7 +2555,12 @@ function GameTable({
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
 
-  const { autoSortDrawnTile } = useThemeStore();
+  // Mirror of ViewerHandHUD's internal displayOrder, kept in sync via the
+  // onDisplayOrderChange callback below. Used by AccessibleHand so the sr-only
+  // DOM buttons always match the visual tile positions in the 3D hand HUD.
+  const [hudDisplayOrder, setHudDisplayOrder] = useState<number[]>(() =>
+    viewerHand.map((_, i) => i),
+  );
 
   // Derive jing set for the viewer hand HUD tile highlighting.
   const jingTypes = new Set<string>();
@@ -2868,6 +2878,7 @@ function GameTable({
             isMyTurn={isMyTurn && !canTsumo}
             jingTypes={jingTypes}
             pendingMove={pendingMove}
+            onDisplayOrderChange={setHudDisplayOrder}
           />
         )}
 
@@ -2898,7 +2909,7 @@ function GameTable({
           onSelect={onSelect}
           onDiscard={handleDiscardOrKong}
           isMyTurn={isMyTurn && !pendingMove && !canTsumo}
-          autoSort={autoSortDrawnTile}
+          displayOrder={hudDisplayOrder}
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}

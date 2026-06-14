@@ -146,35 +146,38 @@ describe('mergeLocalOrder Â· 2DHandÂ·merge', () => {
 
   it('preserves existing entries in user order when hand is unchanged', () => {
     const prev: LocalEntry[] = [
-      { id: 'a', tile: '3m' },
-      { id: 'b', tile: '1m' },
-      { id: 'c', tile: '2m' },
+      { id: 'a', tile: '3m', serverIndex: 2 },
+      { id: 'b', tile: '1m', serverIndex: 0 },
+      { id: 'c', tile: '2m', serverIndex: 1 },
     ];
     const result = mergeLocalOrder(prev, ['1m', '2m', '3m']);
     // user-sorted order preserved: 3m, 1m, 2m
     expect(result.map((e) => e.id)).toEqual(['a', 'b', 'c']);
     expect(result.map((e) => e.tile)).toEqual(['3m', '1m', '2m']);
+    // serverIndices are re-assigned from the new server hand
+    expect(result.map((e) => e.serverIndex)).toEqual([2, 0, 1]);
   });
 
   it('appends a newly drawn tile at the end with a new id', () => {
     const prev: LocalEntry[] = [
-      { id: 'a', tile: '1m' },
-      { id: 'b', tile: '2m' },
+      { id: 'a', tile: '1m', serverIndex: 0 },
+      { id: 'b', tile: '2m', serverIndex: 1 },
     ];
     const result = mergeLocalOrder(prev, ['1m', '2m', '4m']);
     expect(result).toHaveLength(3);
     expect(result[0].id).toBe('a');
     expect(result[1].id).toBe('b');
     expect(result[2].tile).toBe('4m');
+    expect(result[2].serverIndex).toBe(2); // drawn tile is at server index 2
     expect(result[2].id).not.toBe('a');
     expect(result[2].id).not.toBe('b');
   });
 
   it('removes a discarded tile while keeping others in user order', () => {
     const prev: LocalEntry[] = [
-      { id: 'a', tile: '3m' },
-      { id: 'b', tile: '1m' },
-      { id: 'c', tile: '2m' },
+      { id: 'a', tile: '3m', serverIndex: 2 },
+      { id: 'b', tile: '1m', serverIndex: 0 },
+      { id: 'c', tile: '2m', serverIndex: 1 },
     ];
     // 2m was discarded
     const result = mergeLocalOrder(prev, ['1m', '3m']);
@@ -184,23 +187,25 @@ describe('mergeLocalOrder Â· 2DHandÂ·merge', () => {
 
   it('handles duplicate tile types correctly', () => {
     const prev: LocalEntry[] = [
-      { id: 'a', tile: '1m' },
-      { id: 'b', tile: '1m' },
-      { id: 'c', tile: '2m' },
+      { id: 'a', tile: '1m', serverIndex: 0 },
+      { id: 'b', tile: '1m', serverIndex: 1 },
+      { id: 'c', tile: '2m', serverIndex: 2 },
     ];
-    // one 1m was discarded
+    // one 1m was discarded; server hand is now ['1m', '2m']
     const result = mergeLocalOrder(prev, ['1m', '2m']);
     expect(result).toHaveLength(2);
     expect(result.map((e) => e.id)).toEqual(['a', 'c']);
+    // 'a' gets serverIndex 0 (first 1m in new hand), 'c' gets serverIndex 1
+    expect(result.map((e) => e.serverIndex)).toEqual([0, 1]);
   });
 
   it('returns empty array when server hand is empty', () => {
-    const prev: LocalEntry[] = [{ id: 'a', tile: '1m' }];
+    const prev: LocalEntry[] = [{ id: 'a', tile: '1m', serverIndex: 0 }];
     expect(mergeLocalOrder(prev, [])).toEqual([]);
   });
 
   it('stable IDs survive multiple consecutive draws', () => {
-    const start: LocalEntry[] = [{ id: 'x', tile: '1m' }];
+    const start: LocalEntry[] = [{ id: 'x', tile: '1m', serverIndex: 0 }];
     const after1 = mergeLocalOrder(start, ['1m', '2m']);
     expect(after1[0].id).toBe('x');
     const draw1Id = after1[1].id;

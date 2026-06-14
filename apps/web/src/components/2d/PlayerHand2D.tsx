@@ -70,6 +70,14 @@ export interface LocalEntry {
   /** Stable ephemeral ID used as Framer Motion layoutId. */
   id: string;
   tile: TileType;
+  /**
+   * The index of this tile in the server hand array at the time the entry was
+   * last synced. Stored permanently so the sort step never needs to re-derive
+   * it via a fragile multiset match — discard handlers read entry.tile directly
+   * (the server deducts by type), but having serverIndex available makes the
+   * binding explicit and safe.
+   */
+  serverIndex: number;
   /** True when this tile was drawn in the most recent server update. Used to
    *  visually identify the drawn tile after auto-sort reorders it away from the
    *  right end of the hand. Cleared on the next hand change. */
@@ -93,45 +101,44 @@ function genId(): string {
  * Merges a fresh server hand into the current localOrder.
  *
  * Rules:
- *  1. Tiles already present in `prev` are kept in their user-sorted positions.
- *  2. New tiles (drawn) are appended at the end with fresh IDs.
+ *  1. Tiles already present in `prev` are kept in their user-sorted positions,
+ *     with their serverIndex updated to reflect the new server hand layout.
+ *  2. New tiles (drawn) are appended at the end with fresh IDs and the correct
+ *     serverIndex from the incoming hand.
  *  3. Removed tiles (discarded / claimed) are dropped.
  *
- * Uses a multiset-match so duplicate TileType values are handled correctly
- * (e.g., two '1m' tiles in the same hand get independent IDs).
+ * Server indices are assigned ONCE here via a per-tile dequeue — no secondary
+ * multiset match is ever needed in the sort step or elsewhere.
  */
 export function mergeLocalOrder(prev: LocalEntry[], serverHand: TileType[]): LocalEntry[] {
-  // How many of each tile the new server hand contains
-  const want = new Map<TileType, number>();
-  for (const t of serverHand) {
-    want.set(t, (want.get(t) ?? 0) + 1);
-  }
+  // Build a FIFO queue of server indices for each tile type
+  const queues = new Map<TileType, number[]>();
+  serverHand.forEach((tile, idx) => {
+    if (!queues.has(tile)) queues.set(tile, []);
+    queues.get(tile)!.push(idx);
+  });
 
-  // Walk prev in user order; greedily keep matching tiles
-  const consumed = new Map<TileType, number>();
+  // Walk prev in user order; keep entries whose tile type still exists in the
+  // server hand, assigning the next available server index for that type.
   const kept: LocalEntry[] = [];
+  const usedServerIndices = new Set<number>();
   for (const entry of prev) {
-    const total = want.get(entry.tile) ?? 0;
-    const used = consumed.get(entry.tile) ?? 0;
-    if (used < total) {
-      kept.push(entry);
-      consumed.set(entry.tile, used + 1);
+    const q = queues.get(entry.tile);
+    if (q?.length) {
+      const serverIndex = q.shift()!;
+      kept.push({ ...entry, serverIndex });
+      usedServerIndices.add(serverIndex);
     }
+    // No queue entry left → tile was removed (discarded/claimed); drop it.
   }
 
-  // Append tiles that are new (not covered by kept)
-  const keptCount = new Map<TileType, number>();
-  for (const e of kept) {
-    keptCount.set(e.tile, (keptCount.get(e.tile) ?? 0) + 1);
-  }
-
+  // Append new entries for server tiles not yet assigned to a kept entry.
   const appended: LocalEntry[] = [];
-  for (const [tile, total] of want) {
-    const have = keptCount.get(tile) ?? 0;
-    for (let i = have; i < total; i++) {
-      appended.push({ id: genId(), tile });
+  serverHand.forEach((tile, serverIndex) => {
+    if (!usedServerIndices.has(serverIndex)) {
+      appended.push({ id: genId(), tile, serverIndex });
     }
-  }
+  });
 
   return [...kept, ...appended];
 }
@@ -206,47 +213,53 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   // ── Local drag-sort state ─────────────────────────────────────────────────
 
   const [localOrder, setLocalOrder] = useState<LocalEntry[]>(() =>
-    viewerHand.map((tile) => ({ id: genId(), tile })),
+    viewerHand.map((tile, serverIndex) => ({ id: genId(), tile, serverIndex })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Ref kept in sync every render so the sync effect can read current localOrder
+  // without adding it to its dependency array (avoids stale-closure bugs and
+  // prevents re-triggering on every drag reorder).
+  const localOrderRef = useRef<LocalEntry[]>(localOrder);
+  localOrderRef.current = localOrder;
 
   // Track the last hand key to detect server-driven hand changes
   const prevHandKeyRef = useRef<string>(viewerHand.join(','));
 
   useEffect(() => {
     const key = viewerHand.join(',');
-    if (key !== prevHandKeyRef.current) {
-      prevHandKeyRef.current = key;
-      setLocalOrder((prev) => {
-        const merged = mergeLocalOrder(prev, viewerHand);
+    if (key === prevHandKeyRef.current) return;
+    prevHandKeyRef.current = key;
 
-        if (!autoSortDrawnTile) {
-          // Clear any stale isJustDrawn flags carried over from a previous auto-sort
-          // session (e.g. user toggled the setting off mid-game).
-          return merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
-        }
+    // Read current order via ref (avoids adding localOrder to deps which would
+    // re-trigger on every drag reorder).
+    const prev = localOrderRef.current;
+    const merged = mergeLocalOrder(prev, viewerHand);
 
-        // Identify newly added entries by comparing stable IDs against the previous
-        // localOrder. Entries with a new ID were appended by mergeLocalOrder and
-        // represent the tile(s) drawn this turn.
-        const prevIds = new Set(prev.map((e) => e.id));
-        const tagged = merged.map((e) => ({
-          ...e,
-          isJustDrawn: !prevIds.has(e.id),
-        }));
+    let nextOrder: LocalEntry[];
+    if (!autoSortDrawnTile) {
+      // Clear any stale isJustDrawn flags from a previous auto-sort session.
+      nextOrder = merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
+    } else {
+      // Tag newly appended entries (those whose stable UUID wasn't in the previous
+      // order) as isJustDrawn so the gold dot follows the drawn tile.
+      const prevIds = new Set(prev.map((e) => e.id));
+      const tagged = merged.map((e) => ({ ...e, isJustDrawn: !prevIds.has(e.id) }));
 
-        // Sort by canonical tile order, preserving the isJustDrawn flag so the gold
-        // dot indicator follows the drawn tile to its new sorted position.
-        const sortedTiles = sortTypes(tagged.map((e) => e.tile));
-        const pool = [...tagged];
-        return sortedTiles.map((tile) => {
-          const idx = pool.findIndex((e) => e.tile === tile);
-          return pool.splice(idx, 1)[0];
-        });
+      // Sort entry objects directly — serverIndex is already embedded on each entry,
+      // so no secondary multiset match is needed.
+      nextOrder = [...tagged].sort((a, b) => {
+        if (a.tile === b.tile) return 0; // same type: preserve relative order (stable sort)
+        const [first] = sortTypes([a.tile, b.tile]);
+        return first === a.tile ? -1 : 1;
       });
-      // Clear any pending selection when the server delivers a new snapshot
-      setSelectedId(null);
     }
+
+    // Explicitly set the computed state rather than using the functional form, so
+    // Framer Motion's Reorder.Group sees a fully resolved values array in the same
+    // commit and its drag physics stay in sync.
+    setLocalOrder(nextOrder);
+    setSelectedId(null);
   }, [viewerHand, autoSortDrawnTile]);
 
   // ── Interaction ───────────────────────────────────────────────────────────
@@ -265,15 +278,13 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
 
   // ── Sort hand ─────────────────────────────────────────────────────────────
   const handleSortHand = useCallback(() => {
-    setLocalOrder((prev) => {
-      const sortedTiles = sortTypes(prev.map((e) => e.tile));
-      const pool = [...prev];
-      return sortedTiles.map((tile) => {
-        const idx = pool.findIndex((e) => e.tile === tile);
-        const entry = pool.splice(idx, 1)[0];
-        return entry;
-      });
-    });
+    setLocalOrder((prev) =>
+      [...prev].sort((a, b) => {
+        if (a.tile === b.tile) return 0;
+        const [first] = sortTypes([a.tile, b.tile]);
+        return first === a.tile ? -1 : 1;
+      }),
+    );
     setSelectedId(null);
   }, []);
 
