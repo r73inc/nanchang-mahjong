@@ -33,25 +33,9 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
-### IMP-038 · Auto-sort drawn tile into hand ⚠️ HIGH PRIORITY
+### IMP-038 · Auto-sort drawn tile into hand — ⚠️ RE-OPENED (see Open-issues.md)
 
-**Root cause / request:** In the current implementation the drawn tile always appends at the far right. Older players find it tiring to visually re-scan the whole hand after each draw. An opt-in setting was requested to automatically insert the drawn tile into its sorted position.
-
-**Fix:**
-
-- Added `autoSortDrawnTile: boolean` (default `false`) to `ThemeStore`.
-- **`PlayerHand2D` (2D mode — primary mobile path):** Added `isJustDrawn?: boolean` to `LocalEntry`. The hand-sync `useEffect` now identifies newly added entries by comparing stable IDs against the previous `localOrder`. When `autoSortDrawnTile=true`, it tags appended entries with `isJustDrawn=true` and sorts the merged array using `sortTypes` while preserving the tag. A gold dot renders on the drawn tile's wrapper so the player can find it after it moves. When `autoSortDrawnTile=false`, any stale `isJustDrawn` flags are cleared.
-- **`ViewerHandHUD` (3D desktop mode):** The draw handler in the `displayOrder` sync effect now sorts the extended index array by tile type when `autoSortDrawnTile=true`. The `isDrawn` gold dot still works correctly because `drawnHandIdx = hand.length - 1` (server always appends last); only the display position changes.
-- **`AccessibleHand`:** Added `autoSort` prop. When true, builds sorted display entries with correct server indices using a multiset match so duplicate tile types are handled unambiguously — keyboard/screen-reader users see the same sorted order.
-- Customize page: toggle switch for "Auto-Sort Drawn Tile" with EN+ZH labels and description.
-- No backend changes; this is entirely a client-side display feature.
-
-**Tests added:** `Customize·auto-sort` — verifies the toggle switch enables/disables the setting in the store.
-
-**Key learnings:**
-
-- Tagged objects (`{ id, tile, isJustDrawn }`) are the only reliable way to identify which copy of a duplicated tile type was just drawn after sorting — raw string comparison cannot distinguish `['2m', '2m', '2m']`. Using the stable Framer Motion `id` as the comparison key is the correct approach.
-- The AccessibleHand needs its own server-index mapping when auto-sort is on; passing a pre-sorted tile array and having the component call `onSelect(displayIdx)` would pass the wrong index to the server.
+The toggle UI and store plumbing shipped correctly. The actual sort on draw is not triggering for end users in 2D mode. Re-opened as a critical VIP ask. See `Open-issues.md` for full investigation notes and root cause analysis.
 
 ---
 

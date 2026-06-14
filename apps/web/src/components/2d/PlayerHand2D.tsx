@@ -217,47 +217,39 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Ref kept in sync every render so the sync effect can read current localOrder
-  // without adding it to its dependency array (avoids stale-closure bugs and
-  // prevents re-triggering on every drag reorder).
+  // Assigned every render so the effect reads current committed state synchronously
+  // without adding localOrder to the effect deps (which would cause infinite loops).
   const localOrderRef = useRef<LocalEntry[]>(localOrder);
   localOrderRef.current = localOrder;
 
-  // Track the last hand key to detect server-driven hand changes
+  // Track hand content and toggle state for change detection.
+  // Both are checked: a toggle change mid-hand must re-sort immediately
+  // without waiting for the next draw.
   const prevHandKeyRef = useRef<string>(viewerHand.join(','));
+  const prevToggleRef = useRef<boolean>(autoSortDrawnTile);
 
   useEffect(() => {
     const key = viewerHand.join(',');
-    if (key === prevHandKeyRef.current) return;
+    if (key === prevHandKeyRef.current && prevToggleRef.current === autoSortDrawnTile) return;
     prevHandKeyRef.current = key;
+    prevToggleRef.current = autoSortDrawnTile;
 
-    // Read current order via ref (avoids adding localOrder to deps which would
-    // re-trigger on every drag reorder).
     const prev = localOrderRef.current;
     const merged = mergeLocalOrder(prev, viewerHand);
 
     let nextOrder: LocalEntry[];
     if (!autoSortDrawnTile) {
-      // Clear any stale isJustDrawn flags from a previous auto-sort session.
       nextOrder = merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
     } else {
-      // Tag newly appended entries (those whose stable UUID wasn't in the previous
-      // order) as isJustDrawn so the gold dot follows the drawn tile.
       const prevIds = new Set(prev.map((e) => e.id));
       const tagged = merged.map((e) => ({ ...e, isJustDrawn: !prevIds.has(e.id) }));
-
-      // Sort entry objects directly — serverIndex is already embedded on each entry,
-      // so no secondary multiset match is needed.
       nextOrder = [...tagged].sort((a, b) => {
-        if (a.tile === b.tile) return 0; // same type: preserve relative order (stable sort)
+        if (a.tile === b.tile) return 0;
         const [first] = sortTypes([a.tile, b.tile]);
         return first === a.tile ? -1 : 1;
       });
     }
 
-    // Explicitly set the computed state rather than using the functional form, so
-    // Framer Motion's Reorder.Group sees a fully resolved values array in the same
-    // commit and its drag physics stay in sync.
     setLocalOrder(nextOrder);
     setSelectedId(null);
   }, [viewerHand, autoSortDrawnTile]);
