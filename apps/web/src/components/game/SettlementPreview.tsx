@@ -195,15 +195,38 @@ export function SettlementPreview({
                   isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
                 } ${isExpanded ? 'rounded-b-none' : ''}`}
               >
-                <div className="flex items-center gap-2 flex-1 text-left">
-                  <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
+                <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+                  <span className="text-sm font-bold shrink-0" style={{ color: WIND_COLOR[wind] }}>
                     {WIND_CHAR[wind]}
                   </span>
-                  <span className="text-xs text-mj-bone/60">{snapshot.seats[seat].seatName}</span>
-                  {isViewer && (
-                    <span className="text-mj-bone/40 font-normal text-xs ml-auto">
-                      {t('preGameYou')}
-                    </span>
+                  <span className="text-xs text-mj-bone/60 truncate">
+                    {snapshot.seats[seat].seatName}
+                  </span>
+                  {settlementPreview.seatCounts[seat] > 0 && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <MahjongTile2D
+                        tile={settlementPreview.settlementTile}
+                        size="xs"
+                        interactive={false}
+                        isJing
+                        showJingLabel={false}
+                      />
+                      <span className="text-[10px] text-mj-gold/70 font-semibold">
+                        {t('tileCountX', String(settlementPreview.seatCounts[seat]))}
+                      </span>
+                    </div>
+                  )}
+                  {settlementPreview.nextTileSeatCounts[seat] > 0 && settlementPreview.nextTile && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <MahjongTile2D
+                        tile={settlementPreview.nextTile}
+                        size="xs"
+                        interactive={false}
+                      />
+                      <span className="text-[10px] text-mj-bone/50 font-semibold">
+                        {t('tileCountX', String(settlementPreview.nextTileSeatCounts[seat]))}
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

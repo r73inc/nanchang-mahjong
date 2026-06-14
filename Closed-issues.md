@@ -6,6 +6,45 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-028-029-030-ui-polish` (2026-06-14)
+
+### IMP-028 · Remove redundant "You" labels from settlement / score / reveal screens
+
+**Fix:**
+
+- Removed `{t('preGameYou')}` from the viewer row in `SettlementPreview.tsx` (the bonus-tile settlement table before each hand).
+- Removed `{t('preGameYou')}` from the viewer row in the All Hands section of `HandRevealScreen` in `game-page.tsx`.
+- Retired the `preGameYou` key from `en.json` and `zh.json` — the key now has zero usages.
+
+The gold background + border (`bg-mj-gold/15 border border-mj-gold/30`) on the viewer's row remains as the sole "this is you" affordance across all screens.
+
+---
+
+### IMP-029 · Show settlement tiles per player in the collapsed row of the bonus-tile settlement screen
+
+**Fix:**
+
+Added tile-count chips directly in the collapsed row of each player entry in `SettlementPreview.tsx`. For each player, the collapsed row now shows:
+
+- `[settlementTile] ×N` (gold, `xs` size, `isJing` + `showJingLabel={false}`) when the player holds N copies of the 2-pt settlement tile.
+- `[nextTile] ×N` (muted, `xs` size) when the player holds N copies of the 1-pt tile.
+
+Chips only render when the count is > 0 and use `shrink-0` to prevent layout collapse on narrow viewports. The "Tile + ×N" format avoids repeating SVG glyphs per copy, satisfying the mobile-safe constraint from the issue spec.
+
+---
+
+### IMP-030 · Use the winning player's name as the end-of-round detail heading
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Renamed `resultLabel` → `headingLabel`. For a win, `headingLabel` now uses the new key `handRevealWinsHeading` ("{{0}} Wins!") with the winner's name interpolated directly, making the `<h1>` personal and specific.
+- Removed the secondary `<p>` that previously showed `handRevealWinner` ("{{0}} wins this hand") below the h1 for the win case — the name is now in the heading itself, so the secondary line was redundant.
+- Concede and draw cases are unchanged: `handRevealResultConcede` / `handRevealResultDraw` remain as the h1; the concede `<p>` ("{{0}} conceded") is preserved.
+
+**i18n:** Added `handRevealWinsHeading` in `en.json` ("{{0}} Wins!") and `zh.json` ("{{0}} 赢了！"). Retired `handRevealResultWin` ("Someone Won!" / "有人赢了！") — no remaining usages.
+
+---
+
 ## `feat/imp031-unified-hand-result-table` (2026-06-13)
 
 ### IMP-031 · Unified sorted hand-result table with full per-player score breakdown
