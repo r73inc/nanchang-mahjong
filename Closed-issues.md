@@ -6,6 +6,27 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug054-learn-page-hands` (2026-06-14)
+
+### BUG-054 · Learn page "Hands" tab shows incomplete example hands
+
+**Root cause:** Three of the five hand examples in `HandsSection` were sliced at render time or used an incomplete data array:
+
+- `SEVEN_PAIRS_HAND.slice(0, 7)` — the full 14-tile array existed but was halved at the call site.
+- `THIRTEEN_HAND.slice(0, 9)` — the full 14-tile array existed but only the numbered tiles were shown.
+- `[...WINDS, ...DRAGS]` for Seven Star — produced 7 tiles (one of each honor) rather than a valid 14-tile Thirteen Misfits hand containing all 7 honors.
+
+**Fix (`apps/web/src/pages/learn/learn-page.tsx`):**
+
+- Removed `.slice(0, 7)` from the Seven Pairs `<TileRow>` — now shows all 14 tiles.
+- Removed `.slice(0, 9)` from the Thirteen Misfits `<TileRow>` — now shows all 14 tiles.
+- Added `SEVEN_STAR_HAND: TileType[]` constant: `1m, 4m, 7m, 1p, 4p, 7p, 1s` (7 numbered tiles, all inter-tile gaps > 2) + `east, south, west, north, zhong, fa, bai` (all 7 unique honors) = 14 tiles. This is a valid Seven Star Thirteen Misfits hand per the authoritative rules doc.
+- Replaced `TileRow tiles={[...WINDS, ...DRAGS]}` with `TileRow tiles={SEVEN_STAR_HAND}` in the Seven Star card.
+
+**Key learning:** Always check the render call site when displaying a "complete" example — the data array can be correct while a slice at the JSX level silently truncates it.
+
+---
+
 ## `fix/bug051-052-discard-block-palette-preview` (2026-06-14)
 
 ### BUG-052 · Customize palette cards show tiles using the active palette instead of their own
@@ -36,25 +57,6 @@ The feature was implemented across PR #142 (store + toggle) and PR #143 (`fix/im
 - `ViewerHandHUD` sort effect for desktop 3D mode.
 - Gold dot marker for the just-drawn tile.
 - `xs` size tier added to `TILE_DIMS` and `TILE_SIZE_OPTIONS`.
-
----
-
-### BUG-054 · Learn page "Hands" tab shows incomplete example hands
-
-**Root cause:** Three of the five hand examples in `HandsSection` were sliced at render time or used an incomplete data array:
-
-- `SEVEN_PAIRS_HAND.slice(0, 7)` — the full 14-tile array existed but was halved at the call site.
-- `THIRTEEN_HAND.slice(0, 9)` — the full 14-tile array existed but only the numbered tiles were shown.
-- `[...WINDS, ...DRAGS]` for Seven Star — produced 7 tiles (one of each honor) rather than a valid 14-tile Thirteen Misfits hand containing all 7 honors.
-
-**Fix (`apps/web/src/pages/learn/learn-page.tsx`):**
-
-- Removed `.slice(0, 7)` from the Seven Pairs `<TileRow>` — now shows all 14 tiles.
-- Removed `.slice(0, 9)` from the Thirteen Misfits `<TileRow>` — now shows all 14 tiles.
-- Added `SEVEN_STAR_HAND: TileType[]` constant: `1m, 4m, 7m, 1p, 4p, 7p, 1s` (7 numbered tiles, all inter-tile gaps > 2) + `east, south, west, north, zhong, fa, bai` (all 7 unique honors) = 14 tiles. This is a valid Seven Star Thirteen Misfits hand per the authoritative rules doc.
-- Replaced `TileRow tiles={[...WINDS, ...DRAGS]}` with `TileRow tiles={SEVEN_STAR_HAND}` in the Seven Star card.
-
-**Key learning:** Always check the render call site when displaying a "complete" example — the data array can be correct while a slice at the JSX level silently truncates it.
 
 ---
 
