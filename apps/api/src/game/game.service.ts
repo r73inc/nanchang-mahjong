@@ -1357,7 +1357,7 @@ export class GameService {
           scoreDelta: [number, number, number, number];
         }
       | undefined;
-    const openingJingDelta = openingJingEvent?.scoreDelta;
+    const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
 
     // ── Build hand-reveal payload ──────────────────────────────────────────────
     const handReveal: HandRevealPayload = {
