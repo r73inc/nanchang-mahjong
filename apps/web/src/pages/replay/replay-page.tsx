@@ -16,7 +16,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
-import { MahjongTile } from '../../components/mahjong-tile';
+import { MahjongTile2D } from '../../components/2d/MahjongTile2D';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { useReplay } from '../../hooks/use-replay';
@@ -250,7 +250,7 @@ export function ReplayPage() {
                           : undefined
                       }
                     >
-                      <MahjongTile tile={tile} size="sm" />
+                      <MahjongTile2D tile={tile} size="sm" />
                     </div>
                   );
                 })}
@@ -302,7 +302,7 @@ export function ReplayPage() {
                   {eventLabel(step.event.kind, t)}
                 </span>
                 {'tile' in step.event && step.event.tile && (
-                  <MahjongTile tile={step.event.tile as TileType} size="xs" />
+                  <MahjongTile2D tile={step.event.tile as TileType} size="xs" />
                 )}
               </div>
             )}
@@ -387,7 +387,7 @@ export function ReplayPage() {
                   </div>
                   <div className="flex flex-wrap gap-px">
                     {seatState.discards.slice(-10).map((tile, n) => (
-                      <MahjongTile key={n} tile={tile} size="xs" />
+                      <MahjongTile2D key={n} tile={tile} size="xs" />
                     ))}
                     {seatState.discards.length === 0 && (
                       <span className="text-[10px] text-mj-bone/30 px-1">—</span>
@@ -466,7 +466,7 @@ export function ReplayPage() {
                   </span>
                   {'tile' in s.event && s.event.tile && (
                     <span style={{ opacity: past ? 1 : 0.35 }}>
-                      <MahjongTile tile={s.event.tile as TileType} size="xs" />
+                      <MahjongTile2D tile={s.event.tile as TileType} size="xs" />
                     </span>
                   )}
                 </button>

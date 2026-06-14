@@ -8,16 +8,14 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                  | Summary                                                                               |
-| ------- | ------------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC)   | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph      | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-032 | Global sound toggle                   | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-033 | Learn page: textures + content audit  | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
-| IMP-035 | Replay page: migrate to tile textures | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
-| IMP-036 | History & replays are undiscoverable  | History page is not linked from any in-app navigation; players cannot find replays    |
-| IMP-038 | Auto-sort drawn tile — not working    | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
+| ID      | Name                                 | Summary                                                                               |
+| ------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible  | Bot roll animation and result flash by in under a frame; human roll works correctly   |
+| BUG-049 | Hand not visible in settlement (PC)  | On desktop, the player cannot see their own hand during the settlement phase          |
+| BUG-050 | Spirit settlement uses old glyph     | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
+| IMP-032 | Global sound toggle                  | Add an always-available sound on/off toggle next to the language toggle               |
+| IMP-036 | History & replays are undiscoverable | History page is not linked from any in-app navigation; players cannot find replays    |
+| IMP-038 | Auto-sort drawn tile — not working   | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
 
 ---
 
@@ -137,45 +135,6 @@ The sort effect in `PlayerHand2D.tsx` is not producing a visible reorder when a 
 - `apps/web/src/hooks/use-sound.ts` — sound playback gate.
 
 **Notes:** Build a small `SoundToggle` that reads/writes `soundEnabled` from the theme store and place it adjacent to `LangToggle` wherever that renders (ideally the shared `ScreenShell` header, so it's available globally). Keep the existing Home/Customize toggles in sync via the same store. Add an `aria-label` mirroring `LangToggle`'s accessibility treatment.
-
----
-
-### IMP-033 · Learn page: migrate to tile textures and audit content for accuracy
-
-**Request:** The Learn Nanchang Mahjong page needs two things: (1) all tile examples must be migrated from the deprecated text-glyph component to `MahjongTile2D`, and (2) the content itself should be reviewed and updated to be accurate for the current ruleset.
-
-**Status:** OPEN
-
-**Where to look:**
-
-- `apps/web/src/pages/learn/learn-page.tsx:13` — imports `MahjongTile` from `../../components/mahjong-tile` (deprecated).
-- `apps/web/src/pages/learn/learn-page.tsx:129, 149, 251, 261, 294, 322` — 8 `<MahjongTile>` usages across the Tiles, Spirit, Gameplay, and Hands tabs; each must become `<MahjongTile2D>`.
-- `docs/final-nanchang-mahjong-rules.md` — authoritative rules reference; use this to audit and correct any stale or inaccurate content on the Learn page.
-
-**Notes:** Per CLAUDE.md, this is a migration that was deferred until the page was touched for a new feature — that moment is now. After migrating tiles, cross-check every rule description, example hand, and scoring explanation against `docs/final-nanchang-mahjong-rules.md`. Update EN + ZH i18n keys for any corrected text. Retire the `MahjongTile` import once no usages remain in this file. Ensure the existing Learn tests still pass, and add/update tests for any changed content.
-
----
-
-### IMP-035 · Replay page: migrate all tile rendering to tile textures
-
-**Request:** The replay page still uses the deprecated text-glyph `MahjongTile` component in four places across the replay viewer. All must be migrated to `MahjongTile2D` (SVG textures).
-
-**Status:** OPEN
-
-**Where to look — all usages in `apps/web/src/pages/replay/replay-page.tsx`:**
-
-- Line 19 — `import { MahjongTile } from '../../components/mahjong-tile'` (swap to `MahjongTile2D`).
-- Line 253 — hand viewer tile strip: `<MahjongTile tile={tile} size="sm" />` (winning tile highlighted with a gold box-shadow wrapper; preserve that wrapper, only swap the component).
-- Line 305 — current step callout: `<MahjongTile tile={step.event.tile as TileType} size="xs" />` (rendered inside the action event panel when a tile is associated with the current step).
-- Line 390 — discard pile panel: `<MahjongTile key={n} tile={tile} size="xs" />` (last 10 discards per seat).
-- Line 469 — timeline event list: `<MahjongTile tile={s.event.tile as TileType} size="xs" />` (tile shown alongside each event in the scrub timeline).
-
-**Additional cleanup (same PR):**
-
-- `apps/web/src/pages/game/game-page.tsx:25` — dead import `import { MahjongTile } from '../../components/mahjong-tile'`; the component is never rendered in this file. Remove it.
-- `apps/web/src/pages/game/game-page.test.tsx:18` — imports `MahjongTile` for a standalone `describe('MahjongTile', ...)` block (lines 655-707) that tests the legacy component's aria and click behaviour. These tests belong in `apps/web/src/components/mahjong-tile.test.tsx` (which already exists) or can be migrated to test `MahjongTile2D` equivalents. Remove the import and the describe block from `game-page.test.tsx`; ensure coverage is not lost.
-
-**Notes:** Once IMP-033, IMP-034, and IMP-035 are all complete, `MahjongTile` from `components/mahjong-tile.tsx` will have zero production callers and can be deleted along with `mahjong-tile.test.tsx`. Confirm with a project-wide grep for `mahjong-tile` before deleting.
 
 ---
 
