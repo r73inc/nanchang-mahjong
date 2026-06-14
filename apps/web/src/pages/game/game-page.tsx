@@ -658,11 +658,19 @@ function HandRevealScreen({
                       (() => {
                         const wp = handReveal.winPayment!;
                         if (isWinner) {
+                          const liableName =
+                            handReveal.liableSeat !== undefined
+                              ? snapshot.seats[handReveal.liableSeat].seatName
+                              : undefined;
                           const winTypeLabel = handReveal.isRobKong
-                            ? t('handRevealBreakdownWinRobKong')
+                            ? liableName
+                              ? t('handRevealBreakdownWinRobKongNamed', liableName)
+                              : t('handRevealBreakdownWinRobKong')
                             : handReveal.winType === 'tsumo'
                               ? t('handRevealBreakdownWinTsumo')
-                              : t('handRevealBreakdownWinRon');
+                              : liableName
+                                ? t('handRevealBreakdownWinRonNamed', liableName)
+                                : t('handRevealBreakdownWinRon');
                           return (
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
