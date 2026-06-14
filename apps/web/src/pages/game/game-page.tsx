@@ -498,9 +498,11 @@ function HandRevealScreen({
   const spiritHasAny =
     handReveal.spiritDeltas.some((d) => d !== 0) &&
     (handReveal.jingPrimary !== null || handReveal.jingSecondary !== null);
-  const sortedSeats = ([0, 1, 2, 3] as const)
-    .slice()
-    .sort((a, b) => handReveal.handNetDeltas[b] - handReveal.handNetDeltas[a]);
+  const sortedSeats = ([0, 1, 2, 3] as const).slice().sort((a, b) => {
+    const totalA = snapshot.seats[a].score + handReveal.spiritDeltas[a];
+    const totalB = snapshot.seats[b].score + handReveal.spiritDeltas[b];
+    return totalB - totalA;
+  });
 
   const handTypeLabel =
     (handReveal.handType ?? 'standard') !== 'standard'
@@ -547,6 +549,7 @@ function HandRevealScreen({
             const isViewer = seat === viewerSeat;
             const isWinner = seat === handReveal.winnerSeat;
             const delta = handReveal.handNetDeltas[seat];
+            const totalScore = snapshot.seats[seat].score + handReveal.spiritDeltas[seat];
             const isExp = expandedSeat === seat;
 
             const winPayDelta = handReveal.winPayment?.scoreDelta[seat] ?? 0;
@@ -596,18 +599,29 @@ function HandRevealScreen({
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className={`text-base font-bold tabular-nums ${
-                        delta > 0
-                          ? 'text-emerald-400'
-                          : delta < 0
-                            ? 'text-red-400'
-                            : 'text-mj-bone/40'
-                      }`}
-                    >
-                      {delta > 0 ? '+' : ''}
-                      {delta}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span
+                        className={`text-base font-bold tabular-nums ${
+                          delta > 0
+                            ? 'text-emerald-400'
+                            : delta < 0
+                              ? 'text-red-400'
+                              : 'text-mj-bone/40'
+                        }`}
+                      >
+                        {totalScore}
+                      </span>
+                      {delta !== 0 && (
+                        <span
+                          className={`text-[11px] tabular-nums leading-none ${
+                            delta > 0 ? 'text-emerald-400/60' : 'text-red-400/60'
+                          }`}
+                        >
+                          {delta > 0 ? '+' : ''}
+                          {delta}
+                        </span>
+                      )}
+                    </div>
                     {hasBreakdown && (
                       <span className="text-mj-bone/30 text-[10px]" aria-hidden>
                         {isExp ? CHEVRON_UP : CHEVRON_DOWN}
@@ -619,6 +633,25 @@ function HandRevealScreen({
                 {/* ── Expanded breakdown ── */}
                 {isExp && (
                   <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3">
+                    {/* Hand net summary — always first in the expanded view */}
+                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+                      <p className="text-[10px] font-bold tracking-widest text-mj-bone/40 uppercase">
+                        {t('handRevealBreakdownHandNetLabel')}
+                      </p>
+                      <p
+                        className={`text-sm font-bold tabular-nums ${
+                          delta > 0
+                            ? 'text-emerald-400'
+                            : delta < 0
+                              ? 'text-red-400'
+                              : 'text-mj-bone/40'
+                        }`}
+                      >
+                        {delta > 0 ? '+' : ''}
+                        {delta}
+                      </p>
+                    </div>
+
                     {/* Section 1 — Win payment */}
                     {hasWinSection &&
                       handReveal.winPayment &&

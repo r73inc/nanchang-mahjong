@@ -339,6 +339,7 @@
   "settlementEven": "—",
   "settlementReceivedFrom": "从{{1}}收 {{0}}",
   "settlementPaidTo": "付 {{0}} 给{{1}}",
+  "handRevealBreakdownHandNetLabel": "本局",
   "handRevealBreakdownWinTsumo": "自摸",
   "handRevealBreakdownWinRon": "荣和",
   "handRevealBreakdownWinRobKong": "抢杠",

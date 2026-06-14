@@ -339,6 +339,7 @@
   "settlementEven": "—",
   "settlementReceivedFrom": "Received {{0}} from {{1}}",
   "settlementPaidTo": "Paid {{0}} to {{1}}",
+  "handRevealBreakdownHandNetLabel": "This hand",
   "handRevealBreakdownWinTsumo": "Self-Draw Win",
   "handRevealBreakdownWinRon": "Discard Win",
   "handRevealBreakdownWinRobKong": "Rob Kong Win",
