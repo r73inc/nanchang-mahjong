@@ -6,6 +6,20 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-036-history-nav` (2026-06-14)
+
+### IMP-036 · History and replays are completely undiscoverable
+
+**Fix:**
+
+- Added `historyLink` i18n key to `en.json` ("History") and `zh.json` ("历史") — concise label for the nav chip, matching the `profileLink`/`friendsLink` pattern.
+- Added `{ key: 'historyLink', path: '/history', icon: '📜' }` to `NAV_ITEMS` in `home-stub-page.tsx` and changed the grid from `grid-cols-4` to `grid-cols-5` to accommodate all five shortcuts evenly.
+- Added `gameId?: string` prop to `GameEndScreen` in `game-page.tsx`; the component now calls `useNavigate` and renders a "View Replay" button (`historyViewReplay` key, already existed in both locales) that navigates to `/replay/${gameId}` when `gameId` is set. `gameId` is passed from the URL param (`useParams<{ id }>`).
+
+**Key learning:** `historyViewReplay` ("View Replay" / "查看回放") was already present in both locale files from Phase 9 — no new i18n keys needed for the end-screen button. When adding a nav item to a fixed-column grid, update `grid-cols-N` to match the new count rather than letting items wrap onto a second row.
+
+---
+
 ## `feat/imp033-imp035-texture-migration` (2026-06-14)
 
 ### IMP-033 · Learn page: migrate to tile textures and audit content for accuracy

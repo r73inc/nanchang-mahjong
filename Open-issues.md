@@ -8,14 +8,13 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                 | Summary                                                                               |
-| ------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible  | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC)  | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph     | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-032 | Global sound toggle                  | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-036 | History & replays are undiscoverable | History page is not linked from any in-app navigation; players cannot find replays    |
-| IMP-038 | Auto-sort drawn tile — not working   | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
+| ID      | Name                                | Summary                                                                               |
+| ------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible | Bot roll animation and result flash by in under a frame; human roll works correctly   |
+| BUG-049 | Hand not visible in settlement (PC) | On desktop, the player cannot see their own hand during the settlement phase          |
+| BUG-050 | Spirit settlement uses old glyph    | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
+| IMP-032 | Global sound toggle                 | Add an always-available sound on/off toggle next to the language toggle               |
+| IMP-038 | Auto-sort drawn tile — not working  | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
 
 ---
 
@@ -137,19 +136,3 @@ The sort effect in `PlayerHand2D.tsx` is not producing a visible reorder when a 
 **Notes:** Build a small `SoundToggle` that reads/writes `soundEnabled` from the theme store and place it adjacent to `LangToggle` wherever that renders (ideally the shared `ScreenShell` header, so it's available globally). Keep the existing Home/Customize toggles in sync via the same store. Add an `aria-label` mirroring `LangToggle`'s accessibility treatment.
 
 ---
-
-### IMP-036 · History and replays are completely undiscoverable
-
-**Request:** Players have no way to find their game history or replays from within the app. The History page (`/history`) is a registered route and the Replay page (`/replay/:id`) works, but neither is reachable from any in-app navigation link. The only way to access them today is to type the URL directly in the browser address bar.
-
-**Status:** OPEN
-
-**Root cause:** The Home page `NAV_ITEMS` array (`apps/web/src/pages/home/home-stub-page.tsx:13-18`) lists four shortcuts — Profile, Friends, Learn, Customize — but History is absent. There is no link to `/history` anywhere else in the app (confirmed by project-wide grep). The `HistoryPage` navigates to `/replay/:id` correctly once reached, but the page itself is a dead end.
-
-**Fix needed — two entry points:**
-
-1. **Home page nav grid** — add a History shortcut to `NAV_ITEMS` in `apps/web/src/pages/home/home-stub-page.tsx:13`. Use an appropriate icon (e.g. `📜`) and the existing i18n key `historyTitle` (or add `historyLink` to match the pattern of `profileLink`, `friendsLink` etc.). This is the primary entry point.
-
-2. **Game end screen** — after a session ends, the `GameEndScreen` component (`apps/web/src/pages/game/game-page.tsx`, search for `GameEndScreen`) shows results and a rematch button. Add a secondary "View Replay" link/button that navigates to `/replay/${gameId}` so players can jump straight to the replay of the session they just finished without having to go via History. The `gameId` is available from the game store at that point.
-
-**i18n:** `historyTitle` already exists (`apps/web/src/i18n/en.json`). A new `historyLink` key (short label for the nav grid) may be needed in both EN and ZH if `historyTitle` is too long for the 4-column grid chip. Check against `profileLink`, `friendsLink` etc. for the expected label length.

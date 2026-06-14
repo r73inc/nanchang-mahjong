@@ -13,6 +13,7 @@ import { useThemeStore } from '../../stores/theme.store';
 const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
   { key: 'profileLink', path: '/profile', icon: '👤' },
   { key: 'friendsLink', path: '/friends', icon: '👥' },
+  { key: 'historyLink', path: '/history', icon: '📜' },
   { key: 'learnLink', path: '/learn', icon: '📖' },
   { key: 'customizeLink', path: '/customize', icon: '🎨' },
 ];
@@ -151,7 +152,7 @@ export function HomeStubPage() {
         </button>
 
         {/* Navigation shortcuts */}
-        <div className="grid grid-cols-4 gap-2 mb-4">
+        <div className="grid grid-cols-5 gap-2 mb-4">
           {NAV_ITEMS.map(({ key, path, icon }) => (
             <button
               key={key}
