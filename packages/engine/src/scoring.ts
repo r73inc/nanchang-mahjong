@@ -322,3 +322,28 @@ export function calculateSpiritSettlement(
   // scoreDelta[i] = 4 × effectiveScores[i] − totalSpirits  (zero-sum proof: Σ = 0)
   return effectiveScores.map((s) => 4 * s - totalSpirits) as [number, number, number, number];
 }
+
+/**
+ * Calculates the effective spirit score per seat from pre-counted spirit data.
+ *
+ * This is the per-seat intermediate step inside `calculateSpiritSettlement`,
+ * exposed as a standalone function so the UI layer can derive per-seat effective
+ * scores from `HandRevealPayload.spiritCounts` without re-running the full
+ * settlement (which requires the raw `SeatState[]` + tile types).
+ *
+ * Uses the same formula as `calculateSpiritSettlement`:
+ *   raw = primary×2 + secondary×1 + spiritKongs×10
+ *   if raw ≥ 5: effectiveScore = raw × (raw − 3)   [Explosive Spirit §6.2]
+ *   else:        effectiveScore = raw
+ *   if only ONE player has spirits: effectiveScore × 2  [Indomitable Spirit §6.2]
+ */
+export function calculateEffectiveSpiritScores(
+  counts: readonly { primary: number; secondary: number; spiritKongs: number }[],
+): number[] {
+  const rawScores = counts.map((c) => {
+    const raw = c.primary * 2 + c.secondary + c.spiritKongs * 10;
+    return raw >= 5 ? raw * (raw - 3) : raw;
+  });
+  const playersWithSpirits = rawScores.filter((s) => s > 0).length;
+  return rawScores.map((s) => (playersWithSpirits === 1 ? s * 2 : s));
+}

@@ -114,6 +114,7 @@ export {
   calculateWinPayout,
   instantKongPayment,
   calculateSpiritSettlement,
+  calculateEffectiveSpiritScores,
   calculateOpeningJingSettlement,
 } from './scoring';
 

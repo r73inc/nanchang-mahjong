@@ -14,6 +14,7 @@ export {
   sortTypes,
   WIND_CHOWS,
   DRAGON_CHOW,
+  calculateEffectiveSpiritScores,
 } from '@nanchang/engine';
 export type { Decomposition } from '@nanchang/engine';
 
