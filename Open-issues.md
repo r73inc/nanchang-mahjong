@@ -8,13 +8,15 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                | Summary                                                                               |
-| ------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC) | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph    | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-032 | Global sound toggle                 | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-038 | Auto-sort drawn tile — not working  | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
+| ID      | Name                                     | Summary                                                                                       |
+| ------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly           |
+| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                  |
+| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile         |
+| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded            |
+| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own   |
+| BUG-054 | Learn hands section shows partial hands  | Seven Pairs, Thirteen Misfits, and Seven Star examples are cut short — not full 14-tile hands |
+| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                       |
 
 ---
 
@@ -72,53 +74,69 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ---
 
-## Open Improvements
+### BUG-051 · Discard blocked after declining tsumo win
 
-### IMP-038 · Auto-sort drawn tile into hand — CRITICAL VIP ASK ⛔
+**Symptom:** During a playtest, a player drew a tile that completed a winning hand. The "Declare Win" prompt appeared. The player pressed "Keep Playing" to decline the win. After that, no tile could be discarded — the hand was stuck. The "Declare Win" button remained pressable, but the player could not continue by discarding.
 
-**Request:** When `autoSortDrawnTile` is enabled, the tile drawn at the start of a turn should be inserted into its canonical sorted position rather than appended at the far right. Requested by older VIP playtesters who find visual re-scanning of the full hand tiring.
+**Status:** OPEN — critical gameplay bug, reported playtest 2026-06-14.
 
-**Status:** OPEN — ⛔ CRITICAL. Toggle UI and store plumbing shipped in PR #142. The sort does not trigger for end users in 2D mode. Multiple fix attempts in PR #143 (branch `fix/imp038-autosort-regression`) failed to resolve the issue.
+**Suspected cause:** When the client receives the self-draw win offer, it enters a state where the action buttons include "Declare Win" and "Keep Playing". After pressing "Keep Playing", the expected behaviour is to fall back to the normal discard phase (the player holds 14 tiles and must discard one). The likely failure modes are:
 
-**What is in place (working):**
-
-- `autoSortDrawnTile: boolean` in `ThemeStore` (persisted, default `false`).
-- Customize page toggle + EN/ZH labels — setting saves and loads correctly.
-- `LocalEntry { id, tile, serverIndex, isJustDrawn }` and `mergeLocalOrder()` in `PlayerHand2D.tsx` — the data model is correct.
-- Gold dot (`isJustDrawn` flag) marker for the drawn tile — renders correctly when sort fires.
-- `prevHandKeyRef` (content-based change detection) and `prevToggleRef` (mid-game toggle re-sort) guards — logic is correct.
-- `!isMobile` guard on `ViewerHandHUD` — correctly suppresses the desktop 3D hand overlay on mobile so it cannot intercept touches (3D mode mobile fix).
-- `ViewerHandHUD` sort effect with dual-ref pattern — desktop 3D mode sort is in place.
-
-**What is not working:**
-
-The sort effect in `PlayerHand2D.tsx` is not producing a visible reorder when a tile is drawn in 2D mode. The tile stays at the far right of the hand as if `autoSortDrawnTile` were `false`. This affects both mobile 2D and any desktop 2D session.
-
-**Fix attempts in PR #143 (all failed to resolve the end-user symptom):**
-
-1. Switched `setLocalOrder` from direct call to functional setter `(prev) => ...` — no change from user perspective.
-2. Added `!isMobile` guard to `ViewerHandHUD` — only relevant for 3D mobile mode, which uses a different code path.
-3. Added `prevToggleRef` to guard — fixed a toggle deadlock but not the draw sort.
-4. Reverted to `localOrderRef.current` + synchronous `setLocalOrder(nextOrder)` — same end-user result; sort still not visible.
-
-**Suspected remaining causes (not yet investigated):**
-
-- The `useEffect` dependency array `[viewerHand, autoSortDrawnTile]` — verify that `viewerHand` identity actually changes when a new tile is drawn (snapshot arrives). If the array is referentially stable (same object), the effect will not re-run even though content changed. Add a `console.log` inside the effect to confirm it is firing at all.
-- `mergeLocalOrder` may be discarding the new entry. Check whether `viewerHand.length > localOrder.length` at the moment the effect fires, and whether the new tile's `id` is being generated and appended correctly.
-- Framer Motion `Reorder.Group` animation — the sort may be applying (state is correct) but the animation may be reverting to the original visual order. Temporarily disable the Reorder component (replace with a plain div) to confirm whether the state is correct but Framer Motion is overriding it.
-- The `Reorder.Group` `values={localOrder}` prop — if Framer Motion internally debounces or batches layout changes and `onReorder` fires between renders with the old order, the state could be overwritten. Test with `draggable={false}` (i.e. force `onReorder={() => undefined}`) to isolate.
-- Confirm `autoSortDrawnTile` is `true` inside the effect when the draw fires — add a log to verify the store value is being read correctly from within the component.
+1. The server does not send a new `game:snapshot` after the decline, leaving the client in the `tsumo-win-pending` action phase with no discard buttons mounted.
+2. The client-side action reducer does not transition back to the `discard` phase on a "keep playing" action, so `ActionBar` never renders the discard UI.
+3. The server correctly transitions but the decline socket event is never acknowledged / the phase update is swallowed.
 
 **Where to look:**
 
-- `apps/web/src/components/2d/PlayerHand2D.tsx:231-255` — the sort `useEffect` (currently using `localOrderRef.current` + synchronous setState).
-- `apps/web/src/components/2d/PlayerHand2D.tsx` — `mergeLocalOrder()` function — verify it appends new tiles correctly.
-- `apps/web/src/stores/game.store.ts` — how `viewerHand` is derived from the snapshot; check object identity on each snapshot update.
-- `apps/web/src/hooks/use-game.ts` — `game:snapshot` handler; check whether a new array reference is produced for `viewerHand` on every snapshot.
-
-**PR #143 status:** Safe to merge (all changes are client-side display logic, no game state affected). But IMP-038 remains unresolved. A fresh investigation session is required with browser devtools open to confirm whether the effect fires and whether the state update is applied.
+- `apps/api/src/game/game.service.ts` — handler for the "decline tsumo" / "keep playing" event; confirm it calls `toClientSnapshot` and emits `game:snapshot` back to the decliner.
+- `apps/web/src/hooks/use-game.ts` — `handleDeclineTsumo` (or equivalent) client event emitter; confirm the round-trip snapshot is processed.
+- `apps/web/src/pages/game/game-page.tsx` — `ActionBar` / action-phase logic; confirm that phase `'discard'` renders discard buttons after the decline.
+- `apps/web/src/stores/game.store.ts` — action phase derivation; confirm declining a tsumo win sets `actionPhase` back to `'discard'`.
 
 ---
+
+### BUG-052 · Customize palette cards show tiles using the active palette instead of their own
+
+**Symptom:** In the Customize page, the Tile Face section shows three preview cards (Classic, Sepia, Dark). Each card should display sample tiles rendered in _that card's own_ palette so the player can compare them. Instead, all three cards show tiles rendered in the currently-selected palette — e.g. if Dark is active, all three card previews show dark tiles.
+
+**Status:** OPEN — visual bug, reported playtest 2026-06-14.
+
+**Root cause:** `PaletteCard` renders `MahjongTile2D`, which builds its tile-face gradient from the global CSS custom properties `--tile-face-top` and `--tile-face-bottom`. These are written to `:root` by `applyTheme()` using the _current_ active palette only. All three cards inherit the same global values.
+
+**Fix:** Pass the card's own `TilePalette` id into `PaletteCard` and scope the CSS vars to the preview strip by wrapping it in a `<div>` with inline `style={{ '--tile-face-top': cfg.faceTop, '--tile-face-bottom': cfg.faceBottom }}`. CSS custom properties cascade, so `MahjongTile2D`'s `var(--tile-face-top)` will pick up the scoped override rather than the global root value.
+
+**Where to look:**
+
+- `apps/web/src/pages/customize/customize-page.tsx` — `PaletteCard` component (line ~107) and its call site (line ~279).
+- `apps/web/src/lib/theme.utils.ts` — `TILE_CONFIGS` (already exported) provides `faceTop`/`faceBottom` per palette.
+
+---
+
+### BUG-054 · Learn page "Hands" tab shows incomplete example hands
+
+**Symptom:** In the Learn page → Hands tab, three of the five hand examples are cut short and do not show a complete 14-tile winning hand:
+
+- **Small Seven Pairs** — renders only 7 tiles (`slice(0, 7)`), showing half the pairs instead of all 7.
+- **Thirteen Misfits** — renders only 9 tiles (`slice(0, 9)`), omitting the honor tiles entirely.
+- **Seven Star Thirteen Misfits** — renders only 7 tiles (`[...WINDS, ...DRAGS]`), showing each honor once rather than a valid 14-tile hand with all 7 honors plus 7 numbered tiles.
+
+**Status:** OPEN — reported 2026-06-14.
+
+**Root cause:** All three hands use slice or partial arrays in `HandsSection`. `SEVEN_PAIRS_HAND` and `THIRTEEN_HAND` already contain the correct 14 tiles but are sliced at render time. Seven Star has no complete data array defined.
+
+**Fix needed:**
+
+- Remove `.slice(0, 7)` from the Seven Pairs `<TileRow>`.
+- Remove `.slice(0, 9)` from the Thirteen Misfits `<TileRow>`.
+- Add a `SEVEN_STAR_HAND: TileType[]` constant with all 7 unique honors (east, south, west, north, zhong, fa, bai) + 7 numbered tiles with inter-tile gaps > 2 (e.g. 1m, 4m, 7m, 1p, 4p, 7p, 1s) = 14 tiles total. Use that constant in the Seven Star `<TileRow>` instead of `[...WINDS, ...DRAGS]`.
+
+**Where to look:**
+
+- `apps/web/src/pages/learn/learn-page.tsx` — `HandsSection` (~line 360), `SEVEN_PAIRS_HAND` (~line 53), `THIRTEEN_HAND` (~line 78).
+
+---
+
+## Open Improvements
 
 ### IMP-032 · Always-available global sound toggle next to the language toggle
 

@@ -6,6 +6,60 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug054-learn-page-hands` (2026-06-14)
+
+### BUG-054 · Learn page "Hands" tab shows incomplete example hands
+
+**Root cause:** Three of the five hand examples in `HandsSection` were sliced at render time or used an incomplete data array:
+
+- `SEVEN_PAIRS_HAND.slice(0, 7)` — the full 14-tile array existed but was halved at the call site.
+- `THIRTEEN_HAND.slice(0, 9)` — the full 14-tile array existed but only the numbered tiles were shown.
+- `[...WINDS, ...DRAGS]` for Seven Star — produced 7 tiles (one of each honor) rather than a valid 14-tile Thirteen Misfits hand containing all 7 honors.
+
+**Fix (`apps/web/src/pages/learn/learn-page.tsx`):**
+
+- Removed `.slice(0, 7)` from the Seven Pairs `<TileRow>` — now shows all 14 tiles.
+- Removed `.slice(0, 9)` from the Thirteen Misfits `<TileRow>` — now shows all 14 tiles.
+- Added `SEVEN_STAR_HAND: TileType[]` constant: `1m, 4m, 7m, 1p, 4p, 7p, 1s` (7 numbered tiles, all inter-tile gaps > 2) + `east, south, west, north, zhong, fa, bai` (all 7 unique honors) = 14 tiles. This is a valid Seven Star Thirteen Misfits hand per the authoritative rules doc.
+- Replaced `TileRow tiles={[...WINDS, ...DRAGS]}` with `TileRow tiles={SEVEN_STAR_HAND}` in the Seven Star card.
+
+**Key learning:** Always check the render call site when displaying a "complete" example — the data array can be correct while a slice at the JSX level silently truncates it.
+
+---
+
+## `fix/bug051-052-discard-block-palette-preview` (2026-06-14)
+
+### BUG-052 · Customize palette cards show tiles using the active palette instead of their own
+
+**Root cause:** `PaletteCard` rendered `MahjongTile2D` tiles which read `--tile-face-top` and `--tile-face-bottom` from the global `:root` CSS custom properties set by `applyTheme()`. All three cards (Classic, Sepia, Dark) therefore showed tiles in whatever palette was currently active.
+
+**Fix (`apps/web/src/pages/customize/customize-page.tsx`):**
+
+- Added `id: TilePalette` prop to `PaletteCard`.
+- Wrapped the tile preview strip in a `<div style={{ '--tile-face-top': cfg.faceTop, '--tile-face-bottom': cfg.faceBottom }}>` using values from `TILE_CONFIGS[id]`. CSS custom properties cascade, so `MahjongTile2D`'s `var(--tile-face-top)` picks up the scoped override instead of the global root value.
+- `TILE_CONFIGS` imported from `theme.utils.ts` (already exported).
+
+**Key learning:** CSS custom properties set in an inline `style` on a parent element act as scoped overrides that cascade to all `var()` references in the subtree, including those in child inline styles (not just stylesheets). This is a clean way to preview multiple theme variants side-by-side without global state changes.
+
+---
+
+### IMP-038 · Auto-sort drawn tile into hand
+
+**Status:** Confirmed working by user on 2026-06-14 (playtest). Closing.
+
+The feature was implemented across PR #142 (store + toggle) and PR #143 (`fix/imp038-autosort-regression` — sort effect fixes). The repeated fix attempts in PR #143 ultimately resolved the issue; the earlier open-issues entry was written mid-investigation before the final fix was confirmed to work in the live app.
+
+**What was shipped:**
+
+- `autoSortDrawnTile: boolean` in `ThemeStore` (persisted, default `false`).
+- `LocalEntry { id, tile, serverIndex, isJustDrawn }` and `mergeLocalOrder()` in `PlayerHand2D.tsx`.
+- `prevHandKeyRef` + `prevToggleRef` guards to handle content-change detection and mid-game toggle.
+- `ViewerHandHUD` sort effect for desktop 3D mode.
+- Gold dot marker for the just-drawn tile.
+- `xs` size tier added to `TILE_DIMS` and `TILE_SIZE_OPTIONS`.
+
+---
+
 ## `feat/imp-036-history-nav` (2026-06-14)
 
 ### IMP-036 · History and replays are completely undiscoverable
@@ -141,9 +195,9 @@ Chips only render when the count is > 0 and use `shrink-0` to prevent layout col
 
 ---
 
-### IMP-038 · Auto-sort drawn tile into hand — ⚠️ RE-OPENED (see Open-issues.md)
+### IMP-038 · Auto-sort drawn tile into hand — ✅ CONFIRMED WORKING (2026-06-14)
 
-The toggle UI and store plumbing shipped correctly. The actual sort on draw is not triggering for end users in 2D mode. Re-opened as a critical VIP ask. See `Open-issues.md` for full investigation notes and root cause analysis.
+The toggle UI and store plumbing shipped correctly. After multiple fix attempts in PR #143, the feature was confirmed working by the user during playtest on 2026-06-14. Full closure entry under `fix/bug051-052-discard-block-palette-preview` above.
 
 ---
 
