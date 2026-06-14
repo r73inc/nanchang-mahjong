@@ -1015,6 +1015,7 @@ function GameEndScreen({
   snapshot,
   ended,
   viewerSeat,
+  gameId,
   onHome,
   onRematch,
   onViewDetails,
@@ -1022,11 +1023,13 @@ function GameEndScreen({
   snapshot: ClientGameState;
   ended: GameEndedPayload | null;
   viewerSeat: 0 | 1 | 2 | 3 | null;
+  gameId?: string;
   onHome: () => void;
   onRematch: () => void;
   onViewDetails?: () => void;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   // Prefer the authoritative finalScores from game:ended — snapshot seat scores
   // exclude the final hand's spirit settlement (no snapshot follows endSession).
   const scores = ended ? ended.finalScores : snapshot.seats.map((s) => s.score);
@@ -1126,6 +1129,15 @@ function GameEndScreen({
             style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
           >
             {t('endGameViewDetails')}
+          </button>
+        )}
+        {gameId && (
+          <button
+            onClick={() => navigate(`/replay/${gameId}`)}
+            className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
+          >
+            {t('historyViewReplay')}
           </button>
         )}
         {viewerSeat === 0 && (
@@ -3577,6 +3589,7 @@ export function GamePage() {
             snapshot={snapshot}
             ended={ended}
             viewerSeat={viewerSeat}
+            gameId={gameId}
             onHome={handleHome}
             onRematch={requestRematch}
             onViewDetails={finalHandReveal ? () => setShowEndDetails(true) : undefined}
