@@ -119,9 +119,16 @@ describe('CustomizePage', () => {
     expect(useThemeStore.getState().soundEnabled).toBe(true);
   });
 
+  it('Customize·tile-size — selecting Extra Small updates the store', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /extra small/i }));
+    expect(useThemeStore.getState().tileSize).toBe('xs');
+  });
+
   it('Customize·tile-size — selecting Small updates the store (IMP-037)', () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /small/i }));
+    // Use exact name to avoid matching "Extra Small"
+    fireEvent.click(screen.getByRole('button', { name: 'Small' }));
     expect(useThemeStore.getState().tileSize).toBe('sm');
   });
 

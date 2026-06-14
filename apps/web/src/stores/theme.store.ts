@@ -14,10 +14,11 @@ import { persist } from 'zustand/middleware';
 
 export type FeltTheme = 'jade' | 'crimson' | 'slate' | 'navy' | 'yellow';
 export type TilePalette = 'classic' | 'sepia' | 'dark';
-export type TileSize = 'sm' | 'md' | 'lg' | 'xl';
+export type TileSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 /** Scale multipliers for each user-selectable tile size. */
 export const TILE_USER_SCALE: Record<TileSize, number> = {
+  xs: 0.5,
   sm: 0.75,
   md: 1.0,
   lg: 1.25,

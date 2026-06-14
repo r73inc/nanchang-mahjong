@@ -34,6 +34,7 @@ const PALETTE_OPTIONS: { id: TilePalette; key: StringKey }[] = [
 ];
 
 const TILE_SIZE_OPTIONS: { id: TileSize; key: StringKey }[] = [
+  { id: 'xs', key: 'customizeTileSizeXs' },
   { id: 'sm', key: 'customizeTileSizeSm' },
   { id: 'md', key: 'customizeTileSizeMd' },
   { id: 'lg', key: 'customizeTileSizeLg' },
