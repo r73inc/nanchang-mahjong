@@ -8,20 +8,16 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID          | Name                                   | Summary                                                                               |
-| ----------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-045     | Bot dice roll animation not visible    | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049     | Hand not visible in settlement (PC)    | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050     | Spirit settlement uses old glyph       | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-028     | Drop "You" labels everywhere           | Highlight already identifies the viewer; redundant "You" tags should be removed       |
-| IMP-029     | Settlement tiles in dropdown           | Show a tile glyph per settlement tile each player holds in the expanded breakdown     |
-| IMP-030     | Use winner name as detail heading      | Replace generic "Someone Won!" title with the actual winning player's name            |
-| ~~IMP-031~~ | ~~Rank + score breakdown at hand end~~ | ~~Closed — see Closed-issues.md~~                                                     |
-| IMP-032     | Global sound toggle                    | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-033     | Learn page: textures + content audit   | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
-| IMP-035     | Replay page: migrate to tile textures  | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
-| IMP-036     | History & replays are undiscoverable   | History page is not linked from any in-app navigation; players cannot find replays    |
-| IMP-038     | Auto-sort drawn tile — not working     | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
+| ID      | Name                                  | Summary                                                                               |
+| ------- | ------------------------------------- | ------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible   | Bot roll animation and result flash by in under a frame; human roll works correctly   |
+| BUG-049 | Hand not visible in settlement (PC)   | On desktop, the player cannot see their own hand during the settlement phase          |
+| BUG-050 | Spirit settlement uses old glyph      | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
+| IMP-032 | Global sound toggle                   | Add an always-available sound on/off toggle next to the language toggle               |
+| IMP-033 | Learn page: textures + content audit  | Migrate all tiles to MahjongTile2D and audit content for accuracy                     |
+| IMP-035 | Replay page: migrate to tile textures | 4 MahjongTile usages in the replay viewer, step callout, discard and timeline panels  |
+| IMP-036 | History & replays are undiscoverable  | History page is not linked from any in-app navigation; players cannot find replays    |
+| IMP-038 | Auto-sort drawn tile — not working    | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
 
 ---
 
@@ -124,54 +120,6 @@ The sort effect in `PlayerHand2D.tsx` is not producing a visible reorder when a 
 - `apps/web/src/hooks/use-game.ts` — `game:snapshot` handler; check whether a new array reference is produced for `viewerHand` on every snapshot.
 
 **PR #143 status:** Safe to merge (all changes are client-side display logic, no game state affected). But IMP-038 remains unresolved. A fresh investigation session is required with browser devtools open to confirm whether the effect fires and whether the state update is applied.
-
----
-
-### IMP-028 · Remove redundant "You" labels from settlement / score / reveal screens
-
-**Request:** Drop the "You" tag shown next to the viewer's own row across the settlement, scoring, and reveal screens. The viewer's row is already visually highlighted (gold background/border), so the explicit "You" label is redundant.
-
-**Status:** OPEN
-
-**Where to look:**
-
-- `apps/web/src/components/game/SettlementPreview.tsx:203-207` — `{t('preGameYou')}` on the viewer row.
-- `apps/web/src/pages/game/game-page.tsx:497` and `:591` — `{t('preGameYou')}` in the score summary and per-hand reveal rows.
-- i18n key `preGameYou` (`apps/web/src/i18n/en.json`, `zh.json`) — remove usages; retire the key if it becomes unused.
-
-**Notes:** Keep the gold highlight as the sole "this is you" affordance. Sweep for any other `preGameYou` usages before removing the key. Ensure tests that assert on the "You" text are updated.
-
----
-
-### IMP-029 · Show settlement tiles per player in the expanded breakdown
-
-**Request:** On the settlement screen, when a player row is expanded, show a small mahjong tile glyph for each settlement tile that player holds, so a viewer can tell at a glance which players hold how many of each settlement tile.
-
-**Status:** OPEN
-
-**Where to look:**
-
-- `apps/web/src/components/game/SettlementPreview.tsx` — `buildTransferLines()` (lines 45-104) builds the expanded per-player rows; the expanded block (lines 246-263) already renders one `MahjongTile2D` per transfer line.
-
-**Notes:** Today the dropdown shows transfer _lines_ (received/paid amounts) with one tile per line. The request is a per-player at-a-glance count of held settlement tiles.
-
-**Implementation constraint — do NOT repeat SVG glyphs.** Rendering one `MahjongTile2D` per copy held (e.g. 7 tiles in a row) will break the mobile flex container and cause horizontal scrolling on narrow viewports. The count must always be displayed as a **"Tile + Count" format**: one `MahjongTile2D` (size `xs`) followed by a `×N` label. For example: `[2m tile] ×4` and `[3m tile] ×2`. This applies regardless of how many copies a player holds. Decide whether this augments the main (collapsed) row or the expanded block.
-
----
-
-### IMP-030 · Use the winning player's name as the end-of-round detail heading
-
-**Request:** In the end-of-round detail screen, the big heading currently reads a generic result ("Someone Won!") with the actual winner's name in smaller text below. Replace the generic heading with the actual winning player's name as the primary (large) text.
-
-**Status:** OPEN
-
-**Where to look:**
-
-- `apps/web/src/pages/game/game-page.tsx:445-450` — `resultLabel` derives `t('handRevealResultWin')` = "Someone Won!".
-- `apps/web/src/pages/game/game-page.tsx:460-465` — `<h1>` renders `resultLabel`; the winner name (`t('handRevealWinner', ...)`) is the smaller `<p>` below.
-- i18n keys `handRevealResultWin` ("Someone Won!"), `handRevealWinner` ("{{0}} wins this hand").
-
-**Notes:** For a win, promote the winner's name (and/or a "{name} wins!" string) to the `<h1>`. Preserve the concede/draw cases, which have no single winner. Keep EN/ZH parity.
 
 ---
 

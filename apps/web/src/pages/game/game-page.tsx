@@ -514,9 +514,9 @@ function HandRevealScreen({
             : t('handTypeSevenStarThirteen')
       : null;
 
-  const resultLabel =
-    handReveal.result === 'win'
-      ? t('handRevealResultWin')
+  const headingLabel =
+    handReveal.result === 'win' && handReveal.winnerSeat !== undefined
+      ? t('handRevealWinsHeading', snapshot.seats[handReveal.winnerSeat].seatName)
       : handReveal.result === 'concede'
         ? t('handRevealResultConcede')
         : t('handRevealResultDraw');
@@ -529,12 +529,7 @@ function HandRevealScreen({
           <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
             {t('handRevealTitle')}
           </p>
-          <h1 className="text-2xl font-serif font-bold text-mj-bone">{resultLabel}</h1>
-          {handReveal.winnerSeat !== undefined && (
-            <p className="text-sm text-mj-bone/60 mt-1">
-              {t('handRevealWinner', snapshot.seats[handReveal.winnerSeat].seatName)}
-            </p>
-          )}
+          <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
               {t('handRevealConcedeBy', snapshot.seats[handReveal.concedeSeat].seatName)}
@@ -861,7 +856,6 @@ function HandRevealScreen({
                     <span className="text-xs text-mj-bone/70 font-medium">
                       {snapshot.seats[i].seatName}
                     </span>
-                    {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
                     {isWinner && (
                       <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
                         {t('handRevealWinnerBadge')}

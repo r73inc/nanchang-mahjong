@@ -307,7 +307,6 @@
   "preGameSettlementDesc": "Players earn points for each copy of this tile",
   "preGameDiceRolled": "Dealer rolled {{0}} + {{1}}",
   "preGameIndicatorHint": "Spirit indicator →",
-  "preGameYou": "You",
   "preGameIndicator": "Indicator",
   "preGamePrimary": "Primary Spirit",
   "preGameSecondary": "Secondary Spirit",
@@ -322,9 +321,9 @@
   "diceRollResult": "{{0}} + {{1}} = {{2}}",
 
   "handRevealTitle": "Hand Complete",
-  "handRevealResultWin": "Someone Won!",
   "handRevealResultDraw": "Draw — No Winner",
   "handRevealResultConcede": "Player Conceded",
+  "handRevealWinsHeading": "{{0}} Wins!",
   "handRevealWinner": "{{0}} wins this hand",
   "handRevealConcedeBy": "{{0}} conceded",
   "handRevealWinnerBadge": "Win",
@@ -533,5 +532,6 @@
   "learnScoringKong": "Exposed Kong: 1 pt from each player instantly. Concealed Kong: 2 pts from each.",
   "learnScoringGerman": "German (德国): win without using any Spirit as a wildcard — earn (base ×2) + 5 pts bonus.",
 
-  "lastDiscardLabel": "Last"
+  "lastDiscardLabel": "Last",
+  "tileCountX": "×{{0}}"
 }
