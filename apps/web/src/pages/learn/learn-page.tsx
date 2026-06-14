@@ -92,6 +92,24 @@ const THIRTEEN_HAND: TileType[] = [
   'fa',
 ];
 
+// Seven Star Thirteen Misfits: all 7 unique honors + 7 numbered tiles (gaps > 2 within each suit)
+const SEVEN_STAR_HAND: TileType[] = [
+  '1m',
+  '4m',
+  '7m',
+  '1p',
+  '4p',
+  '7p',
+  '1s',
+  'east',
+  'south',
+  'west',
+  'north',
+  'zhong',
+  'fa',
+  'bai',
+];
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -365,13 +383,13 @@ function HandsSection() {
         <MeldRow melds={STANDARD_HAND} />
       </HandCard>
       <HandCard title={t('learnHandsSevenPairsTitle')} desc={t('learnHandsSevenPairsDesc')}>
-        <TileRow tiles={SEVEN_PAIRS_HAND.slice(0, 7)} />
+        <TileRow tiles={SEVEN_PAIRS_HAND} />
       </HandCard>
       <HandCard title={t('learnHandsBigSevenPairsTitle')} desc={t('learnHandsBigSevenPairsDesc')}>
         <MeldRow melds={ALL_TRIPLETS_HAND} />
       </HandCard>
       <HandCard title={t('learnHandsThirteenTitle')} desc={t('learnHandsThirteenDesc')}>
-        <TileRow tiles={THIRTEEN_HAND.slice(0, 9)} />
+        <TileRow tiles={THIRTEEN_HAND} />
         <div
           className="mt-2 rounded-lg px-2.5 py-2 text-xs text-mj-gold/80 leading-snug"
           style={{ background: 'rgba(201,169,97,0.08)', border: '1px solid rgba(201,169,97,0.2)' }}
@@ -380,7 +398,7 @@ function HandsSection() {
         </div>
       </HandCard>
       <HandCard title={t('learnHandsSevenStarTitle')} desc={t('learnHandsSevenStarDesc')}>
-        <TileRow tiles={[...WINDS, ...DRAGS]} />
+        <TileRow tiles={SEVEN_STAR_HAND} />
       </HandCard>
     </div>
   );
