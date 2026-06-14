@@ -1010,7 +1010,7 @@ export class GameService {
 
     if (session.engine.state.phase === 'finished') {
       // draw_game (exhaustive draw)
-      this.handleHandEnd(session, null, 'draw');
+      this.handleHandEnd(session, { winnerSeat: null, result: 'draw' });
       return;
     }
 
@@ -1143,17 +1143,15 @@ export class GameService {
     });
     this.broadcastSnapshots(session);
 
-    this.handleHandEnd(
-      session,
+    this.handleHandEnd(session, {
       winnerSeat,
-      'win',
+      result: 'win',
       payment,
       winType,
       handType,
-      undefined,
-      liableSeatForDisplay,
-      opts.isRobKong,
-    );
+      liableSeat: liableSeatForDisplay,
+      isRobKong: opts.isRobKong,
+    });
   }
 
   private applyRobKongResolution(
@@ -1285,22 +1283,26 @@ export class GameService {
 
     this.broadcastEvent(session, { kind: 'concede', seat });
     this.broadcastSnapshots(session);
-    this.handleHandEnd(session, null, 'concede', undefined, undefined, undefined, seat);
+    this.handleHandEnd(session, { winnerSeat: null, result: 'concede', concedeSeat: seat });
   }
 
   // ── Hand end & session management ────────────────────────────────────────────
 
   private handleHandEnd(
     session: GameSession,
-    winnerSeat: Seat4 | null,
-    result: 'win' | 'draw' | 'concede',
-    payment?: WinPaymentResult,
-    winType?: WinType,
-    handType?: HandType,
-    concedeSeat?: Seat4,
-    liableSeat?: Seat4,
-    isRobKong?: boolean,
+    opts: {
+      winnerSeat: Seat4 | null;
+      result: 'win' | 'draw' | 'concede';
+      payment?: WinPaymentResult;
+      winType?: WinType;
+      handType?: HandType;
+      concedeSeat?: Seat4;
+      liableSeat?: Seat4;
+      isRobKong?: boolean;
+    },
   ): void {
+    const { winnerSeat, result, payment, winType, handType, concedeSeat, liableSeat, isRobKong } =
+      opts;
     session.clearAfkTimers();
     session.closeClaimWindow();
     session.handsPlayed++;

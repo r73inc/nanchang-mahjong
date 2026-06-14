@@ -33,6 +33,7 @@ import {
   sortTypes,
   WIND_CHOWS,
   DRAGON_CHOW,
+  calculateEffectiveSpiritScores,
 } from '@nanchang/shared';
 import type {
   ClientGameState,
@@ -458,25 +459,6 @@ function reconstructMeldTiles(
   return groups;
 }
 
-// ── Spirit effective score helper ─────────────────────────────────────────────
-// Re-derives the effective spirit score per seat from SpiritCount data for the
-// expanded breakdown display. Mirrors calculateSpiritSettlement in the engine.
-function computeEffectiveSpiritScores(
-  spiritCounts: HandRevealPayload['spiritCounts'],
-): [number, number, number, number] {
-  const rawScores = spiritCounts.map((c) => {
-    const raw = c.primary * 2 + c.secondary + c.spiritKongs * 10;
-    return raw >= 5 ? raw * (raw - 3) : raw;
-  });
-  const playersWithSpirits = rawScores.filter((s) => s > 0).length;
-  return rawScores.map((s) => (playersWithSpirits === 1 ? s * 2 : s)) as [
-    number,
-    number,
-    number,
-    number,
-  ];
-}
-
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
 // Full-screen post-hand reveal. Shows all hands, spirit settlement, and
 // payment breakdown.
@@ -513,7 +495,7 @@ function HandRevealScreen({
   };
   const PAIR_LABEL = t('handPair');
 
-  const effectiveSpiritScores = computeEffectiveSpiritScores(handReveal.spiritCounts);
+  const effectiveSpiritScores = calculateEffectiveSpiritScores(handReveal.spiritCounts);
   const spiritHasAny =
     handReveal.spiritDeltas.some((d) => d !== 0) &&
     (handReveal.jingPrimary !== null || handReveal.jingSecondary !== null);
