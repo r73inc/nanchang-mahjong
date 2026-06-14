@@ -8,13 +8,15 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                | Summary                                                                               |
-| ------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible | Bot roll animation and result flash by in under a frame; human roll works correctly   |
-| BUG-049 | Hand not visible in settlement (PC) | On desktop, the player cannot see their own hand during the settlement phase          |
-| BUG-050 | Spirit settlement uses old glyph    | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile |
-| IMP-032 | Global sound toggle                 | Add an always-available sound on/off toggle next to the language toggle               |
-| IMP-038 | Auto-sort drawn tile — not working  | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users  |
+| ID      | Name                                     | Summary                                                                                     |
+| ------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly         |
+| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                |
+| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile       |
+| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded          |
+| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own |
+| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                     |
+| IMP-038 | Auto-sort drawn tile — not working       | Toggle + store shipped; drawn tile still stays at far right in 2D mode for all users        |
 
 ---
 
@@ -69,6 +71,44 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 - `apps/web/src/pages/game/game-page.tsx:543-544` — spirit-count rows rendering `${JING_CHAR}${MULT_CHAR}${counts.primary}` etc.
 
 **Fix needed:** Remove the `节` glyph entirely (it is incorrect). Render the spirit tile itself as `MahjongTile2D` (size `xs`, `isJing`) followed by the `×N` count, matching the tile-texture treatment used in the rest of the reveal screen. Per CLAUDE.md, all tiles must use `MahjongTile2D`. The `JING_CHAR` constant can be retired once it has no remaining usages.
+
+---
+
+### BUG-051 · Discard blocked after declining tsumo win
+
+**Symptom:** During a playtest, a player drew a tile that completed a winning hand. The "Declare Win" prompt appeared. The player pressed "Keep Playing" to decline the win. After that, no tile could be discarded — the hand was stuck. The "Declare Win" button remained pressable, but the player could not continue by discarding.
+
+**Status:** OPEN — critical gameplay bug, reported playtest 2026-06-14.
+
+**Suspected cause:** When the client receives the self-draw win offer, it enters a state where the action buttons include "Declare Win" and "Keep Playing". After pressing "Keep Playing", the expected behaviour is to fall back to the normal discard phase (the player holds 14 tiles and must discard one). The likely failure modes are:
+
+1. The server does not send a new `game:snapshot` after the decline, leaving the client in the `tsumo-win-pending` action phase with no discard buttons mounted.
+2. The client-side action reducer does not transition back to the `discard` phase on a "keep playing" action, so `ActionBar` never renders the discard UI.
+3. The server correctly transitions but the decline socket event is never acknowledged / the phase update is swallowed.
+
+**Where to look:**
+
+- `apps/api/src/game/game.service.ts` — handler for the "decline tsumo" / "keep playing" event; confirm it calls `toClientSnapshot` and emits `game:snapshot` back to the decliner.
+- `apps/web/src/hooks/use-game.ts` — `handleDeclineTsumo` (or equivalent) client event emitter; confirm the round-trip snapshot is processed.
+- `apps/web/src/pages/game/game-page.tsx` — `ActionBar` / action-phase logic; confirm that phase `'discard'` renders discard buttons after the decline.
+- `apps/web/src/stores/game.store.ts` — action phase derivation; confirm declining a tsumo win sets `actionPhase` back to `'discard'`.
+
+---
+
+### BUG-052 · Customize palette cards show tiles using the active palette instead of their own
+
+**Symptom:** In the Customize page, the Tile Face section shows three preview cards (Classic, Sepia, Dark). Each card should display sample tiles rendered in _that card's own_ palette so the player can compare them. Instead, all three cards show tiles rendered in the currently-selected palette — e.g. if Dark is active, all three card previews show dark tiles.
+
+**Status:** OPEN — visual bug, reported playtest 2026-06-14.
+
+**Root cause:** `PaletteCard` renders `MahjongTile2D`, which builds its tile-face gradient from the global CSS custom properties `--tile-face-top` and `--tile-face-bottom`. These are written to `:root` by `applyTheme()` using the _current_ active palette only. All three cards inherit the same global values.
+
+**Fix:** Pass the card's own `TilePalette` id into `PaletteCard` and scope the CSS vars to the preview strip by wrapping it in a `<div>` with inline `style={{ '--tile-face-top': cfg.faceTop, '--tile-face-bottom': cfg.faceBottom }}`. CSS custom properties cascade, so `MahjongTile2D`'s `var(--tile-face-top)` will pick up the scoped override rather than the global root value.
+
+**Where to look:**
+
+- `apps/web/src/pages/customize/customize-page.tsx` — `PaletteCard` component (line ~107) and its call site (line ~279).
+- `apps/web/src/lib/theme.utils.ts` — `TILE_CONFIGS` (already exported) provides `faceTop`/`faceBottom` per palette.
 
 ---
 
