@@ -107,8 +107,10 @@ export function CombinedDiscardPool2D() {
     >
       <AnimatePresence>
         {entries.map(({ tile, seatIdx, posInSeat }) => {
-          // Exact coordinate match: seat + tile value.
-          const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
+          // Seat + position uniquely identifies the last discard — no tile-type
+          // comparison needed (fixed BUG-053: type-only match lit up duplicates).
+          const isPulse =
+            lastDiscard?.seat === seatIdx && posInSeat === seats[seatIdx].discards.length - 1;
 
           // Connect the discard-flight shared-element animation from PlayerHand2D.
           const isViewerLastDiscard =

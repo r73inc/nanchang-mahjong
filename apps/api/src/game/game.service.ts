@@ -1010,7 +1010,7 @@ export class GameService {
 
     if (session.engine.state.phase === 'finished') {
       // draw_game (exhaustive draw)
-      this.handleHandEnd(session, null, 'draw');
+      this.handleHandEnd(session, { winnerSeat: null, result: 'draw' });
       return;
     }
 
@@ -1093,6 +1093,13 @@ export class GameService {
       }
     }
 
+    // Capture the liable seat before declareWin clears pendingDiscard / discardedBySeat.
+    const liableSeatForDisplay: Seat4 | undefined = opts.isRobKong
+      ? opts.robKongSeat
+      : winType === 'ron'
+        ? (state.discardedBySeat ?? undefined)
+        : undefined;
+
     try {
       session.engine = session.engine.declareWin(winnerSeat, {
         isTrueGerman,
@@ -1106,12 +1113,10 @@ export class GameService {
         // can surface the rejection rather than silently ignoring the claim.
         const socketId = session.socketIdForSeat(winnerSeat);
         if (socketId && this.server) {
-          this.server
-            .to(socketId)
-            .emit('game:error', {
-              code: 'RULE_VIOLATION',
-              message: (err as GameRuleError).message,
-            });
+          this.server.to(socketId).emit('game:error', {
+            code: 'RULE_VIOLATION',
+            message: (err as GameRuleError).message,
+          });
         }
         this.logger.warn(
           `Rule violation in declareWin seat ${winnerSeat} game ${session.gameId}: ${err.message}`,
@@ -1138,7 +1143,15 @@ export class GameService {
     });
     this.broadcastSnapshots(session);
 
-    this.handleHandEnd(session, winnerSeat, 'win', payment, winType, handType);
+    this.handleHandEnd(session, {
+      winnerSeat,
+      result: 'win',
+      payment,
+      winType,
+      handType,
+      liableSeat: liableSeatForDisplay,
+      isRobKong: opts.isRobKong,
+    });
   }
 
   private applyRobKongResolution(
@@ -1270,20 +1283,26 @@ export class GameService {
 
     this.broadcastEvent(session, { kind: 'concede', seat });
     this.broadcastSnapshots(session);
-    this.handleHandEnd(session, null, 'concede', undefined, undefined, undefined, seat);
+    this.handleHandEnd(session, { winnerSeat: null, result: 'concede', concedeSeat: seat });
   }
 
   // ── Hand end & session management ────────────────────────────────────────────
 
   private handleHandEnd(
     session: GameSession,
-    winnerSeat: Seat4 | null,
-    result: 'win' | 'draw' | 'concede',
-    payment?: WinPaymentResult,
-    winType?: WinType,
-    handType?: HandType,
-    concedeSeat?: Seat4,
+    opts: {
+      winnerSeat: Seat4 | null;
+      result: 'win' | 'draw' | 'concede';
+      payment?: WinPaymentResult;
+      winType?: WinType;
+      handType?: HandType;
+      concedeSeat?: Seat4;
+      liableSeat?: Seat4;
+      isRobKong?: boolean;
+    },
   ): void {
+    const { winnerSeat, result, payment, winType, handType, concedeSeat, liableSeat, isRobKong } =
+      opts;
     session.clearAfkTimers();
     session.closeClaimWindow();
     session.handsPlayed++;
@@ -1349,6 +1368,8 @@ export class GameService {
       isLastHand,
       nextDealerSeat: isLastHand ? undefined : nextDealerInfo.dealerSeat,
       handNetDeltas,
+      liableSeat,
+      isRobKong,
     };
 
     // ── Store pending state, emit hand-reveal, and pause ──────────────────────

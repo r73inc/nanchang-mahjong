@@ -6,6 +6,211 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-036-history-nav` (2026-06-14)
+
+### IMP-036 · History and replays are completely undiscoverable
+
+**Fix:**
+
+- Added `historyLink` i18n key to `en.json` ("History") and `zh.json` ("历史") — concise label for the nav chip, matching the `profileLink`/`friendsLink` pattern.
+- Added `{ key: 'historyLink', path: '/history', icon: '📜' }` to `NAV_ITEMS` in `home-stub-page.tsx` and changed the grid from `grid-cols-4` to `grid-cols-5` to accommodate all five shortcuts evenly.
+- Added `gameId?: string` prop to `GameEndScreen` in `game-page.tsx`; the component now calls `useNavigate` and renders a "View Replay" button (`historyViewReplay` key, already existed in both locales) that navigates to `/replay/${gameId}` when `gameId` is set. `gameId` is passed from the URL param (`useParams<{ id }>`).
+
+**Key learning:** `historyViewReplay` ("View Replay" / "查看回放") was already present in both locale files from Phase 9 — no new i18n keys needed for the end-screen button. When adding a nav item to a fixed-column grid, update `grid-cols-N` to match the new count rather than letting items wrap onto a second row.
+
+---
+
+## `feat/imp033-imp035-texture-migration` (2026-06-14)
+
+### IMP-033 · Learn page: migrate to tile textures and audit content for accuracy
+
+**Fix:**
+
+- Replaced `import { MahjongTile }` with `import { MahjongTile2D }` in `learn-page.tsx`.
+- Migrated all 8 `<MahjongTile>` usages across `TileRow`, `MeldRow`, `SpiritSection`, and `MeldCard` to `<MahjongTile2D>`.
+- All usages were display-only (no `onClick`, no `faceDown`); the `size="xs"` / `size="sm"` props map directly with no behavioural change.
+- `Table2DContext` defaults to `tileScale: 1.0` when no Provider is present (confirmed by the context file comment and default value), so Learn page tiles render at full reference size.
+- Content was audited against `docs/final-nanchang-mahjong-rules.md` — EN descriptions match the authoritative ruleset.
+
+**Key learning:** `MahjongTile2D` is safe to use on any page without a `Table2DContext` Provider; the hook gracefully falls back to scale=1.0.
+
+---
+
+### IMP-035 · Replay page: migrate all tile rendering to tile textures
+
+**Fix:**
+
+- Replaced `import { MahjongTile }` with `import { MahjongTile2D }` in `replay-page.tsx`.
+- Migrated all 4 usages: final winning-hand strip (line 253 `size="sm"`), current-step callout (line 305 `size="xs"`), discard pool panel (line 390 `size="xs"`), and timeline event list (line 469 `size="xs"`). The gold box-shadow wrapper on the winning tile was preserved unchanged.
+- Removed the dead `import { MahjongTile }` from `game-page.tsx` (line 25 in original); found and migrated 2 actual `MahjongTile` usages in the move-history panel (lines 2254 + 2369) to `MahjongTile2D` — the import was not dead as stated; it was used in the history sidebar.
+- Removed the misplaced `describe('MahjongTile', ...)` test block from `game-page.test.tsx` (lines 655–707); equivalent coverage already exists in `mahjong-tile.test.tsx`.
+
+**Key learning:** Always grep for all usages before removing an import — the issue doc said line 25 was a "dead import" but the component was still used lower in the same file.
+
+---
+
+## `feat/imp-028-029-030-ui-polish` (2026-06-14)
+
+### IMP-028 · Remove redundant "You" labels from settlement / score / reveal screens
+
+**Fix:**
+
+- Removed `{t('preGameYou')}` from the viewer row in `SettlementPreview.tsx` (the bonus-tile settlement table before each hand).
+- Removed `{t('preGameYou')}` from the viewer row in the All Hands section of `HandRevealScreen` in `game-page.tsx`.
+- Retired the `preGameYou` key from `en.json` and `zh.json` — the key now has zero usages.
+
+The gold background + border (`bg-mj-gold/15 border border-mj-gold/30`) on the viewer's row remains as the sole "this is you" affordance across all screens.
+
+---
+
+### IMP-029 · Show settlement tiles per player in the collapsed row of the bonus-tile settlement screen
+
+**Fix:**
+
+Added tile-count chips directly in the collapsed row of each player entry in `SettlementPreview.tsx`. For each player, the collapsed row now shows:
+
+- `[settlementTile] ×N` (gold, `xs` size, `isJing` + `showJingLabel={false}`) when the player holds N copies of the 2-pt settlement tile.
+- `[nextTile] ×N` (muted, `xs` size) when the player holds N copies of the 1-pt tile.
+
+Chips only render when the count is > 0 and use `shrink-0` to prevent layout collapse on narrow viewports. The "Tile + ×N" format avoids repeating SVG glyphs per copy, satisfying the mobile-safe constraint from the issue spec.
+
+---
+
+### IMP-030 · Use the winning player's name as the end-of-round detail heading
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Renamed `resultLabel` → `headingLabel`. For a win, `headingLabel` now uses the new key `handRevealWinsHeading` ("{{0}} Wins!") with the winner's name interpolated directly, making the `<h1>` personal and specific.
+- Removed the secondary `<p>` that previously showed `handRevealWinner` ("{{0}} wins this hand") below the h1 for the win case — the name is now in the heading itself, so the secondary line was redundant.
+- Concede and draw cases are unchanged: `handRevealResultConcede` / `handRevealResultDraw` remain as the h1; the concede `<p>` ("{{0}} conceded") is preserved.
+
+**i18n:** Added `handRevealWinsHeading` in `en.json` ("{{0}} Wins!") and `zh.json` ("{{0}} 赢了！"). Retired `handRevealResultWin` ("Someone Won!" / "有人赢了！") — no remaining usages.
+
+---
+
+## `feat/imp031-unified-hand-result-table` (2026-06-13)
+
+### IMP-031 · Unified sorted hand-result table with full per-player score breakdown
+
+**Request:** Replace the two-table layout (score summary + separate spirit section) with a single unified table sorted by net gain this hand, where every row expands to show a full breakdown — win payment, spirit settlement, and kong payouts.
+
+**Fix:**
+
+- **`packages/shared/src/game.events.ts`:** Added `liableSeat?: 0 | 1 | 2 | 3` and `isRobKong?: boolean` to `HandRevealPayload`. `liableSeat` identifies the primary paying seat (ron discarder or rob-kong seat). These are UI-only fields — no scoring changes.
+- **`apps/api/src/game/game.service.ts`:** `applyWinClaim` captures the discarder/kong seat before calling `declareWin` (which clears the relevant state). `handleHandEnd` receives and forwards these to the payload.
+- **`apps/web/src/pages/game/game-page.tsx`:**
+  - Removed the old score summary table and separate spirit section.
+  - Added `computeEffectiveSpiritScores()` helper (mirrors engine's `calculateSpiritSettlement` formula without importing it).
+  - `HandRevealScreen` now renders a single sorted unified table (most gained → top) using `useState<number | null>` for expand/collapse per row.
+  - Expanded rows show three sections: (1) Win payment — winner sees multiplier chain + per-loser payments; loser sees their role (Self-Draw / Discarded / Bystander) and amount paid. (2) Spirit — tile icons, explosive/indomitable badges, effective score, net delta. (3) Kong payouts net.
+  - Hand type badge (Seven Pairs / All Triplets / Thirteen Misfits / Seven Star Thirteen) shows in the winner's collapsed row and expanded win header.
+- **i18n:** 18 new EN + ZH keys added for all breakdown labels and hand type names.
+
+**Key learnings:**
+
+- Capturing `discardedBySeat` / `kongSeat` must happen BEFORE calling `declareWin` — the engine clears these from state as part of the phase transition to `'finished'`.
+- The spirit effective-score formula must be re-derived in the frontend (not imported from the engine) to keep the web bundle clean. The formula is small enough to duplicate safely.
+- Kong delta is frontend-derivable: `handNetDeltas[i] − (winPayment?.scoreDelta[i] ?? 0) − spiritDeltas[i]`. This cleanly separates the three contributors to each seat's net change.
+
+---
+
+## `feat/imp-037-038-tile-size-autosort` (2026-06-13)
+
+### IMP-037 · Adjustable hand tile size in Customize page ⚠️ HIGH PRIORITY
+
+**Root cause / request:** Older VIP playtesters set their OS font size large for accessibility; large system fonts cause the in-game tile row to feel cramped or difficult to navigate on mobile. An in-app control was requested so players can reduce tile size independently of OS font settings.
+
+**Fix:**
+
+- Added `tileSize: 'sm' | 'md' | 'lg' | 'xl'` (default `'md'`) to `ThemeStore`, persisted to `localStorage`.
+- Exported `TILE_USER_SCALE` map (`sm=0.75, md=1.0, lg=1.25, xl=1.5`) for shared use.
+- `MahjongTile2D`: reads `tileSize` from the store and multiplies `tileScale * userScale` to compute `effectiveScale` for all pixel dimensions (width, height, shadow, border-radius, font-size). All existing `tileScale` calculations now use `effectiveScale`.
+- `SvgHandTile` (3D desktop hand HUD): reads `tileSize` and scales the base `46 × 62` dimensions by `userScale`. Hard minima (`28 × 38`) prevent collapse to unusably small sizes.
+- `MahjongTile2D` outer wrapper: enforces `min-width: 44px` / `min-height: 44px` when `interactive=true`, maintaining the Apple HIG / WCAG 2.5.5 touch target for interactive tiles even at small sizes. Non-interactive (decorative) tiles are not padded.
+- Customize page: four-chip tile size selector ("Small / Default / Large / X-Large") with EN+ZH labels.
+- **`transform: scale()` was explicitly avoided** per design spec — all sizing goes through actual `width`/`height` so flex containers reflow correctly.
+
+**Also closes IMP-034** — `MahjongTile2D` is now used for the palette preview strip in the Customize page (migrated from the deprecated `MahjongTile` text-glyph component, which CLAUDE.md requires whenever a legacy page is touched).
+
+**Tests added:** `Customize·tile-size` — two new tests verifying that selecting "Small" and "X-Large" updates the store correctly. `Customize·renders` updated to verify all five sections.
+
+**Key learnings:**
+
+- Combining viewport-fit scale (`tileScale` from Table2DContext) with user preference scale (`userScale` from store) cleanly separates two orthogonal concerns: one fits the board to the viewport, the other respects the player's explicit preference.
+- Min touch target must be on the _wrapper_ (outer div), not on the tile face — the face can be smaller while the wrapper gives fingers a safe tap zone. `justifyContent: 'center'` centers the smaller face inside the larger wrapper.
+
+---
+
+### IMP-038 · Auto-sort drawn tile into hand — ⚠️ RE-OPENED (see Open-issues.md)
+
+The toggle UI and store plumbing shipped correctly. The actual sort on draw is not triggering for end users in 2D mode. Re-opened as a critical VIP ask. See `Open-issues.md` for full investigation notes and root cause analysis.
+
+---
+
+## `fix/last-discard-duplicate-pulse` (2026-06-13)
+
+### BUG-053 · Last-discard red outline highlights multiple tiles when the same tile type appears more than once in a seat's discards
+
+**Root cause:** All three discard pool components (`DiscardPool2D`, `CombinedDiscardPool2D`, `MobileDiscardPool2D`) identified the "last discarded tile" using only `seat + tile type`:
+
+```ts
+const isPulse = lastDiscard?.seat === seatIdx && lastDiscard?.tile === tile;
+```
+
+During a `discards.map()` / `entries.map()` pass, this matched every occurrence of that tile type in the discard array — not just the most recently added one. When a player discarded the same tile type as a previous discard in their own pile, every earlier matching tile also received the pulse outline.
+
+**Fix (`apps/web/src/components/2d/DiscardPool2D.tsx`, `CombinedDiscardPool2D.tsx`, `MobileDiscardPool2D.tsx`):**
+
+Added a position guard — the last discarded tile is always the final entry in the discard array:
+
+- `DiscardPool2D`: `&& i === discards.length - 1`
+- `CombinedDiscardPool2D` / `MobileDiscardPool2D`: `&& posInSeat === seats[seatIdx].discards.length - 1`
+
+The tile-type check is retained as a fast-path guard; the position check ensures only the actual last tile is highlighted regardless of duplicates.
+
+**Tests added:** Two regression tests in `last-discard-pulse.test.tsx` — one for `MobileDiscardPool2D` and one for `CombinedDiscardPool2D` — verify that exactly one pulse appears when the same tile type has been discarded twice.
+
+**Key learnings:**
+
+- Matching by tile type alone is insufficient as a unique tile identifier in a discard pool — the same type can appear multiple times. Always combine type with position (last index) to identify the most recently discarded tile.
+- The existing BUG-020 tests only covered unique tile types per seat, so this variant slipped through. Future regression tests for visual state selectors should include duplicate-tile scenarios.
+
+---
+
+## `fix/bug-051-052-jing-meld-display` (2026-06-13)
+
+### BUG-051 · Jing/wildcard tiles silently transformed in the hand reveal meld display
+
+**Root cause:** `tryMelds` and `tryChow` in `packages/engine/src/hand.ts` record every meld's tile positions as the natural target tile, even when a jing wildcard filled that slot. For example, a pung of `2m` where one position was filled by the primary jing tile records `[2m, 2m, 2m]` — the jing's actual type is never stored. `decomposeConcealed` (display-only, not scoring) inherits this; the returned `Decomposition.melds[].tiles` arrays contain only natural tile types.
+
+`HandRevealScreen` used `decomp.melds[i].tiles` directly to render each meld group. Because no tile in the array matched `jingPrimary`/`jingSecondary`, the `isJing()` check returned `false` for every tile, the jing tile's actual identity was completely replaced by the natural tile, and no gold border/glow was applied — both identity and the wildcard indicator were lost.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+Added a `reconstructMeldTiles(decomp, hand, jingTypes)` helper (placed after `greedyGroupHand`). After calling `decomposeConcealed`, it reconstructs the actual tile identities by pool-matching from the original hand (which still holds real jing tile types). For each meld position with natural target `T`: if `T` is available in the pool, take it (it was actually `T`); otherwise a jing tile must have been used — take the first available jing from the pool. The same logic handles the pair, with `jingPair` from the decomposition indicating whether one slot was a wildcard. The winner decomposition path now calls `reconstructMeldTiles` instead of using `decomp.melds.map(m => m.tiles)` directly.
+
+**Key learnings:**
+
+- The engine's `tryMelds`/`tryChow` record melds as all-natural-tile arrays for algorithmic simplicity. Any display layer that needs to show actual tile identities (including wildcard tiles) must reconstruct them from the original hand, not the decomposition tile arrays.
+- A greedy pool-reconstruction algorithm is sufficient for the end-screen hand reveal: which of two `2m` positions is natural vs. jing may be ambiguous, but both wildcard positions are shown correctly and the gold glow highlights the right number of wildcards. Exact physical tile tracking would require engine-level wildcard position storage (deferred until animated replay).
+- Once tile types are correctly preserved, `isJing(tile)` returns `true` automatically for jing tiles, and the `MahjongTile2D` gold treatment works with no additional changes.
+
+---
+
+### BUG-052 · 精 label below jing tiles breaks vertical alignment in meld groups on mobile
+
+**Root cause:** `MahjongTile2D` renders the `精` character in a `flex-column` beneath the tile face when `isJing={true}` and `showJingLabel={true}` (the default). This adds extra height to the jing tile's container. Inside the meld rows in `HandRevealScreen` (`<div className="flex gap-0.5">`), this taller jing container misaligned adjacent tiles on mobile where tile sizes are small and the label's pixel height is significant relative to tile height.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+Passed `showJingLabel={false}` to all `MahjongTile2D` calls inside the hand reveal meld groups (grouped tiles and ungrouped remainder). The gold border + glow from `isJing={true}` clearly identifies wildcards without the label. The fix was made possible by BUG-051 being resolved first — once wildcards display as their actual jing tile type (with gold treatment), the `精` label is redundant.
+
+**Key learnings:**
+
+- `showJingLabel` defaults to `true` for contexts where the label adds useful identity information (e.g. when a tile is shown in isolation). In dense meld groups where the gold glow already identifies wildcards, suppress it with `showJingLabel={false}` to keep tile rows vertically aligned.
+
+---
+
 ## `fix/bug-047-imp-027-thirteen-misfits-seven-pairs` (2026-06-13)
 
 ### BUG-047 · Thirteen Misfits (十三烂) unwinnable when a Jing tile overlaps the pattern

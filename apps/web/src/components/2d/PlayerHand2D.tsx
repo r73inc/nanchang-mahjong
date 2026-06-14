@@ -24,6 +24,7 @@ import { sortTypes } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { useDiscardContext } from './DiscardContext';
 import { useI18n } from '../../i18n';
+import { useThemeStore } from '../../stores/theme.store';
 import { MahjongTile2D } from './MahjongTile2D';
 
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
@@ -69,6 +70,18 @@ export interface LocalEntry {
   /** Stable ephemeral ID used as Framer Motion layoutId. */
   id: string;
   tile: TileType;
+  /**
+   * The index of this tile in the server hand array at the time the entry was
+   * last synced. Stored permanently so the sort step never needs to re-derive
+   * it via a fragile multiset match — discard handlers read entry.tile directly
+   * (the server deducts by type), but having serverIndex available makes the
+   * binding explicit and safe.
+   */
+  serverIndex: number;
+  /** True when this tile was drawn in the most recent server update. Used to
+   *  visually identify the drawn tile after auto-sort reorders it away from the
+   *  right end of the hand. Cleared on the next hand change. */
+  isJustDrawn?: boolean;
 }
 
 // ── ID generator ──────────────────────────────────────────────────────────────
@@ -88,45 +101,44 @@ function genId(): string {
  * Merges a fresh server hand into the current localOrder.
  *
  * Rules:
- *  1. Tiles already present in `prev` are kept in their user-sorted positions.
- *  2. New tiles (drawn) are appended at the end with fresh IDs.
+ *  1. Tiles already present in `prev` are kept in their user-sorted positions,
+ *     with their serverIndex updated to reflect the new server hand layout.
+ *  2. New tiles (drawn) are appended at the end with fresh IDs and the correct
+ *     serverIndex from the incoming hand.
  *  3. Removed tiles (discarded / claimed) are dropped.
  *
- * Uses a multiset-match so duplicate TileType values are handled correctly
- * (e.g., two '1m' tiles in the same hand get independent IDs).
+ * Server indices are assigned ONCE here via a per-tile dequeue — no secondary
+ * multiset match is ever needed in the sort step or elsewhere.
  */
 export function mergeLocalOrder(prev: LocalEntry[], serverHand: TileType[]): LocalEntry[] {
-  // How many of each tile the new server hand contains
-  const want = new Map<TileType, number>();
-  for (const t of serverHand) {
-    want.set(t, (want.get(t) ?? 0) + 1);
-  }
+  // Build a FIFO queue of server indices for each tile type
+  const queues = new Map<TileType, number[]>();
+  serverHand.forEach((tile, idx) => {
+    if (!queues.has(tile)) queues.set(tile, []);
+    queues.get(tile)!.push(idx);
+  });
 
-  // Walk prev in user order; greedily keep matching tiles
-  const consumed = new Map<TileType, number>();
+  // Walk prev in user order; keep entries whose tile type still exists in the
+  // server hand, assigning the next available server index for that type.
   const kept: LocalEntry[] = [];
+  const usedServerIndices = new Set<number>();
   for (const entry of prev) {
-    const total = want.get(entry.tile) ?? 0;
-    const used = consumed.get(entry.tile) ?? 0;
-    if (used < total) {
-      kept.push(entry);
-      consumed.set(entry.tile, used + 1);
+    const q = queues.get(entry.tile);
+    if (q?.length) {
+      const serverIndex = q.shift()!;
+      kept.push({ ...entry, serverIndex });
+      usedServerIndices.add(serverIndex);
     }
+    // No queue entry left → tile was removed (discarded/claimed); drop it.
   }
 
-  // Append tiles that are new (not covered by kept)
-  const keptCount = new Map<TileType, number>();
-  for (const e of kept) {
-    keptCount.set(e.tile, (keptCount.get(e.tile) ?? 0) + 1);
-  }
-
+  // Append new entries for server tiles not yet assigned to a kept entry.
   const appended: LocalEntry[] = [];
-  for (const [tile, total] of want) {
-    const have = keptCount.get(tile) ?? 0;
-    for (let i = have; i < total; i++) {
-      appended.push({ id: genId(), tile });
+  serverHand.forEach((tile, serverIndex) => {
+    if (!usedServerIndices.has(serverIndex)) {
+      appended.push({ id: genId(), tile, serverIndex });
     }
-  }
+  });
 
   return [...kept, ...appended];
 }
@@ -159,6 +171,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
   const canTsumo = useGameStore((s) => s.canTsumo);
+  const { autoSortDrawnTile } = useThemeStore();
 
   // ── Hand-height CSS variable ──────────────────────────────────────────────
   // Observes the container height and sets --mj-hand-height on :root so that
@@ -200,22 +213,46 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   // ── Local drag-sort state ─────────────────────────────────────────────────
 
   const [localOrder, setLocalOrder] = useState<LocalEntry[]>(() =>
-    viewerHand.map((tile) => ({ id: genId(), tile })),
+    viewerHand.map((tile, serverIndex) => ({ id: genId(), tile, serverIndex })),
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Track the last hand key to detect server-driven hand changes
+  // Assigned every render so the effect reads current committed state synchronously
+  // without adding localOrder to the effect deps (which would cause infinite loops).
+  const localOrderRef = useRef<LocalEntry[]>(localOrder);
+  localOrderRef.current = localOrder;
+
+  // Track hand content and toggle state for change detection.
+  // Both are checked: a toggle change mid-hand must re-sort immediately
+  // without waiting for the next draw.
   const prevHandKeyRef = useRef<string>(viewerHand.join(','));
+  const prevToggleRef = useRef<boolean>(autoSortDrawnTile);
 
   useEffect(() => {
     const key = viewerHand.join(',');
-    if (key !== prevHandKeyRef.current) {
-      prevHandKeyRef.current = key;
-      setLocalOrder((prev) => mergeLocalOrder(prev, viewerHand));
-      // Clear any pending selection when the server delivers a new snapshot
-      setSelectedId(null);
+    if (key === prevHandKeyRef.current && prevToggleRef.current === autoSortDrawnTile) return;
+    prevHandKeyRef.current = key;
+    prevToggleRef.current = autoSortDrawnTile;
+
+    const prev = localOrderRef.current;
+    const merged = mergeLocalOrder(prev, viewerHand);
+
+    let nextOrder: LocalEntry[];
+    if (!autoSortDrawnTile) {
+      nextOrder = merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
+    } else {
+      const prevIds = new Set(prev.map((e) => e.id));
+      const tagged = merged.map((e) => ({ ...e, isJustDrawn: !prevIds.has(e.id) }));
+      nextOrder = [...tagged].sort((a, b) => {
+        if (a.tile === b.tile) return 0;
+        const [first] = sortTypes([a.tile, b.tile]);
+        return first === a.tile ? -1 : 1;
+      });
     }
-  }, [viewerHand]);
+
+    setLocalOrder(nextOrder);
+    setSelectedId(null);
+  }, [viewerHand, autoSortDrawnTile]);
 
   // ── Interaction ───────────────────────────────────────────────────────────
 
@@ -233,15 +270,13 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
 
   // ── Sort hand ─────────────────────────────────────────────────────────────
   const handleSortHand = useCallback(() => {
-    setLocalOrder((prev) => {
-      const sortedTiles = sortTypes(prev.map((e) => e.tile));
-      const pool = [...prev];
-      return sortedTiles.map((tile) => {
-        const idx = pool.findIndex((e) => e.tile === tile);
-        const entry = pool.splice(idx, 1)[0];
-        return entry;
-      });
-    });
+    setLocalOrder((prev) =>
+      [...prev].sort((a, b) => {
+        if (a.tile === b.tile) return 0;
+        const [first] = sortTypes([a.tile, b.tile]);
+        return first === a.tile ? -1 : 1;
+      }),
+    );
     setSelectedId(null);
   }, []);
 
@@ -393,6 +428,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
                 // Pairs with the Reorder.Group flexShrink/minWidth above.
                 flexShrink: 1,
                 minWidth: 0,
+                position: 'relative',
               }}
             >
               <MahjongTile2D
@@ -405,6 +441,24 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
                 layoutId={`hand-${entry.id}`}
                 onSelect={() => handleTileSelect(entry)}
               />
+              {/* Gold dot marks the tile drawn this turn after auto-sort moves it
+                  away from the right end. Only shown when auto-sort is enabled. */}
+              {entry.isJustDrawn && autoSortDrawnTile && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: 5,
+                    right: 5,
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: '#c9a961',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                  }}
+                />
+              )}
             </Reorder.Item>
           ))}
         </AnimatePresence>

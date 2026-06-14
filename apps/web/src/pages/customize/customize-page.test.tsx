@@ -4,8 +4,10 @@
  * Feature coverage:
  *  - Customize·persistence: choosing a theme stores the value in localStorage
  *  - Customize·contrast-guard: hexLuminance / contrastGuard returns correct ink
- *  - Customize·renders: all three sections render (felt, palette, sound)
+ *  - Customize·renders: all five sections render (felt, palette, tile size, sound, auto-sort)
  *  - Customize·sound-toggle: sound switch flips the store and UI
+ *  - Customize·tile-size: selecting a size updates the store (IMP-037)
+ *  - Customize·auto-sort: toggle flips the store (IMP-038)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -60,14 +62,22 @@ describe('Customize·contrast-guard', () => {
 describe('CustomizePage', () => {
   beforeEach(() => {
     // Reset store to defaults before each test
-    useThemeStore.setState({ felt: 'jade', tilePalette: 'classic', soundEnabled: false });
+    useThemeStore.setState({
+      felt: 'jade',
+      tilePalette: 'classic',
+      soundEnabled: false,
+      tileSize: 'md',
+      autoSortDrawnTile: false,
+    });
   });
 
-  it('Customize·renders — shows all three sections', () => {
+  it('Customize·renders — shows all five sections', () => {
     renderPage();
     expect(screen.getByText(/table felt/i)).toBeInTheDocument();
     expect(screen.getByText(/tile face/i)).toBeInTheDocument();
     expect(screen.getAllByText(/sound effects/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/hand tile size/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/auto-sort drawn tile/i).length).toBeGreaterThan(0);
   });
 
   it('Customize·renders — shows all five felt options', () => {
@@ -107,5 +117,33 @@ describe('CustomizePage', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(useThemeStore.getState().soundEnabled).toBe(true);
+  });
+
+  it('Customize·tile-size — selecting Extra Small updates the store', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /extra small/i }));
+    expect(useThemeStore.getState().tileSize).toBe('xs');
+  });
+
+  it('Customize·tile-size — selecting Small updates the store (IMP-037)', () => {
+    renderPage();
+    // Use exact name to avoid matching "Extra Small"
+    fireEvent.click(screen.getByRole('button', { name: 'Small' }));
+    expect(useThemeStore.getState().tileSize).toBe('sm');
+  });
+
+  it('Customize·tile-size — selecting X-Large updates the store (IMP-037)', () => {
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /x-large/i }));
+    expect(useThemeStore.getState().tileSize).toBe('xl');
+  });
+
+  it('Customize·auto-sort — clicking the toggle enables auto-sort (IMP-038)', () => {
+    renderPage();
+    const toggle = screen.getByRole('switch', { name: /auto-sort drawn tile/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(useThemeStore.getState().autoSortDrawnTile).toBe(true);
   });
 });

@@ -22,7 +22,6 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
-import { MahjongTile } from '../../components/mahjong-tile';
 import { LangToggle, useI18n } from '../../i18n';
 import {
   tileAriaLabel,
@@ -33,6 +32,7 @@ import {
   sortTypes,
   WIND_CHOWS,
   DRAGON_CHOW,
+  calculateEffectiveSpiritScores,
 } from '@nanchang/shared';
 import type {
   ClientGameState,
@@ -45,6 +45,7 @@ import type {
 } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
+import { useThemeStore, TILE_USER_SCALE } from '../../stores/theme.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D, ForcedLandscapeWrapper } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
@@ -70,9 +71,11 @@ const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '
 // Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
 const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
-const JING_CHAR = '节' as const;
-const MULT_CHAR = '×' as const;
 const SCORE_SEP = ': ' as const;
+const MULT_CHAR = '×' as const;
+const CHEVRON_UP = '▲' as const;
+const CHEVRON_DOWN = '▼' as const;
+const ARROW_RIGHT = '→ ' as const;
 
 const WIND_COLOR: Record<SeatWind, string> = {
   east: '#c9a961',
@@ -408,6 +411,53 @@ function greedyGroupHand(tiles: TileType[]): { groups: TileGroup[]; ungrouped: T
   return { groups, ungrouped: sortTypes([...bag]) };
 }
 
+// ── reconstructMeldTiles ──────────────────────────────────────────────────────
+// Re-derives the actual tile identities in each decomposed meld group by
+// matching from the original hand pool (which still holds real jing tile types).
+// The engine's decomposeConcealed fills every meld position with the natural
+// target tile, so the actual jing tile identity is lost. This function restores
+// it: for each position, prefer the natural tile from the pool; if it's absent,
+// a jing tile must have been used — take one from the pool instead.
+function reconstructMeldTiles(
+  decomp: { pair: TileType; melds: Meld[]; jingPair: boolean },
+  hand: TileType[],
+  jingTypes: TileType[],
+): { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] }[] {
+  const pool: TileType[] = [...hand];
+
+  const takeFromPool = (natural: TileType): TileType => {
+    const natIdx = pool.indexOf(natural);
+    if (natIdx !== -1) {
+      pool.splice(natIdx, 1);
+      return natural;
+    }
+    // Natural not in pool — a jing tile filled this position
+    for (const jt of jingTypes) {
+      const ji = pool.indexOf(jt);
+      if (ji !== -1) {
+        pool.splice(ji, 1);
+        return jt;
+      }
+    }
+    return natural; // unreachable for valid decompositions
+  };
+
+  const groups: { kind: 'pung' | 'chow' | 'pair'; tiles: TileType[] }[] = [];
+
+  for (const meld of decomp.melds) {
+    groups.push({
+      kind: meld.kind as 'pung' | 'chow',
+      tiles: meld.tiles.map((t) => takeFromPool(t)),
+    });
+  }
+
+  const pairNatural = takeFromPool(decomp.pair);
+  const pairSecond = takeFromPool(decomp.pair);
+  groups.push({ kind: 'pair', tiles: [pairNatural, pairSecond] });
+
+  return groups;
+}
+
 // ── HandRevealScreen ──────────────────────────────────────────────────────────
 // Full-screen post-hand reveal. Shows all hands, spirit settlement, and
 // payment breakdown.
@@ -435,6 +485,8 @@ function HandRevealScreen({
   const { t } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
 
+  const [expandedSeat, setExpandedSeat] = useState<number | null>(null);
+
   const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
     pung: t('gamePung'),
     chow: t('gameChow'),
@@ -442,9 +494,31 @@ function HandRevealScreen({
   };
   const PAIR_LABEL = t('handPair');
 
-  const resultLabel =
+  const effectiveSpiritScores = calculateEffectiveSpiritScores(handReveal.spiritCounts);
+  const spiritHasAny =
+    handReveal.spiritDeltas.some((d) => d !== 0) &&
+    (handReveal.jingPrimary !== null || handReveal.jingSecondary !== null);
+  const sortedSeats = ([0, 1, 2, 3] as const)
+    .slice()
+    .sort((a, b) => handReveal.handNetDeltas[b] - handReveal.handNetDeltas[a]);
+
+  const handTypeLabel =
+    (handReveal.handType ?? 'standard') !== 'standard'
+      ? handReveal.handType === 'seven_pairs'
+        ? t('handTypeSevenPairs')
+        : handReveal.handType === 'all_triplets'
+          ? t('handTypeAllTriplets')
+          : handReveal.handType === 'thirteen_misfits'
+            ? t('handTypeThirteenMisfits')
+            : t('handTypeSevenStarThirteen')
+      : null;
+
+  if (handReveal.result === 'win' && handReveal.winnerSeat === undefined) {
+    throw new Error('Invalid domain state: Win condition missing winnerSeat');
+  }
+  const headingLabel =
     handReveal.result === 'win'
-      ? t('handRevealResultWin')
+      ? t('handRevealWinsHeading', snapshot.seats[handReveal.winnerSeat!].seatName)
       : handReveal.result === 'concede'
         ? t('handRevealResultConcede')
         : t('handRevealResultDraw');
@@ -457,12 +531,7 @@ function HandRevealScreen({
           <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
             {t('handRevealTitle')}
           </p>
-          <h1 className="text-2xl font-serif font-bold text-mj-bone">{resultLabel}</h1>
-          {handReveal.winnerSeat !== undefined && (
-            <p className="text-sm text-mj-bone/60 mt-1">
-              {t('handRevealWinner', snapshot.seats[handReveal.winnerSeat].seatName)}
-            </p>
-          )}
+          <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
               {t('handRevealConcedeBy', snapshot.seats[handReveal.concedeSeat].seatName)}
@@ -470,100 +539,301 @@ function HandRevealScreen({
           )}
         </div>
 
-        {/* ── Score summary ────────────────────────────────────────────────── */}
+        {/* ── Unified sorted results table ─────────────────────────────────── */}
         <div className="flex flex-col gap-2 w-full">
-          {handReveal.handNetDeltas.map((delta, i) => {
-            const wind = snapshot.seats[i].wind;
-            const isViewer = i === viewerSeat;
-            const isWinner = i === handReveal.winnerSeat;
+          {sortedSeats.map((seat) => {
+            const wind = snapshot.seats[seat].wind;
+            const seatName = snapshot.seats[seat].seatName;
+            const isViewer = seat === viewerSeat;
+            const isWinner = seat === handReveal.winnerSeat;
+            const delta = handReveal.handNetDeltas[seat];
+            const isExp = expandedSeat === seat;
+
+            const winPayDelta = handReveal.winPayment?.scoreDelta[seat] ?? 0;
+            const spiritDelta = handReveal.spiritDeltas[seat];
+            const kongDelta = delta - winPayDelta - spiritDelta;
+            const hasWinSection =
+              handReveal.result === 'win' && handReveal.winPayment !== undefined;
+            const hasBreakdown = hasWinSection || spiritHasAny || kongDelta !== 0;
+
             return (
               <div
-                key={i}
-                className={`flex items-center justify-between px-4 py-2.5 rounded-xl ${
+                key={seat}
+                className={`rounded-xl overflow-hidden ${
                   isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: WIND_COLOR[wind] }}
-                  />
-                  <span
-                    className="text-base font-bold max-w-[120px] truncate"
-                    style={{ color: WIND_COLOR[wind] }}
-                  >
-                    {snapshot.seats[i].seatName}
-                  </span>
-                  {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
-                  {isWinner && (
-                    <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
-                      {t('handRevealWinnerBadge')}
-                    </span>
-                  )}
-                </div>
-                <span
-                  className={`text-base font-bold tabular-nums ${
-                    delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-mj-bone/40'
-                  }`}
+                {/* ── Collapsed row ── */}
+                <button
+                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  onClick={() => hasBreakdown && setExpandedSeat(isExp ? null : seat)}
+                  aria-expanded={hasBreakdown ? isExp : undefined}
                 >
-                  {delta > 0 ? '+' : ''}
-                  {delta}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── Spirit settlement breakdown ──────────────────────────────────── */}
-        {(handReveal.jingPrimary || handReveal.jingSecondary) && (
-          <div className="w-full">
-            <p className="text-[10px] font-bold tracking-widest text-mj-gold/60 uppercase mb-2 text-center">
-              {t('handRevealSpiritSection')}
-            </p>
-            <div className="flex flex-col gap-1.5 w-full">
-              {handReveal.spiritDeltas.map((delta, i) => {
-                const wind = snapshot.seats[i].wind;
-                const counts = handReveal.spiritCounts[i];
-                const isViewer = i === viewerSeat;
-                if (delta === 0 && counts.primary === 0 && counts.secondary === 0) return null;
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between px-3 py-1.5 rounded-lg ${
-                      isViewer ? 'bg-mj-gold/10' : 'bg-white/4'
-                    }`}
-                  >
+                  <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className="text-sm font-bold max-w-[100px] truncate"
+                      className="text-sm font-bold shrink-0"
                       style={{ color: WIND_COLOR[wind] }}
                     >
-                      {snapshot.seats[i].seatName}
-                    </span>
-                    <span className="text-xs text-mj-bone/50">
-                      {counts.primary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.primary} `}
-                      {counts.secondary > 0 && `${JING_CHAR}${MULT_CHAR}${counts.secondary}`}
+                      {WIND_CHAR[wind]}
                     </span>
                     <span
-                      className={`text-sm font-bold tabular-nums ${
+                      className="text-sm font-bold truncate"
+                      style={{ color: WIND_COLOR[wind] }}
+                    >
+                      {seatName}
+                    </span>
+                    {isWinner && (
+                      <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide shrink-0">
+                        {t('handRevealWinnerBadge')}
+                      </span>
+                    )}
+                    {handTypeLabel && isWinner && (
+                      <span className="text-[10px] bg-mj-gold/10 text-mj-gold/70 px-1.5 py-0.5 rounded shrink-0">
+                        {handTypeLabel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`text-base font-bold tabular-nums ${
                         delta > 0
                           ? 'text-emerald-400'
                           : delta < 0
                             ? 'text-red-400'
-                            : 'text-mj-bone/30'
+                            : 'text-mj-bone/40'
                       }`}
                     >
-                      {delta > 0
-                        ? t('settlementReceived', String(delta))
-                        : delta < 0
-                          ? t('settlementPaid', String(Math.abs(delta)))
-                          : t('settlementEven')}
+                      {delta > 0 ? '+' : ''}
+                      {delta}
                     </span>
+                    {hasBreakdown && (
+                      <span className="text-mj-bone/30 text-[10px]" aria-hidden>
+                        {isExp ? CHEVRON_UP : CHEVRON_DOWN}
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                </button>
+
+                {/* ── Expanded breakdown ── */}
+                {isExp && (
+                  <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3">
+                    {/* Section 1 — Win payment */}
+                    {hasWinSection &&
+                      handReveal.winPayment &&
+                      (() => {
+                        const wp = handReveal.winPayment!;
+                        if (isWinner) {
+                          const winTypeLabel = handReveal.isRobKong
+                            ? t('handRevealBreakdownWinRobKong')
+                            : handReveal.winType === 'tsumo'
+                              ? t('handRevealBreakdownWinTsumo')
+                              : t('handRevealBreakdownWinRon');
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold bg-emerald-400/15 text-emerald-400 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                  {winTypeLabel}
+                                </span>
+                                {handTypeLabel && (
+                                  <span className="text-[10px] font-bold bg-mj-gold/15 text-mj-gold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                    {handTypeLabel}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Multiplier chain */}
+                              <div className="flex flex-wrap items-center gap-1 text-[11px] text-mj-bone/50">
+                                <span>{t('handRevealBreakdownBase')}</span>
+                                {wp.items.map((item, ii) => (
+                                  <span key={ii} className="flex items-center gap-1">
+                                    <span className="text-mj-bone/30">{MULT_CHAR}</span>
+                                    <span className="bg-white/8 px-1.5 py-0.5 rounded text-mj-bone/70">
+                                      {item.name} {MULT_CHAR}
+                                      {item.multiplier}
+                                    </span>
+                                  </span>
+                                ))}
+                                <span className="text-mj-bone/70 font-bold">
+                                  {ARROW_RIGHT}
+                                  {t('handRevealBreakdownTotalMult', String(wp.totalMultiplier))}
+                                </span>
+                              </div>
+                              {wp.flatBonusPerLoser > 0 && (
+                                <p className="text-[11px] text-mj-bone/40">
+                                  {t(
+                                    'handRevealBreakdownFlatPerPlayer',
+                                    String(wp.flatBonusPerLoser),
+                                  )}
+                                </p>
+                              )}
+                              {/* Payments received from each loser */}
+                              {([0, 1, 2, 3] as const)
+                                .filter((s) => s !== seat)
+                                .map((loser) => {
+                                  const received = -wp.scoreDelta[loser];
+                                  if (received === 0) return null;
+                                  return (
+                                    <p key={loser} className="text-[12px] text-emerald-400/80">
+                                      {t(
+                                        'handRevealBreakdownReceivedFrom',
+                                        String(received),
+                                        snapshot.seats[loser].seatName,
+                                      )}
+                                    </p>
+                                  );
+                                })}
+                              <p className="text-sm font-bold text-emerald-400">
+                                {t('handRevealBreakdownWinTotal', String(wp.winnerTotal))}
+                              </p>
+                            </div>
+                          );
+                        } else {
+                          const loseTypeLabel =
+                            handReveal.winType === 'tsumo'
+                              ? t('handRevealBreakdownLoseTsumo')
+                              : handReveal.liableSeat === seat
+                                ? handReveal.isRobKong
+                                  ? t('handRevealBreakdownWinRobKong')
+                                  : t('handRevealBreakdownLoseDiscard')
+                                : t('handRevealBreakdownLoseBystander');
+                          const paid = Math.abs(wp.scoreDelta[seat]);
+                          const winnerName =
+                            handReveal.winnerSeat !== undefined
+                              ? snapshot.seats[handReveal.winnerSeat].seatName
+                              : '';
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-[10px] font-bold bg-red-400/15 text-red-400 px-1.5 py-0.5 rounded uppercase tracking-wide self-start">
+                                {loseTypeLabel}
+                              </span>
+                              {paid > 0 && (
+                                <p className="text-[12px] text-red-400/80">
+                                  {t('handRevealBreakdownPaidWinner', winnerName, String(paid))}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                      })()}
+
+                    {/* Section 2 — Spirit settlement */}
+                    {spiritHasAny &&
+                      (() => {
+                        const counts = handReveal.spiritCounts[seat];
+                        const effScore = effectiveSpiritScores[seat];
+                        const rawScore =
+                          counts.primary * 2 + counts.secondary + counts.spiritKongs * 10;
+                        const isExplosive = rawScore >= 5;
+                        const playersWithSpirits = effectiveSpiritScores.filter(
+                          (s) => s > 0,
+                        ).length;
+                        const isIndomitable = playersWithSpirits === 1 && effScore > 0;
+                        const sDelta = handReveal.spiritDeltas[seat];
+                        return (
+                          <div className="flex flex-col gap-1.5">
+                            <p className="text-[10px] font-bold tracking-widest text-mj-gold/50 uppercase">
+                              {t('handRevealBreakdownSpiritHeader')}
+                            </p>
+                            {/* Tile icons + holdings */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {handReveal.jingPrimary && counts.primary > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <MahjongTile2D
+                                    tile={handReveal.jingPrimary}
+                                    size="xs"
+                                    interactive={false}
+                                    isJing
+                                    showJingLabel={false}
+                                  />
+                                  <span className="text-[11px] text-mj-bone/60">
+                                    {MULT_CHAR}
+                                    {counts.primary}
+                                  </span>
+                                </span>
+                              )}
+                              {handReveal.jingSecondary && counts.secondary > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <MahjongTile2D
+                                    tile={handReveal.jingSecondary}
+                                    size="xs"
+                                    interactive={false}
+                                    showJingLabel={false}
+                                  />
+                                  <span className="text-[11px] text-mj-bone/60">
+                                    {MULT_CHAR}
+                                    {counts.secondary}
+                                  </span>
+                                </span>
+                              )}
+                              {counts.spiritKongs > 0 && (
+                                <span className="text-[11px] text-mj-bone/60">
+                                  {t('handRevealBreakdownSpiritKongs', String(counts.spiritKongs))}
+                                </span>
+                              )}
+                              {counts.primary === 0 &&
+                                counts.secondary === 0 &&
+                                counts.spiritKongs === 0 && (
+                                  <span className="text-[11px] text-mj-bone/30">—</span>
+                                )}
+                            </div>
+                            {effScore > 0 && (
+                              <div className="flex flex-wrap gap-1 text-[11px]">
+                                {isExplosive && (
+                                  <span className="bg-orange-400/15 text-orange-400 px-1.5 py-0.5 rounded">
+                                    {t('handRevealBreakdownSpiritExplosive')}
+                                  </span>
+                                )}
+                                {isIndomitable && (
+                                  <span className="bg-purple-400/15 text-purple-400 px-1.5 py-0.5 rounded">
+                                    {t('handRevealBreakdownSpiritIndomitable')}
+                                  </span>
+                                )}
+                                <span className="text-mj-bone/50">
+                                  {t('handRevealBreakdownSpiritEffective', String(effScore))}
+                                </span>
+                              </div>
+                            )}
+                            <p
+                              className={`text-sm font-bold tabular-nums ${
+                                sDelta > 0
+                                  ? 'text-emerald-400'
+                                  : sDelta < 0
+                                    ? 'text-red-400'
+                                    : 'text-mj-bone/40'
+                              }`}
+                            >
+                              {t(
+                                'handRevealBreakdownSpiritNet',
+                                sDelta > 0 ? `+${sDelta}` : String(sDelta),
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })()}
+
+                    {/* Section 3 — Kong payouts */}
+                    {kongDelta !== 0 && (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] font-bold tracking-widest text-mj-gold/50 uppercase">
+                          {t('handRevealBreakdownKongHeader')}
+                        </p>
+                        <p
+                          className={`text-sm font-bold tabular-nums ${
+                            kongDelta > 0 ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
+                          {t(
+                            'handRevealBreakdownKongNet',
+                            kongDelta > 0 ? `+${kongDelta}` : String(kongDelta),
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
         {/* ── All four hands ───────────────────────────────────────────────── */}
         <div className="w-full">
@@ -588,7 +858,6 @@ function HandRevealScreen({
                     <span className="text-xs text-mj-bone/70 font-medium">
                       {snapshot.seats[i].seatName}
                     </span>
-                    {isViewer && <span className="text-xs text-mj-bone/50">{t('preGameYou')}</span>}
                     {isWinner && (
                       <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
                         {t('handRevealWinnerBadge')}
@@ -641,14 +910,7 @@ function HandRevealScreen({
                     if (isWinner) {
                       const decomps = decomposeConcealed(hand, jingTypes);
                       if (decomps.length > 0) {
-                        const decomp = decomps[0];
-                        groups = [
-                          ...decomp.melds.map((m) => ({
-                            kind: m.kind as 'pung' | 'chow',
-                            tiles: [...m.tiles],
-                          })),
-                          { kind: 'pair' as const, tiles: [decomp.pair, decomp.pair] },
-                        ];
+                        groups = reconstructMeldTiles(decomps[0], hand, jingTypes);
                         ungrouped = [];
                       } else {
                         // Seven pairs, thirteen misfits, or edge cases — greedy fallback
@@ -687,6 +949,7 @@ function HandRevealScreen({
                                   size="xs"
                                   interactive={false}
                                   isJing={isJing(tile)}
+                                  showJingLabel={false}
                                 />
                               ))}
                             </div>
@@ -705,6 +968,7 @@ function HandRevealScreen({
                                 size="xs"
                                 interactive={false}
                                 isJing={isJing(tile)}
+                                showJingLabel={false}
                               />
                             ))}
                           </div>
@@ -751,6 +1015,7 @@ function GameEndScreen({
   snapshot,
   ended,
   viewerSeat,
+  gameId,
   onHome,
   onRematch,
   onViewDetails,
@@ -758,11 +1023,13 @@ function GameEndScreen({
   snapshot: ClientGameState;
   ended: GameEndedPayload | null;
   viewerSeat: 0 | 1 | 2 | 3 | null;
+  gameId?: string;
   onHome: () => void;
   onRematch: () => void;
   onViewDetails?: () => void;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   // Prefer the authoritative finalScores from game:ended — snapshot seat scores
   // exclude the final hand's spirit settlement (no snapshot follows endSession).
   const scores = ended ? ended.finalScores : snapshot.seats.map((s) => s.score);
@@ -862,6 +1129,15 @@ function GameEndScreen({
             style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
           >
             {t('endGameViewDetails')}
+          </button>
+        )}
+        {gameId && (
+          <button
+            onClick={() => navigate(`/replay/${gameId}`)}
+            className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
+          >
+            {t('historyViewReplay')}
           </button>
         )}
         {viewerSeat === 0 && (
@@ -1042,29 +1318,41 @@ function AccessibleHand({
   onSelect,
   onDiscard,
   isMyTurn,
+  displayOrder,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
   isMyTurn: boolean;
+  /** Maps display position → server hand index. Mirrors ViewerHandHUD's display
+   *  order so screen-reader buttons stay in sync with the visual tile positions.
+   *  Pass `hand.map((_, i) => i)` for natural order (2D mode / no auto-sort). */
+  displayOrder: number[];
 }) {
   const { lang } = useI18n();
 
+  // Derive entries directly from displayOrder — serverIdx is permanently baked in,
+  // no multiset match needed. Entries whose serverIdx is out of range are skipped
+  // (transient during hand transitions).
+  const entries = displayOrder
+    .filter((serverIdx) => serverIdx < hand.length)
+    .map((serverIdx) => ({ tile: hand[serverIdx], serverIdx }));
+
   return (
     <div className="sr-only" role="group" aria-label="Your hand">
-      {hand.map((tile, idx) => (
+      {entries.map(({ tile, serverIdx }) => (
         <button
-          key={`accessible-${tile}-${idx}`}
+          key={`accessible-${tile}-${serverIdx}`}
           aria-label={tileAriaLabel(tile, lang)}
-          aria-pressed={selectedTileIdx === idx}
+          aria-pressed={selectedTileIdx === serverIdx}
           data-tile={engineToDesignTile(tile)}
           onClick={() => {
             if (!isMyTurn) return;
-            if (selectedTileIdx === idx) {
+            if (selectedTileIdx === serverIdx) {
               onDiscard(tile);
             } else {
-              onSelect(idx);
+              onSelect(serverIdx);
             }
           }}
         >
@@ -1562,6 +1850,10 @@ interface HistoryEntry {
  * Uses the same Regular SVG textures as the 3D tile face stamps, displayed
  * on an ivory background that matches the 3D tile body colour.
  */
+// Base dimensions for SvgHandTile at md (1.0) scale.
+const SVG_HAND_TILE_BASE_W = 46;
+const SVG_HAND_TILE_BASE_H = 62;
+
 function SvgHandTile({
   tile,
   isJing = false,
@@ -1573,12 +1865,17 @@ function SvgHandTile({
   isSelected?: boolean;
   isDrawn?: boolean;
 }) {
+  const { tileSize } = useThemeStore();
+  const userScale = TILE_USER_SCALE[tileSize];
+  const tileW = Math.max(28, Math.round(SVG_HAND_TILE_BASE_W * userScale));
+  const tileH = Math.max(38, Math.round(SVG_HAND_TILE_BASE_H * userScale));
+
   return (
     <div
       style={{
         position: 'relative',
-        width: 46,
-        height: 62,
+        width: tileW,
+        height: tileH,
         borderRadius: 5,
         background: '#f5efe0',
         border: isJing || isSelected ? '2px solid #c9a961' : '1.5px solid rgba(201,169,97,0.35)',
@@ -1634,6 +1931,7 @@ function ViewerHandHUD({
   isMyTurn,
   jingTypes,
   pendingMove,
+  onDisplayOrderChange,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
@@ -1642,30 +1940,78 @@ function ViewerHandHUD({
   isMyTurn: boolean;
   jingTypes: Set<string>;
   pendingMove: boolean;
+  /** Called whenever the internal displayOrder changes so the parent can mirror
+   *  it in AccessibleHand (keeping sr-only buttons in sync with visual order). */
+  onDisplayOrderChange?: (order: number[]) => void;
 }) {
   const { t } = useI18n();
+  const { autoSortDrawnTile } = useThemeStore();
   // displayOrder[displayIdx] = handIdx
   const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const prevLenRef = useRef(hand.length);
+  // Content-based detection mirrors PlayerHand2D's prevHandKeyRef pattern.
+  // prevToggleRef ensures a settings change mid-hand re-sorts immediately.
+  const prevHandKeyRef = useRef<string>(hand.join(','));
+  const prevToggleRef = useRef<boolean>(autoSortDrawnTile);
 
-  // Sync displayOrder when hand length changes (new draw or discard confirmation).
+  // Sync displayOrder on hand changes or auto-sort toggle changes.
   useEffect(() => {
-    const prev = prevLenRef.current;
+    const key = hand.join(',');
+    const handUnchanged = key === prevHandKeyRef.current;
+    const toggleUnchanged = prevToggleRef.current === autoSortDrawnTile;
+
+    if (handUnchanged && toggleUnchanged) return;
+
+    const prevLen = prevLenRef.current;
+    prevHandKeyRef.current = key;
+    prevToggleRef.current = autoSortDrawnTile;
     prevLenRef.current = hand.length;
 
-    if (hand.length === prev) return;
-
-    if (hand.length > prev) {
-      // A tile was drawn — append its index (hand.length - 1) at the end of
-      // the display so the newly drawn tile appears on the right.
-      setDisplayOrder((order) => [...order, hand.length - 1]);
-    } else {
-      // A tile was discarded — we can't cheaply determine which index was
-      // removed, so reset to natural order for the new hand.
+    if (hand.length < prevLen) {
+      // Tile discarded — reset to natural order.
       setDisplayOrder(hand.map((_, i) => i));
+      return;
     }
-  }, [hand.length]);
+
+    if (hand.length > prevLen) {
+      // Tile drawn — server always appends at the end of the hand array.
+      const newHandIdx = hand.length - 1;
+      if (autoSortDrawnTile) {
+        setDisplayOrder((order) => {
+          const extended = [...order, newHandIdx];
+          return extended.sort((a, b) => {
+            const ta = hand[a];
+            const tb = hand[b];
+            const sorted = sortTypes([ta, tb]);
+            return sorted[0] === sorted[1] ? 0 : sorted[0] === ta ? -1 : 1;
+          });
+        });
+      } else {
+        setDisplayOrder((order) => [...order, newHandIdx]);
+      }
+      return;
+    }
+
+    // Same hand length: toggle changed mid-hand. Apply the new setting immediately.
+    if (autoSortDrawnTile) {
+      setDisplayOrder((order) =>
+        [...order].sort((a, b) => {
+          const ta = hand[a];
+          const tb = hand[b];
+          const sorted = sortTypes([ta, tb]);
+          return sorted[0] === sorted[1] ? 0 : sorted[0] === ta ? -1 : 1;
+        }),
+      );
+    }
+    // Disabling: keep the current user-arranged order unchanged.
+  }, [hand, autoSortDrawnTile]);
+
+  // Report displayOrder to the parent whenever it changes so AccessibleHand can
+  // mirror the exact visual order without recomputing it independently.
+  useEffect(() => {
+    onDisplayOrderChange?.(displayOrder);
+  }, [displayOrder, onDisplayOrderChange]);
 
   const handleDragStart = (displayIdx: number) => {
     setDragFrom(displayIdx);
@@ -1917,7 +2263,7 @@ function GameHistoryPanel({
                           : ACTION_LABEL[entry.kind]}
                       </span>
                       {entry.tile && (
-                        <MahjongTile
+                        <MahjongTile2D
                           tile={entry.tile}
                           size="xs"
                           isJing={
@@ -2032,7 +2378,7 @@ function GameHistoryPanel({
                     </span>
                     {/* Tile (if any) */}
                     {entry.tile && (
-                      <MahjongTile
+                      <MahjongTile2D
                         tile={entry.tile}
                         size="xs"
                         isJing={
@@ -2464,6 +2810,13 @@ function GameTable({
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
 
+  // Mirror of ViewerHandHUD's internal displayOrder, kept in sync via the
+  // onDisplayOrderChange callback below. Used by AccessibleHand so the sr-only
+  // DOM buttons always match the visual tile positions in the 3D hand HUD.
+  const [hudDisplayOrder, setHudDisplayOrder] = useState<number[]>(() =>
+    viewerHand.map((_, i) => i),
+  );
+
   // Derive jing set for the viewer hand HUD tile highlighting.
   const jingTypes = new Set<string>();
   if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
@@ -2767,11 +3120,12 @@ function GameTable({
         )}
 
         {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
-        {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
-        {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
+        {/* In 2D mode or on mobile, GameTable2D renders PlayerHand2D as the     */}
+        {/* interactive hand. ViewerHandHUD is only needed on desktop in 3D mode  */}
+        {/* where it overlays the R3F canvas (which has no mobile handling).      */}
         {/* Kept visible when canTsumo is true so the hand remains visible while  */}
         {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
-        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
+        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && !isMobile && (
           <ViewerHandHUD
             hand={viewerHand}
             selectedTileIdx={selectedTileIdx}
@@ -2780,6 +3134,7 @@ function GameTable({
             isMyTurn={isMyTurn && !canTsumo}
             jingTypes={jingTypes}
             pendingMove={pendingMove}
+            onDisplayOrderChange={setHudDisplayOrder}
           />
         )}
 
@@ -2810,6 +3165,7 @@ function GameTable({
           onSelect={onSelect}
           onDiscard={handleDiscardOrKong}
           isMyTurn={isMyTurn && !pendingMove && !canTsumo}
+          displayOrder={hudDisplayOrder}
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}
@@ -3233,6 +3589,7 @@ export function GamePage() {
             snapshot={snapshot}
             ended={ended}
             viewerSeat={viewerSeat}
+            gameId={gameId}
             onHome={handleHome}
             onRematch={requestRematch}
             onViewDetails={finalHandReveal ? () => setShowEndDetails(true) : undefined}
