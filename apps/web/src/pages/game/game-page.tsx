@@ -2865,11 +2865,12 @@ function GameTable({
         )}
 
         {/* ── Viewer hand HUD — large draggable tiles at the bottom ─────────── */}
-        {/* In 2D mode GameTable2D renders PlayerHand2D as the interactive hand. */}
-        {/* ViewerHandHUD is only needed in 3D mode (it overlays the R3F canvas). */}
+        {/* In 2D mode or on mobile, GameTable2D renders PlayerHand2D as the     */}
+        {/* interactive hand. ViewerHandHUD is only needed on desktop in 3D mode  */}
+        {/* where it overlays the R3F canvas (which has no mobile handling).      */}
         {/* Kept visible when canTsumo is true so the hand remains visible while  */}
         {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
-        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && (
+        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && !isMobile && (
           <ViewerHandHUD
             hand={viewerHand}
             selectedTileIdx={selectedTileIdx}
