@@ -24,6 +24,7 @@ import { sortTypes } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import { useDiscardContext } from './DiscardContext';
 import { useI18n } from '../../i18n';
+import { useThemeStore } from '../../stores/theme.store';
 import { MahjongTile2D } from './MahjongTile2D';
 
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
@@ -69,6 +70,10 @@ export interface LocalEntry {
   /** Stable ephemeral ID used as Framer Motion layoutId. */
   id: string;
   tile: TileType;
+  /** True when this tile was drawn in the most recent server update. Used to
+   *  visually identify the drawn tile after auto-sort reorders it away from the
+   *  right end of the hand. Cleared on the next hand change. */
+  isJustDrawn?: boolean;
 }
 
 // ── ID generator ──────────────────────────────────────────────────────────────
@@ -159,6 +164,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
   const claimWindow = useGameStore((s) => s.claimWindow);
   const pendingMove = useGameStore((s) => s.pendingMove);
   const canTsumo = useGameStore((s) => s.canTsumo);
+  const { autoSortDrawnTile } = useThemeStore();
 
   // ── Hand-height CSS variable ──────────────────────────────────────────────
   // Observes the container height and sets --mj-hand-height on :root so that
@@ -211,11 +217,37 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
     const key = viewerHand.join(',');
     if (key !== prevHandKeyRef.current) {
       prevHandKeyRef.current = key;
-      setLocalOrder((prev) => mergeLocalOrder(prev, viewerHand));
+      setLocalOrder((prev) => {
+        const merged = mergeLocalOrder(prev, viewerHand);
+
+        if (!autoSortDrawnTile) {
+          // Clear any stale isJustDrawn flags carried over from a previous auto-sort
+          // session (e.g. user toggled the setting off mid-game).
+          return merged.map((e) => (e.isJustDrawn ? { ...e, isJustDrawn: false } : e));
+        }
+
+        // Identify newly added entries by comparing stable IDs against the previous
+        // localOrder. Entries with a new ID were appended by mergeLocalOrder and
+        // represent the tile(s) drawn this turn.
+        const prevIds = new Set(prev.map((e) => e.id));
+        const tagged = merged.map((e) => ({
+          ...e,
+          isJustDrawn: !prevIds.has(e.id),
+        }));
+
+        // Sort by canonical tile order, preserving the isJustDrawn flag so the gold
+        // dot indicator follows the drawn tile to its new sorted position.
+        const sortedTiles = sortTypes(tagged.map((e) => e.tile));
+        const pool = [...tagged];
+        return sortedTiles.map((tile) => {
+          const idx = pool.findIndex((e) => e.tile === tile);
+          return pool.splice(idx, 1)[0];
+        });
+      });
       // Clear any pending selection when the server delivers a new snapshot
       setSelectedId(null);
     }
-  }, [viewerHand]);
+  }, [viewerHand, autoSortDrawnTile]);
 
   // ── Interaction ───────────────────────────────────────────────────────────
 
@@ -393,6 +425,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
                 // Pairs with the Reorder.Group flexShrink/minWidth above.
                 flexShrink: 1,
                 minWidth: 0,
+                position: 'relative',
               }}
             >
               <MahjongTile2D
@@ -405,6 +438,24 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
                 layoutId={`hand-${entry.id}`}
                 onSelect={() => handleTileSelect(entry)}
               />
+              {/* Gold dot marks the tile drawn this turn after auto-sort moves it
+                  away from the right end. Only shown when auto-sort is enabled. */}
+              {entry.isJustDrawn && autoSortDrawnTile && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: 5,
+                    right: 5,
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: '#c9a961',
+                    pointerEvents: 'none',
+                    zIndex: 2,
+                  }}
+                />
+              )}
             </Reorder.Item>
           ))}
         </AnimatePresence>

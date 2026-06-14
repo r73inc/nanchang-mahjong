@@ -21,6 +21,7 @@ import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
 import { tileTexturePath, backTexturePath } from '../../r3f/utils/tile-texture-map';
 import { useTable2DScale } from './Table2DContext';
+import { useThemeStore, TILE_USER_SCALE } from '../../stores/theme.store';
 import type { SeatRole } from './layout-2d';
 
 // ── Module-level constants (avoids i18next/no-literal-string on JSX nodes) ────
@@ -138,25 +139,32 @@ export function MahjongTile2D({
 }: MahjongTile2DProps) {
   const { lang } = useI18n();
   const { tileScale } = useTable2DScale();
+  const { tileSize } = useThemeStore();
 
-  // Scale all pixel dimensions by tileScale so tiles shrink proportionally
+  // Combine viewport-fit scale (from Table2DContext) with the user's size preference.
+  // tileScale handles responsive viewport fitting; userScale reflects the player's
+  // explicit preference from the Customize page.
+  const userScale = TILE_USER_SCALE[tileSize];
+  const effectiveScale = tileScale * userScale;
+
+  // Scale all pixel dimensions by effectiveScale so tiles shrink proportionally
   // on narrow or short viewports. Math.round prevents sub-pixel blurriness;
   // Math.max guards against dimensions collapsing to 0.
   const ref = TILE_DIMS[size];
   const dims = {
-    w: Math.max(8, Math.round(ref.w * tileScale)),
-    h: Math.max(11, Math.round(ref.h * tileScale)),
-    shadow: Math.max(1, Math.round(ref.shadow * tileScale)),
-    radius: Math.max(2, Math.round(4 * tileScale)),
+    w: Math.max(8, Math.round(ref.w * effectiveScale)),
+    h: Math.max(11, Math.round(ref.h * effectiveScale)),
+    shadow: Math.max(1, Math.round(ref.shadow * effectiveScale)),
+    radius: Math.max(2, Math.round(4 * effectiveScale)),
   };
 
   const [sxRef, syRef] = SHADOW_OFFSETS[role];
-  const sx = Math.round(sxRef * tileScale);
-  const sy = Math.round(syRef * tileScale);
+  const sx = Math.round(sxRef * effectiveScale);
+  const sy = Math.round(syRef * effectiveScale);
   const thickness = dims.shadow;
   // Tile lift when selected — scale proportionally so it doesn't look exaggerated
   // at small tile sizes.
-  const liftY = Math.round(-6 * tileScale);
+  const liftY = Math.round(-6 * effectiveScale);
 
   const isBack = tile === 'back';
   const baseSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
@@ -187,8 +195,8 @@ export function MahjongTile2D({
 
   // Build box-shadow: directional thickness + optional selected ring + optional jing glow.
   // Ring width and glow radius also scale so they remain proportional to tile size.
-  const ringPx = Math.max(1, Math.round(2 * tileScale));
-  const glowPx = Math.max(4, Math.round(12 * tileScale));
+  const ringPx = Math.max(1, Math.round(2 * effectiveScale));
+  const glowPx = Math.max(4, Math.round(12 * effectiveScale));
   const shadowParts: string[] = [`${sx}px ${sy}px ${thickness}px rgba(0,0,0,0.6)`];
   if (selected) shadowParts.push(`0 0 0 ${ringPx}px #c9a961`);
   if (isJing) shadowParts.push(`0 0 ${glowPx}px rgba(201,169,97,0.7)`);
@@ -201,15 +209,25 @@ export function MahjongTile2D({
     }
   };
 
+  // Minimum touch target: 44 × 44 px (Apple HIG / WCAG 2.5.5).
+  // When the user selects a small tile size, the face may shrink below 44 px
+  // but the wrapper retains enough padding so the tap target stays accessible.
+  // Non-interactive tiles (decorative) don't need the minimum.
+  const minTouchW = interactive ? Math.max(dims.w, 44) : dims.w;
+  const minTouchH = interactive ? Math.max(dims.h, 44) : dims.h;
+
   return (
     <div
       style={{
         display: 'inline-flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
         // position:relative is required so the absolutely-positioned pulse
         // overlay is scoped to this tile and not the discard pool grid.
         position: 'relative',
+        minWidth: minTouchW,
+        minHeight: minTouchH,
       }}
       data-testid="mahjong-tile-2d"
     >
@@ -310,9 +328,9 @@ export function MahjongTile2D({
           aria-hidden="true"
           style={{
             color: '#c9a961',
-            fontSize: Math.max(8, Math.round(10 * tileScale)),
+            fontSize: Math.max(8, Math.round(10 * effectiveScale)),
             lineHeight: 1,
-            marginTop: Math.max(1, Math.round(2 * tileScale)),
+            marginTop: Math.max(1, Math.round(2 * effectiveScale)),
             fontFamily: 'serif',
           }}
         >

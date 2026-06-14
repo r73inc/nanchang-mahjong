@@ -45,6 +45,7 @@ import type {
 } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
+import { useThemeStore, TILE_USER_SCALE } from '../../stores/theme.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D, ForcedLandscapeWrapper } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
@@ -1084,29 +1085,46 @@ function AccessibleHand({
   onSelect,
   onDiscard,
   isMyTurn,
+  autoSort = false,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
   isMyTurn: boolean;
+  autoSort?: boolean;
 }) {
   const { lang } = useI18n();
 
+  // Build display entries: { tile, serverIdx } pairs. When autoSort is on, sort by
+  // canonical tile order. serverIdx is the index in the server hand array — it must
+  // be forwarded to onSelect/onDiscard so the server receives the correct tile identity
+  // regardless of display order. Uses a multiset match to handle duplicate tile types.
+  const entries = (() => {
+    if (!autoSort) return hand.map((tile, serverIdx) => ({ tile, serverIdx }));
+    const sortedTiles = sortTypes([...hand]);
+    const pool = hand.map((tile, idx) => ({ tile, idx, used: false }));
+    return sortedTiles.map((tile) => {
+      const entry = pool.find((e) => e.tile === tile && !e.used)!;
+      entry.used = true;
+      return { tile, serverIdx: entry.idx };
+    });
+  })();
+
   return (
     <div className="sr-only" role="group" aria-label="Your hand">
-      {hand.map((tile, idx) => (
+      {entries.map(({ tile, serverIdx }) => (
         <button
-          key={`accessible-${tile}-${idx}`}
+          key={`accessible-${tile}-${serverIdx}`}
           aria-label={tileAriaLabel(tile, lang)}
-          aria-pressed={selectedTileIdx === idx}
+          aria-pressed={selectedTileIdx === serverIdx}
           data-tile={engineToDesignTile(tile)}
           onClick={() => {
             if (!isMyTurn) return;
-            if (selectedTileIdx === idx) {
+            if (selectedTileIdx === serverIdx) {
               onDiscard(tile);
             } else {
-              onSelect(idx);
+              onSelect(serverIdx);
             }
           }}
         >
@@ -1604,6 +1622,10 @@ interface HistoryEntry {
  * Uses the same Regular SVG textures as the 3D tile face stamps, displayed
  * on an ivory background that matches the 3D tile body colour.
  */
+// Base dimensions for SvgHandTile at md (1.0) scale.
+const SVG_HAND_TILE_BASE_W = 46;
+const SVG_HAND_TILE_BASE_H = 62;
+
 function SvgHandTile({
   tile,
   isJing = false,
@@ -1615,12 +1637,17 @@ function SvgHandTile({
   isSelected?: boolean;
   isDrawn?: boolean;
 }) {
+  const { tileSize } = useThemeStore();
+  const userScale = TILE_USER_SCALE[tileSize];
+  const tileW = Math.max(28, Math.round(SVG_HAND_TILE_BASE_W * userScale));
+  const tileH = Math.max(38, Math.round(SVG_HAND_TILE_BASE_H * userScale));
+
   return (
     <div
       style={{
         position: 'relative',
-        width: 46,
-        height: 62,
+        width: tileW,
+        height: tileH,
         borderRadius: 5,
         background: '#f5efe0',
         border: isJing || isSelected ? '2px solid #c9a961' : '1.5px solid rgba(201,169,97,0.35)',
@@ -1686,6 +1713,7 @@ function ViewerHandHUD({
   pendingMove: boolean;
 }) {
   const { t } = useI18n();
+  const { autoSortDrawnTile } = useThemeStore();
   // displayOrder[displayIdx] = handIdx
   const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -1699,15 +1727,31 @@ function ViewerHandHUD({
     if (hand.length === prev) return;
 
     if (hand.length > prev) {
-      // A tile was drawn — append its index (hand.length - 1) at the end of
-      // the display so the newly drawn tile appears on the right.
-      setDisplayOrder((order) => [...order, hand.length - 1]);
+      const newHandIdx = hand.length - 1;
+      if (autoSortDrawnTile) {
+        // Insert the drawn tile at its canonical sorted position among existing tiles.
+        // Sort the extended displayOrder array by tile type using the engine's canonical
+        // ordering so the drawn tile slots into the correct visual position.
+        setDisplayOrder((order) => {
+          const extended = [...order, newHandIdx];
+          return extended.sort((a, b) => {
+            const ta = hand[a];
+            const tb = hand[b];
+            const sorted = sortTypes([ta, tb]);
+            // When ta === tb the two tiles compare equal; preserve relative order.
+            return sorted[0] === sorted[1] ? 0 : sorted[0] === ta ? -1 : 1;
+          });
+        });
+      } else {
+        // Default: append the drawn tile at the right end of the display.
+        setDisplayOrder((order) => [...order, newHandIdx]);
+      }
     } else {
       // A tile was discarded — we can't cheaply determine which index was
       // removed, so reset to natural order for the new hand.
       setDisplayOrder(hand.map((_, i) => i));
     }
-  }, [hand.length]);
+  }, [hand.length, autoSortDrawnTile]);
 
   const handleDragStart = (displayIdx: number) => {
     setDragFrom(displayIdx);
@@ -2506,6 +2550,8 @@ function GameTable({
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
 
+  const { autoSortDrawnTile } = useThemeStore();
+
   // Derive jing set for the viewer hand HUD tile highlighting.
   const jingTypes = new Set<string>();
   if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
@@ -2852,6 +2898,7 @@ function GameTable({
           onSelect={onSelect}
           onDiscard={handleDiscardOrKong}
           isMyTurn={isMyTurn && !pendingMove && !canTsumo}
+          autoSort={autoSortDrawnTile}
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}
