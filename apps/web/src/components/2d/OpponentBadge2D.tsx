@@ -88,9 +88,10 @@ export function OpponentBadge2D({ seatIdx, position }: OpponentBadge2DProps) {
             objectFit: 'cover',
             border: `2px solid ${isActive ? '#c9a961' : windColor}`,
             flexShrink: 0,
-            // Center the avatar over the pill when the outer container is pinned
-            // to a screen edge (flex-start / flex-end) rather than centered.
-            alignSelf: position === 'left' || position === 'right' ? 'center' : undefined,
+            // Pin avatar to the same edge as the badge pill. 'center' caused the
+            // avatar to drift inward as open melds widened the flex column.
+            alignSelf:
+              position === 'left' ? 'flex-start' : position === 'right' ? 'flex-end' : undefined,
           }}
         />
       )}
