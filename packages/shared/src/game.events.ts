@@ -301,6 +301,15 @@ export interface HandRevealPayload {
   liableSeat?: 0 | 1 | 2 | 3;
   /** True when the win was a rob-kong (抢杠). UI label only — does not change payment logic. */
   isRobKong?: boolean;
+  /**
+   * How the winning tile completed the hand (ron wins only; omitted for tsumo and rob-kong).
+   * Derived server-side from the winning tile's copy count in the 13-tile closed hand:
+   *   0 copies → chow (tile not in hand, must complete a sequence)
+   *   1 copy   → pair (completes the eyes/jantou)
+   *   2+ copies → pung (completes a triplet)
+   * Also inferred from handType: seven_pairs → pair, all_triplets → pung.
+   */
+  winMeldKind?: 'chow' | 'pung' | 'pair';
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */

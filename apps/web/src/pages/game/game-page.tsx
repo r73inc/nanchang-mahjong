@@ -662,6 +662,14 @@ function HandRevealScreen({
                             handReveal.liableSeat !== undefined
                               ? snapshot.seats[handReveal.liableSeat].seatName
                               : undefined;
+                          const ronKey =
+                            handReveal.winMeldKind === 'chow'
+                              ? 'handRevealBreakdownWinRonChow'
+                              : handReveal.winMeldKind === 'pung'
+                                ? 'handRevealBreakdownWinRonPung'
+                                : handReveal.winMeldKind === 'pair'
+                                  ? 'handRevealBreakdownWinRonPair'
+                                  : 'handRevealBreakdownWinRonNamed';
                           const winTypeLabel = handReveal.isRobKong
                             ? liableName
                               ? t('handRevealBreakdownWinRobKongNamed', liableName)
@@ -669,7 +677,7 @@ function HandRevealScreen({
                             : handReveal.winType === 'tsumo'
                               ? t('handRevealBreakdownWinTsumo')
                               : liableName
-                                ? t('handRevealBreakdownWinRonNamed', liableName)
+                                ? t(ronKey, liableName)
                                 : t('handRevealBreakdownWinRon');
                           return (
                             <div className="flex flex-col gap-1.5">

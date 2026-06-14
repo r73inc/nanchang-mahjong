@@ -1359,6 +1359,28 @@ export class GameService {
       | undefined;
     const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
 
+    // ── Win meld kind (ron only) — how the winning tile completed the hand ──────
+    // Derived from the copy count of the winning tile in the 13-tile closed hand:
+    //   0 copies → chow (must complete a sequence)
+    //   1 copy   → pair (completes the eyes/jantou)
+    //   2+ copies → pung (completes a triplet)
+    let winMeldKind: HandRevealPayload['winMeldKind'];
+    if (winnerSeat !== null && winType === 'ron' && !opts.isRobKong) {
+      if (handType === 'seven_pairs') {
+        winMeldKind = 'pair';
+      } else if (handType === 'all_triplets') {
+        winMeldKind = 'pung';
+      } else {
+        const events = session.engine.events;
+        const prevEvent = events.length >= 2 ? events[events.length - 2] : undefined;
+        const winTile = prevEvent?.kind === 'discard' ? prevEvent.tile : undefined;
+        if (winTile) {
+          const copies = state.seats[winnerSeat].hand.filter((t) => t === winTile).length;
+          winMeldKind = copies >= 2 ? 'pung' : copies === 1 ? 'pair' : 'chow';
+        }
+      }
+    }
+
     // ── Build hand-reveal payload ──────────────────────────────────────────────
     const handReveal: HandRevealPayload = {
       hands: state.seats.map((s) => [...s.hand]) as [
@@ -1384,6 +1406,7 @@ export class GameService {
       openingJingDelta,
       liableSeat,
       isRobKong,
+      winMeldKind,
     };
 
     // ── Store pending state, emit hand-reveal, and pause ──────────────────────
