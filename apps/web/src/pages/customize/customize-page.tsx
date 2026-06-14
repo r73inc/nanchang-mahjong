@@ -14,7 +14,7 @@ import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { useThemeStore } from '../../stores/theme.store';
 import type { FeltTheme, TilePalette, TileSize } from '../../stores/theme.store';
-import { FELT_CONFIGS } from '../../lib/theme.utils';
+import { FELT_CONFIGS, TILE_CONFIGS } from '../../lib/theme.utils';
 import type { TileType } from '@nanchang/shared';
 
 // ── Constants (outside JSX for no-literal-string rule) ────────────────────────
@@ -105,14 +105,17 @@ function FeltSwatch({
 // ── Palette cards ─────────────────────────────────────────────────────────────
 
 function PaletteCard({
+  id,
   label,
   selected,
   onSelect,
 }: {
+  id: TilePalette;
   label: string;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const cfg = TILE_CONFIGS[id];
   return (
     <button
       onClick={onSelect}
@@ -124,8 +127,16 @@ function PaletteCard({
         border: selected ? '1.5px solid #c9a961' : '1.5px solid rgba(var(--felt-ink-rgb),0.08)',
       }}
     >
-      {/* Mini tile preview strip using SVG textures (IMP-034) */}
-      <div className="flex gap-1 items-center">
+      {/* Tile preview scoped to this palette's own CSS vars so each card shows its own look */}
+      <div
+        className="flex gap-1 items-center"
+        style={
+          {
+            '--tile-face-top': cfg.faceTop,
+            '--tile-face-bottom': cfg.faceBottom,
+          } as React.CSSProperties
+        }
+      >
         {PREVIEW_TILES.slice(0, 3).map((tile) => (
           <MahjongTile2D key={tile} tile={tile} size="xs" />
         ))}
@@ -278,6 +289,7 @@ export function CustomizePage() {
             {PALETTE_OPTIONS.map(({ id, key }) => (
               <PaletteCard
                 key={id}
+                id={id}
                 label={t(key)}
                 selected={tilePalette === id}
                 onSelect={() => setTilePalette(id)}
