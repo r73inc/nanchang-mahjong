@@ -335,14 +335,14 @@ In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed
 
 - `apps/web/src/stores/theme.store.ts` — add `tileSize: 'sm' | 'md' | 'lg' | 'xl'` (default `'md'`) alongside the existing `felt` and `tilePalette` fields. Add it to the `applyTheme()` call if theme vars are written there, or write a separate `applyTileSize()` helper.
 - `apps/web/src/pages/customize/customize-page.tsx` — add a size-selector row, modelled on the felt colour swatches. Four labelled options with a visual preview of how tile size changes. EN + ZH labels required.
-- `apps/web/src/components/2d/MahjongTile2D.tsx` — the `size` prop currently accepts `'xs' | 'sm' | 'md' | 'lg'`; confirm what pixel widths those map to and how a global CSS var could scale them (e.g. wrapping with a `transform: scale(var(--tile-scale))` or adjusting the passed `size` prop based on the store value).
+- `apps/web/src/components/2d/MahjongTile2D.tsx` — the `size` prop currently accepts `'xs' | 'sm' | 'md' | 'lg'`; confirm what pixel widths those map to and how the CSS custom property `--tile-size-px` (written by `applyTheme()`) should drive the tile wrapper's explicit `width` and `height` so the flex container reflows correctly at every size.
 - `apps/web/src/pages/game/game-page.tsx` — wherever the viewer's hand tile row is rendered; this is the highest-impact location and should be the primary test surface.
 - `apps/web/src/i18n/en.json` + `zh.json` — add keys for the size-selector labels (e.g. `customizeTileSize`, `customizeTileSizeSm`, `customizeTileSizeMd`, `customizeTileSizeLg`, `customizeTileSizeXl`).
 
 **Implementation notes:**
 
-- A CSS `transform: scale()` approach lets the tile DOM size stay fixed (avoiding layout reflow in flex containers) at the cost of potential clipping at container edges — test carefully on narrow viewports.
-- Alternatively, the store value could directly map to a wider range of `size` prop values passed down the component tree; simpler but requires touching every call site.
+- **`transform: scale()` is FORBIDDEN for this feature.** Scaling a flex child with `transform` leaves the element's layout box unchanged — the browser still reserves the original pre-scale space. Shrinking causes phantom gaps between tiles; growing causes tiles to visually overlap their neighbours. Neither is acceptable. The CSS custom property (`--tile-size-px`) must drive the actual `width` and `height` properties on the tile wrapper element so the flex container reflows correctly at every size.
+- **Maintain minimum touch target size when shrinking.** The tile face itself may shrink, but the tappable wrapper must retain sufficient padding so that the overall touch target never falls below ~44 × 44 px (Apple HIG / WCAG 2.5.5 recommendation). This is especially important for this feature since its primary users are older players with reduced dexterity. Add explicit `min-width` / `min-height` constraints on the wrapper rather than relying on the tile face alone.
 - The selector should appear in the Customize page only (not the Home settings section, which is already getting a sound toggle via IMP-032). The persisted value takes effect immediately on every page via the CSS var.
 - For Phase 12B, confirm this doesn't conflict with the `prefers-reduced-motion` work already planned.
 
@@ -356,7 +356,7 @@ In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed
 
 **Status:** OPEN — HIGH PRIORITY
 
-**Proposed solution:** When rendering the viewer's hand tiles, instead of appending the drawn tile at the right end (index N), compute its correct sorted position and render it inline. Sorting should match the existing tile-ordering convention used elsewhere in the engine (`packages/engine/src/utils.ts` or wherever the canonical sort is defined) — suit order (bamboo → circles → characters → honours) then rank ascending within suit. This is a **display-only, client-side change** — the server never needs to know about the visual sort order, and the "last drawn tile" identity (needed for discard, for highlighting, for accessibility) must still be trackable even after being visually reordered.
+**Proposed solution:** This feature must be controlled by a new opt-in Zustand user setting (`autoSortDrawnTile: boolean`, default `false`) stored in `ThemeStore` alongside the existing tile-size and palette preferences. Auto-sorting violates standard digital mahjong conventions — experienced players rely on the drawn tile always appearing at the far right — so it must never be forced on all players globally. A toggle should be exposed in the Customize page with an EN + ZH label. When the setting is `false`, behaviour is unchanged. When `true`, the following rendering logic applies: before passing tiles to the hand renderer, the client must map the raw hand array into **tagged objects** (`{ type: TileType, isJustDrawn: boolean }`) — tagging the drawn tile by reference at the point where `concealedTiles` and `drawnTile` are merged — and only then apply the visual sort. Sorting should match the existing tile-ordering convention used elsewhere in the engine (`packages/engine/src/utils.ts` or wherever the canonical sort is defined) — suit order (bamboo → circles → characters → honours) then rank ascending within suit. This is a **display-only, client-side change** — the server never needs to know about the visual sort order.
 
 **Where to look:**
 
@@ -368,9 +368,9 @@ In `apps/api/src/game/game.service.ts`, where `HandRevealPayload` is constructed
 
 **Implementation notes:**
 
-- The "drawn tile" highlight (the visual indicator showing which tile you just drew) must still work after the tile is re-positioned. Track the drawn tile by its identity (tile type value), not by array index, since the index will change after sorting.
-- If two tiles of the same type exist in the hand (e.g. you draw a second 2-bamboo), insert the new one adjacent to the existing one — prefer inserting at the rightmost position among same-type tiles so the "just drawn" one is visually distinguishable.
-- Ensure the accessibility hand (`AccessibleHand` sr-only buttons) also reflects the sorted order, so keyboard/screen-reader users benefit equally.
+- **Gate on `autoSortDrawnTile` setting.** Add `autoSortDrawnTile: boolean` (default `false`) to `ThemeStore` and expose a toggle in the Customize page. When `false` the rendering path is completely unchanged. Only when `true` should the sort-merge logic run. This keeps the change invisible to players who did not opt in and avoids disrupting experienced players.
+- **Use tagged objects, not raw tile type strings, before sorting.** When `autoSortDrawnTile` is `true`, map the combined array to `{ type: TileType, isJustDrawn: boolean }` objects _before_ sorting. The `isJustDrawn` flag must be set at merge time — i.e. while you still know which element came from `drawnTile` — not derived from the sorted position afterwards. This is the only way to correctly highlight the drawn tile when the player's hand contains duplicates: if the hand is `['2m', '2m']` and a third `2m` is drawn, raw string comparison cannot determine which of the three sorted `2m` objects is the one just drawn; the tagged-object approach solves this unambiguously.
+- Ensure the accessibility hand (`AccessibleHand` sr-only buttons) also reflects the sorted order when auto-sort is enabled, so keyboard/screen-reader users benefit equally.
 - The discard action must continue to send the correct tile identity to the server regardless of visual order — confirm that the tile's `TileType` value is passed, not its visual index.
 - No backend changes required for this feature.
 
