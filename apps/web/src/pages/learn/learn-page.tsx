@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
-import { MahjongTile } from '../../components/mahjong-tile';
+import { MahjongTile2D } from '../../components/2d/MahjongTile2D';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import type { TileType } from '@nanchang/shared';
@@ -126,7 +126,7 @@ function TileRow({
               highlight?.has(i) ? { boxShadow: '0 0 0 2px #c9a961', borderRadius: 5 } : undefined
             }
           >
-            <MahjongTile tile={tile} size="xs" />
+            <MahjongTile2D tile={tile} size="xs" />
           </div>
         ))}
       </div>
@@ -146,7 +146,7 @@ function MeldRow({ melds, label }: { melds: TileType[][]; label?: string }) {
         {melds.map((meld, mi) => (
           <div key={mi} className="flex gap-0.5">
             {meld.map((tile, ti) => (
-              <MahjongTile key={ti} tile={tile} size="xs" />
+              <MahjongTile2D key={ti} tile={tile} size="xs" />
             ))}
           </div>
         ))}
@@ -248,7 +248,7 @@ function SpiritSection() {
                 borderRadius: 6,
               }}
             >
-              <MahjongTile tile={SPIRIT_PRIMARY} size="sm" />
+              <MahjongTile2D tile={SPIRIT_PRIMARY} size="sm" />
             </div>
           </div>
           <div>
@@ -258,7 +258,7 @@ function SpiritSection() {
             <div
               style={{ boxShadow: '0 0 0 1.5px rgba(var(--felt-ink-rgb),0.4)', borderRadius: 6 }}
             >
-              <MahjongTile tile={SPIRIT_SECONDARY} size="sm" />
+              <MahjongTile2D tile={SPIRIT_SECONDARY} size="sm" />
             </div>
           </div>
         </div>
@@ -291,7 +291,7 @@ function MeldCard({ title, desc, tiles }: { title: string; desc: string; tiles: 
       <BodyText>{desc}</BodyText>
       <div className="flex gap-0.5 mt-2">
         {tiles.map((t, i) => (
-          <MahjongTile key={i} tile={t} size="xs" />
+          <MahjongTile2D key={i} tile={t} size="xs" />
         ))}
       </div>
     </Card>
@@ -319,7 +319,7 @@ function GameplaySection() {
         <p className="text-[11px] text-mj-bone/50 mb-1.5">{t('learnGameplayHonorChowNote')}</p>
         <div className="flex gap-0.5">
           {HONOR_CHOW.map((tile, i) => (
-            <MahjongTile key={i} tile={tile} size="xs" />
+            <MahjongTile2D key={i} tile={tile} size="xs" />
           ))}
         </div>
       </Card>

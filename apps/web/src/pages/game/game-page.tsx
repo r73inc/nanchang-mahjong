@@ -22,7 +22,6 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
-import { MahjongTile } from '../../components/mahjong-tile';
 import { LangToggle, useI18n } from '../../i18n';
 import {
   tileAriaLabel,
@@ -2252,7 +2251,7 @@ function GameHistoryPanel({
                           : ACTION_LABEL[entry.kind]}
                       </span>
                       {entry.tile && (
-                        <MahjongTile
+                        <MahjongTile2D
                           tile={entry.tile}
                           size="xs"
                           isJing={
@@ -2367,7 +2366,7 @@ function GameHistoryPanel({
                     </span>
                     {/* Tile (if any) */}
                     {entry.tile && (
-                      <MahjongTile
+                      <MahjongTile2D
                         tile={entry.tile}
                         size="xs"
                         isJing={

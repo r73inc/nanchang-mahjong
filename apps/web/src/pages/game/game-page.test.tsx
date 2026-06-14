@@ -15,7 +15,6 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GamePage } from './game-page';
-import { MahjongTile } from '../../components/mahjong-tile';
 import type { ClientGameState, HandRevealPayload, GameEndedPayload } from '@nanchang/shared';
 
 // â”€â”€ Mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -649,59 +648,5 @@ describe('GamePage', () => {
 
     // Clean up for other tests.
     document.body.style.overscrollBehavior = '';
-  });
-});
-
-// â”€â”€ MahjongTile unit tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-describe('MahjongTile', () => {
-  it('renders with correct aria-label from tile-map (EN)', () => {
-    render(
-      <MemoryRouter>
-        <MahjongTile tile="1m" size="md" />
-      </MemoryRouter>,
-    );
-    // aria-label is set from tileAriaLabel (lang='en' fallback in test env)
-    expect(screen.getByLabelText(/1 character/i)).toBeInTheDocument();
-  });
-
-  it('renders face-down tile with aria-hidden content', () => {
-    const { container } = render(
-      <MemoryRouter>
-        <MahjongTile tile="1m" faceDown size="md" />
-      </MemoryRouter>,
-    );
-    // The tile itself still has the aria-label (screen readers know what's under it)
-    expect(container.querySelector('[aria-label]')).toBeInTheDocument();
-  });
-
-  it('fires onClick when clicked', () => {
-    const handleClick = vi.fn();
-    render(
-      <MemoryRouter>
-        <MahjongTile tile="east" size="md" onClick={handleClick} />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: /east wind/i }));
-    expect(handleClick).toHaveBeenCalledOnce();
-  });
-
-  it('has role=button with aria-pressed when onClick provided', () => {
-    render(
-      <MemoryRouter>
-        <MahjongTile tile="zhong" size="md" onClick={() => undefined} selected />
-      </MemoryRouter>,
-    );
-    const btn = screen.getByRole('button', { name: /red dragon/i });
-    expect(btn).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('data-tile attribute reflects design tile id', () => {
-    const { container } = render(
-      <MemoryRouter>
-        <MahjongTile tile="1m" size="md" />
-      </MemoryRouter>,
-    );
-    expect(container.querySelector('[data-tile="c1"]')).toBeInTheDocument();
   });
 });

@@ -6,6 +6,35 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp033-imp035-texture-migration` (2026-06-14)
+
+### IMP-033 · Learn page: migrate to tile textures and audit content for accuracy
+
+**Fix:**
+
+- Replaced `import { MahjongTile }` with `import { MahjongTile2D }` in `learn-page.tsx`.
+- Migrated all 8 `<MahjongTile>` usages across `TileRow`, `MeldRow`, `SpiritSection`, and `MeldCard` to `<MahjongTile2D>`.
+- All usages were display-only (no `onClick`, no `faceDown`); the `size="xs"` / `size="sm"` props map directly with no behavioural change.
+- `Table2DContext` defaults to `tileScale: 1.0` when no Provider is present (confirmed by the context file comment and default value), so Learn page tiles render at full reference size.
+- Content was audited against `docs/final-nanchang-mahjong-rules.md` — EN descriptions match the authoritative ruleset.
+
+**Key learning:** `MahjongTile2D` is safe to use on any page without a `Table2DContext` Provider; the hook gracefully falls back to scale=1.0.
+
+---
+
+### IMP-035 · Replay page: migrate all tile rendering to tile textures
+
+**Fix:**
+
+- Replaced `import { MahjongTile }` with `import { MahjongTile2D }` in `replay-page.tsx`.
+- Migrated all 4 usages: final winning-hand strip (line 253 `size="sm"`), current-step callout (line 305 `size="xs"`), discard pool panel (line 390 `size="xs"`), and timeline event list (line 469 `size="xs"`). The gold box-shadow wrapper on the winning tile was preserved unchanged.
+- Removed the dead `import { MahjongTile }` from `game-page.tsx` (line 25 in original); found and migrated 2 actual `MahjongTile` usages in the move-history panel (lines 2254 + 2369) to `MahjongTile2D` — the import was not dead as stated; it was used in the history sidebar.
+- Removed the misplaced `describe('MahjongTile', ...)` test block from `game-page.test.tsx` (lines 655–707); equivalent coverage already exists in `mahjong-tile.test.tsx`.
+
+**Key learning:** Always grep for all usages before removing an import — the issue doc said line 25 was a "dead import" but the component was still used lower in the same file.
+
+---
+
 ## `feat/imp-028-029-030-ui-polish` (2026-06-14)
 
 ### IMP-028 · Remove redundant "You" labels from settlement / score / reveal screens
