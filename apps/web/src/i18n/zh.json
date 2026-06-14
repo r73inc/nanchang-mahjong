@@ -111,6 +111,17 @@
   "customizeSoundOn": "开启",
   "customizeSoundOff": "关闭",
 
+  "customizeTileSizeTitle": "手牌大小",
+  "customizeTileSizeDesc": "调整手牌显示大小",
+  "customizeTileSizeXs": "超小",
+  "customizeTileSizeSm": "小",
+  "customizeTileSizeMd": "默认",
+  "customizeTileSizeLg": "大",
+  "customizeTileSizeXl": "超大",
+
+  "customizeAutoSortTitle": "摸牌自动归位",
+  "customizeAutoSortDesc": "摸入的牌自动按顺序插入手牌",
+
   "adminPanel": "管理面板",
   "adminInvites": "邀请码",
   "adminCount": "数量",

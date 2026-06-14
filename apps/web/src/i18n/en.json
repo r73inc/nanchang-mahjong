@@ -111,6 +111,17 @@
   "customizeSoundOn": "On",
   "customizeSoundOff": "Off",
 
+  "customizeTileSizeTitle": "Hand Tile Size",
+  "customizeTileSizeDesc": "Adjust how large your hand tiles appear",
+  "customizeTileSizeXs": "Extra Small",
+  "customizeTileSizeSm": "Small",
+  "customizeTileSizeMd": "Default",
+  "customizeTileSizeLg": "Large",
+  "customizeTileSizeXl": "X-Large",
+
+  "customizeAutoSortTitle": "Auto-Sort Drawn Tile",
+  "customizeAutoSortDesc": "Insert drawn tile into its sorted position",
+
   "adminPanel": "Admin Panel",
   "adminInvites": "Invite Codes",
   "adminCount": "Count",

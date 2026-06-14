@@ -6,6 +6,55 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `feat/imp-037-038-tile-size-autosort` (2026-06-13)
+
+### IMP-037 · Adjustable hand tile size in Customize page ⚠️ HIGH PRIORITY
+
+**Root cause / request:** Older VIP playtesters set their OS font size large for accessibility; large system fonts cause the in-game tile row to feel cramped or difficult to navigate on mobile. An in-app control was requested so players can reduce tile size independently of OS font settings.
+
+**Fix:**
+
+- Added `tileSize: 'sm' | 'md' | 'lg' | 'xl'` (default `'md'`) to `ThemeStore`, persisted to `localStorage`.
+- Exported `TILE_USER_SCALE` map (`sm=0.75, md=1.0, lg=1.25, xl=1.5`) for shared use.
+- `MahjongTile2D`: reads `tileSize` from the store and multiplies `tileScale * userScale` to compute `effectiveScale` for all pixel dimensions (width, height, shadow, border-radius, font-size). All existing `tileScale` calculations now use `effectiveScale`.
+- `SvgHandTile` (3D desktop hand HUD): reads `tileSize` and scales the base `46 × 62` dimensions by `userScale`. Hard minima (`28 × 38`) prevent collapse to unusably small sizes.
+- `MahjongTile2D` outer wrapper: enforces `min-width: 44px` / `min-height: 44px` when `interactive=true`, maintaining the Apple HIG / WCAG 2.5.5 touch target for interactive tiles even at small sizes. Non-interactive (decorative) tiles are not padded.
+- Customize page: four-chip tile size selector ("Small / Default / Large / X-Large") with EN+ZH labels.
+- **`transform: scale()` was explicitly avoided** per design spec — all sizing goes through actual `width`/`height` so flex containers reflow correctly.
+
+**Also closes IMP-034** — `MahjongTile2D` is now used for the palette preview strip in the Customize page (migrated from the deprecated `MahjongTile` text-glyph component, which CLAUDE.md requires whenever a legacy page is touched).
+
+**Tests added:** `Customize·tile-size` — two new tests verifying that selecting "Small" and "X-Large" updates the store correctly. `Customize·renders` updated to verify all five sections.
+
+**Key learnings:**
+
+- Combining viewport-fit scale (`tileScale` from Table2DContext) with user preference scale (`userScale` from store) cleanly separates two orthogonal concerns: one fits the board to the viewport, the other respects the player's explicit preference.
+- Min touch target must be on the _wrapper_ (outer div), not on the tile face — the face can be smaller while the wrapper gives fingers a safe tap zone. `justifyContent: 'center'` centers the smaller face inside the larger wrapper.
+
+---
+
+### IMP-038 · Auto-sort drawn tile into hand ⚠️ HIGH PRIORITY
+
+**Root cause / request:** In the current implementation the drawn tile always appends at the far right. Older players find it tiring to visually re-scan the whole hand after each draw. An opt-in setting was requested to automatically insert the drawn tile into its sorted position.
+
+**Fix:**
+
+- Added `autoSortDrawnTile: boolean` (default `false`) to `ThemeStore`.
+- **`PlayerHand2D` (2D mode — primary mobile path):** Added `isJustDrawn?: boolean` to `LocalEntry`. The hand-sync `useEffect` now identifies newly added entries by comparing stable IDs against the previous `localOrder`. When `autoSortDrawnTile=true`, it tags appended entries with `isJustDrawn=true` and sorts the merged array using `sortTypes` while preserving the tag. A gold dot renders on the drawn tile's wrapper so the player can find it after it moves. When `autoSortDrawnTile=false`, any stale `isJustDrawn` flags are cleared.
+- **`ViewerHandHUD` (3D desktop mode):** The draw handler in the `displayOrder` sync effect now sorts the extended index array by tile type when `autoSortDrawnTile=true`. The `isDrawn` gold dot still works correctly because `drawnHandIdx = hand.length - 1` (server always appends last); only the display position changes.
+- **`AccessibleHand`:** Added `autoSort` prop. When true, builds sorted display entries with correct server indices using a multiset match so duplicate tile types are handled unambiguously — keyboard/screen-reader users see the same sorted order.
+- Customize page: toggle switch for "Auto-Sort Drawn Tile" with EN+ZH labels and description.
+- No backend changes; this is entirely a client-side display feature.
+
+**Tests added:** `Customize·auto-sort` — verifies the toggle switch enables/disables the setting in the store.
+
+**Key learnings:**
+
+- Tagged objects (`{ id, tile, isJustDrawn }`) are the only reliable way to identify which copy of a duplicated tile type was just drawn after sorting — raw string comparison cannot distinguish `['2m', '2m', '2m']`. Using the stable Framer Motion `id` as the comparison key is the correct approach.
+- The AccessibleHand needs its own server-index mapping when auto-sort is on; passing a pre-sorted tile array and having the component call `onSelect(displayIdx)` would pass the wrong index to the server.
+
+---
+
 ## `fix/last-discard-duplicate-pulse` (2026-06-13)
 
 ### BUG-053 · Last-discard red outline highlights multiple tiles when the same tile type appears more than once in a seat's discards

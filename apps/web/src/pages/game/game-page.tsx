@@ -45,6 +45,7 @@ import type {
 } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
+import { useThemeStore, TILE_USER_SCALE } from '../../stores/theme.store';
 import { GameCanvas } from '../../r3f/GameCanvas';
 import { GameTable2D, MahjongTile2D, ForcedLandscapeWrapper } from '../../components/2d';
 import { MobileLandscapeGate } from '../../components/2d/MobileLandscapeGate';
@@ -1084,29 +1085,41 @@ function AccessibleHand({
   onSelect,
   onDiscard,
   isMyTurn,
+  displayOrder,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
   onSelect: (idx: number) => void;
   onDiscard: (tile: TileType) => void;
   isMyTurn: boolean;
+  /** Maps display position → server hand index. Mirrors ViewerHandHUD's display
+   *  order so screen-reader buttons stay in sync with the visual tile positions.
+   *  Pass `hand.map((_, i) => i)` for natural order (2D mode / no auto-sort). */
+  displayOrder: number[];
 }) {
   const { lang } = useI18n();
 
+  // Derive entries directly from displayOrder — serverIdx is permanently baked in,
+  // no multiset match needed. Entries whose serverIdx is out of range are skipped
+  // (transient during hand transitions).
+  const entries = displayOrder
+    .filter((serverIdx) => serverIdx < hand.length)
+    .map((serverIdx) => ({ tile: hand[serverIdx], serverIdx }));
+
   return (
     <div className="sr-only" role="group" aria-label="Your hand">
-      {hand.map((tile, idx) => (
+      {entries.map(({ tile, serverIdx }) => (
         <button
-          key={`accessible-${tile}-${idx}`}
+          key={`accessible-${tile}-${serverIdx}`}
           aria-label={tileAriaLabel(tile, lang)}
-          aria-pressed={selectedTileIdx === idx}
+          aria-pressed={selectedTileIdx === serverIdx}
           data-tile={engineToDesignTile(tile)}
           onClick={() => {
             if (!isMyTurn) return;
-            if (selectedTileIdx === idx) {
+            if (selectedTileIdx === serverIdx) {
               onDiscard(tile);
             } else {
-              onSelect(idx);
+              onSelect(serverIdx);
             }
           }}
         >
@@ -1604,6 +1617,10 @@ interface HistoryEntry {
  * Uses the same Regular SVG textures as the 3D tile face stamps, displayed
  * on an ivory background that matches the 3D tile body colour.
  */
+// Base dimensions for SvgHandTile at md (1.0) scale.
+const SVG_HAND_TILE_BASE_W = 46;
+const SVG_HAND_TILE_BASE_H = 62;
+
 function SvgHandTile({
   tile,
   isJing = false,
@@ -1615,12 +1632,17 @@ function SvgHandTile({
   isSelected?: boolean;
   isDrawn?: boolean;
 }) {
+  const { tileSize } = useThemeStore();
+  const userScale = TILE_USER_SCALE[tileSize];
+  const tileW = Math.max(28, Math.round(SVG_HAND_TILE_BASE_W * userScale));
+  const tileH = Math.max(38, Math.round(SVG_HAND_TILE_BASE_H * userScale));
+
   return (
     <div
       style={{
         position: 'relative',
-        width: 46,
-        height: 62,
+        width: tileW,
+        height: tileH,
         borderRadius: 5,
         background: '#f5efe0',
         border: isJing || isSelected ? '2px solid #c9a961' : '1.5px solid rgba(201,169,97,0.35)',
@@ -1676,6 +1698,7 @@ function ViewerHandHUD({
   isMyTurn,
   jingTypes,
   pendingMove,
+  onDisplayOrderChange,
 }: {
   hand: TileType[];
   selectedTileIdx: number | null;
@@ -1684,8 +1707,12 @@ function ViewerHandHUD({
   isMyTurn: boolean;
   jingTypes: Set<string>;
   pendingMove: boolean;
+  /** Called whenever the internal displayOrder changes so the parent can mirror
+   *  it in AccessibleHand (keeping sr-only buttons in sync with visual order). */
+  onDisplayOrderChange?: (order: number[]) => void;
 }) {
   const { t } = useI18n();
+  const { autoSortDrawnTile } = useThemeStore();
   // displayOrder[displayIdx] = handIdx
   const [displayOrder, setDisplayOrder] = useState<number[]>(() => hand.map((_, i) => i));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -1699,15 +1726,37 @@ function ViewerHandHUD({
     if (hand.length === prev) return;
 
     if (hand.length > prev) {
-      // A tile was drawn — append its index (hand.length - 1) at the end of
-      // the display so the newly drawn tile appears on the right.
-      setDisplayOrder((order) => [...order, hand.length - 1]);
+      const newHandIdx = hand.length - 1;
+      if (autoSortDrawnTile) {
+        // Insert the drawn tile at its canonical sorted position among existing tiles.
+        // Sort the extended displayOrder array by tile type using the engine's canonical
+        // ordering so the drawn tile slots into the correct visual position.
+        setDisplayOrder((order) => {
+          const extended = [...order, newHandIdx];
+          return extended.sort((a, b) => {
+            const ta = hand[a];
+            const tb = hand[b];
+            const sorted = sortTypes([ta, tb]);
+            // When ta === tb the two tiles compare equal; preserve relative order.
+            return sorted[0] === sorted[1] ? 0 : sorted[0] === ta ? -1 : 1;
+          });
+        });
+      } else {
+        // Default: append the drawn tile at the right end of the display.
+        setDisplayOrder((order) => [...order, newHandIdx]);
+      }
     } else {
       // A tile was discarded — we can't cheaply determine which index was
       // removed, so reset to natural order for the new hand.
       setDisplayOrder(hand.map((_, i) => i));
     }
-  }, [hand.length]);
+  }, [hand.length, autoSortDrawnTile]);
+
+  // Report displayOrder to the parent whenever it changes so AccessibleHand can
+  // mirror the exact visual order without recomputing it independently.
+  useEffect(() => {
+    onDisplayOrderChange?.(displayOrder);
+  }, [displayOrder, onDisplayOrderChange]);
 
   const handleDragStart = (displayIdx: number) => {
     setDragFrom(displayIdx);
@@ -2506,6 +2555,13 @@ function GameTable({
   const isMyTurn = snapshot.currentSeat === viewerSeat && snapshot.phase === 'playing';
   const viewerHand = snapshot.seats[viewerSeat].hand ?? [];
 
+  // Mirror of ViewerHandHUD's internal displayOrder, kept in sync via the
+  // onDisplayOrderChange callback below. Used by AccessibleHand so the sr-only
+  // DOM buttons always match the visual tile positions in the 3D hand HUD.
+  const [hudDisplayOrder, setHudDisplayOrder] = useState<number[]>(() =>
+    viewerHand.map((_, i) => i),
+  );
+
   // Derive jing set for the viewer hand HUD tile highlighting.
   const jingTypes = new Set<string>();
   if (snapshot.jingPrimary) jingTypes.add(snapshot.jingPrimary);
@@ -2822,6 +2878,7 @@ function GameTable({
             isMyTurn={isMyTurn && !canTsumo}
             jingTypes={jingTypes}
             pendingMove={pendingMove}
+            onDisplayOrderChange={setHudDisplayOrder}
           />
         )}
 
@@ -2852,6 +2909,7 @@ function GameTable({
           onSelect={onSelect}
           onDiscard={handleDiscardOrKong}
           isMyTurn={isMyTurn && !pendingMove && !canTsumo}
+          displayOrder={hudDisplayOrder}
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}
