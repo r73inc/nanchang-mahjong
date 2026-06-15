@@ -1359,11 +1359,11 @@ export class GameService {
       | undefined;
     const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
 
-    // ── Win meld kind (ron only) — how the winning tile completed the hand ──────
-    // Derived from the copy count of the winning tile in the 13-tile closed hand:
-    //   0 copies → chow (must complete a sequence)
-    //   1 copy   → pair (completes the eyes/jantou)
-    //   2+ copies → pung (completes a triplet)
+    // ── Win meld kind (ron only) + winning tile ───────────────────────────────
+    // prevEvent is events[n-2]: 'discard' for ron, 'draw' for tsumo, 'kong_added' for rob-kong.
+    const engineEvents = session.engine.events;
+    const prevEvent = engineEvents.length >= 2 ? engineEvents[engineEvents.length - 2] : undefined;
+
     let winMeldKind: HandRevealPayload['winMeldKind'];
     if (winnerSeat !== null && winType === 'ron' && !opts.isRobKong) {
       if (handType === 'seven_pairs') {
@@ -1371,8 +1371,6 @@ export class GameService {
       } else if (handType === 'all_triplets') {
         winMeldKind = 'pung';
       } else {
-        const events = session.engine.events;
-        const prevEvent = events.length >= 2 ? events[events.length - 2] : undefined;
         const winTile = prevEvent?.kind === 'discard' ? prevEvent.tile : undefined;
         if (winTile) {
           const copies = state.seats[winnerSeat].hand.filter((t) => t === winTile).length;
@@ -1380,6 +1378,14 @@ export class GameService {
         }
       }
     }
+
+    // The tile that completed the hand — from the event immediately before 'win'.
+    // All three event types that can precede a win ('draw', 'discard', 'kong_added')
+    // carry a 'tile' field, so a simple 'tile' in prevEvent check covers all cases.
+    const winningTile: HandRevealPayload['winningTile'] =
+      winnerSeat !== null && prevEvent && 'tile' in prevEvent
+        ? (prevEvent as { tile: TileType }).tile
+        : undefined;
 
     // ── Build hand-reveal payload ──────────────────────────────────────────────
     const handReveal: HandRevealPayload = {
@@ -1407,6 +1413,7 @@ export class GameService {
       liableSeat,
       isRobKong,
       winMeldKind,
+      winningTile,
     };
 
     // ── Store pending state, emit hand-reveal, and pause ──────────────────────

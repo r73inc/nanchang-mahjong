@@ -990,6 +990,21 @@ function HandRevealScreen({
                       ({ groups, ungrouped } = greedyGroupHand(hand));
                     }
 
+                    // For tsumo wins, highlight the first occurrence of the winning tile
+                    // in the winner's hand (drawn tile is already in the 14-tile array).
+                    let winHighlighted = false;
+                    const markWin = (tile: TileType): boolean => {
+                      if (
+                        !isWinner ||
+                        handReveal.winType !== 'tsumo' ||
+                        tile !== handReveal.winningTile ||
+                        winHighlighted
+                      )
+                        return false;
+                      winHighlighted = true;
+                      return true;
+                    };
+
                     if (groups.length === 0 && ungrouped.length > 0) {
                       // No recognisable groups — flat row
                       return (
@@ -1001,6 +1016,7 @@ function HandRevealScreen({
                               size="xs"
                               interactive={false}
                               isJing={isJing(tile)}
+                              isLastDiscard={markWin(tile)}
                             />
                           ))}
                         </div>
@@ -1020,6 +1036,7 @@ function HandRevealScreen({
                                   interactive={false}
                                   isJing={isJing(tile)}
                                   showJingLabel={false}
+                                  isLastDiscard={markWin(tile)}
                                 />
                               ))}
                             </div>
@@ -1039,6 +1056,7 @@ function HandRevealScreen({
                                 interactive={false}
                                 isJing={isJing(tile)}
                                 showJingLabel={false}
+                                isLastDiscard={markWin(tile)}
                               />
                             ))}
                           </div>
@@ -1046,6 +1064,23 @@ function HandRevealScreen({
                       </div>
                     );
                   })()}
+
+                  {/* Ron / rob-kong winning tile — not in the hand array, shown separately */}
+                  {isWinner && handReveal.winningTile && handReveal.winType !== 'tsumo' && (
+                    <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-mj-bone/10">
+                      <span className="text-[9px] text-mj-bone/40 select-none">+</span>
+                      <MahjongTile2D
+                        tile={handReveal.winningTile}
+                        size="xs"
+                        interactive={false}
+                        isJing={
+                          handReveal.winningTile === handReveal.jingPrimary ||
+                          handReveal.winningTile === handReveal.jingSecondary
+                        }
+                        isLastDiscard={true}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -310,6 +310,14 @@ export interface HandRevealPayload {
    * Also inferred from handType: seven_pairs → pair, all_triplets → pung.
    */
   winMeldKind?: 'chow' | 'pung' | 'pair';
+  /**
+   * The tile that completed the winning hand.
+   * - Tsumo: the drawn tile (already present in hands[winnerSeat]).
+   * - Ron: the discarded tile (NOT in hands[winnerSeat] — show separately in UI).
+   * - Rob-kong: the robbed tile (NOT in hands[winnerSeat] — show separately in UI).
+   * - Draw / concede: undefined.
+   */
+  winningTile?: TileType;
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */
