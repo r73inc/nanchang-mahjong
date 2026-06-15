@@ -358,9 +358,11 @@ export function RoomPage() {
                         ? t('openSeat')
                         : seat.isBot
                           ? t(
-                              seat.botDifficulty === 'normal'
-                                ? 'botDifficultyNormalFull'
-                                : 'botDifficultyEasyFull',
+                              seat.botDifficulty === 'hard'
+                                ? 'botDifficultyHardFull'
+                                : seat.botDifficulty === 'normal'
+                                  ? 'botDifficultyNormalFull'
+                                  : 'botDifficultyEasyFull',
                             )
                           : seat.isHost || seat.ready
                             ? t('ready')
