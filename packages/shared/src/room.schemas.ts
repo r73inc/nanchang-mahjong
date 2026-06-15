@@ -21,10 +21,17 @@ export const RoomSettingsSchema = z.object({
 
   /**
    * How the session ends.
-   * 'rounds' — play the configured number of rounds, then settle scores.
-   * 'bust'   — play until any player's score drops below 0, then settle.
+   * 'rounds'      — play the configured number of wind-rounds, then settle scores.
+   * 'bust'        — play until any player's score drops below 0, then settle.
+   * 'fixed-hands' — play exactly maxHands hands, then settle scores.
    */
-  terminationType: z.enum(['rounds', 'bust']).default('rounds'),
+  terminationType: z.enum(['rounds', 'bust', 'fixed-hands']).default('rounds'),
+
+  /**
+   * Maximum number of hands to play (1–4).
+   * Only applies when terminationType is 'fixed-hands'.
+   */
+  maxHands: z.number().int().min(1).max(4).optional(),
 
   /**
    * Starting score for each player.

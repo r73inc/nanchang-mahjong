@@ -45,9 +45,15 @@ export function LobbyPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const { data: challenges } = useChallenges();
 
-  // Open challenges the user can still act on (pending invite or in-progress game)
+  // Challenges the user should see in the lobby:
+  // - Waiting for their action (pending invite or accepted but not yet played)
+  // - They already completed but the overall challenge is still open (waiting for others)
   const actionableChallenges = (challenges ?? [])
-    .filter((c) => c.status === 'open' && (c.myStatus === 'pending' || c.myStatus === 'accepted'))
+    .filter(
+      (c) =>
+        c.status === 'open' &&
+        (c.myStatus === 'pending' || c.myStatus === 'accepted' || c.myStatus === 'completed'),
+    )
     .slice(0, 3);
 
   /** Ensure the socket is connected before navigating to the room screen. */
@@ -241,15 +247,13 @@ export function LobbyPage() {
         >
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-base font-bold text-mj-bone">{t('pointChallenge')}</h2>
-            {(challenges?.length ?? 0) > 0 && (
-              <button
-                onClick={() => navigate('/challenges')}
-                className="text-xs font-semibold"
-                style={{ color: 'rgba(150,100,200,0.9)' }}
-              >
-                {t('challengeViewAll')}
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/challenges')}
+              className="text-xs font-semibold"
+              style={{ color: 'rgba(150,100,200,0.9)' }}
+            >
+              {t('challengeViewAll')}
+            </button>
           </div>
           <p className="text-xs text-mj-bone/60 mb-4">{t('pointChallengeSub')}</p>
 
@@ -313,8 +317,8 @@ function ChallengeSummaryRow({
           {t('challengeCreatedBy').replace('{{0}}', challenge.creatorHandle)}
         </p>
         <p className="text-xs text-mj-bone/50">
-          {t('challengeRoundsLabel').replace('{{0}}', String(challenge.config.numRounds))} {BULLET}{' '}
-          {challenge.completedCount}/{challenge.participantCount + 1}{' '}
+          {t('challengeHandsLabel').replace('{{0}}', String(challenge.config.numRounds))} {BULLET}{' '}
+          {challenge.completedCount}/{challenge.participantCount}{' '}
           {t('challengeStatusCompleted').toLowerCase()}
         </p>
       </div>

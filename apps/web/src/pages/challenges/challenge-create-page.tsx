@@ -17,11 +17,11 @@ import type { BotDifficulty, ChallengeConfig } from '@nanchang/shared';
 
 type Step = 'friends' | 'difficulty' | 'settings';
 
-const NUM_ROUNDS_OPTIONS: Array<{ value: 1 | 2 | 3 | 4; labelKey: string }> = [
-  { value: 1, labelKey: 'challengeRound1' },
-  { value: 2, labelKey: 'challengeRound2' },
-  { value: 3, labelKey: 'challengeRound3' },
-  { value: 4, labelKey: 'challengeRound4' },
+const NUM_HANDS_OPTIONS: Array<{ value: 1 | 2 | 3 | 4; labelKey: string }> = [
+  { value: 1, labelKey: 'challengeHand1' },
+  { value: 2, labelKey: 'challengeHand2' },
+  { value: 3, labelKey: 'challengeHand3' },
+  { value: 4, labelKey: 'challengeHand4' },
 ];
 
 const BOT_DIFFICULTIES: Array<{ value: BotDifficulty; labelKey: string }> = [
@@ -212,9 +212,9 @@ export function ChallengeCreatePage() {
             </div>
 
             <div>
-              <h2 className="text-base font-bold text-mj-bone mb-3">{t('challengeNumRounds')}</h2>
+              <h2 className="text-base font-bold text-mj-bone mb-3">{t('challengeNumHands')}</h2>
               <div className="flex flex-col gap-2">
-                {NUM_ROUNDS_OPTIONS.map((opt) => (
+                {NUM_HANDS_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     onClick={() => setConfig((c) => ({ ...c, numRounds: opt.value }))}

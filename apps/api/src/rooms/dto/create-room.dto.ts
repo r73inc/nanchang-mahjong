@@ -17,8 +17,14 @@ export class RoomSettingsDto {
   rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
 
   @IsOptional()
-  @IsIn(['rounds', 'bust'])
-  terminationType?: 'rounds' | 'bust';
+  @IsIn(['rounds', 'bust', 'fixed-hands'])
+  terminationType?: 'rounds' | 'bust' | 'fixed-hands';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  maxHands?: number;
 
   @IsOptional()
   @IsInt()

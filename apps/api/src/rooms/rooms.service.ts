@@ -575,7 +575,8 @@ export class RoomsService {
       viewMode?: '2D' | '3D';
       ruleTopBottomJing?: boolean;
       rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
-      terminationType?: 'rounds' | 'bust';
+      terminationType?: 'rounds' | 'bust' | 'fixed-hands';
+      maxHands?: number;
       claimWindowSecs?: number;
     },
   ): Promise<RoomState> {
@@ -608,6 +609,10 @@ export class RoomsService {
     if (updates.terminationType !== undefined) {
       setParts.push('settings.terminationType = :terminationType');
       values[':terminationType'] = updates.terminationType;
+    }
+    if (updates.maxHands !== undefined) {
+      setParts.push('settings.maxHands = :maxHands');
+      values[':maxHands'] = updates.maxHands;
     }
     if (updates.claimWindowSecs !== undefined) {
       setParts.push('settings.claimWindowSecs = :claimWindowSecs');

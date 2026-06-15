@@ -32,8 +32,11 @@ const ROUNDS_OPTIONS = ['east', 'east+south'] as const;
 type RoundsOption = (typeof ROUNDS_OPTIONS)[number];
 
 // API values for the termination-type toggle
-const TERMINATION_OPTIONS = ['rounds', 'bust'] as const;
+const TERMINATION_OPTIONS = ['rounds', 'bust', 'fixed-hands'] as const;
 type TerminationOption = (typeof TERMINATION_OPTIONS)[number];
+
+// Hand count options for fixed-hands mode
+const MAX_HANDS_OPTIONS = [1, 2, 3, 4] as const;
 
 // Claim window options in seconds (0 = unlimited)
 const CLAIM_WINDOW_OPTIONS = [5, 8, 15, 30, 0] as const;
@@ -566,7 +569,13 @@ export function RoomPage() {
                         }}
                         aria-pressed={active}
                       >
-                        {t(opt === 'bust' ? 'settingTerminationBust' : 'settingTerminationRounds')}
+                        {t(
+                          opt === 'bust'
+                            ? 'settingTerminationBust'
+                            : opt === 'fixed-hands'
+                              ? 'settingTerminationFixedHands'
+                              : 'settingTerminationRounds',
+                        )}
                       </button>
                     );
                   })}
@@ -576,14 +585,16 @@ export function RoomPage() {
                   {t(
                     room.settings.terminationType === 'bust'
                       ? 'settingTerminationBust'
-                      : 'settingTerminationRounds',
+                      : room.settings.terminationType === 'fixed-hands'
+                        ? 'settingTerminationFixedHands'
+                        : 'settingTerminationRounds',
                   )}
                 </span>
               )}
             </div>
 
-            {/* ── Rounds row — hidden when Bust mode is active ─────────── */}
-            {room.settings.terminationType !== 'bust' && (
+            {/* ── Rounds row — only shown in Fixed Rounds mode ─────────── */}
+            {room.settings.terminationType === 'rounds' && (
               <div
                 className="flex justify-between items-center px-4 py-3 text-sm"
                 style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
@@ -627,6 +638,46 @@ export function RoomPage() {
                         : 'settingRoundsEast',
                     )}
                   </span>
+                )}
+              </div>
+            )}
+
+            {/* ── Max Hands row — only shown in Fixed Hands mode ───────── */}
+            {room.settings.terminationType === 'fixed-hands' && (
+              <div
+                className="flex justify-between items-center px-4 py-3 text-sm"
+                style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
+              >
+                <span className="text-mj-bone/70">{t('settingMaxHandsLabel')}</span>
+                {isHost && room.status === 'waiting' ? (
+                  <div className="flex gap-1.5" role="group" aria-label={t('settingMaxHandsLabel')}>
+                    {MAX_HANDS_OPTIONS.map((n) => {
+                      const active = (room.settings.maxHands ?? 1) === n;
+                      return (
+                        <button
+                          key={n}
+                          onClick={() => updateSettings(room.roomId, { maxHands: n })}
+                          disabled={loading}
+                          className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
+                          style={{
+                            background: active
+                              ? 'rgba(201,169,97,0.25)'
+                              : 'rgba(var(--felt-ink-rgb),0.06)',
+                            border: active
+                              ? '1px solid rgba(201,169,97,0.6)'
+                              : '1px solid rgba(var(--felt-ink-rgb),0.12)',
+                            color: active ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.45)',
+                            cursor: loading ? 'not-allowed' : 'pointer',
+                          }}
+                          aria-pressed={active}
+                        >
+                          {n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-mj-gold font-semibold">{room.settings.maxHands ?? 1}</span>
                 )}
               </div>
             )}

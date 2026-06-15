@@ -141,7 +141,8 @@ export class RoomsController {
       viewMode?: '2D' | '3D';
       ruleTopBottomJing?: boolean;
       rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
-      terminationType?: 'rounds' | 'bust';
+      terminationType?: 'rounds' | 'bust' | 'fixed-hands';
+      maxHands?: number;
       claimWindowSecs?: number;
     },
   ) {

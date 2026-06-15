@@ -1237,7 +1237,7 @@ function GameEndScreen({
             {t('historyViewReplay')}
           </button>
         )}
-        {viewerSeat === 0 && (
+        {viewerSeat === 0 && !ended?.challengeId && (
           <button
             onClick={onRematch}
             className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
