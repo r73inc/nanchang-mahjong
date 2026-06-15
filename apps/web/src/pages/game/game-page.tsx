@@ -990,13 +990,14 @@ function HandRevealScreen({
                       ({ groups, ungrouped } = greedyGroupHand(hand));
                     }
 
-                    // For tsumo wins, highlight the first occurrence of the winning tile
-                    // in the winner's hand (drawn tile is already in the 14-tile array).
+                    // Highlight the winning tile exactly once in the winner's hand.
+                    // The engine always includes the winning tile in the 14-tile final hand
+                    // (ron: discard added; tsumo: drawn tile already in hand).
                     let winHighlighted = false;
                     const markWin = (tile: TileType): boolean => {
                       if (
                         !isWinner ||
-                        handReveal.winType !== 'tsumo' ||
+                        !handReveal.winningTile ||
                         tile !== handReveal.winningTile ||
                         winHighlighted
                       )
@@ -1064,23 +1065,6 @@ function HandRevealScreen({
                       </div>
                     );
                   })()}
-
-                  {/* Ron / rob-kong winning tile — not in the hand array, shown separately */}
-                  {isWinner && handReveal.winningTile && handReveal.winType !== 'tsumo' && (
-                    <div className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-mj-bone/10">
-                      <span className="text-[9px] text-mj-bone/40 select-none">+</span>
-                      <MahjongTile2D
-                        tile={handReveal.winningTile}
-                        size="xs"
-                        interactive={false}
-                        isJing={
-                          handReveal.winningTile === handReveal.jingPrimary ||
-                          handReveal.winningTile === handReveal.jingSecondary
-                        }
-                        isLastDiscard={true}
-                      />
-                    </div>
-                  )}
                 </div>
               );
             })}

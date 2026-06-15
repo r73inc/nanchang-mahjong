@@ -1373,8 +1373,10 @@ export class GameService {
       } else {
         const winTile = prevEvent?.kind === 'discard' ? prevEvent.tile : undefined;
         if (winTile) {
+          // After declareWin, the winner's hand is 14 tiles (winning tile included).
+          // copies >= 3 → pung (2 pre-existing + 1 won), 2 → pair, 1 → chow.
           const copies = state.seats[winnerSeat].hand.filter((t) => t === winTile).length;
-          winMeldKind = copies >= 2 ? 'pung' : copies === 1 ? 'pair' : 'chow';
+          winMeldKind = copies >= 3 ? 'pung' : copies === 2 ? 'pair' : 'chow';
         }
       }
     }
