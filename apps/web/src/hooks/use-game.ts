@@ -516,13 +516,17 @@ export function useGame(gameId: string, spectate = false) {
     }
   }, [setCanTsumo, setCanAddToKong]);
 
-  const kongConcealed = useCallback((tile: TileType) => {
-    try {
-      getSocket().emit('game:kong-concealed', { tile });
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const kongConcealed = useCallback(
+    (tile: TileType) => {
+      setCanAddToKong(null);
+      try {
+        getSocket().emit('game:kong-concealed', { tile });
+      } catch {
+        /* ignore */
+      }
+    },
+    [setCanAddToKong],
+  );
 
   const kongAdd = useCallback(
     (tile: TileType) => {
