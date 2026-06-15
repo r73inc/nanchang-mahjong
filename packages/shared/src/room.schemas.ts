@@ -31,7 +31,7 @@ export const RoomSettingsSchema = z.object({
    * Maximum number of hands to play (1–4).
    * Only applies when terminationType is 'fixed-hands'.
    */
-  maxHands: z.number().int().min(1).max(4).optional(),
+  maxHands: z.number().int().min(1).max(4).default(1),
 
   /**
    * Starting score for each player.

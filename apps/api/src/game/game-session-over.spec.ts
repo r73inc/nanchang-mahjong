@@ -28,6 +28,7 @@ import type { RoomSettings } from '@nanchang/shared';
 const BASE_SETTINGS: RoomSettings = {
   rounds: 'east',
   terminationType: 'rounds',
+  maxHands: 1,
   startingScore: 0,
   timerSecs: 30,
   viewMode: '3D',

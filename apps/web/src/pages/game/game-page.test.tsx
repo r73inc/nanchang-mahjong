@@ -528,19 +528,16 @@ describe('GamePage', () => {
     expect(screen.getByText(/return to lobby/i)).toBeInTheDocument();
 
     // 3. View Final Hand -- the detailed reveal is the LAST screen
-    const viewHandBtn = screen.queryByRole('button', { name: /view final hand/i });
-    if (viewHandBtn) {
-      fireEvent.click(viewHandBtn);
-      await waitFor(() => {
-        expect(screen.getByText(/all hands/i)).toBeInTheDocument();
-      });
+    fireEvent.click(screen.getByRole('button', { name: /view final hand/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/all hands/i)).toBeInTheDocument();
+    });
 
-      // Back returns to the match stats screen
-      fireEvent.click(screen.getByRole('button', { name: /back to results/i }));
-      await waitFor(() => {
-        expect(screen.getByText(/final standings/i)).toBeInTheDocument();
-      });
-    }
+    // Back returns to the match stats screen
+    fireEvent.click(screen.getByRole('button', { name: /back to results/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/final standings/i)).toBeInTheDocument();
+    });
   });
 
   it('BUG-025: stale handReveal is cleared when the next hand starts', async () => {

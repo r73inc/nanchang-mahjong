@@ -179,6 +179,7 @@ export class RoomsService {
     const settings: RoomSettings = {
       rounds: dto?.settings?.rounds ?? 'east+south',
       terminationType: dto?.settings?.terminationType ?? 'rounds',
+      maxHands: dto?.settings?.maxHands ?? 1,
       startingScore: dto?.settings?.startingScore ?? 0,
       timerSecs: dto?.settings?.timerSecs ?? 30,
       viewMode: dto?.settings?.viewMode ?? '2D',
