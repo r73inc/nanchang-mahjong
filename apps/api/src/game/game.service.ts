@@ -167,7 +167,7 @@ export class GameService {
       handSeeds: challengeOpts?.handSeeds,
       targetHands:
         challengeOpts?.numHands ??
-        (settings.terminationType === 'fixed-hands' ? (settings.maxHands ?? 1) : undefined),
+        (settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined),
       onGameEnded: challengeOpts?.onGameEnded,
     });
 
