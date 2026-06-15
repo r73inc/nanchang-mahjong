@@ -358,9 +358,11 @@ export function RoomPage() {
                         ? t('openSeat')
                         : seat.isBot
                           ? t(
-                              seat.botDifficulty === 'normal'
-                                ? 'botDifficultyNormalFull'
-                                : 'botDifficultyEasyFull',
+                              seat.botDifficulty === 'hard'
+                                ? 'botDifficultyHardFull'
+                                : seat.botDifficulty === 'normal'
+                                  ? 'botDifficultyNormalFull'
+                                  : 'botDifficultyEasyFull',
                             )
                           : seat.isHost || seat.ready
                             ? t('ready')
@@ -372,7 +374,7 @@ export function RoomPage() {
                       <div className="mt-2">
                         {addingBotToSeat === seat.seatIdx ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {(['easy', 'normal'] as BotDifficulty[]).map((diff) => (
+                            {(['easy', 'normal', 'hard'] as BotDifficulty[]).map((diff) => (
                               <button
                                 key={diff}
                                 onClick={() => void handleAddBot(seat.seatIdx, diff)}
@@ -386,7 +388,9 @@ export function RoomPage() {
                                 {t(
                                   diff === 'easy'
                                     ? 'botDifficultyEasyFull'
-                                    : 'botDifficultyNormalFull',
+                                    : diff === 'normal'
+                                      ? 'botDifficultyNormalFull'
+                                      : 'botDifficultyHardFull',
                                 )}
                               </button>
                             ))}

@@ -27,6 +27,7 @@ const NUM_HANDS_OPTIONS: Array<{ value: 1 | 2 | 3 | 4; labelKey: string }> = [
 const BOT_DIFFICULTIES: Array<{ value: BotDifficulty; labelKey: string }> = [
   { value: 'easy', labelKey: 'challengeBotEasy' },
   { value: 'normal', labelKey: 'challengeBotNormal' },
+  { value: 'hard', labelKey: 'challengeBotHard' },
 ];
 
 const VIEW_MODES: Array<{ value: '2D' | '3D'; labelKey: string }> = [

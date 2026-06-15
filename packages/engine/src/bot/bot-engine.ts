@@ -11,9 +11,18 @@
 
 import { isHonor, isTerminalOrHonor, getRank, getSuit } from '../tiles';
 import { separateJing } from '../jing';
-import type { TileType } from '../types';
+import type { TileType, GameState } from '../types';
+import { overallDist } from './ting-distance';
+import {
+  getVisibleTiles,
+  rankDiscardCandidates,
+  simulatePung,
+  simulateChow,
+  bestDistAfterClaim,
+} from './effective-draws';
+import { isOpponentThreatening, safestDiscard } from './defense';
 
-export type BotDifficulty = 'easy' | 'normal';
+export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
 /**
  * Available call options offered to the bot during a claim window.
@@ -72,6 +81,96 @@ function tileScore(tile: TileType, naturals: TileType[]): number {
   return r === 1 || r === 9 ? 1 : 2; // isolated terminal or isolated simple
 }
 
+// ── Hard difficulty: discard logic ───────────────────────────────────────────
+
+function getHardBotDiscard(
+  hand: TileType[],
+  jingTypes: TileType[],
+  state: GameState,
+  botSeat: 0 | 1 | 2 | 3,
+): TileType {
+  const { naturals } = separateJing(hand, jingTypes);
+
+  // If the entire hand is wildcards, must discard one (last resort)
+  if (naturals.length === 0) return hand[0];
+
+  const visible = getVisibleTiles(hand, state.seats);
+  const candidates = rankDiscardCandidates(hand, jingTypes, visible);
+
+  if (candidates.length === 0) return naturals[0];
+
+  const bestDist = candidates[0].distAfterDiscard;
+
+  // Check whether any opponent is threatening
+  const threatened = isOpponentThreatening(state.seats, botSeat, jingTypes);
+
+  // Defense mode: switch when threatened AND we are more than 1 step from Ting
+  if (threatened && bestDist > 1) {
+    return safestDiscard(naturals, visible, state.seats, botSeat);
+  }
+
+  // Attack mode: discard the tile that keeps the best effective draws path
+  return candidates[0].tile;
+}
+
+// ── Hard difficulty: claim logic ──────────────────────────────────────────────
+
+function getHardBotClaim(
+  available: BotClaimOption[],
+  discardedTile: TileType,
+  hand: TileType[],
+  jingTypes: TileType[],
+): BotClaimDecision | null {
+  // Kong is always worth claiming (extra draw + instant payout)
+  const kong = available.find((a) => a.kind === 'kong');
+  if (kong) return { kind: 'kong' };
+
+  // Current distance from the 13-tile concealed hand
+  const currentDist = overallDist(hand, jingTypes);
+
+  // ── Pung evaluation ──────────────────────────────────────────────────────────
+  const pung = available.find((a) => a.kind === 'pung');
+  if (pung) {
+    const hand11 = simulatePung(hand, discardedTile);
+    if (hand11 !== null) {
+      const distAfterPung = bestDistAfterClaim(hand11, jingTypes);
+      // Claim pung if it reduces or maintains distance to Ting
+      if (distAfterPung <= currentDist) {
+        return { kind: 'pung' };
+      }
+    }
+  }
+
+  // ── Chow evaluation ──────────────────────────────────────────────────────────
+  // Claiming a chow forecloses on Thirteen Misfits and Seven Pairs paths,
+  // so only do it when it genuinely improves the standard-hand distance.
+  const chow = available.find(
+    (a): a is Extract<BotClaimOption, { kind: 'chow' }> => a.kind === 'chow',
+  );
+  if (chow) {
+    let bestChowDist = Infinity;
+    let bestSeq: [TileType, TileType, TileType] | null = null;
+
+    for (const seq of chow.sequences) {
+      const hand11 = simulateChow(hand, discardedTile, seq);
+      if (hand11 === null) continue;
+      const distAfterChow = bestDistAfterClaim(hand11, jingTypes);
+      if (distAfterChow < bestChowDist) {
+        bestChowDist = distAfterChow;
+        bestSeq = seq;
+      }
+    }
+
+    // Only claim chow if it strictly improves the distance (not just maintains it),
+    // because the open meld eliminates special-hand flexibility.
+    if (bestSeq !== null && bestChowDist < currentDist) {
+      return { kind: 'chow', sequence: bestSeq };
+    }
+  }
+
+  return null;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -82,11 +181,17 @@ function tileScore(tile: TileType, naturals: TileType[]): number {
  * Normal — scores every non-wildcard tile by strategic utility and discards
  *          the weakest one; ties are broken randomly. Wildcards are never
  *          discarded unless no natural tiles remain.
+ * Hard   — uses Distance-to-Ting + effective draws (Jin Zhang) for attack mode,
+ *          falls back to danger-score-based discard in defense mode.
+ *          Requires `state` and `botSeat` to access the visible board; falls
+ *          back to Normal behaviour if not provided.
  */
 export function getBotDiscard(
   hand: TileType[],
   wildcards: TileType[],
   difficulty: BotDifficulty,
+  state?: GameState,
+  botSeat?: 0 | 1 | 2 | 3,
 ): TileType {
   const { naturals } = separateJing(hand, wildcards);
 
@@ -96,7 +201,12 @@ export function getBotDiscard(
     return naturals[Math.floor(Math.random() * naturals.length)];
   }
 
-  // Normal: discard the tile with the lowest utility score; break ties randomly.
+  if (difficulty === 'hard' && state !== undefined && botSeat !== undefined) {
+    return getHardBotDiscard(hand, wildcards, state, botSeat);
+  }
+
+  // Normal (and hard fallback when state not available):
+  // discard the tile with the lowest utility score; break ties randomly.
   let minScore = Infinity;
   for (const t of naturals) {
     const sc = tileScore(t, naturals);
@@ -113,13 +223,17 @@ export function getBotDiscard(
  * @param available     Claim options offered by the engine for this seat.
  * @param discardedTile The tile currently pending in the claim window.
  * @param openMeldCount Number of open melds this bot already holds.
- * @param difficulty    'easy' | 'normal'
+ * @param difficulty    'easy' | 'normal' | 'hard'
+ * @param hand          Bot's current concealed hand (required for 'hard').
+ * @param jingTypes     Active Jing tile types (required for 'hard').
  */
 export function getBotClaim(
   available: BotClaimOption[],
   discardedTile: TileType,
   openMeldCount: number,
   difficulty: BotDifficulty,
+  hand?: TileType[],
+  jingTypes?: TileType[],
 ): BotClaimDecision | null {
   if (available.length === 0) return null;
 
@@ -139,7 +253,11 @@ export function getBotClaim(
     return { kind: choice.kind as 'pung' | 'kong' };
   }
 
-  // Normal difficulty heuristics:
+  if (difficulty === 'hard' && hand !== undefined && jingTypes !== undefined) {
+    return getHardBotClaim(available, discardedTile, hand, jingTypes);
+  }
+
+  // Normal difficulty heuristics (also used as hard fallback when hand not provided):
 
   // Kong is always worth claiming (extra draw + instant payout).
   const kong = available.find((a) => a.kind === 'kong');
