@@ -395,6 +395,14 @@ export interface GameEndedPayload {
   ratingDeltas?: [number, number, number, number];
   /** Present when this game is part of a Point Challenge. Navigate to /challenges/:id after viewing the result. */
   challengeId?: string;
+  /** Cumulative spirit settlement points per seat across ALL hands in the session. Zero-sum. */
+  sessionSpiritPoints?: [number, number, number, number];
+  /** Cumulative opening bonus-tile settlement per seat across ALL hands in the session. */
+  sessionBonusTilePoints?: [number, number, number, number];
+  /** Number of hands won by each seat in the session. */
+  handsWon?: [number, number, number, number];
+  /** Highest single-hand net score delta achieved by each seat in the session. */
+  bestHandPoints?: [number, number, number, number];
 }
 
 export interface RematchReadyPayload {

@@ -295,11 +295,11 @@ describe('GamePage', () => {
 
     const tile = screen.getAllByRole('button', { name: /1 character|1è¬/i })[0];
 
-    // First tap â†’ selects (no emit yet)
+    // First tap â†' selects (no emit yet)
     fireEvent.click(tile);
     expect(mockEmit).not.toHaveBeenCalledWith('game:discard', expect.anything());
 
-    // Second tap â†’ discard
+    // Second tap â†' discard
     fireEvent.click(tile);
     expect(mockEmit).toHaveBeenCalledWith('game:discard', { tile: '1m' });
   });
@@ -483,16 +483,16 @@ describe('GamePage', () => {
     expect(screen.getByText('Player Wins!')).toBeInTheDocument();
     expect(screen.queryByText(/hand complete/i)).not.toBeInTheDocument();
 
-    // Tap anywhere to skip â†’ detail screen (HandRevealScreen) appears
+    // Tap anywhere to skip â†' detail screen (HandRevealScreen) appears
     fireEvent.click(screen.getByText('Player Wins!'));
     await waitFor(() => {
       expect(screen.getByText(/hand complete/i)).toBeInTheDocument();
     });
   });
 
-  it('BUG-025: session end â€” announcement first, results second, hand details last', async () => {
+  it('BUG-025: session end - announcement first, hand reveal second, match stats third, hand details last', async () => {
     renderGamePage();
-    // viewerSeat=0 === dealerSeat=0 â†’ this client is the host
+    // viewerSeat=0 === dealerSeat=0 -- this client is the host
     await pushSnapshot(makeSnapshot({ phase: 'finished' }));
 
     await act(async () => {
@@ -501,34 +501,42 @@ describe('GamePage', () => {
       );
     });
 
-    // Host auto-ends the session â€” no manual "View Final Scores" click needed
+    // 1. Winner announcement is the FIRST screen
+    expect(screen.getByText(/you win/i)).toBeInTheDocument();
+    expect(screen.queryByText(/final standings/i)).not.toBeInTheDocument();
+
+    // 2. Skip the announcement -- HandRevealScreen with “Final Hand” badge and “View Match Results” button
+    fireEvent.click(screen.getByText(/you win/i));
+    await waitFor(() => {
+      expect(screen.getByText(/hand complete/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/final hand/i)).toBeInTheDocument();
+
+    // Host clicks “View Match Results” -- emits game:advance-hand
+    const advanceBtn = screen.getByRole('button', { name: /view match results/i });
+    fireEvent.click(advanceBtn);
     expect(mockEmit).toHaveBeenCalledWith('game:advance-hand', { gameId: 'game-test' });
 
-    // 1. Winner announcement is the FIRST screen (no results table behind it yet)
-    expect(screen.getByText(/you win/i)).toBeInTheDocument();
-    expect(screen.queryByText(/final scores/i)).not.toBeInTheDocument();
-
+    // game:ended arrives -- match stats screen shows
     await act(async () => {
       registeredHandlers.get('game:ended')?.(makeEnded());
     });
-
-    // 2. Skip the announcement â†’ results screen (placement, scores, rating)
-    fireEvent.click(screen.getByText(/you win/i));
     await waitFor(() => {
-      expect(screen.getByText(/final scores/i)).toBeInTheDocument();
+      expect(screen.getByText(/final standings/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/1st place/i)).toBeInTheDocument();
+    expect(screen.getByText(/return to lobby/i)).toBeInTheDocument();
 
-    // 3. View Hand Details â†’ the detailed reveal is the LAST screen
-    fireEvent.click(screen.getByRole('button', { name: /view hand details/i }));
+    // 3. View Final Hand -- the detailed reveal is the LAST screen
+    fireEvent.click(screen.getByRole('button', { name: /view final hand/i }));
     await waitFor(() => {
       expect(screen.getByText(/all hands/i)).toBeInTheDocument();
     });
 
-    // Back returns to the results screen
+    // Back returns to the match stats screen
     fireEvent.click(screen.getByRole('button', { name: /back to results/i }));
     await waitFor(() => {
-      expect(screen.getByText(/final scores/i)).toBeInTheDocument();
+      expect(screen.getByText(/final standings/i)).toBeInTheDocument();
     });
   });
 

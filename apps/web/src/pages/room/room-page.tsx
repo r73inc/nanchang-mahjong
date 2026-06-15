@@ -558,7 +558,12 @@ export function RoomPage() {
                     return (
                       <button
                         key={opt}
-                        onClick={() => updateSettings(room.roomId, { terminationType: opt })}
+                        onClick={() =>
+                          updateSettings(room.roomId, {
+                            terminationType: opt,
+                            ...(opt === 'fixed-hands' ? { maxHands: room.settings.maxHands } : {}),
+                          })
+                        }
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{
@@ -656,7 +661,7 @@ export function RoomPage() {
                 {isHost && room.status === 'waiting' ? (
                   <div className="flex gap-1.5" role="group" aria-label={t('settingMaxHandsLabel')}>
                     {MAX_HANDS_OPTIONS.map((n) => {
-                      const active = (room.settings.maxHands ?? 1) === n;
+                      const active = room.settings.maxHands === n;
                       return (
                         <button
                           key={n}
@@ -681,7 +686,7 @@ export function RoomPage() {
                     })}
                   </div>
                 ) : (
-                  <span className="text-mj-gold font-semibold">{room.settings.maxHands ?? 1}</span>
+                  <span className="text-mj-gold font-semibold">{room.settings.maxHands}</span>
                 )}
               </div>
             )}
