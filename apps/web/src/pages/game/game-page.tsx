@@ -498,9 +498,11 @@ function HandRevealScreen({
   const spiritHasAny =
     handReveal.spiritDeltas.some((d) => d !== 0) &&
     (handReveal.jingPrimary !== null || handReveal.jingSecondary !== null);
-  const sortedSeats = ([0, 1, 2, 3] as const)
-    .slice()
-    .sort((a, b) => handReveal.handNetDeltas[b] - handReveal.handNetDeltas[a]);
+  const sortedSeats = ([0, 1, 2, 3] as const).slice().sort((a, b) => {
+    const totalA = snapshot.seats[a].score + handReveal.spiritDeltas[a];
+    const totalB = snapshot.seats[b].score + handReveal.spiritDeltas[b];
+    return totalB - totalA;
+  });
 
   const handTypeLabel =
     (handReveal.handType ?? 'standard') !== 'standard'
@@ -547,14 +549,17 @@ function HandRevealScreen({
             const isViewer = seat === viewerSeat;
             const isWinner = seat === handReveal.winnerSeat;
             const delta = handReveal.handNetDeltas[seat];
+            const totalScore = snapshot.seats[seat].score + handReveal.spiritDeltas[seat];
             const isExp = expandedSeat === seat;
 
             const winPayDelta = handReveal.winPayment?.scoreDelta[seat] ?? 0;
             const spiritDelta = handReveal.spiritDeltas[seat];
-            const kongDelta = delta - winPayDelta - spiritDelta;
+            const bonusTileDelta = handReveal.openingJingDelta?.[seat] ?? 0;
+            const kongDelta = delta - winPayDelta - spiritDelta - bonusTileDelta;
             const hasWinSection =
               handReveal.result === 'win' && handReveal.winPayment !== undefined;
-            const hasBreakdown = hasWinSection || spiritHasAny || kongDelta !== 0;
+            const hasBreakdown =
+              hasWinSection || spiritHasAny || kongDelta !== 0 || bonusTileDelta !== 0;
 
             return (
               <div
@@ -594,18 +599,29 @@ function HandRevealScreen({
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span
-                      className={`text-base font-bold tabular-nums ${
-                        delta > 0
-                          ? 'text-emerald-400'
-                          : delta < 0
-                            ? 'text-red-400'
-                            : 'text-mj-bone/40'
-                      }`}
-                    >
-                      {delta > 0 ? '+' : ''}
-                      {delta}
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span
+                        className={`text-base font-bold tabular-nums ${
+                          delta > 0
+                            ? 'text-emerald-400'
+                            : delta < 0
+                              ? 'text-red-400'
+                              : 'text-mj-bone/40'
+                        }`}
+                      >
+                        {totalScore}
+                      </span>
+                      {delta !== 0 && (
+                        <span
+                          className={`text-[11px] tabular-nums leading-none ${
+                            delta > 0 ? 'text-emerald-400/60' : 'text-red-400/60'
+                          }`}
+                        >
+                          {delta > 0 ? '+' : ''}
+                          {delta}
+                        </span>
+                      )}
+                    </div>
                     {hasBreakdown && (
                       <span className="text-mj-bone/30 text-[10px]" aria-hidden>
                         {isExp ? CHEVRON_UP : CHEVRON_DOWN}
@@ -617,17 +633,52 @@ function HandRevealScreen({
                 {/* ── Expanded breakdown ── */}
                 {isExp && (
                   <div className="px-4 pb-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3">
+                    {/* Hand net summary — always first in the expanded view */}
+                    <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+                      <p className="text-[10px] font-bold tracking-widest text-mj-bone/40 uppercase">
+                        {t('handRevealBreakdownHandNetLabel')}
+                      </p>
+                      <p
+                        className={`text-sm font-bold tabular-nums ${
+                          delta > 0
+                            ? 'text-emerald-400'
+                            : delta < 0
+                              ? 'text-red-400'
+                              : 'text-mj-bone/40'
+                        }`}
+                      >
+                        {delta > 0 ? '+' : ''}
+                        {delta}
+                      </p>
+                    </div>
+
                     {/* Section 1 — Win payment */}
                     {hasWinSection &&
                       handReveal.winPayment &&
                       (() => {
                         const wp = handReveal.winPayment!;
                         if (isWinner) {
+                          const liableName =
+                            handReveal.liableSeat !== undefined
+                              ? snapshot.seats[handReveal.liableSeat].seatName
+                              : undefined;
+                          const ronKey =
+                            handReveal.winMeldKind === 'chow'
+                              ? 'handRevealBreakdownWinRonChow'
+                              : handReveal.winMeldKind === 'pung'
+                                ? 'handRevealBreakdownWinRonPung'
+                                : handReveal.winMeldKind === 'pair'
+                                  ? 'handRevealBreakdownWinRonPair'
+                                  : 'handRevealBreakdownWinRonNamed';
                           const winTypeLabel = handReveal.isRobKong
-                            ? t('handRevealBreakdownWinRobKong')
+                            ? liableName
+                              ? t('handRevealBreakdownWinRobKongNamed', liableName)
+                              : t('handRevealBreakdownWinRobKong')
                             : handReveal.winType === 'tsumo'
                               ? t('handRevealBreakdownWinTsumo')
-                              : t('handRevealBreakdownWinRon');
+                              : liableName
+                                ? t(ronKey, liableName)
+                                : t('handRevealBreakdownWinRon');
                           return (
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -828,6 +879,25 @@ function HandRevealScreen({
                         </p>
                       </div>
                     )}
+
+                    {/* Section 4 — Bonus tile (opening jing settlement) */}
+                    {bonusTileDelta !== 0 && (
+                      <div className="flex flex-col gap-1">
+                        <p className="text-[10px] font-bold tracking-widest text-mj-gold/50 uppercase">
+                          {t('handRevealBreakdownBonusTileHeader')}
+                        </p>
+                        <p
+                          className={`text-sm font-bold tabular-nums ${
+                            bonusTileDelta > 0 ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
+                          {t(
+                            'handRevealBreakdownBonusTileNet',
+                            bonusTileDelta > 0 ? `+${bonusTileDelta}` : String(bonusTileDelta),
+                          )}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -920,6 +990,28 @@ function HandRevealScreen({
                       ({ groups, ungrouped } = greedyGroupHand(hand));
                     }
 
+                    // Pre-compute the exact position of the winning tile so we can
+                    // highlight it without mutable state during render.
+                    // The engine always stores the winning tile in the 14-tile final hand
+                    // (ron: discard appended; tsumo: drawn tile already present).
+                    let winGIdx = -1;
+                    let winTIdx = -1;
+                    let winUIdx = -1;
+                    if (isWinner && handReveal.winningTile) {
+                      outer: for (let gi = 0; gi < groups.length; gi++) {
+                        for (let ti = 0; ti < groups[gi].tiles.length; ti++) {
+                          if (groups[gi].tiles[ti] === handReveal.winningTile) {
+                            winGIdx = gi;
+                            winTIdx = ti;
+                            break outer;
+                          }
+                        }
+                      }
+                      if (winGIdx === -1) {
+                        winUIdx = ungrouped.indexOf(handReveal.winningTile);
+                      }
+                    }
+
                     if (groups.length === 0 && ungrouped.length > 0) {
                       // No recognisable groups — flat row
                       return (
@@ -931,6 +1023,7 @@ function HandRevealScreen({
                               size="xs"
                               interactive={false}
                               isJing={isJing(tile)}
+                              isLastDiscard={j === winUIdx}
                             />
                           ))}
                         </div>
@@ -950,6 +1043,7 @@ function HandRevealScreen({
                                   interactive={false}
                                   isJing={isJing(tile)}
                                   showJingLabel={false}
+                                  isLastDiscard={gi === winGIdx && ti === winTIdx}
                                 />
                               ))}
                             </div>
@@ -969,6 +1063,7 @@ function HandRevealScreen({
                                 interactive={false}
                                 isJing={isJing(tile)}
                                 showJingLabel={false}
+                                isLastDiscard={ui === winUIdx}
                               />
                             ))}
                           </div>

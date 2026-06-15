@@ -1335,7 +1335,7 @@ export class GameService {
       state.jingSecondary,
     );
 
-    // ── Net hand delta per seat (win + kong payouts + spirit vs. starting score) ─
+    // ── Net hand delta per seat (win + kong payouts + opening jing + spirit) ─────
     const handMeta = session.handLog[session.handLog.length - 1];
     const handStarting =
       handMeta?.startingScores ?? ([0, 0, 0, 0] as [number, number, number, number]);
@@ -1345,6 +1345,49 @@ export class GameService {
       number,
       number,
     ];
+
+    // Opening jing settlement delta (ruleTopBottomJing only) — tracked separately
+    // so the UI can label it "Bonus Tile" instead of lumping it into "Kong Payouts".
+    const openingJingEvent = session.engine.events.find(
+      (e) => e.kind === 'opening_jing_settlement',
+    ) as
+      | {
+          kind: 'opening_jing_settlement';
+          settlementTile: TileType;
+          scoreDelta: [number, number, number, number];
+        }
+      | undefined;
+    const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
+
+    // ── Win meld kind (ron only) + winning tile ───────────────────────────────
+    // prevEvent is events[n-2]: 'discard' for ron, 'draw' for tsumo, 'kong_added' for rob-kong.
+    const engineEvents = session.engine.events;
+    const prevEvent = engineEvents.length >= 2 ? engineEvents[engineEvents.length - 2] : undefined;
+
+    let winMeldKind: HandRevealPayload['winMeldKind'];
+    if (winnerSeat !== null && winType === 'ron' && !opts.isRobKong) {
+      if (handType === 'seven_pairs') {
+        winMeldKind = 'pair';
+      } else if (handType === 'all_triplets') {
+        winMeldKind = 'pung';
+      } else {
+        const winTile = prevEvent?.kind === 'discard' ? prevEvent.tile : undefined;
+        if (winTile) {
+          // After declareWin, the winner's hand is 14 tiles (winning tile included).
+          // copies >= 3 → pung (2 pre-existing + 1 won), 2 → pair, 1 → chow.
+          const copies = state.seats[winnerSeat].hand.filter((t) => t === winTile).length;
+          winMeldKind = copies >= 3 ? 'pung' : copies === 2 ? 'pair' : 'chow';
+        }
+      }
+    }
+
+    // The tile that completed the hand — from the event immediately before 'win'.
+    // All three event types that can precede a win ('draw', 'discard', 'kong_added')
+    // carry a 'tile' field, so a simple 'tile' in prevEvent check covers all cases.
+    const winningTile: HandRevealPayload['winningTile'] =
+      winnerSeat !== null && prevEvent && 'tile' in prevEvent
+        ? (prevEvent as { tile: TileType }).tile
+        : undefined;
 
     // ── Build hand-reveal payload ──────────────────────────────────────────────
     const handReveal: HandRevealPayload = {
@@ -1368,8 +1411,11 @@ export class GameService {
       isLastHand,
       nextDealerSeat: isLastHand ? undefined : nextDealerInfo.dealerSeat,
       handNetDeltas,
+      openingJingDelta,
       liableSeat,
       isRobKong,
+      winMeldKind,
+      winningTile,
     };
 
     // ── Store pending state, emit hand-reveal, and pause ──────────────────────

@@ -6,6 +6,23 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug055-kong-payout-opening-jing` (2026-06-14)
+
+### BUG-055 · "Kong Payout" shown with no kongs — opening jing settlement leaks into kong line
+
+**Root cause:** The hand-reveal breakdown computed `kongDelta = handNetDeltas[seat] - winPayDelta - spiritDelta`. `handNetDeltas` is the total score change for the hand, which includes **four** components: win payment + kong instant payouts + opening jing settlement + spirit settlement. Subtracting only win and spirit left the opening jing settlement (bonus tile payout) in the residual, which was then displayed under the "Kong Payouts" label. In a no-kong game with `ruleTopBottomJing` on, this produced a non-zero "Kong Payout" line (e.g. `-1`) for every player whose bonus tile holdings differed from average.
+
+**Fix:**
+
+- `packages/shared/src/game.events.ts` — Added `openingJingDelta?: [number, number, number, number]` to `HandRevealPayload`. This field is already included in `handNetDeltas` but now tracked separately so the UI can display it correctly.
+- `apps/api/src/game/game.service.ts` — In `handleHandEnd`, look up the `opening_jing_settlement` event from `session.engine.events` (present when `ruleTopBottomJing` is active) and populate `openingJingDelta` in the hand-reveal payload.
+- `apps/web/src/pages/game/game-page.tsx` — Updated `kongDelta` to `delta - winPayDelta - spiritDelta - bonusTileDelta`. Added a new "Section 4 — Bonus Tile" block that renders when `bonusTileDelta !== 0`.
+- `apps/web/src/i18n/en.json` + `zh.json` — Added `handRevealBreakdownBonusTileHeader` / `handRevealBreakdownBonusTileNet` keys.
+
+**Key learning:** Any time a server-computed aggregate (`handNetDeltas`) is decomposed in the UI by subtracting known components, every component that can be non-zero must be tracked and subtracted — otherwise the residual absorbs unrelated items. The opening jing settlement was the missing term.
+
+---
+
 ## `fix/bug054-learn-page-hands` (2026-06-14)
 
 ### BUG-054 · Learn page "Hands" tab shows incomplete example hands
