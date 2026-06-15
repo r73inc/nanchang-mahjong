@@ -880,3 +880,97 @@ describe('shantenNumber', () => {
     expect(shantenNumber(hand, NO_JINGS)).toBe(0);
   });
 });
+
+// ── BUG-056 regression: wildcard in low chow position ────────────────────────
+
+describe('Engine·BUG-056 — wildcard fills lowest position in a suit chow', () => {
+  // Jing = '9s' (the wildcard used in the reported playtest)
+  const JING9S: TileType = '9s';
+  const JINGS9S: TileType[] = [JING9S];
+
+  it('all-chow hand where wild is the LOW tile: wild+7s+8s = 6s7s8s', () => {
+    // melds: [wild,7s,8s]=6s7s8s  1p2p3p  4p5p6p  7p8p9p  pair: 1m1m
+    const hand: TileType[] = [
+      JING9S,
+      '7s',
+      '8s',
+      '1p',
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8p',
+      '9p',
+      '1m',
+      '1m',
+    ];
+    expect(isWinningHand(hand, JINGS9S)).toBe(true);
+  });
+
+  it('all-chow hand where wild is the LOW tile at rank boundary: wild+8s+9s', () => {
+    // melds: [wild,8s,9s]=7s8s9s  1p2p3p  4p5p6p  7p8p9p  pair: east east
+    const hand: TileType[] = [
+      JING9S,
+      '8s',
+      '9s',
+      '1p',
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8p',
+      '9p',
+      'east',
+      'east',
+    ];
+    expect(isWinningHand(hand, JINGS9S)).toBe(true);
+  });
+
+  it('all-chow hand with two wilds both filling low positions', () => {
+    // Primary='9s', Secondary='1m' (stepAbove 9s). Both are wildcards.
+    // melds: [wild,7s,8s]=6s7s8s  [wild,2p,3p]=1p2p3p  4p5p6p  7p8p9p  pair: east east
+    const JING1M: TileType = '1m';
+    const hand: TileType[] = [
+      JING9S, // wildcard 1 → fills low of 6s7s8s
+      '7s',
+      '8s',
+      JING1M, // wildcard 2 → fills low of 1p2p3p
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8p',
+      '9p',
+      'east',
+      'east',
+    ];
+    expect(isWinningHand(hand, [JING9S, JING1M])).toBe(true);
+  });
+
+  it('pair contains a wild; remaining melds are all sequential with wild in low pos', () => {
+    // melds: [wild,7s,8s]=6s7s8s  1p2p3p  4p5p6p  7p8p9p  pair: east+wild
+    const hand: TileType[] = [
+      JING9S, // wildcard 1 → fills low of 6s7s8s
+      '7s',
+      '8s',
+      '1p',
+      '2p',
+      '3p',
+      '4p',
+      '5p',
+      '6p',
+      '7p',
+      '8p',
+      '9p',
+      'east',
+      JING9S, // wildcard 2 → completes east pair
+    ];
+    expect(isWinningHand(hand, JINGS9S)).toBe(true);
+  });
+});
