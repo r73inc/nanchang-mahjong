@@ -13,8 +13,8 @@ export class BotConfigDto {
 
 export class RoomSettingsDto {
   @IsOptional()
-  @IsIn(['east', 'east+south'])
-  rounds?: 'east' | 'east+south';
+  @IsIn(['east', 'east+south', 'east+south+west', 'all'])
+  rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
 
   @IsOptional()
   @IsIn(['rounds', 'bust'])

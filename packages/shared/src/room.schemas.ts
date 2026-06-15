@@ -10,11 +10,14 @@ export type BotDifficulty = 'easy' | 'normal';
 export const RoomSettingsSchema = z.object({
   /**
    * Which rounds to play.
-   * 'east' = East round only (4 dealerships).
-   * 'east+south' = East + South rounds (8 dealerships).
+   * 'east'             = East round only (~4 hands).
+   * 'east+south'       = East + South rounds (~8 hands).
+   * 'east+south+west'  = East + South + West rounds (~12 hands).
+   * 'all'              = All four rounds (~16 hands).
    * Only applies when terminationType is 'rounds'.
+   * The three- and four-round variants are used exclusively by Point Challenges.
    */
-  rounds: z.enum(['east', 'east+south']).default('east+south'),
+  rounds: z.enum(['east', 'east+south', 'east+south+west', 'all']).default('east+south'),
 
   /**
    * How the session ends.

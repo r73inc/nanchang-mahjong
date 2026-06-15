@@ -393,6 +393,8 @@ export interface GameEndedPayload {
   endedAt: string;
   /** ELO rating deltas per seat [seat0, seat1, seat2, seat3]. Added by Phase 8. */
   ratingDeltas?: [number, number, number, number];
+  /** Present when this game is part of a Point Challenge. Navigate to /challenges/:id after viewing the result. */
+  challengeId?: string;
 }
 
 export interface RematchReadyPayload {

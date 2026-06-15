@@ -63,7 +63,7 @@ export { GameRuleError } from './errors';
 
 // ── PRNG ──────────────────────────────────────────────────────────────────────
 
-export { mulberry32, seededShuffle } from './prng';
+export { mulberry32, seededShuffle, deriveHandSeeds } from './prng';
 
 // ── Dice ──────────────────────────────────────────────────────────────────────
 

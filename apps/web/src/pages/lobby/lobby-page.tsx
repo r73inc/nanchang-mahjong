@@ -17,6 +17,10 @@ import { useRoomActions } from '../../hooks/use-room';
 import { useRoomStore } from '../../stores/room.store';
 import { connectSocket } from '../../lib/socket';
 import { useAuthStore } from '../../stores/auth.store';
+import { useChallenges } from '../../hooks/use-challenges';
+import type { ChallengeSummary, ChallengeParticipantStatus } from '@nanchang/shared';
+
+const BULLET = '·';
 
 export function LobbyPage() {
   const { t } = useI18n();
@@ -39,6 +43,12 @@ export function LobbyPage() {
   }
 
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { data: challenges } = useChallenges();
+
+  // Open challenges the user can still act on (pending invite or in-progress game)
+  const actionableChallenges = (challenges ?? [])
+    .filter((c) => c.status === 'open' && (c.myStatus === 'pending' || c.myStatus === 'accepted'))
+    .slice(0, 3);
 
   /** Ensure the socket is connected before navigating to the room screen. */
   function ensureSocket() {
@@ -220,7 +230,100 @@ export function LobbyPage() {
             </div>
           )}
         </div>
+
+        {/* ── Point Challenge ─────────────────────────────────────────────── */}
+        <div
+          className="rounded-2xl p-5"
+          style={{
+            background: 'rgba(90,60,120,0.08)',
+            border: '1px solid rgba(150,100,200,0.25)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-base font-bold text-mj-bone">{t('pointChallenge')}</h2>
+            {(challenges?.length ?? 0) > 0 && (
+              <button
+                onClick={() => navigate('/challenges')}
+                className="text-xs font-semibold"
+                style={{ color: 'rgba(150,100,200,0.9)' }}
+              >
+                {t('challengeViewAll')}
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-mj-bone/60 mb-4">{t('pointChallengeSub')}</p>
+
+          {/* Open challenges that need action */}
+          {actionableChallenges.length > 0 && (
+            <div className="flex flex-col gap-2 mb-4">
+              {actionableChallenges.map((c) => (
+                <ChallengeSummaryRow
+                  key={c.challengeId}
+                  challenge={c}
+                  onClick={() => navigate(`/challenges/${c.challengeId}`)}
+                />
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate('/challenges/create')}
+            className="w-full py-3.5 rounded-[14px] font-bold text-sm"
+            style={{
+              background: 'rgba(150,100,200,0.15)',
+              border: '1px solid rgba(150,100,200,0.4)',
+              color: 'rgba(190,150,240,0.95)',
+            }}
+          >
+            {t('challengeCreate')}
+          </button>
+        </div>
       </div>
     </ScreenShell>
+  );
+}
+
+// ── Internal helper ───────────────────────────────────────────────────────────
+
+function ChallengeSummaryRow({
+  challenge,
+  onClick,
+}: {
+  challenge: ChallengeSummary;
+  onClick: () => void;
+}) {
+  const { t } = useI18n();
+  const myStatusKey =
+    `challengeStatus${challenge.myStatus.charAt(0).toUpperCase()}${challenge.myStatus.slice(1)}` as never;
+  const statusColor: Record<ChallengeParticipantStatus, string> = {
+    pending: '#c9a961',
+    accepted: 'rgba(90,175,90,0.9)',
+    completed: 'rgba(var(--felt-ink-rgb),0.5)',
+    declined: 'rgba(192,57,43,0.8)',
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-3 px-4 py-3 rounded-xl text-left w-full"
+      style={{ background: 'rgba(150,100,200,0.07)', border: '1px solid rgba(150,100,200,0.2)' }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-mj-bone truncate">
+          {t('challengeCreatedBy').replace('{{0}}', challenge.creatorHandle)}
+        </p>
+        <p className="text-xs text-mj-bone/50">
+          {t('challengeRoundsLabel').replace('{{0}}', String(challenge.config.numRounds))} {BULLET}{' '}
+          {challenge.completedCount}/{challenge.participantCount + 1}{' '}
+          {t('challengeStatusCompleted').toLowerCase()}
+        </p>
+      </div>
+      <span
+        className="text-xs font-bold flex-shrink-0"
+        style={{ color: statusColor[challenge.myStatus] }}
+      >
+        {t(myStatusKey)}
+      </span>
+    </button>
   );
 }

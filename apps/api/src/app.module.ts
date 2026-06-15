@@ -14,6 +14,7 @@ import { FriendsModule } from './friends/friends.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { ReplayModule } from './replay/replay.module';
 import { PushModule } from './push/push.module';
+import { ChallengesModule } from './challenges/challenges.module';
 import { HealthController } from './health/health.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { I18nModule } from './i18n/i18n.module';
@@ -54,6 +55,7 @@ import { I18nModule } from './i18n/i18n.module';
     RoomsModule, // transitively imports GameModule
     ReplayModule,
     PushModule,
+    ChallengesModule,
   ],
   controllers: [HealthController],
   providers: [
