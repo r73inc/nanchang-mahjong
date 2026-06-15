@@ -34,45 +34,48 @@ function countOf(arr: TileType[], t: TileType): number {
 }
 
 /**
- * Try to build a Chow starting at `first` from the sorted `naturals`.
- * Returns { rest, jingsUsed } if possible (using wildcards to fill gaps), or null.
+ * Try to build a Chow that includes `first` at position `firstPos` (0=low, 1=mid, 2=high).
+ * Wildcards fill the other two positions if they are absent from `naturals`.
+ * Returns { rest, jingsUsed, tiles } on success, or null if the chow is impossible.
+ *
+ * Trying all three `firstPos` values in the caller fixes BUG-056: previously only
+ * `firstPos=0` was tried, so hands where the lowest chow tile was a wildcard were
+ * never found (e.g. concealed [7s, 8s] + wild needing [6s, 7s, 8s] was missed).
  */
 function tryChow(
   naturals: TileType[],
   first: TileType,
   wildsLeft: number,
+  firstPos: 0 | 1 | 2 = 0,
 ): { rest: TileType[]; jingsUsed: number; tiles: [TileType, TileType, TileType] } | null {
   if (isHonor(first)) return null;
 
   const rank = getRank(first)!;
   const suit = first[1]; // 'm' | 'p' | 's'
-  if (rank > 7) return null; // can't start a chow at 8 or 9
+  const baseRank = rank - firstPos; // rank of the lowest tile in the chow
+  if (baseRank < 1 || baseRank + 2 > 9) return null;
 
-  const t2 = `${rank + 1}${suit}` as TileType;
-  const t3 = `${rank + 2}${suit}` as TileType;
+  const tiles = [
+    `${baseRank}${suit}` as TileType,
+    `${baseRank + 1}${suit}` as TileType,
+    `${baseRank + 2}${suit}` as TileType,
+  ] as [TileType, TileType, TileType];
 
-  let rest = removeOne(naturals, first);
+  let rest = removeOne(naturals, first); // remove the anchor tile first
   let jingsUsed = 0;
 
-  // second tile
-  if (countOf(rest, t2) > 0) {
-    rest = removeOne(rest, t2);
-  } else if (wildsLeft > jingsUsed) {
-    jingsUsed++;
-  } else {
-    return null;
+  for (let i = 0; i < 3; i++) {
+    if (i === firstPos) continue; // anchor already removed above
+    if (countOf(rest, tiles[i]) > 0) {
+      rest = removeOne(rest, tiles[i]);
+    } else if (wildsLeft > jingsUsed) {
+      jingsUsed++;
+    } else {
+      return null;
+    }
   }
 
-  // third tile
-  if (countOf(rest, t3) > 0) {
-    rest = removeOne(rest, t3);
-  } else if (wildsLeft > jingsUsed) {
-    jingsUsed++;
-  } else {
-    return null;
-  }
-
-  return { rest, jingsUsed, tiles: [first, t2, t3] };
+  return { rest, jingsUsed, tiles };
 }
 
 /**
@@ -137,16 +140,19 @@ function tryMelds(
 
   // ── Try Chow ──────────────────────────────────────────────────────────────
   if (isSuit(first)) {
-    // Suit Chow: 3 consecutive tiles in the same suit
-    const chowResult = tryChow(sorted, first, wildsLeft);
-    if (chowResult) {
-      const sub = tryMelds(
-        chowResult.rest,
-        wildsLeft - chowResult.jingsUsed,
-        [...meldsAcc, { kind: 'chow', tiles: chowResult.tiles, concealed: true }],
-        jingsUsedAcc + chowResult.jingsUsed,
-      );
-      results.push(...sub);
+    // Suit Chow: try `first` as the low (0), mid (1), or high (2) tile of a sequence.
+    // All three positions are enumerated so wildcards can fill any lower position.
+    for (const firstPos of [0, 1, 2] as const) {
+      const chowResult = tryChow(sorted, first, wildsLeft, firstPos);
+      if (chowResult) {
+        const sub = tryMelds(
+          chowResult.rest,
+          wildsLeft - chowResult.jingsUsed,
+          [...meldsAcc, { kind: 'chow', tiles: chowResult.tiles, concealed: true }],
+          jingsUsedAcc + chowResult.jingsUsed,
+        );
+        results.push(...sub);
+      }
     }
   } else {
     // Honor Chow: try all valid wind/dragon sequences containing `first`

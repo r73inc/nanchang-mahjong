@@ -447,3 +447,57 @@ describe('isTenpai', () => {
     expect(waiting).toContain('9s');
   });
 });
+
+// ── BUG-057 regression: open meld tiles must not be reused ───────────────────
+
+describe('canWin·BUG-057 — open meld tiles cannot be broken up or reused', () => {
+  it('rejects false win where engine would split open pung into chow + pair', () => {
+    // Player has 3 open pungs: 1m×3, 2m×3, 3m×3 (9 tiles).
+    // Concealed: 2m, 3m, 3p, 4p. Draw: 5p.
+    // Concealed+draw = [2m,3m,3p,4p,5p] — no valid 1-meld+pair decomposition.
+    //
+    // The old flat-pool bug: all 14 tiles together can be arranged as
+    //   1m2m3m chow, 1m1m pair, 2m2m2m pung, 3m3m3m pung, 3p4p5p chow
+    //   — but this illegally dismantles the open 1m×3 pung.
+    const openMeldTiles: TileType[] = ['1m', '1m', '1m', '2m', '2m', '2m', '3m', '3m', '3m'];
+    const hand: TileType[] = ['2m', '3m', '3p', '4p'];
+    expect(canWin(hand, '5p', NO_JINGS, openMeldTiles)).toBe(false);
+  });
+
+  it('accepts a legitimate win with 3 open pungs and a valid concealed finish', () => {
+    // Player has 3 open pungs: 1m×3, 2m×3, 3m×3.
+    // Concealed: 4m, 4m, 5m, 5m. Draw: 4m → pung(4m) + pair(5m) ✓
+    const openMeldTiles: TileType[] = ['1m', '1m', '1m', '2m', '2m', '2m', '3m', '3m', '3m'];
+    const hand: TileType[] = ['4m', '4m', '5m', '5m'];
+    expect(canWin(hand, '4m', NO_JINGS, openMeldTiles)).toBe(true);
+  });
+
+  it('rejects false tsumo from the exact reported scenario: 3 open pungs, 2+3 man and 3+4 dot in hand, draws 5 dot', () => {
+    // Reported bug: 3 revealed 1m pungs, concealed 2m 3m 3p 4p, drew 5p.
+    // Engine falsely offered a win. With the fix, concealed [2m,3m,3p,4p,5p]
+    // cannot form 1 meld + 1 pair → correctly rejected.
+    const openMeldTiles: TileType[] = ['1m', '1m', '1m', '1m', '1m', '1m', '1m', '1m', '1m'];
+    const hand: TileType[] = ['2m', '3m', '3p', '4p'];
+    expect(canWin(hand, '5p', NO_JINGS, openMeldTiles)).toBe(false);
+  });
+
+  it('fully concealed hand still uses isWinningHand (Seven Pairs path preserved)', () => {
+    // Seven Pairs: fully concealed 14-tile hand — must still be detected.
+    const hand: TileType[] = [
+      '1m',
+      '1m',
+      '2m',
+      '2m',
+      '3m',
+      '3m',
+      '4m',
+      '4m',
+      '1p',
+      '1p',
+      '2p',
+      '2p',
+      '3p',
+    ];
+    expect(canWin(hand, '3p', NO_JINGS, [])).toBe(true);
+  });
+});

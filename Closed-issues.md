@@ -1548,6 +1548,42 @@ Draw and concede paths were correct because the engine never touched scores ther
 
 ---
 
+### BUG-056 · Win not offered when wildcard fills the lowest position in a chow
+
+**Symptom:** A player holds a valid all-chow winning hand where 2 wildcards (9 bamboo) are in play — one completing a concealed meld and one completing the pair. The "Declare Win" / "Hu" button was never shown across 3 separate turns in a round where the hand was objectively complete.
+
+**Root cause:** `tryChow` in `packages/engine/src/hand.ts` anchored its `first` argument at **position 0 (lowest)** of the chow and constructed `[first, first+1, first+2]`. Wildcards could substitute for position 1 or position 2 but **never** position 0. In `tryMelds`, `first = sorted[0]` is always the smallest remaining natural tile. When the intended chow was `[WILD, natural1, natural2]` — wildcard representing a tile lower than the two naturals — the algorithm tried only `[natural1, natural1+1, natural1+2]` and never explored the valid grouping `[natural1-1, natural1, natural1+1]` or `[natural1-2, natural1-1, natural1]`. If no valid decomposition existed on the `firstPos=0` path, `isWinningHand` returned `false` and suppressed the win button. Additionally, when `first` had rank > 7 (e.g. 8s or 9s), `tryChow` returned null immediately via `if (rank > 7) return null` — even though wildcards could fill the two lower positions.
+
+**Fix:** Extended `tryChow` with a `firstPos: 0 | 1 | 2` parameter. The anchor tile `first` is now placed at `firstPos` within the chow; `baseRank = rank - firstPos` determines the lowest rank; validity is checked as `baseRank >= 1 && baseRank + 2 <= 9`. In `tryMelds`, the suit-chow branch now loops over all three `firstPos` values and collects results from each, ensuring every possible chow orientation is explored.
+
+**Files changed:**
+
+- `packages/engine/src/hand.ts` — `tryChow`: replaced hardcoded position-0 anchor with `firstPos` param; removed `if (rank > 7) return null` check (now handled by `baseRank` range validation). `tryMelds` suit-chow branch: iterates `firstPos ∈ {0, 1, 2}`.
+- `packages/engine/src/__tests__/hand.test.ts` — added `Engine·BUG-056` describe block: 4 regression cases covering wildcard in low position, wildcard at rank boundary (8s/9s), two wildcards both in low positions, wildcard-low + wildcard-in-pair (the exact reported scenario).
+
+**Key learning:** When a decomposition algorithm picks the "smallest remaining tile" as an anchor, it naturally covers only the case where the anchor is the low end of a sequence. Any hand-evaluation algorithm that supports wildcards must explicitly try the anchor tile at all positions within the sequence (low, mid, high), otherwise valid sequences where the wildcard is lower than all naturals are silently skipped.
+
+---
+
+### BUG-057 · Win falsely offered — open meld tiles regrouped into invalid decompositions
+
+**Symptom:** A player with 3 revealed pung melds (9 open tiles) and a concealed hand of 2m, 3m, 3p, 4p was falsely offered a win after drawing 5p. The 5 concealed tiles cannot form 1 meld + 1 pair; no valid decomposition exists in the concealed portion. The engine was illegally dismantling a declared pung and reassigning its tiles into a pair + chow.
+
+**Root cause:** All win-check sites built `fullHand = [...openMeldTiles, ...hand, tile]` — a flat 14-tile pool — and passed it to `isWinningHand`. `decomposeCore` has no concept of locked melds; it tries every pair+meld grouping from the full pool and therefore legally (in its view) used tiles from a declared open pung to form a new pair or contribute to a new chow. Four sites shared this flaw: `canWin` in `calls.ts`, the `declareWin` validation in `engine.ts`, and the tsumo-detection checks in `startTurn` and `handleBotTurn` in `game.service.ts`.
+
+**Fix:** When open melds exist, only the concealed portion (`[...hand, tile]`) needs to decompose. The existing `decomposeConcealed` function handles any `3k+2` tile count (2, 5, 8, 11 tiles) and correctly returns meld+pair decompositions without any concept of open meld tiles. Seven Pairs and Thirteen Misfits are impossible once any meld is declared, so `decomposeConcealed` (which checks standard meld+pair only) is the complete and correct check for the open-meld case. All four sites were updated: when `openMeldTiles.length > 0`, use `decomposeConcealed(concealedPlusDraw, jingTypes).length > 0`; otherwise keep the existing `isWinningHand` path (which covers Seven Pairs and Thirteen Misfits for fully concealed hands).
+
+**Files changed:**
+
+- `packages/engine/src/calls.ts` — `canWin`: added `decomposeConcealed` import; replaced flat-pool `isWinningHand` with `decomposeConcealed` branch when `openMeldTiles.length > 0`.
+- `packages/engine/src/engine.ts` — `declareWin`: added `decomposeConcealed` import; split `concealedPlusDraw` from `winningHand`; replaced single `isWinningHand(winningHand, ...)` call with branched validation.
+- `apps/api/src/game/game.service.ts` — `startTurn` and `handleBotTurn`: added `decomposeConcealed` import; replaced `fullHand = [...openMeldTiles, ...hand]` + `isWinningHand` with branched `decomposeConcealed` check in both tsumo-detection blocks.
+- `packages/engine/src/__tests__/calls.test.ts` — added `canWin·BUG-057` describe block: 4 regression cases covering the exact reported scenario (false win), a legitimate win with open melds, the extreme reported case (three open pungs of 1m), and the fully concealed Seven Pairs path (to verify that path is preserved).
+
+**Key learning:** The invariant for win detection is: with k open melds, **only the concealed portion** (14 - 3k tiles) must form (4-k) melds + 1 pair. Open meld tiles are already validated at declaration time and must be treated as locked. Flattening them into the decomposition pool allows the algorithm to legally — but incorrectly — reassign those tiles, violating the one-way nature of meld declarations. Always separate "what tiles are locked" from "what tiles are free to decompose."
+
+---
+
 ## Key Learnings Across All Fixes
 
 1. **Data flow verification:** Always trace socket emit → subscription → store update → render when debugging end-to-end features.

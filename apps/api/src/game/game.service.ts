@@ -24,6 +24,7 @@ import {
   calculateOpeningJingSettlement,
   isWinningHand,
   decomposeHand,
+  decomposeConcealed,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -642,9 +643,16 @@ export class GameService {
           ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
           : ([...m.tiles] as TileType[]),
       );
-      const fullHand = [...openMeldTiles, ...seatState.hand];
+      const concealedHand = seatState.hand;
+      const totalTiles = openMeldTiles.length + concealedHand.length;
+      // BUG-057: check only the concealed portion when open melds exist.
+      const canTsumo =
+        totalTiles === 14 &&
+        (openMeldTiles.length === 0
+          ? isWinningHand(concealedHand, jingTypes, true)
+          : decomposeConcealed(concealedHand, jingTypes).length > 0);
 
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes, true)) {
+      if (canTsumo) {
         this.logger.log(
           `Can-tsumo: seat ${activeSeat} has a complete hand after kong (game ${session.gameId})`,
         );
@@ -709,8 +717,15 @@ export class GameService {
           ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
           : ([...m.tiles] as TileType[]),
       );
-      const fullHand = [...openMeldTiles, ...seatState.hand];
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes, true)) {
+      const concealedHand = seatState.hand;
+      const totalTiles = openMeldTiles.length + concealedHand.length;
+      // BUG-057: check only the concealed portion when open melds exist.
+      if (
+        totalTiles === 14 &&
+        (openMeldTiles.length === 0
+          ? isWinningHand(concealedHand, jingTypes, true)
+          : decomposeConcealed(concealedHand, jingTypes).length > 0)
+      ) {
         this.logger.log(`Bot auto-tsumo: seat ${seat} (game ${session.gameId})`);
         this.applyWinClaim(session, seat, 'tsumo', { isRobKong: false });
         return;
