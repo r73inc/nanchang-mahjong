@@ -126,6 +126,8 @@ export class GameService {
       challengeId: string;
       handSeeds: readonly number[];
       onGameEnded: (playerSub: string, finalScore: number) => Promise<void>;
+      /** Number of hands to play before ending the session (Challenge numRounds). */
+      numHands?: number;
     },
   ): Promise<void> {
     // Use first hand seed from challenge if provided, otherwise generate randomly.
@@ -162,6 +164,7 @@ export class GameService {
       startedAt: now,
       challengeId: challengeOpts?.challengeId,
       handSeeds: challengeOpts?.handSeeds,
+      targetHands: challengeOpts?.numHands,
       onGameEnded: challengeOpts?.onGameEnded,
     });
 
@@ -1495,6 +1498,12 @@ export class GameService {
     nextDealerInfo: { dealerSeat: 0 | 1 | 2 | 3; roundWind: SeatWind; roundComplete: boolean },
   ): boolean {
     const { settings, cumulativeScores, engine } = session;
+
+    // Point Challenge: numRounds means "N hands played", not N wind rounds.
+    // targetHands overrides the wind-round logic below.
+    if (session.targetHands !== undefined) {
+      return session.handsPlayed >= session.targetHands;
+    }
 
     if (settings.terminationType === 'bust') {
       // Bust: only eliminate after a full round completes (roundComplete = true).

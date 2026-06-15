@@ -402,6 +402,7 @@ export class ChallengesService {
     roomSettings: RoomSettings;
     botDifficulty: BotDifficulty;
     challengeId: string;
+    numRounds: number;
     onGameEnded: (playerSub: string, finalScore: number, gameId: string) => Promise<void>;
   }> {
     const item = await this.getChallengeItem(challengeId);
@@ -448,6 +449,7 @@ export class ChallengesService {
       roomSettings,
       botDifficulty: item.config.botDifficulty,
       challengeId,
+      numRounds: item.config.numRounds,
       onGameEnded,
     };
   }

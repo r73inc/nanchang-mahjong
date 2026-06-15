@@ -165,6 +165,13 @@ export class GameSession {
   readonly handSeeds?: readonly number[];
 
   /**
+   * If set, the session ends after exactly this many hands (Point Challenge).
+   * Takes priority over the wind-round termination logic in isSessionOver().
+   * numRounds in ChallengeConfig means "N hands played", not N wind rounds.
+   */
+  readonly targetHands?: number;
+
+  /**
    * Callback registered by ChallengesService when a challenge game is created.
    * Called by GameService.endSession() once the human player's final score is known.
    */
@@ -225,6 +232,7 @@ export class GameSession {
     startedAt: string;
     challengeId?: string;
     handSeeds?: readonly number[];
+    targetHands?: number;
     onGameEnded?: (playerSub: string, finalScore: number) => Promise<void>;
   }) {
     this.engine = params.engine;
@@ -237,6 +245,7 @@ export class GameSession {
     this.startedAt = params.startedAt;
     this.challengeId = params.challengeId;
     this.handSeeds = params.handSeeds;
+    this.targetHands = params.targetHands;
     this.onGameEnded = params.onGameEnded;
 
     this.userToSeat = new Map(params.seatMap.map((userId, i) => [userId, i as Seat4]));

@@ -128,4 +128,43 @@ describe('GameService.isSessionOver', () => {
     const session = makeSession('rounds', 'east+south', [0, 0, 0, 0], 'south');
     expect(svc.isSessionOver(session, nextInfo(true, 'west'))).toBe(true);
   });
+
+  // ── Fixed hand count (Point Challenge numRounds) ──────────────────────────
+
+  it('SessionOver·target-hands·not-reached — does NOT end when handsPlayed < targetHands', () => {
+    const session = {
+      ...makeSession('rounds', 'east', [0, 0, 0, 0]),
+      targetHands: 3,
+      handsPlayed: 2,
+    };
+    expect(svc.isSessionOver(session, nextInfo(false))).toBe(false);
+  });
+
+  it('SessionOver·target-hands·reached — DOES end when handsPlayed === targetHands', () => {
+    const session = {
+      ...makeSession('rounds', 'east', [0, 0, 0, 0]),
+      targetHands: 3,
+      handsPlayed: 3,
+    };
+    expect(svc.isSessionOver(session, nextInfo(false))).toBe(true);
+  });
+
+  it('SessionOver·target-hands·overrides-wind-round — ends after 1 hand even when roundComplete is false', () => {
+    // numRounds:1 challenge must end after 1 hand regardless of dealer rotation.
+    const session = {
+      ...makeSession('rounds', 'east', [0, 0, 0, 0]),
+      targetHands: 1,
+      handsPlayed: 1,
+    };
+    expect(svc.isSessionOver(session, nextInfo(false))).toBe(true);
+  });
+
+  it('SessionOver·target-hands·single-hand-not-yet — 1-hand challenge does NOT end before first hand completes', () => {
+    const session = {
+      ...makeSession('rounds', 'east', [0, 0, 0, 0]),
+      targetHands: 1,
+      handsPlayed: 0,
+    };
+    expect(svc.isSessionOver(session, nextInfo(false))).toBe(false);
+  });
 });

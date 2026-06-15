@@ -121,7 +121,7 @@ export class ChallengesController {
       gameId,
       seatNames,
       seatAvatarUrls,
-      { challengeId, handSeeds, onGameEnded },
+      { challengeId, handSeeds, onGameEnded, numHands: dto.config.numRounds },
     );
 
     return { challengeId, gameId };
@@ -150,7 +150,7 @@ export class ChallengesController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') challengeId: string,
   ) {
-    const { handSeeds, roomSettings, botDifficulty, onGameEnded } =
+    const { handSeeds, roomSettings, botDifficulty, onGameEnded, numRounds } =
       await this.challenges.prepareParticipantGame(challengeId, user.sub);
 
     // Create a fresh solo room for this participant.
@@ -188,7 +188,7 @@ export class ChallengesController {
       gameId,
       seatNames,
       seatAvatarUrls,
-      { challengeId, handSeeds, onGameEnded: wrappedOnGameEnded },
+      { challengeId, handSeeds, onGameEnded: wrappedOnGameEnded, numHands: numRounds },
     );
 
     return { gameId };
