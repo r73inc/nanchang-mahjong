@@ -6,6 +6,64 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug058-059-060-add-to-kong-german-win` (2026-06-15)
+
+### BUG-058 · Add-to-Kong (加杠) not triggered when drawing the 4th tile matching an open pung
+
+**Root cause:** Two separate gaps:
+
+1. **Bot never checked for add-to-kong.** `handleBotTurn()` in `apps/api/src/game/game.service.ts` checked tsumo then immediately picked a discard tile — it never scanned `openMelds` for a pung that the drawn tile could extend.
+2. **No proactive server notification for human players.** Unlike the tsumo case (server emits `game:can-tsumo` → client shows TsumoBar), add-to-kong had no equivalent server event. The client only detected the opportunity when the player clicked the matching tile, which is not discoverable.
+
+**Fix:**
+
+- `apps/api/src/game/game.service.ts` — Added `addToKongOptions` import. In `startTurn()`, after the tsumo check, iterates `seatState.openMelds` for kind=`'pung'` and emits `game:can-add-to-kong: { seat, tile }` to the player's socket when a match is found. In `handleBotTurn()`, inserted an add-to-kong check (using `addToKongOptions`) before the discard logic; bots that can extend a pung now call `engine.addToKong()` and return instead of discarding.
+- `apps/web/src/stores/game.store.ts` — Added `canAddToKong: TileType | null` state and `setCanAddToKong` action; cleared on every `setSnapshot` call.
+- `apps/web/src/hooks/use-game.ts` — Added `game:can-add-to-kong` socket handler that calls `setCanAddToKong(tile)` when the event targets the viewer's seat. Clears `canAddToKong` on discard, tsumo, and `kongAdd` actions.
+- `apps/web/src/pages/game/game-page.tsx` — Added `canAddToKong` prop to `GameTable`. When set and it is the player's turn, renders a proactive "Add to Kong (加杠)" bar above the hand (positioned above the TsumoBar when both are active). Clicking it calls `onKongAdd(canAddToKong)`.
+- `apps/web/src/i18n/en.json` + `zh.json` — Added `addToKongPrompt` and `addToKong` keys.
+
+**Key learning:** Any player action the server knows is available (like add-to-kong) should be proactively communicated to the client via a dedicated event, not left for the client to discover by clicking. Mirror the pattern used for `game:can-tsumo`.
+
+---
+
+### BUG-059 · German win (德国胡) not detected when winner holds spirit tiles at face value
+
+**Root cause:** In `packages/engine/src/engine.ts`, `declareWin()` determined German status for standard hands with:
+
+```ts
+isGerman = winJings === 0;
+```
+
+`winJings` is the count of ALL jing (spirit) tiles in the winning hand, regardless of how they are used. A player holding spirit tiles at their **face value** (e.g., a pung of 一索 when 一索 is jingPrimary) still has `winJings > 0`, so the German bonus was denied even though no wildcard substitution occurred. The rules definition of "German" is "win without using any Jing as a wildcard" — not "win without holding any Jing tile."
+
+**Fix (`packages/engine/src/engine.ts`):**
+
+```ts
+// Before (buggy):
+isGerman = winJings === 0;
+
+// After (correct):
+isGerman = decomposeHand(winningHand, []).length > 0;
+```
+
+Re-decomposing with `jingTypes=[]` treats all tiles as their natural type (no wildcards). If a valid standard decomposition exists, the hand can win without any substitution → German. If the hand can only win when jings stand in for other tiles, no natural decomp is found → not German.
+
+**Key learning:** "Holds a jing tile" ≠ "used a jing as a wildcard." The test must check whether the decomposition **requires** wildcard substitution, not whether jing tiles are present. The seven-pairs case already handled this correctly with its natural-singles check; the standard-hand case was the blind spot.
+
+---
+
+### BUG-060 · Final hand scores wrong — compound of BUG-058 and BUG-059
+
+**Root cause:** Compound bug — the incorrect scores observed in the playtest were the sum of:
+
+1. BUG-058: East's add-to-kong instant payout (+3 for East, −1 each for West/South/North) was never applied.
+2. BUG-059: The German win +5 flat-bonus-per-loser (×3 = +15 for South, −5 each for East/West/North) was not applied because `isGerman` was incorrectly false.
+
+**Fix:** Resolved by fixing BUG-058 and BUG-059 above.
+
+---
+
 ## `fix/bug055-kong-payout-opening-jing` (2026-06-14)
 
 ### BUG-055 · "Kong Payout" shown with no kongs — opening jing settlement leaks into kong line
