@@ -751,7 +751,13 @@ export class GameService {
       }
     }
 
-    const tile = getBotDiscard(state.seats[seat].hand, jingTypes, session.getBotDifficulty(seat));
+    const tile = getBotDiscard(
+      state.seats[seat].hand,
+      jingTypes,
+      session.getBotDifficulty(seat),
+      state,
+      seat,
+    );
 
     try {
       session.engine = session.engine.discard(tile);
@@ -913,11 +919,16 @@ export class GameService {
     const state = session.engine.state;
     const discardedTile = state.pendingDiscard ?? '1m';
     const openMeldCount = state.seats[seat].openMelds.length;
+    const jingTypesForClaim: TileType[] = [];
+    if (state.jingPrimary) jingTypesForClaim.push(state.jingPrimary);
+    if (state.jingSecondary) jingTypesForClaim.push(state.jingSecondary);
     const decision = getBotClaim(
       available,
       discardedTile,
       openMeldCount,
       session.getBotDifficulty(seat),
+      state.seats[seat].hand,
+      jingTypesForClaim,
     );
 
     if (!decision) {

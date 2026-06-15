@@ -187,6 +187,8 @@
   "botSeatLabel": "Bot ({{0}})",
   "botDifficultyEasyFull": "Easy Bot",
   "botDifficultyNormalFull": "Normal Bot",
+  "botDifficultyHard": "Hard",
+  "botDifficultyHardFull": "Hard Bot",
   "roomAddBot": "Add Bot",
 
   "settingStyleLabel": "Style",
@@ -563,6 +565,7 @@
   "challengeBotDifficulty": "Bot Difficulty",
   "challengeBotEasy": "Easy",
   "challengeBotNormal": "Normal",
+  "challengeBotHard": "Hard",
   "challengeNumRounds": "Rounds",
   "challengeRound1": "1 Round (East)",
   "challengeRound2": "2 Rounds (East + South)",

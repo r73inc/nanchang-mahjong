@@ -187,6 +187,8 @@
   "botSeatLabel": "机器人（{{0}}）",
   "botDifficultyEasyFull": "简单机器人",
   "botDifficultyNormalFull": "普通机器人",
+  "botDifficultyHard": "困难",
+  "botDifficultyHardFull": "困难机器人",
   "roomAddBot": "添加机器人",
 
   "settingStyleLabel": "玩法",
@@ -564,6 +566,7 @@
   "challengeBotDifficulty": "机器人难度",
   "challengeBotEasy": "简单",
   "challengeBotNormal": "普通",
+  "challengeBotHard": "困难",
   "challengeNumRounds": "局数",
   "challengeRound1": "1 局（东风）",
   "challengeRound2": "2 局（东风 + 南风）",

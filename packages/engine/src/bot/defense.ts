@@ -1,0 +1,138 @@
+/**
+ * Defensive heuristics for the Nanchang Mahjong hard bot.
+ *
+ * Provides danger scoring for potential discards and opponent threat detection,
+ * enabling the bot to switch from "attack" mode (maximize effective draws) to
+ * "defense" mode (minimize the chance of dealing into an opponent's winning hand).
+ *
+ * All functions are pure — no I/O, no mutation.
+ */
+
+import { isHonor } from '../tiles';
+import type { TileType, SeatState } from '../types';
+
+// ── Opponent threat detection ─────────────────────────────────────────────────
+
+/**
+ * Returns true if any opponent appears to be in or near Ting (tenpai).
+ *
+ * Threat indicators:
+ *   1. 3+ open melds — only needs 1 complete meld + pair in their concealed hand.
+ *   2. Has discarded a Jing tile — giving up a wildcard is a strong signal
+ *      the player has a complete hand and no longer needs flexibility.
+ *
+ * @param seats     All four seat states.
+ * @param botSeat   The bot's own seat index (skipped in the loop).
+ * @param jingTypes Active Jing tile types for this game.
+ */
+export function isOpponentThreatening(
+  seats: SeatState[],
+  botSeat: number,
+  jingTypes: TileType[],
+): boolean {
+  for (let i = 0; i < seats.length; i++) {
+    if (i === botSeat) continue;
+    const seat = seats[i];
+
+    // 3+ open melds → very close to a complete hand
+    if (seat.openMelds.length >= 3) return true;
+
+    // Discarded a Jing tile → voluntarily gave up a wildcard → likely tenpai
+    if (seat.discards.some((t) => jingTypes.includes(t))) return true;
+  }
+  return false;
+}
+
+// ── Danger scoring ────────────────────────────────────────────────────────────
+
+/**
+ * Compute a danger score for discarding a specific tile.
+ *
+ * Higher score = more dangerous (more likely to complete an opponent's hand).
+ * Score 0 = completely safe.
+ *
+ * Safety rules (score 0):
+ *   - All 4 copies of this tile type are already visible (in melds/discards/bot hand).
+ *   - Every opponent has already discarded this tile at least once.
+ *
+ * Danger estimation for unsafe tiles:
+ *   Base = (4 − visibleCount) × 2   (more unseen copies = more danger)
+ *   Honors get a −2 reduction        (honors can't be part of chow sequences)
+ *
+ * @param tile      The tile being considered for discard.
+ * @param seats     All four seat states.
+ * @param botSeat   The bot's own seat index.
+ * @param botHand   The bot's current concealed hand (to count own visible copies).
+ * @param jingTypes Active Jing tile types (not used for scoring but kept for API consistency).
+ */
+export function getDangerScore(
+  tile: TileType,
+  seats: SeatState[],
+  botSeat: number,
+  botHand: TileType[],
+): number {
+  // Count all visible copies of this tile
+  let visible = 0;
+
+  // Bot's own hand
+  for (const t of botHand) if (t === tile) visible++;
+
+  // All players' open melds and discard piles
+  for (const seat of seats) {
+    for (const meld of seat.openMelds) {
+      for (const t of meld.tiles) if (t === tile) visible++;
+    }
+    for (const t of seat.discards) if (t === tile) visible++;
+  }
+
+  // All 4 copies are accounted for — safe
+  if (visible >= 4) return 0;
+
+  // Every opponent has discarded this tile — no one is waiting for it
+  const allOpponentsDiscarded = seats.every(
+    (seat, i) => i === botSeat || seat.discards.includes(tile),
+  );
+  if (allOpponentsDiscarded) return 0;
+
+  // Base danger from unseen copies
+  const unseenCount = 4 - visible;
+  let score = unseenCount * 2;
+
+  // Honors can't complete chows, so they're slightly safer
+  if (isHonor(tile)) score = Math.max(0, score - 2);
+
+  return score;
+}
+
+// ── Safe discard selector ─────────────────────────────────────────────────────
+
+/**
+ * Return the tile with the lowest danger score from the given list of naturals.
+ * Ties are broken by returning the first (leftmost) tile in the array.
+ *
+ * @param naturals  Non-jing candidate discard tiles.
+ * @param seats     All four seat states.
+ * @param botSeat   The bot's own seat index.
+ * @param botHand   The bot's current full concealed hand.
+ */
+export function safestDiscard(
+  naturals: TileType[],
+  seats: SeatState[],
+  botSeat: number,
+  botHand: TileType[],
+): TileType {
+  if (naturals.length === 0) throw new Error('safestDiscard called with empty naturals');
+
+  let minScore = Infinity;
+  let best = naturals[0];
+
+  for (const tile of naturals) {
+    const score = getDangerScore(tile, seats, botSeat, botHand);
+    if (score < minScore) {
+      minScore = score;
+      best = tile;
+    }
+  }
+
+  return best;
+}

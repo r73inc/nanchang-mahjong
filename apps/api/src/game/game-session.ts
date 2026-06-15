@@ -288,10 +288,12 @@ export class GameSession {
     return this.botSeats.has(seat);
   }
 
-  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal'. */
+  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal', 'bot-hard-N' → 'hard'. */
   getBotDifficulty(seat: Seat4): BotDifficulty {
     const userId = this.seatMap[seat];
-    return userId.startsWith('bot-normal') ? 'normal' : 'easy';
+    if (userId.startsWith('bot-normal')) return 'normal';
+    if (userId.startsWith('bot-hard')) return 'hard';
+    return 'easy';
   }
 
   get hasBots(): boolean {

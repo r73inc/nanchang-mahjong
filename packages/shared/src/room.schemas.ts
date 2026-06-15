@@ -5,7 +5,7 @@ import { z } from 'zod';
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 /** AI opponent difficulty level. */
-export type BotDifficulty = 'easy' | 'normal';
+export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
 export const RoomSettingsSchema = z.object({
   /**
@@ -99,7 +99,7 @@ export const BotConfigSchema = z.object({
   /** Number of bot seats to fill (0–3). */
   count: z.number().int().min(0).max(3),
   /** Difficulty applied to all bots in this room. */
-  difficulty: z.enum(['easy', 'normal']),
+  difficulty: z.enum(['easy', 'normal', 'hard']),
 });
 export type BotConfig = z.infer<typeof BotConfigSchema>;
 
