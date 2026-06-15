@@ -106,7 +106,7 @@ function getHardBotDiscard(
 
   // Defense mode: switch when threatened AND we are more than 1 step from Ting
   if (threatened && bestDist > 1) {
-    return safestDiscard(naturals, state.seats, botSeat, hand);
+    return safestDiscard(naturals, visible, state.seats, botSeat);
   }
 
   // Attack mode: discard the tile that keeps the best effective draws path

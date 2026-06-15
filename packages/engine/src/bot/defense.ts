@@ -60,33 +60,20 @@ export function isOpponentThreatening(
  *   Honors get a −2 reduction        (honors can't be part of chow sequences)
  *
  * @param tile      The tile being considered for discard.
- * @param seats     All four seat states.
+ * @param visible   Pre-computed visible tile map (from getVisibleTiles).
+ * @param seats     All four seat states (used only for the allOpponentsDiscarded check).
  * @param botSeat   The bot's own seat index.
- * @param botHand   The bot's current concealed hand (to count own visible copies).
- * @param jingTypes Active Jing tile types (not used for scoring but kept for API consistency).
  */
 export function getDangerScore(
   tile: TileType,
+  visible: Map<TileType, number>,
   seats: SeatState[],
   botSeat: number,
-  botHand: TileType[],
 ): number {
-  // Count all visible copies of this tile
-  let visible = 0;
-
-  // Bot's own hand
-  for (const t of botHand) if (t === tile) visible++;
-
-  // All players' open melds and discard piles
-  for (const seat of seats) {
-    for (const meld of seat.openMelds) {
-      for (const t of meld.tiles) if (t === tile) visible++;
-    }
-    for (const t of seat.discards) if (t === tile) visible++;
-  }
+  const visibleCount = visible.get(tile) ?? 0;
 
   // All 4 copies are accounted for — safe
-  if (visible >= 4) return 0;
+  if (visibleCount >= 4) return 0;
 
   // Every opponent has discarded this tile — no one is waiting for it
   const allOpponentsDiscarded = seats.every(
@@ -95,7 +82,7 @@ export function getDangerScore(
   if (allOpponentsDiscarded) return 0;
 
   // Base danger from unseen copies
-  const unseenCount = 4 - visible;
+  const unseenCount = 4 - visibleCount;
   let score = unseenCount * 2;
 
   // Honors can't complete chows, so they're slightly safer
@@ -111,15 +98,15 @@ export function getDangerScore(
  * Ties are broken by returning the first (leftmost) tile in the array.
  *
  * @param naturals  Non-jing candidate discard tiles.
+ * @param visible   Pre-computed visible tile map (from getVisibleTiles).
  * @param seats     All four seat states.
  * @param botSeat   The bot's own seat index.
- * @param botHand   The bot's current full concealed hand.
  */
 export function safestDiscard(
   naturals: TileType[],
+  visible: Map<TileType, number>,
   seats: SeatState[],
   botSeat: number,
-  botHand: TileType[],
 ): TileType {
   if (naturals.length === 0) throw new Error('safestDiscard called with empty naturals');
 
@@ -127,7 +114,7 @@ export function safestDiscard(
   let best = naturals[0];
 
   for (const tile of naturals) {
-    const score = getDangerScore(tile, seats, botSeat, botHand);
+    const score = getDangerScore(tile, visible, seats, botSeat);
     if (score < minScore) {
       minScore = score;
       best = tile;
