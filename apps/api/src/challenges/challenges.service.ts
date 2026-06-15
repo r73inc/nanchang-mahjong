@@ -134,6 +134,18 @@ export class ChallengesService {
       };
     }
 
+    // Explicitly construct a plain object for the config (never store DTO class instances
+    // in DynamoDB — the marshaler can't handle class-validator decorated class instances).
+    const configPlain = {
+      numRounds: dto.config.numRounds,
+      botDifficulty: dto.config.botDifficulty,
+      startingScore: dto.config.startingScore,
+      timerSecs: dto.config.timerSecs,
+      viewMode: dto.config.viewMode,
+      ruleTopBottomJing: dto.config.ruleTopBottomJing,
+      claimWindowSecs: dto.config.claimWindowSecs,
+    };
+
     const challengeItem: ChallengeItem = {
       PK: `CHALLENGE#${challengeId}`,
       SK: 'META',
@@ -141,9 +153,9 @@ export class ChallengesService {
       creatorSub,
       creatorHandle,
       seed,
-      handSeeds,
-      config: dto.config,
-      challengedSubs: dto.challengedSubs,
+      handSeeds: [...handSeeds], // plain array, not readonly
+      config: configPlain,
+      challengedSubs: [...dto.challengedSubs], // plain array
       participants,
       status: 'awaiting_creator',
       createdAt: now,
