@@ -167,7 +167,7 @@ export class GameService {
       handSeeds: challengeOpts?.handSeeds,
       targetHands:
         challengeOpts?.numHands ??
-        (settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined),
+        (settings.terminationType === 'fixed-hands' ? (settings.maxHands ?? 1) : undefined),
       onGameEnded: challengeOpts?.onGameEnded,
     });
 
@@ -1446,6 +1446,20 @@ export class GameService {
       | undefined;
     const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
 
+    // ── Accumulate session-level statistics ───────────────────────────────────
+    for (let i = 0; i < 4; i++) {
+      session.sessionSpiritPoints[i as Seat4] += spiritDeltas[i];
+      if (openingJingDelta) {
+        session.sessionBonusTilePoints[i as Seat4] += openingJingDelta[i];
+      }
+      if (handNetDeltas[i] > session.bestHandPoints[i as Seat4]) {
+        session.bestHandPoints[i as Seat4] = handNetDeltas[i];
+      }
+    }
+    if (result === 'win' && winnerSeat !== null) {
+      session.handsWon[winnerSeat]++;
+    }
+
     // ── Win meld kind (ron only) + winning tile ───────────────────────────────
     // prevEvent is events[n-2]: 'discard' for ron, 'draw' for tsumo, 'kong_added' for rob-kong.
     const engineEvents = session.engine.events;
@@ -1670,6 +1684,15 @@ export class GameService {
       endedAt,
       ratingDeltas,
       challengeId: session.challengeId,
+      sessionSpiritPoints: [...session.sessionSpiritPoints] as [number, number, number, number],
+      sessionBonusTilePoints: [...session.sessionBonusTilePoints] as [
+        number,
+        number,
+        number,
+        number,
+      ],
+      handsWon: [...session.handsWon] as [number, number, number, number],
+      bestHandPoints: [...session.bestHandPoints] as [number, number, number, number],
     };
 
     // Broadcast game:ended to all in room

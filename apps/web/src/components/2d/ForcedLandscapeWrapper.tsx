@@ -45,7 +45,10 @@ export function ForcedLandscapeWrapper({
           top: '50%',
           left: '50%',
           // Physical height (now our logical width) minus notch/home-bar insets.
-          width: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+          // Use 100svh (smallest viewport height) so the value doesn't change when the
+          // browser address bar hides — prevents the bottom-clip stale-measurement bug
+          // that persists for an entire hand (BUG-061).
+          width: 'calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
           // Physical width (now our logical height) minus side insets.
           height: 'calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right))',
           transform: 'translate(-50%, -50%) rotate(90deg)',

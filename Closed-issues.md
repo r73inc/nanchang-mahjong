@@ -6,6 +6,82 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-061-062-match-end` (2026-06-15)
+
+### BUG-061 · Mobile player hand half cut off at bottom of screen
+
+**Root cause:** `ForcedLandscapeWrapper` used `width: calc(100dvh - ...)` to set its logical width in CSS-landscape mode. On iOS Safari (and some Android browsers), `dvh` (dynamic viewport height) updates lazily — its value is captured while the browser address bar is visible and then does not update as the bar hides mid-hand. Because the wrapper has `overflow: hidden`, the stale-larger `dvh` snapshot meant the visible area was smaller than the wrapper, clipping the bottom of the player hand. The clipping persisted for the entire hand because `dvh` only re-evaluates on scroll or explicit resize, not on browser-chrome toggle.
+
+**Fix (`apps/web/src/components/2d/ForcedLandscapeWrapper.tsx`):**
+
+Changed `100dvh` to `100svh` (smallest viewport height). `svh` is defined as the viewport height with the maximum browser chrome visible — it is always the smallest possible value and never changes as the address bar hides. This means the landscape wrapper is sized conservatively and the hand is never clipped regardless of browser-chrome state.
+
+```ts
+// Before (buggy — stale when address bar hides on iOS Safari):
+width: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+
+// After (stable — svh does not change as browser chrome toggles):
+width: 'calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+```
+
+**Key learning:** Never use `dvh` for a layout measurement that must remain stable for the duration of a UI state (e.g., one full hand). `dvh` is appropriate for full-page hero layouts that want to respond to browser-chrome changes; for game UI where tiles must stay anchored, use `svh` (the static minimum).
+
+---
+
+### BUG-062 · Fixed-hands session never ends after the final hand
+
+**Root cause:** The room settings schema declares `maxHands` as `.optional()` with no Zod default. When the host selects "Fixed Hands" in the room page but never explicitly clicks a hand-count button, `maxHands` remains `undefined` in DynamoDB. The UI masked this by displaying `room.settings.maxHands ?? 1` (visually showing "1"), but the underlying stored value was `undefined`.
+
+In `game.service.ts:createGame()`:
+
+```ts
+// Before (broken):
+targetHands:
+  challengeOpts?.numHands ??
+  (settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined),
+```
+
+`settings.maxHands === undefined` → `targetHands = undefined`. In `isSessionOver()`:
+
+```ts
+if (session.targetHands !== undefined) { … }  // skipped
+```
+
+All branches were skipped → `isSessionOver()` always returned `false` for fixed-hands → `isLastHand = false` in every `HandRevealPayload` → client showed "Continue" forever.
+
+**Fix:**
+
+- **`apps/api/src/game/game.service.ts`** — Applied `?? 1` default in `createGame()`:
+  ```ts
+  targetHands:
+    challengeOpts?.numHands ??
+    (settings.terminationType === 'fixed-hands' ? (settings.maxHands ?? 1) : undefined),
+  ```
+- **`apps/web/src/pages/room/room-page.tsx`** — When switching to `fixed-hands` in the host UI, explicitly sends `maxHands: room.settings.maxHands ?? 1` so the stored value is always defined from that point on.
+
+**Key learning:** A `?? N` display default in the UI is invisible to the server — always apply the same default at the point the value is consumed server-side. Prefer explicit defaults at the schema layer (Zod `.default(1)`) or at the service layer over relying on UI fallbacks reaching the DB.
+
+---
+
+### Match End Statistics Screen (new feature, same PR)
+
+**Change:** Replaced the old `GameEndScreen` (which included a rematch button) with a new `MatchEndStatsScreen`. The new screen shows:
+
+- Final Standings sorted by total score with placement badges
+- Per-player breakdown: hands won, spirit tile points, bonus tile points, best hand score
+- ELO rating delta for the viewer
+- "View Final Hand" (links to hand-reveal for last hand) and "View Replay" optional buttons
+- Prominent "Return to Lobby" gold button — no rematch / "Play Again" button
+
+**Additional changes:**
+
+- `HandRevealScreen` now shows a gold "Final Hand" badge on the last hand, with a large "View Match Results →" CTA replacing the subtle "Continue" link. Non-host players see "Waiting for host to view match results…"
+- Removed the host auto-advance effect on the last hand — the host must explicitly click to end the session so all players can read the final hand reveal.
+- `GameEndedPayload` extended with `sessionSpiritPoints`, `sessionBonusTilePoints`, `handsWon`, and `bestHandPoints` for the stats screen.
+- `GameSession` accumulates these stats in `resolveHand()` across all hands.
+
+---
+
 ## `fix/bug058-059-060-add-to-kong-german-win` (2026-06-15)
 
 ### BUG-058 · Add-to-Kong (加杠) not triggered when drawing the 4th tile matching an open pung

@@ -558,7 +558,14 @@ export function RoomPage() {
                     return (
                       <button
                         key={opt}
-                        onClick={() => updateSettings(room.roomId, { terminationType: opt })}
+                        onClick={() =>
+                          updateSettings(room.roomId, {
+                            terminationType: opt,
+                            ...(opt === 'fixed-hands'
+                              ? { maxHands: room.settings.maxHands ?? 1 }
+                              : {}),
+                          })
+                        }
                         disabled={loading}
                         className="px-3 py-1 rounded-full text-xs font-bold transition-colors"
                         style={{

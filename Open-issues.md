@@ -8,16 +8,14 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                     | Summary                                                                                                               |
-| ------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly                                   |
-| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                                          |
-| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile                                 |
-| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded                                    |
-| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own                           |
-| BUG-061 | Mobile hand clipped at bottom            | On mobile, the player's hand is intermittently half cut off at the bottom of the screen for an entire hand            |
-| BUG-062 | Fixed-hands session never ends           | A room set to 1-hand fixed-hands mode does not terminate after the hand; "Continue" is shown instead of "End Session" |
-| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                                               |
+| ID      | Name                                     | Summary                                                                                     |
+| ------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly         |
+| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                |
+| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile       |
+| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded          |
+| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own |
+| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                     |
 
 ---
 
@@ -110,81 +108,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 - `apps/web/src/pages/customize/customize-page.tsx` — `PaletteCard` component (line ~107) and its call site (line ~279).
 - `apps/web/src/lib/theme.utils.ts` — `TILE_CONFIGS` (already exported) provides `faceTop`/`faceBottom` per palette.
-
----
-
-### BUG-061 · Mobile player hand half cut off at bottom of screen (intermittent)
-
-**Symptom:** On mobile devices (tested in a play-with-friends session), the player's own hand tiles were half cut off at the bottom of the screen. The clipping persisted for the entire hand and resolved itself at the start of the next hand. The trigger and device model were not isolated during the playtest.
-
-**Status:** OPEN — reported playtest 2026-06-15.
-
-**Suspected causes:**
-
-1. **`100dvh` layout shift (most likely):** `ForcedLandscapeWrapper` sizes itself using `width: calc(100dvh - ...)` in css-landscape mode. On iOS Safari and some Android browsers, `dvh` (dynamic viewport height) updates lazily as the browser address bar appears or disappears. If the initial `dvh` snapshot is taken while the browser chrome is still visible but then the chrome hides mid-hand, the wrapper's effective CSS height becomes stale. Combined with `overflow: hidden` on the wrapper, the bottom portion of the hand container can be clipped. Because `dvh` does not re-trigger a layout recalculation automatically (unlike `100%` of a parent that resizes), the stale measurement can persist for the entire hand.
-
-2. **ResizeObserver race on first mount:** `PlayerHand2D` uses a `useLayoutEffect` + `ResizeObserver` to set `--mj-hand-height = el.offsetHeight` on `:root`. If `offsetHeight` is `0` on the very first paint (the element is not yet in the painted layout), the CSS variable is written as `0px`. Subsequent mounts on the next hand re-measure correctly. This would misplace overlays above the hand but would not itself clip the tiles.
-
-3. **`env(safe-area-inset-*)` axis remapping:** In css-landscape mode, `ForcedLandscapeWrapper` remaps safe-area insets to the rotated axes (physical top → `--mj-safe-left`, physical bottom → `--mj-safe-right`, physical left → `--mj-safe-bottom`). If the inset values are not yet available (they are `0px` on first paint on some browsers) the hand is positioned correctly, but if a non-zero value later propagates it could shift the hand below the visible area. Unlikely to explain the "persists for one hand" duration, but worth ruling out.
-
-**Where to look:**
-
-- `apps/web/src/components/2d/ForcedLandscapeWrapper.tsx` — `100dvh` calculation and `overflow: hidden`; consider adding a resize listener that updates the height on viewport change events, or switching to `100svh` (smallest viewport height) which doesn't change as chrome shows/hides.
-- `apps/web/src/components/2d/PlayerHand2D.tsx:180–197` — `useLayoutEffect` / `ResizeObserver` for `--mj-hand-height`; verify `el.offsetHeight` is non-zero on first mount.
-- `apps/web/src/components/2d/MobileGameTable2D.tsx:348–360` — viewer hand container; `bottom: var(--mj-safe-bottom, 0px)`.
-
-**Reproduction note:** Trigger was not isolated. The bug may require a specific browser (iOS Safari is most likely due to its lazy `dvh` update), a device with a large home indicator or address bar, and a particular orientation change sequence at game start.
-
----
-
-### BUG-062 · Fixed-hands (1-hand) session does not terminate after the single hand
-
-**Symptom:** A play-with-friends room was configured with `terminationType: 'fixed-hands'` and `maxHands: 1` (via the room settings UI — three hard bots filled the other seats). After completing the one hand, the hand-reveal details screen showed only the "Continue Playing Next Hand →" button with no indication the session was over. Pressing it started a second hand rather than ending the session.
-
-**Status:** OPEN — reported playtest 2026-06-15.
-
-**Root cause (suspected):** The room settings schema declares `maxHands` as optional (`z.number().int().min(1).max(4).optional()`). When the host selects the "Fixed Hands" termination type in the room page but never explicitly clicks a `maxHands` count button, the setting remains `undefined` in the database. The room-page UI masks this by displaying `room.settings.maxHands ?? 1` — visually showing "1" — but the underlying stored value is `undefined`.
-
-In `game.service.ts:createGame()` (line ~167):
-
-```ts
-targetHands:
-  challengeOpts?.numHands ??
-  (settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined),
-```
-
-When `settings.maxHands` is `undefined`, `targetHands = undefined`.
-
-In `isSessionOver()` (line 1517):
-
-```ts
-if (session.targetHands !== undefined) {
-  return session.handsPlayed >= session.targetHands;
-}
-```
-
-Since `targetHands === undefined`, this branch is skipped. None of the `'bust'` or `'rounds'` branches apply to `'fixed-hands'`, so `isSessionOver` always returns `false`. Consequently `isLastHand = false` in the `HandRevealPayload`, causing the client to show "Continue" instead of "End Session" and to start a new hand on advance.
-
-**Fix needed:**
-
-Apply the same `?? 1` default in `createGame()` that the UI already uses for display:
-
-```ts
-// Before (broken when maxHands not explicitly set):
-(settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined)(
-  // After (matches UI default of 1):
-  settings.terminationType === 'fixed-hands' ? (settings.maxHands ?? 1) : undefined,
-);
-```
-
-Alternatively, write `maxHands: 1` as the default to the database when the host selects `fixed-hands` (in `room.schemas.ts` via `.default(1)`) so the stored value is always defined.
-
-**Where to look:**
-
-- `apps/api/src/game/game.service.ts:167` — `targetHands` assignment in `createGame()`; apply `?? 1`.
-- `packages/shared/src/room.schemas.ts:34` — `maxHands` field; consider adding `.default(1)` so the Zod schema always coerces `undefined` to `1` when `terminationType === 'fixed-hands'`.
-- `apps/api/src/game/game.service.ts:1509–1548` — `isSessionOver()`; no change needed once `targetHands` is set correctly.
-- `apps/web/src/pages/room/room-page.tsx:658–684` — host UI; confirm the default selection sends an explicit `maxHands: 1` when `fixed-hands` is chosen, rather than relying on the fallback.
 
 ---
 
