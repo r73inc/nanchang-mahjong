@@ -181,7 +181,6 @@ export class RoomsService {
       terminationType: dto?.settings?.terminationType ?? 'rounds',
       startingScore: dto?.settings?.startingScore ?? 0,
       timerSecs: dto?.settings?.timerSecs ?? 30,
-      minFan: dto?.settings?.minFan ?? 1,
       viewMode: dto?.settings?.viewMode ?? '2D',
       ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? true,
       claimWindowSecs: dto?.settings?.claimWindowSecs ?? 0,

@@ -33,7 +33,6 @@ export interface ChallengeConfig {
   botDifficulty: BotDifficulty;
   startingScore: number;
   timerSecs: number;
-  minFan: number;
   viewMode: '2D' | '3D';
   ruleTopBottomJing: boolean;
   claimWindowSecs: number;

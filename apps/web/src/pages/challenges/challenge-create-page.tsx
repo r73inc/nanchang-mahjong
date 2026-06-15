@@ -48,7 +48,6 @@ export function ChallengeCreatePage() {
     botDifficulty: 'easy',
     startingScore: 0,
     timerSecs: 30,
-    minFan: 1,
     viewMode: '2D',
     ruleTopBottomJing: true,
     claimWindowSecs: 0,
@@ -300,20 +299,6 @@ export function ChallengeCreatePage() {
                   className="bg-transparent text-sm font-semibold text-mj-bone/90 border-0 outline-none"
                 >
                   {[0, 10, 20, 50, 100].map((v) => (
-                    <option key={v} value={v}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </SettingRow>
-
-              <SettingRow label={t('challengeMinFan')}>
-                <select
-                  value={config.minFan}
-                  onChange={(e) => setConfig((c) => ({ ...c, minFan: Number(e.target.value) }))}
-                  className="bg-transparent text-sm font-semibold text-mj-bone/90 border-0 outline-none"
-                >
-                  {[1, 2, 3, 4, 5].map((v) => (
                     <option key={v} value={v}>
                       {v}
                     </option>

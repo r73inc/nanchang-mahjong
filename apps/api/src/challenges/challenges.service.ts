@@ -68,7 +68,6 @@ interface ChallengeItem {
     botDifficulty: BotDifficulty;
     startingScore: number;
     timerSecs: number;
-    minFan: number;
     viewMode: '2D' | '3D';
     ruleTopBottomJing: boolean;
     claimWindowSecs: number;
@@ -180,7 +179,6 @@ export class ChallengesService {
       terminationType: 'rounds',
       startingScore: dto.config.startingScore,
       timerSecs: dto.config.timerSecs,
-      minFan: dto.config.minFan,
       viewMode: dto.config.viewMode,
       ruleTopBottomJing: dto.config.ruleTopBottomJing,
       claimWindowSecs: dto.config.claimWindowSecs,
@@ -424,7 +422,6 @@ export class ChallengesService {
       terminationType: 'rounds',
       startingScore: item.config.startingScore,
       timerSecs: item.config.timerSecs,
-      minFan: item.config.minFan,
       viewMode: item.config.viewMode,
       ruleTopBottomJing: item.config.ruleTopBottomJing,
       claimWindowSecs: item.config.claimWindowSecs,
@@ -673,7 +670,6 @@ export class ChallengesService {
       terminationType: 'rounds',
       startingScore: config.startingScore,
       timerSecs: config.timerSecs,
-      minFan: config.minFan,
       viewMode: config.viewMode,
       ruleTopBottomJing: config.ruleTopBottomJing,
       claimWindowSecs: config.claimWindowSecs,

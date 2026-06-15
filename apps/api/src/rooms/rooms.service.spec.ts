@@ -50,7 +50,7 @@ function buildRoomItems(overrides: Record<string, unknown> = {}) {
     code,
     hostUserId,
     status,
-    settings: { rounds: 'east+south', timerSecs: 8, minFan: 3 },
+    settings: { rounds: 'east+south', timerSecs: 8 },
     createdAt: '2024-01-01T00:00:00.000Z',
     idleAt: '2024-01-01T00:00:00.000Z',
     ttl: 9999999999,
@@ -149,7 +149,7 @@ describe('RoomsService', () => {
       db.query.mockResolvedValue({ Items: buildRoomItems().items });
 
       await service.createRoom('user-host', 'h', {
-        settings: { timerSecs: 15, rounds: undefined, minFan: undefined },
+        settings: { timerSecs: 15, rounds: undefined },
       });
 
       const { TransactItems } = txInput(db);

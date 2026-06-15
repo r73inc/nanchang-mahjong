@@ -109,7 +109,6 @@ export function ChallengeDetailPage() {
             label={t('challengeStartingScore')}
             value={String(challenge.config.startingScore)}
           />
-          <ConfigRow label={t('challengeMinFan')} value={String(challenge.config.minFan)} />
           <ConfigRow
             label={t('challengeRuleTopBottomJing')}
             value={challenge.config.ruleTopBottomJing ? t('ruleOn') : t('ruleOff')}

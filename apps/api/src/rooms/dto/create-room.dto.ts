@@ -33,12 +33,6 @@ export class RoomSettingsDto {
   timerSecs?: number;
 
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(8)
-  minFan?: number;
-
-  @IsOptional()
   @IsIn(['2D', '3D'])
   viewMode?: '2D' | '3D';
 

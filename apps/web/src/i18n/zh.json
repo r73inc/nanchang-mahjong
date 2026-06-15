@@ -567,7 +567,6 @@
   "challengeRound4": "4 局（完整游戏）",
   "challengeGameSettings": "游戏设置",
   "challengeStartingScore": "起始分数",
-  "challengeMinFan": "最低番数",
   "challengeClaimWindow": "认牌窗口（秒）",
   "claimWindowUnlimited": "无限制",
   "secondsShort": "{{0}}秒",

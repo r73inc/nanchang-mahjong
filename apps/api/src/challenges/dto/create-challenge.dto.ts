@@ -37,11 +37,6 @@ export class ChallengeGameConfigDto {
   @Max(60)
   timerSecs!: number;
 
-  @IsInt()
-  @Min(1)
-  @Max(8)
-  minFan!: number;
-
   @IsIn(['2D', '3D'])
   viewMode!: '2D' | '3D';
 
