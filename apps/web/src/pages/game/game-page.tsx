@@ -990,21 +990,27 @@ function HandRevealScreen({
                       ({ groups, ungrouped } = greedyGroupHand(hand));
                     }
 
-                    // Highlight the winning tile exactly once in the winner's hand.
-                    // The engine always includes the winning tile in the 14-tile final hand
-                    // (ron: discard added; tsumo: drawn tile already in hand).
-                    let winHighlighted = false;
-                    const markWin = (tile: TileType): boolean => {
-                      if (
-                        !isWinner ||
-                        !handReveal.winningTile ||
-                        tile !== handReveal.winningTile ||
-                        winHighlighted
-                      )
-                        return false;
-                      winHighlighted = true;
-                      return true;
-                    };
+                    // Pre-compute the exact position of the winning tile so we can
+                    // highlight it without mutable state during render.
+                    // The engine always stores the winning tile in the 14-tile final hand
+                    // (ron: discard appended; tsumo: drawn tile already present).
+                    let winGIdx = -1;
+                    let winTIdx = -1;
+                    let winUIdx = -1;
+                    if (isWinner && handReveal.winningTile) {
+                      outer: for (let gi = 0; gi < groups.length; gi++) {
+                        for (let ti = 0; ti < groups[gi].tiles.length; ti++) {
+                          if (groups[gi].tiles[ti] === handReveal.winningTile) {
+                            winGIdx = gi;
+                            winTIdx = ti;
+                            break outer;
+                          }
+                        }
+                      }
+                      if (winGIdx === -1) {
+                        winUIdx = ungrouped.indexOf(handReveal.winningTile);
+                      }
+                    }
 
                     if (groups.length === 0 && ungrouped.length > 0) {
                       // No recognisable groups — flat row
@@ -1017,7 +1023,7 @@ function HandRevealScreen({
                               size="xs"
                               interactive={false}
                               isJing={isJing(tile)}
-                              isLastDiscard={markWin(tile)}
+                              isLastDiscard={j === winUIdx}
                             />
                           ))}
                         </div>
@@ -1037,7 +1043,7 @@ function HandRevealScreen({
                                   interactive={false}
                                   isJing={isJing(tile)}
                                   showJingLabel={false}
-                                  isLastDiscard={markWin(tile)}
+                                  isLastDiscard={gi === winGIdx && ti === winTIdx}
                                 />
                               ))}
                             </div>
@@ -1057,7 +1063,7 @@ function HandRevealScreen({
                                 interactive={false}
                                 isJing={isJing(tile)}
                                 showJingLabel={false}
-                                isLastDiscard={markWin(tile)}
+                                isLastDiscard={ui === winUIdx}
                               />
                             ))}
                           </div>
