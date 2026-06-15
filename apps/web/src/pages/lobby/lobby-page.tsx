@@ -21,6 +21,7 @@ import { useChallenges } from '../../hooks/use-challenges';
 import type { ChallengeSummary, ChallengeParticipantStatus } from '@nanchang/shared';
 
 const BULLET = '·';
+const INFO_GLYPH = 'ⓘ' as const;
 
 export function LobbyPage() {
   const { t } = useI18n();
@@ -31,6 +32,7 @@ export function LobbyPage() {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [code, setCode] = useState('');
+  const [showChallengeInfo, setShowChallengeInfo] = useState(false);
 
   // Rejoin card — shown when a gameId was stored by game-page before navigating away.
   const [activeGameId, setActiveGameId] = useState<string | null>(() =>
@@ -246,7 +248,31 @@ export function LobbyPage() {
           }}
         >
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-base font-bold text-mj-bone">{t('pointChallenge')}</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-base font-bold text-mj-bone">{t('pointChallenge')}</h2>
+              <button
+                onClick={() => setShowChallengeInfo(true)}
+                aria-label={t('pointChallengeInfoLabel')}
+                style={{
+                  width: 15,
+                  height: 15,
+                  borderRadius: '50%',
+                  border: '1px solid rgba(150,100,200,0.4)',
+                  color: 'rgba(150,100,200,0.7)',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  background: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  lineHeight: 1,
+                }}
+              >
+                {INFO_GLYPH}
+              </button>
+            </div>
             <button
               onClick={() => navigate('/challenges')}
               className="text-xs font-semibold"
@@ -283,6 +309,38 @@ export function LobbyPage() {
           </button>
         </div>
       </div>
+
+      {/* ── Point Challenge info modal ──────────────────────────────────────── */}
+      {showChallengeInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
+          onClick={() => setShowChallengeInfo(false)}
+        >
+          <div
+            className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-3"
+            style={{ background: '#1c1c1c', border: '1px solid rgba(150,100,200,0.2)' }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('pointChallengeInfoLabel')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-mj-bone">{t('pointChallenge')}</h3>
+            <p className="text-sm text-mj-bone/70 leading-relaxed">{t('pointChallengeInfo')}</p>
+            <button
+              onClick={() => setShowChallengeInfo(false)}
+              className="self-end px-4 py-2 rounded-xl text-xs font-bold"
+              style={{
+                background: 'rgba(150,100,200,0.15)',
+                border: '1px solid rgba(150,100,200,0.3)',
+                color: 'rgba(190,150,240,0.9)',
+              }}
+            >
+              {t('settingInfoClose')}
+            </button>
+          </div>
+        </div>
+      )}
     </ScreenShell>
   );
 }

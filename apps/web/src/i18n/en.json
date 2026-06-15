@@ -549,6 +549,8 @@
 
   "pointChallenge": "Point Challenge",
   "pointChallengeSub": "Challenge friends to beat your score on the same game.",
+  "pointChallengeInfoLabel": "About Point Challenges",
+  "pointChallengeInfo": "A Point Challenge lets you compete against friends without needing to play at the same time. You configure a bot match (number of hands, difficulty, and rules), play it out, then challenge friends to play the same game — same tiles, same starting hands, same bot opponents. Everyone's score is recorded and compared once all participants have finished. The highest score wins.",
   "challengeCreate": "Create Challenge",
   "challengeViewAll": "View All Challenges",
   "challengeMyOpen": "My Challenges",

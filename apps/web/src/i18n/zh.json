@@ -549,6 +549,8 @@
   "tileCountX": "×{{0}}",
 
   "pointChallenge": "积分挑战",
+  "pointChallengeInfoLabel": "关于积分挑战",
+  "pointChallengeInfo": "积分挑战让你与朋友异步竞技，无需同时在线。你先配置一局机器人对局（手数、难度与规则），打完后将挑战发给好友——每位好友将面对完全相同的牌局：同样的起手牌、同样的机器人对手。所有人完成后系统汇总得分，最高分获胜。",
   "pointChallengeSub": "向朋友发起挑战，看谁能在同一局游戏中得到更高分。",
   "challengeCreate": "创建挑战",
   "challengeViewAll": "查看所有挑战",
