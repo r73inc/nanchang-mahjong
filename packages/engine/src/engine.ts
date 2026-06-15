@@ -24,7 +24,7 @@ import {
   swapStackTiles,
 } from './wall';
 import { jingTypesFromIndicator, separateJing } from './jing';
-import { isWinningHand, decomposeHand, checkSevenPairs } from './hand';
+import { isWinningHand, decomposeHand, decomposeConcealed, checkSevenPairs } from './hand';
 import { GameRuleError } from './errors';
 import {
   canPung,
@@ -697,14 +697,23 @@ export class GameEngine {
     const openMeldTiles = winnerSeat.openMelds.flatMap((m) =>
       m.kind === 'kong' ? [m.tiles[0], m.tiles[0], m.tiles[0]] : [...m.tiles],
     );
-    const winningHand: TileType[] = [
-      ...openMeldTiles,
+    const concealedPlusDraw: TileType[] = [
       ...winnerSeat.hand,
       ...(isRon ? [this.state.pendingDiscard!] : []),
       ...(isRobKong && robTile ? [robTile] : []),
     ];
+    // Full 14-tile hand (open melds normalized to 3 tiles each) — used for
+    // detectHandType and scoring, which need the complete tile picture.
+    const winningHand: TileType[] = [...openMeldTiles, ...concealedPlusDraw];
 
-    if (!isWinningHand(winningHand, this.jingTypes, isTsumo)) {
+    // BUG-057: validate using only the concealed portion when open melds exist.
+    // Passing the flat 14-tile pool to isWinningHand allows decomposeCore to
+    // reassign locked meld tiles into different pairs/melds — an illegal move.
+    const isValid =
+      openMeldTiles.length === 0
+        ? isWinningHand(winningHand, this.jingTypes, isTsumo)
+        : decomposeConcealed(concealedPlusDraw, this.jingTypes).length > 0;
+    if (!isValid) {
       throw new Error('Hand is not a winning hand');
     }
 

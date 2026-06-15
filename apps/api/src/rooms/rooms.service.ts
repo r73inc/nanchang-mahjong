@@ -181,7 +181,6 @@ export class RoomsService {
       terminationType: dto?.settings?.terminationType ?? 'rounds',
       startingScore: dto?.settings?.startingScore ?? 0,
       timerSecs: dto?.settings?.timerSecs ?? 30,
-      minFan: dto?.settings?.minFan ?? 1,
       viewMode: dto?.settings?.viewMode ?? '2D',
       ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? true,
       claimWindowSecs: dto?.settings?.claimWindowSecs ?? 0,
@@ -575,8 +574,9 @@ export class RoomsService {
     updates: {
       viewMode?: '2D' | '3D';
       ruleTopBottomJing?: boolean;
-      rounds?: 'east' | 'east+south';
-      terminationType?: 'rounds' | 'bust';
+      rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
+      terminationType?: 'rounds' | 'bust' | 'fixed-hands';
+      maxHands?: number;
       claimWindowSecs?: number;
     },
   ): Promise<RoomState> {
@@ -609,6 +609,10 @@ export class RoomsService {
     if (updates.terminationType !== undefined) {
       setParts.push('settings.terminationType = :terminationType');
       values[':terminationType'] = updates.terminationType;
+    }
+    if (updates.maxHands !== undefined) {
+      setParts.push('settings.maxHands = :maxHands');
+      values[':maxHands'] = updates.maxHands;
     }
     if (updates.claimWindowSecs !== undefined) {
       setParts.push('settings.claimWindowSecs = :claimWindowSecs');

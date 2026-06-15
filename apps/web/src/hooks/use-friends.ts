@@ -33,7 +33,9 @@ export function useSearchUsers(query: string) {
   return useQuery({
     queryKey: ['friends', 'search', query],
     queryFn: () =>
-      api.get<SearchResult[]>(`/friends/search?q=${encodeURIComponent(query)}`).then((r) => r.data),
+      api
+        .get<{ users: SearchResult[] }>(`/friends/search?q=${encodeURIComponent(query)}`)
+        .then((r) => r.data.users),
     enabled: query.trim().length > 0,
   });
 }

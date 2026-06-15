@@ -20,6 +20,17 @@ export function mulberry32(seed: number): () => number {
 }
 
 /**
+ * Derive a sequence of `count` hand seeds from a single challenge seed.
+ * Uses the mulberry32 PRNG as a sequence generator so the result is fully
+ * deterministic: same challengeSeed + count always produces the same array.
+ * Callers should generate more seeds than they expect to need (numRounds * 4 + buffer).
+ */
+export function deriveHandSeeds(challengeSeed: number, count: number): number[] {
+  const rng = mulberry32(challengeSeed);
+  return Array.from({ length: count }, () => Math.floor(rng() * 0x7fff_ffff));
+}
+
+/**
  * Return a **new** array that is a Fisher-Yates shuffle of `arr` using `seed`.
  * The original array is not mutated.
  */

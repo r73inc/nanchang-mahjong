@@ -140,8 +140,9 @@ export class RoomsController {
     body: {
       viewMode?: '2D' | '3D';
       ruleTopBottomJing?: boolean;
-      rounds?: 'east' | 'east+south';
-      terminationType?: 'rounds' | 'bust';
+      rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
+      terminationType?: 'rounds' | 'bust' | 'fixed-hands';
+      maxHands?: number;
       claimWindowSecs?: number;
     },
   ) {

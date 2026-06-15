@@ -152,6 +152,32 @@ export class GameSession {
   readonly startedAt: string;
 
   /**
+   * If this game was created as part of a Point Challenge, stores the challenge ID
+   * so GameService can record the result when the session ends.
+   */
+  readonly challengeId?: string;
+
+  /**
+   * Pre-determined hand seeds for Point Challenge games.
+   * When set, startNextHand() uses handSeeds[handsPlayed] instead of Math.random().
+   * Indexed by hand index (0-based); generated deterministically from the challenge seed.
+   */
+  readonly handSeeds?: readonly number[];
+
+  /**
+   * If set, the session ends after exactly this many hands (Point Challenge).
+   * Takes priority over the wind-round termination logic in isSessionOver().
+   * numRounds in ChallengeConfig means "N hands played", not N wind rounds.
+   */
+  readonly targetHands?: number;
+
+  /**
+   * Callback registered by ChallengesService when a challenge game is created.
+   * Called by GameService.endSession() once the human player's final score is known.
+   */
+  onGameEnded?: (playerSub: string, finalScore: number) => Promise<void>;
+
+  /**
    * Set of seat indices occupied by bots (derived from seatMap at construction time).
    * Used throughout GameService to decide whether to schedule async bot actions.
    */
@@ -204,6 +230,10 @@ export class GameSession {
     seatNames: [string, string, string, string];
     seatAvatarUrls: [string | null, string | null, string | null, string | null];
     startedAt: string;
+    challengeId?: string;
+    handSeeds?: readonly number[];
+    targetHands?: number;
+    onGameEnded?: (playerSub: string, finalScore: number) => Promise<void>;
   }) {
     this.engine = params.engine;
     this.gameId = params.gameId;
@@ -213,6 +243,10 @@ export class GameSession {
     this.seatNames = params.seatNames;
     this.seatAvatarUrls = params.seatAvatarUrls;
     this.startedAt = params.startedAt;
+    this.challengeId = params.challengeId;
+    this.handSeeds = params.handSeeds;
+    this.targetHands = params.targetHands;
+    this.onGameEnded = params.onGameEnded;
 
     this.userToSeat = new Map(params.seatMap.map((userId, i) => [userId, i as Seat4]));
 

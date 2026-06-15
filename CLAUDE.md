@@ -56,6 +56,7 @@ Private family Nanchang Mahjong web app. Four human players connect to a private
 
 - **`pre-prod` and `main` are both protected. NEVER commit directly to either. NEVER raise a PR targeting `main`.** All feature work goes through a branch → PR → `pre-prod`. Branch naming: `feat/phase-N-slug`, `fix/slug`, `chore/slug`, `engine/slug`.
 - **Engine is immutable.** Every `GameEngine` method returns a new instance. Never mutate state directly.
+- **THIS IS NANCHANG MAHJONG ONLY. Tier-0 absolute requirement.** This project implements Nanchang Mahjong exclusively. Never make any decision, add any rule, or write any logic based on Japanese/Riichi Mahjong, International Mahjong, Standard Mahjong, or any other variant. Every hand that forms a valid winning pattern under Nanchang rules is a legal win — no minimum fan, no minimum score, no minimum points required. All special hands (Seven Pairs 七对, Thirteen Misfits 十三烂, and standard 4-meld+pair) are unconditionally valid. `minFan` does not exist in this codebase and must never be reintroduced. If you find yourself reaching for a concept from another Mahjong variant, stop and consult `docs/final-nanchang-mahjong-rules.md`.
 - **Scoring: locked rules only.** Base(1) × Multipliers system. No additive fan. Zero-sum invariant must hold on every hand.
 - **Server is authoritative.** `game:snapshot` always replaces client state wholesale. No client-side game logic.
 - **Redaction at the edge.** `toClientSnapshot(state, viewer)` hides concealed hands. Spectators and opponents never see `TileType[]`.

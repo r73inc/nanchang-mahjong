@@ -7,9 +7,12 @@
  *  - Manages the 1.5s reconnecting overlay timer (PLAN §7.5).
  *  - Returns typed action functions (discard, claim, pass, concede, revealJing).
  *
- * The hook never calls connectSocket() — the socket is already alive from the
- * Room page. On each mount it calls getSocket() and subscribes; cleanup on
- * unmount removes all listeners.
+ * The hook never calls connectSocket() — the socket must be alive by the time
+ * this hook's effect runs. GamePage now guarantees this by calling
+ * connectSocket() in an earlier useEffect (declared before useGame) so the
+ * singleton exists even when entering from the challenge flow without a room.
+ * On each mount it calls getSocket() and subscribes; cleanup on unmount removes
+ * all listeners.
  */
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -348,7 +351,13 @@ export function useGame(gameId: string, spectate = false) {
     // ── Join ──────────────────────────────────────────────────────────────────
     // Emit AFTER all listeners are registered so we cannot miss game:snapshot
     // even if the server responds before this effect resumes execution.
-    s.emit('game:join', { gameId, spectate });
+    // Only emit if the socket is already connected; if it is still in the
+    // connecting state (e.g. GamePage just called connectSocket() in its
+    // earlier effect), handleConnect above will emit once the connection is
+    // established, avoiding a double game:join.
+    if (s.connected) {
+      s.emit('game:join', { gameId, spectate });
+    }
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     return () => {

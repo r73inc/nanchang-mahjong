@@ -24,6 +24,7 @@ import {
   calculateOpeningJingSettlement,
   isWinningHand,
   decomposeHand,
+  decomposeConcealed,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -106,6 +107,11 @@ export class GameService {
    * Create a new game session from an already-started room.
    * The room's seats must be fully occupied (4 players).
    * Returns the gameId.
+   *
+   * Pass `challengeOpts` when this game is part of a Point Challenge:
+   *  - handSeeds: pre-derived seeds from the challenge seed (used instead of Math.random()).
+   *  - challengeId: stored on the session so endSession() can record the result.
+   *  - onGameEnded: called with (humanPlayerSub, finalScore) when the session ends.
    */
   async createGame(
     roomId: string,
@@ -116,8 +122,16 @@ export class GameService {
     seatNames: [string, string, string, string],
     /** Pre-resolved avatar URLs from the room snapshot (includes bot profile paths). */
     preResolvedAvatarUrls: [string | null, string | null, string | null, string | null],
+    challengeOpts?: {
+      challengeId: string;
+      handSeeds: readonly number[];
+      onGameEnded: (playerSub: string, finalScore: number) => Promise<void>;
+      /** Number of hands to play before ending the session (Challenge numRounds). */
+      numHands?: number;
+    },
   ): Promise<void> {
-    const seed = (Math.random() * 0x7fff_ffff) >>> 0; // non-negative 31-bit int
+    // Use first hand seed from challenge if provided, otherwise generate randomly.
+    const seed = challengeOpts?.handSeeds[0] ?? (Math.random() * 0x7fff_ffff) >>> 0;
     const now = new Date().toISOString();
 
     // Bust mode always starts at 20 regardless of the room's startingScore setting.
@@ -148,6 +162,12 @@ export class GameService {
       seatNames,
       seatAvatarUrls,
       startedAt: now,
+      challengeId: challengeOpts?.challengeId,
+      handSeeds: challengeOpts?.handSeeds,
+      targetHands:
+        challengeOpts?.numHands ??
+        (settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined),
+      onGameEnded: challengeOpts?.onGameEnded,
     });
 
     // Record hand-0 metadata for replay
@@ -642,9 +662,16 @@ export class GameService {
           ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
           : ([...m.tiles] as TileType[]),
       );
-      const fullHand = [...openMeldTiles, ...seatState.hand];
+      const concealedHand = seatState.hand;
+      const totalTiles = openMeldTiles.length + concealedHand.length;
+      // BUG-057: check only the concealed portion when open melds exist.
+      const canTsumo =
+        totalTiles === 14 &&
+        (openMeldTiles.length === 0
+          ? isWinningHand(concealedHand, jingTypes, true)
+          : decomposeConcealed(concealedHand, jingTypes).length > 0);
 
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes, true)) {
+      if (canTsumo) {
         this.logger.log(
           `Can-tsumo: seat ${activeSeat} has a complete hand after kong (game ${session.gameId})`,
         );
@@ -709,8 +736,15 @@ export class GameService {
           ? ([m.tiles[0], m.tiles[0], m.tiles[0]] as TileType[])
           : ([...m.tiles] as TileType[]),
       );
-      const fullHand = [...openMeldTiles, ...seatState.hand];
-      if (fullHand.length === 14 && isWinningHand(fullHand, jingTypes, true)) {
+      const concealedHand = seatState.hand;
+      const totalTiles = openMeldTiles.length + concealedHand.length;
+      // BUG-057: check only the concealed portion when open melds exist.
+      if (
+        totalTiles === 14 &&
+        (openMeldTiles.length === 0
+          ? isWinningHand(concealedHand, jingTypes, true)
+          : decomposeConcealed(concealedHand, jingTypes).length > 0)
+      ) {
         this.logger.log(`Bot auto-tsumo: seat ${seat} (game ${session.gameId})`);
         this.applyWinClaim(session, seat, 'tsumo', { isRobKong: false });
         return;
@@ -1335,7 +1369,7 @@ export class GameService {
       state.jingSecondary,
     );
 
-    // ── Net hand delta per seat (win + kong payouts + spirit vs. starting score) ─
+    // ── Net hand delta per seat (win + kong payouts + opening jing + spirit) ─────
     const handMeta = session.handLog[session.handLog.length - 1];
     const handStarting =
       handMeta?.startingScores ?? ([0, 0, 0, 0] as [number, number, number, number]);
@@ -1345,6 +1379,49 @@ export class GameService {
       number,
       number,
     ];
+
+    // Opening jing settlement delta (ruleTopBottomJing only) — tracked separately
+    // so the UI can label it "Bonus Tile" instead of lumping it into "Kong Payouts".
+    const openingJingEvent = session.engine.events.find(
+      (e) => e.kind === 'opening_jing_settlement',
+    ) as
+      | {
+          kind: 'opening_jing_settlement';
+          settlementTile: TileType;
+          scoreDelta: [number, number, number, number];
+        }
+      | undefined;
+    const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
+
+    // ── Win meld kind (ron only) + winning tile ───────────────────────────────
+    // prevEvent is events[n-2]: 'discard' for ron, 'draw' for tsumo, 'kong_added' for rob-kong.
+    const engineEvents = session.engine.events;
+    const prevEvent = engineEvents.length >= 2 ? engineEvents[engineEvents.length - 2] : undefined;
+
+    let winMeldKind: HandRevealPayload['winMeldKind'];
+    if (winnerSeat !== null && winType === 'ron' && !opts.isRobKong) {
+      if (handType === 'seven_pairs') {
+        winMeldKind = 'pair';
+      } else if (handType === 'all_triplets') {
+        winMeldKind = 'pung';
+      } else {
+        const winTile = prevEvent?.kind === 'discard' ? prevEvent.tile : undefined;
+        if (winTile) {
+          // After declareWin, the winner's hand is 14 tiles (winning tile included).
+          // copies >= 3 → pung (2 pre-existing + 1 won), 2 → pair, 1 → chow.
+          const copies = state.seats[winnerSeat].hand.filter((t) => t === winTile).length;
+          winMeldKind = copies >= 3 ? 'pung' : copies === 2 ? 'pair' : 'chow';
+        }
+      }
+    }
+
+    // The tile that completed the hand — from the event immediately before 'win'.
+    // All three event types that can precede a win ('draw', 'discard', 'kong_added')
+    // carry a 'tile' field, so a simple 'tile' in prevEvent check covers all cases.
+    const winningTile: HandRevealPayload['winningTile'] =
+      winnerSeat !== null && prevEvent && 'tile' in prevEvent
+        ? (prevEvent as { tile: TileType }).tile
+        : undefined;
 
     // ── Build hand-reveal payload ──────────────────────────────────────────────
     const handReveal: HandRevealPayload = {
@@ -1368,8 +1445,11 @@ export class GameService {
       isLastHand,
       nextDealerSeat: isLastHand ? undefined : nextDealerInfo.dealerSeat,
       handNetDeltas,
+      openingJingDelta,
       liableSeat,
       isRobKong,
+      winMeldKind,
+      winningTile,
     };
 
     // ── Store pending state, emit hand-reveal, and pause ──────────────────────
@@ -1421,6 +1501,12 @@ export class GameService {
   ): boolean {
     const { settings, cumulativeScores, engine } = session;
 
+    // Point Challenge: numRounds means "N hands played", not N wind rounds.
+    // targetHands overrides the wind-round logic below.
+    if (session.targetHands !== undefined) {
+      return session.handsPlayed >= session.targetHands;
+    }
+
     if (settings.terminationType === 'bust') {
       // Bust: only eliminate after a full round completes (roundComplete = true).
       // A player may go negative mid-round from spirit settlement and recover;
@@ -1438,6 +1524,13 @@ export class GameService {
       // East+South: session ends once the South round completes
       if (settings.rounds === 'east+south' && currentRoundWind === 'south' && roundComplete)
         return true;
+
+      // East+South+West: session ends once the West round completes (3 rounds, Point Challenge)
+      if (settings.rounds === 'east+south+west' && currentRoundWind === 'west' && roundComplete)
+        return true;
+
+      // All four rounds: session ends once the North round completes (4 rounds, Point Challenge)
+      if (settings.rounds === 'all' && currentRoundWind === 'north' && roundComplete) return true;
     }
 
     return false;
@@ -1448,7 +1541,8 @@ export class GameService {
     nextDealerInfo: { dealerSeat: 0 | 1 | 2 | 3; roundWind: SeatWind },
   ): void {
     const { dealerSeat, roundWind } = nextDealerInfo;
-    const seed = (Math.random() * 0x7fff_ffff) >>> 0;
+    // handSeeds[0] was consumed for the first hand; subsequent hands use index = handsPlayed.
+    const seed = session.handSeeds?.[session.handsPlayed] ?? (Math.random() * 0x7fff_ffff) >>> 0;
 
     const startingScores = [...session.cumulativeScores] as [number, number, number, number];
     const newEngine = GameEngine.create(seed, {
@@ -1522,6 +1616,7 @@ export class GameService {
       startedAt: session.startedAt,
       endedAt,
       ratingDeltas,
+      challengeId: session.challengeId,
     };
 
     // Broadcast game:ended to all in room
@@ -1592,6 +1687,19 @@ export class GameService {
     await this.storage
       .putReplay(session.gameId, replayPayload)
       .catch((err) => this.logger.error(`Failed to write replay for ${session.gameId}: ${err}`));
+
+    // ── Notify challenge system if this was a Point Challenge game ────────────
+    if (session.onGameEnded) {
+      // The human player is always seat 0 in a challenge game (solo vs bots).
+      const humanSeat = ([0, 1, 2, 3] as const).find((i) => !session.isBotSeat(i)) ?? 0;
+      const humanSub = session.seatMap[humanSeat];
+      const humanFinalScore = finalScores[humanSeat];
+      await session
+        .onGameEnded(humanSub, humanFinalScore)
+        .catch((err) =>
+          this.logger.error(`Challenge result recording failed for game ${session.gameId}: ${err}`),
+        );
+    }
 
     // ── Schedule session teardown ──────────────────────────────────────────────
     session.teardownTimer = setTimeout(

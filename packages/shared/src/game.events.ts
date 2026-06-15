@@ -281,10 +281,17 @@ export interface HandRevealPayload {
   /** Dealer seat for the next hand (undefined when isLastHand). */
   nextDealerSeat?: 0 | 1 | 2 | 3;
   /**
-   * Net score change per seat this hand: includes win payment, kong payouts, and
-   * spirit settlement. Zero-sum; useful for "you gained/lost N this hand" display.
+   * Net score change per seat this hand: includes win payment, kong payouts,
+   * opening jing settlement, and spirit settlement. Zero-sum.
    */
   handNetDeltas: [number, number, number, number];
+  /**
+   * Opening jing settlement delta per seat (ruleTopBottomJing only).
+   * Omitted when the rule is off or no settlement occurred this hand.
+   * Already included in handNetDeltas — tracked separately so the UI can
+   * display it as "Bonus Tile" rather than lumping it into "Kong Payouts".
+   */
+  openingJingDelta?: [number, number, number, number];
   /**
    * The single seat liable for the full win payment.
    * - Ron: the seat that discarded the winning tile.
@@ -294,6 +301,23 @@ export interface HandRevealPayload {
   liableSeat?: 0 | 1 | 2 | 3;
   /** True when the win was a rob-kong (抢杠). UI label only — does not change payment logic. */
   isRobKong?: boolean;
+  /**
+   * How the winning tile completed the hand (ron wins only; omitted for tsumo and rob-kong).
+   * Derived server-side from the winning tile's copy count in the 13-tile closed hand:
+   *   0 copies → chow (tile not in hand, must complete a sequence)
+   *   1 copy   → pair (completes the eyes/jantou)
+   *   2+ copies → pung (completes a triplet)
+   * Also inferred from handType: seven_pairs → pair, all_triplets → pung.
+   */
+  winMeldKind?: 'chow' | 'pung' | 'pair';
+  /**
+   * The tile that completed the winning hand.
+   * - Tsumo: the drawn tile (already present in hands[winnerSeat]).
+   * - Ron: the discarded tile (NOT in hands[winnerSeat] — show separately in UI).
+   * - Rob-kong: the robbed tile (NOT in hands[winnerSeat] — show separately in UI).
+   * - Draw / concede: undefined.
+   */
+  winningTile?: TileType;
 }
 
 /** A single available call during a claim window, sent to each eligible seat. */
@@ -369,6 +393,8 @@ export interface GameEndedPayload {
   endedAt: string;
   /** ELO rating deltas per seat [seat0, seat1, seat2, seat3]. Added by Phase 8. */
   ratingDeltas?: [number, number, number, number];
+  /** Present when this game is part of a Point Challenge. Navigate to /challenges/:id after viewing the result. */
+  challengeId?: string;
 }
 
 export interface RematchReadyPayload {

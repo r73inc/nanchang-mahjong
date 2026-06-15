@@ -5,7 +5,7 @@
  * are evaluated correctly (e.g., pung with 1 natural + 1 Jing + 1 discarded).
  */
 import { getRank, isHonor, TILE_TYPES, getHonorChowsContaining } from './tiles';
-import { isWinningHand } from './hand';
+import { isWinningHand, decomposeConcealed } from './hand';
 import { separateJing } from './jing';
 import type { TileType } from './types';
 
@@ -30,9 +30,16 @@ export function canWin(
   openMeldTiles: TileType[] = [],
   isSelfDraw = false,
 ): boolean {
-  const fullHand = [...openMeldTiles, ...hand, tile];
-  if (fullHand.length !== 14) return false;
-  return isWinningHand(fullHand, jingTypes, isSelfDraw);
+  const concealedPlusDraw = [...hand, tile];
+  if (openMeldTiles.length + concealedPlusDraw.length !== 14) return false;
+  // With open melds, only the concealed portion must decompose. Using the flat
+  // pool (openMeldTiles + concealed) allows decomposeCore to break up locked melds
+  // into invalid pair/meld combinations — BUG-057. Seven Pairs and Thirteen
+  // Misfits are impossible with any declared meld, so decomposeConcealed suffices.
+  if (openMeldTiles.length > 0) {
+    return decomposeConcealed(concealedPlusDraw, jingTypes).length > 0;
+  }
+  return isWinningHand(concealedPlusDraw, jingTypes, isSelfDraw);
 }
 
 // ── Pung ──────────────────────────────────────────────────────────────────────
