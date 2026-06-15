@@ -1023,7 +1023,7 @@ function HandRevealScreen({
                               size="xs"
                               interactive={false}
                               isJing={isJing(tile)}
-                              isWinningTile={j === winUIdx}
+                              isLastDiscard={j === winUIdx}
                             />
                           ))}
                         </div>
@@ -1043,7 +1043,7 @@ function HandRevealScreen({
                                   interactive={false}
                                   isJing={isJing(tile)}
                                   showJingLabel={false}
-                                  isWinningTile={gi === winGIdx && ti === winTIdx}
+                                  isLastDiscard={gi === winGIdx && ti === winTIdx}
                                 />
                               ))}
                             </div>
@@ -1063,7 +1063,7 @@ function HandRevealScreen({
                                 interactive={false}
                                 isJing={isJing(tile)}
                                 showJingLabel={false}
-                                isWinningTile={ui === winUIdx}
+                                isLastDiscard={ui === winUIdx}
                               />
                             ))}
                           </div>

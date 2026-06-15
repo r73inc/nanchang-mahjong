@@ -56,20 +56,6 @@ const LAST_DISCARD_TRANSITION = {
   ease: 'easeInOut' as const,
 };
 
-// Keyframes for the pulsing glow on the winning tile in the hand-reveal screen.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const WINNING_TILE_SHADOW: any[] = [
-  '0 0 4px 1px rgb(34, 197, 94)',
-  '0 0 10px 3px rgb(34, 197, 94)',
-  '0 0 4px 1px rgb(34, 197, 94)',
-];
-const WINNING_TILE_ANIMATE = { boxShadow: WINNING_TILE_SHADOW };
-const WINNING_TILE_TRANSITION = {
-  duration: 0.85,
-  repeat: Infinity,
-  ease: 'easeInOut' as const,
-};
-
 // ── Size table ────────────────────────────────────────────────────────────────
 
 /** Pixel dimensions at 800px reference width; scale via CSS container queries. */
@@ -133,11 +119,6 @@ export interface MahjongTile2DProps {
    * keyframes never bleeds into opacity or scale interpolation.
    */
   isLastDiscard?: boolean;
-  /**
-   * When true, mounts a green pulsing ring overlay — used in the hand-reveal
-   * screen to mark the tile that completed the winning hand.
-   */
-  isWinningTile?: boolean;
   /** Fired when an interactive tile is clicked or activated via keyboard. */
   onSelect?: () => void;
 }
@@ -154,7 +135,6 @@ export function MahjongTile2D({
   interactive = false,
   layoutId,
   isLastDiscard = false,
-  isWinningTile = false,
   onSelect,
 }: MahjongTile2DProps) {
   const { lang } = useI18n();
@@ -339,25 +319,6 @@ export function MahjongTile2D({
             // Explicit border is an always-on fallback: even if boxShadow is clipped
             // by an ancestor overflow:hidden, the hard red edge remains visible.
             border: '2px solid rgb(220, 38, 38)',
-          }}
-        />
-      )}
-      {isWinningTile && (
-        <motion.div
-          aria-hidden="true"
-          data-testid="winning-tile-pulse"
-          animate={WINNING_TILE_ANIMATE}
-          transition={WINNING_TILE_TRANSITION}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: dims.w,
-            height: dims.h,
-            borderRadius: dims.radius,
-            pointerEvents: 'none',
-            zIndex: 20,
-            border: '2px solid rgb(34, 197, 94)',
           }}
         />
       )}
