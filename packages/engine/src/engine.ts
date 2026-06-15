@@ -750,7 +750,11 @@ export class GameEngine {
       const singles = [...naturalCounts.values()].reduce((sum, c) => sum + (c % 2), 0);
       isGerman = singles === 0;
     } else {
-      isGerman = winJings === 0;
+      // German if no Jing was used as a wildcard. Re-decompose treating all tiles
+      // as naturals (jingTypes=[]); if a valid decomposition exists, the hand wins
+      // without any wildcard substitution. A spirit tile held at face value (e.g.,
+      // a pung of 一索 when 一索 is jingPrimary) does NOT disqualify the German bonus.
+      isGerman = decomposeHand(winningHand, []).length > 0;
     }
 
     // Heavenly Win: tsumo before any discard or draw has occurred

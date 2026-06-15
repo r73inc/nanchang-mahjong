@@ -8,15 +8,14 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                     | Summary                                                                                       |
-| ------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly           |
-| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                  |
-| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile         |
-| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded            |
-| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own   |
-| BUG-054 | Learn hands section shows partial hands  | Seven Pairs, Thirteen Misfits, and Seven Star examples are cut short — not full 14-tile hands |
-| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                       |
+| ID      | Name                                     | Summary                                                                                     |
+| ------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly         |
+| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                |
+| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile       |
+| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded          |
+| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own |
+| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                     |
 
 ---
 
@@ -109,30 +108,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 - `apps/web/src/pages/customize/customize-page.tsx` — `PaletteCard` component (line ~107) and its call site (line ~279).
 - `apps/web/src/lib/theme.utils.ts` — `TILE_CONFIGS` (already exported) provides `faceTop`/`faceBottom` per palette.
-
----
-
-### BUG-054 · Learn page "Hands" tab shows incomplete example hands
-
-**Symptom:** In the Learn page → Hands tab, three of the five hand examples are cut short and do not show a complete 14-tile winning hand:
-
-- **Small Seven Pairs** — renders only 7 tiles (`slice(0, 7)`), showing half the pairs instead of all 7.
-- **Thirteen Misfits** — renders only 9 tiles (`slice(0, 9)`), omitting the honor tiles entirely.
-- **Seven Star Thirteen Misfits** — renders only 7 tiles (`[...WINDS, ...DRAGS]`), showing each honor once rather than a valid 14-tile hand with all 7 honors plus 7 numbered tiles.
-
-**Status:** OPEN — reported 2026-06-14.
-
-**Root cause:** All three hands use slice or partial arrays in `HandsSection`. `SEVEN_PAIRS_HAND` and `THIRTEEN_HAND` already contain the correct 14 tiles but are sliced at render time. Seven Star has no complete data array defined.
-
-**Fix needed:**
-
-- Remove `.slice(0, 7)` from the Seven Pairs `<TileRow>`.
-- Remove `.slice(0, 9)` from the Thirteen Misfits `<TileRow>`.
-- Add a `SEVEN_STAR_HAND: TileType[]` constant with all 7 unique honors (east, south, west, north, zhong, fa, bai) + 7 numbered tiles with inter-tile gaps > 2 (e.g. 1m, 4m, 7m, 1p, 4p, 7p, 1s) = 14 tiles total. Use that constant in the Seven Star `<TileRow>` instead of `[...WINDS, ...DRAGS]`.
-
-**Where to look:**
-
-- `apps/web/src/pages/learn/learn-page.tsx` — `HandsSection` (~line 360), `SEVEN_PAIRS_HAND` (~line 53), `THIRTEEN_HAND` (~line 78).
 
 ---
 

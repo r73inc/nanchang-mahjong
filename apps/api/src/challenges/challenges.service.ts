@@ -189,6 +189,7 @@ export class ChallengesService {
     const roomSettings: RoomSettings = {
       rounds: ROUNDS_MAP[dto.config.numRounds],
       terminationType: 'rounds',
+      maxHands: 1,
       startingScore: dto.config.startingScore,
       timerSecs: dto.config.timerSecs,
       viewMode: dto.config.viewMode,
@@ -433,6 +434,7 @@ export class ChallengesService {
     const roomSettings: RoomSettings = {
       rounds: ROUNDS_MAP[item.config.numRounds],
       terminationType: 'rounds',
+      maxHands: 1,
       startingScore: item.config.startingScore,
       timerSecs: item.config.timerSecs,
       viewMode: item.config.viewMode,
@@ -682,6 +684,7 @@ export class ChallengesService {
     return {
       rounds: ROUNDS_MAP[config.numRounds],
       terminationType: 'rounds',
+      maxHands: 1,
       startingScore: config.startingScore,
       timerSecs: config.timerSecs,
       viewMode: config.viewMode,

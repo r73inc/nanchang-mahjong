@@ -126,6 +126,21 @@ export class GameSession {
   /** Number of complete hands played so far. */
   handsPlayed = 0;
 
+  /** Cumulative spirit settlement per seat across all hands. Updated in resolveHand(). */
+  sessionSpiritPoints: [number, number, number, number] = [0, 0, 0, 0];
+
+  /** Cumulative opening bonus-tile settlement per seat across all hands. */
+  sessionBonusTilePoints: [number, number, number, number] = [0, 0, 0, 0];
+
+  /** Number of hands won by each seat. */
+  handsWon: [number, number, number, number] = [0, 0, 0, 0];
+
+  /**
+   * Best (highest) single-hand net delta achieved by each seat.
+   * Initialized to 0 — negative-delta hands are not tracked as "best".
+   */
+  bestHandPoints: [number, number, number, number] = [0, 0, 0, 0];
+
   /** Full ordered move log (all hands). Serialized to S3 on game end. */
   readonly moveLog: GameEvent[] = [];
 
@@ -288,10 +303,12 @@ export class GameSession {
     return this.botSeats.has(seat);
   }
 
-  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal'. */
+  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal', 'bot-hard-N' → 'hard'. */
   getBotDifficulty(seat: Seat4): BotDifficulty {
     const userId = this.seatMap[seat];
-    return userId.startsWith('bot-normal') ? 'normal' : 'easy';
+    if (userId.startsWith('bot-normal')) return 'normal';
+    if (userId.startsWith('bot-hard')) return 'hard';
+    return 'easy';
   }
 
   get hasBots(): boolean {

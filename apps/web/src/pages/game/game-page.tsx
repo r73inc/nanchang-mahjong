@@ -1079,20 +1079,58 @@ function HandRevealScreen({
           </div>
         </div>
 
+        {/* ── Final hand badge ─────────────────────────────────────────────── */}
+        {mode !== 'review' && handReveal.isLastHand && (
+          <div
+            className="px-4 py-1.5 rounded-full text-xs font-bold tracking-widest uppercase"
+            style={{
+              background: 'rgba(201,169,97,0.15)',
+              border: '1px solid rgba(201,169,97,0.5)',
+              color: '#c9a961',
+            }}
+          >
+            {t('handRevealLastHandBadge')}
+          </div>
+        )}
+
         {/* ── Continue / waiting / back ────────────────────────────────────── */}
-        <div className="pt-2 pb-4 flex flex-col items-center gap-3">
+        <div className="pt-2 pb-4 flex flex-col items-center gap-3 w-full max-w-[280px] mx-auto">
           {mode === 'review' ? (
             <GoldButton onClick={onBack ?? (() => undefined)}>
               {t('endGameBackToResults')}
             </GoldButton>
           ) : isHost ? (
-            <GoldButton onClick={onAdvance ?? (() => undefined)}>
-              {handReveal.isLastHand ? t('handRevealEndSession') : t('handRevealContinue')} →
-            </GoldButton>
+            handReveal.isLastHand ? (
+              <button
+                onClick={onAdvance ?? (() => undefined)}
+                className="w-full py-4 rounded-full font-bold text-base"
+                style={{
+                  background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+                  boxShadow: '0 6px 18px rgba(201,169,97,0.45)',
+                  color: '#1a1a1a',
+                }}
+              >
+                {t('handRevealEndSession')} →
+              </button>
+            ) : (
+              <button
+                onClick={onAdvance ?? (() => undefined)}
+                className="w-full py-3 rounded-full font-bold text-sm"
+                style={{
+                  background: 'rgba(var(--felt-ink-rgb),0.08)',
+                  border: '1px solid rgba(var(--felt-ink-rgb),0.2)',
+                  color: 'var(--felt-ink,#f5efdf)',
+                }}
+              >
+                {t('handRevealContinue')} →
+              </button>
+            )
           ) : (
             <>
               <WaitingDots />
-              <p className="text-xs text-mj-bone/40">{t('handRevealWaitingHost')}</p>
+              <p className="text-xs text-mj-bone/40">
+                {handReveal.isLastHand ? t('handRevealWaitingHostEnd') : t('handRevealWaitingHost')}
+              </p>
             </>
           )}
         </div>
@@ -1108,154 +1146,246 @@ const PLACEMENT_KEY = {
   4: 'endGamePlacement4',
 } as const;
 
-function GameEndScreen({
+function MatchEndStatsScreen({
   snapshot,
   ended,
   viewerSeat,
   gameId,
   onHome,
-  onRematch,
-  onViewDetails,
+  onViewFinalHand,
 }: {
   snapshot: ClientGameState;
   ended: GameEndedPayload | null;
   viewerSeat: 0 | 1 | 2 | 3 | null;
   gameId?: string;
   onHome: () => void;
-  onRematch: () => void;
-  onViewDetails?: () => void;
+  onViewFinalHand?: () => void;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   // Prefer the authoritative finalScores from game:ended — snapshot seat scores
   // exclude the final hand's spirit settlement (no snapshot follows endSession).
-  const scores = ended ? ended.finalScores : snapshot.seats.map((s) => s.score);
-  const sorted = [...scores].sort((a, b) => b - a);
-  const myScore = viewerSeat !== null ? scores[viewerSeat] : null;
-  const iWon = myScore !== null && myScore === sorted[0];
+  const scores = (ended ? ended.finalScores : snapshot.seats.map((s) => s.score)) as [
+    number,
+    number,
+    number,
+    number,
+  ];
   const myPlacement = viewerSeat !== null && ended ? ended.placement[viewerSeat] : null;
   const myRatingDelta =
     viewerSeat !== null && ended?.ratingDeltas ? ended.ratingDeltas[viewerSeat] : null;
 
+  // Sort seats by final score descending for display
+  const sortedSeatIndices = ([0, 1, 2, 3] as const)
+    .slice()
+    .sort((a, b) => scores[b] - scores[a]) as (0 | 1 | 2 | 3)[];
+
+  const hasStats = !!ended?.handsWon;
+
   return (
-    <div className="flex flex-col items-center justify-center gap-6 min-h-dvh px-8 text-center bg-mj-bg-page">
-      {myPlacement && (
-        <p
-          className="text-[13px] font-bold tracking-widest uppercase"
-          style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)' }}
+    <div className="min-h-dvh bg-mj-bg-page overflow-y-auto">
+      <div className="flex flex-col items-center gap-6 px-4 py-8 max-w-lg mx-auto">
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <div className="text-center">
+          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+            {t('matchEndTitle')}
+          </p>
+          {ended && (
+            <p className="text-xs text-mj-bone/40">
+              {t('endGameHandsPlayed').replace('{{0}}', String(ended.handsPlayed))}
+            </p>
+          )}
+        </div>
+
+        {/* ── Viewer placement + ELO ──────────────────────────────────────── */}
+        {myPlacement && (
+          <p
+            className="text-[13px] font-bold tracking-widest uppercase"
+            style={{ color: myPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)' }}
+          >
+            {t(PLACEMENT_KEY[myPlacement])}
+          </p>
+        )}
+
+        {myRatingDelta !== null && (
+          <p
+            className="text-sm font-mono font-bold"
+            style={{ color: myRatingDelta >= 0 ? '#7fc299' : '#e88080' }}
+          >
+            {myRatingDelta >= 0 ? '+' : ''}
+            {myRatingDelta} {t('matchEndRatingChange')}
+          </p>
+        )}
+
+        {/* ── Final standings ─────────────────────────────────────────────── */}
+        <div
+          className="w-full rounded-xl p-4"
+          style={{
+            background: 'rgba(var(--felt-ink-rgb),0.05)',
+            border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+          }}
         >
-          {t(PLACEMENT_KEY[myPlacement])}
-        </p>
-      )}
-
-      <h1
-        className="text-3xl font-serif font-bold"
-        style={{ color: iWon ? '#7fc299' : 'var(--felt-ink,#f5efdf)' }}
-      >
-        {iWon ? t('gameYouWin') : t('gameSessionEnd')}
-      </h1>
-
-      {myRatingDelta !== null && (
-        <p
-          className="text-sm font-mono font-bold"
-          style={{ color: myRatingDelta >= 0 ? '#7fc299' : '#e88080' }}
-          aria-label={t('endGameRatingDelta')}
-        >
-          {myRatingDelta >= 0 ? '+' : ''}
-          {myRatingDelta} {t('endGameRatingDelta')}
-        </p>
-      )}
-
-      <div
-        className="w-full max-w-[300px] rounded-xl p-4 space-y-2"
-        style={{
-          background: 'rgba(var(--felt-ink-rgb),0.05)',
-          border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-        }}
-      >
-        <p className="text-xs font-bold tracking-widest text-mj-gold/70 uppercase mb-3">
-          {t('gameFinalScores')}
-        </p>
-        {snapshot.seats.map((seat, i) => {
-          const seatPlacement = ended ? ended.placement[i] : null;
-          return (
-            <div key={i} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ background: WIND_COLOR[seat.wind] }}
-                />
-                <span className="text-mj-bone/70 max-w-[110px] truncate">{seat.seatName}</span>
-                {seatPlacement && (
+          <p className="text-xs font-bold tracking-widest text-mj-gold/70 uppercase mb-3">
+            {t('matchEndFinalStandings')}
+          </p>
+          {sortedSeatIndices.map((i, rank) => {
+            const seat = snapshot.seats[i];
+            const isMe = i === viewerSeat;
+            const seatPlacement = ended ? ended.placement[i] : ((rank + 1) as 1 | 2 | 3 | 4);
+            return (
+              <div key={i} className="flex items-center justify-between py-2 text-sm">
+                <div className="flex items-center gap-2">
                   <span
-                    className="text-[10px] font-bold"
+                    className="text-[10px] font-bold w-5 text-center"
                     style={{
                       color: seatPlacement === 1 ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.3)',
                     }}
                   >
                     #{seatPlacement}
                   </span>
-                )}
-                {i === viewerSeat && (
-                  <span className="text-[10px] text-mj-gold/60">{t('youSuffix')}</span>
-                )}
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ background: WIND_COLOR[seat.wind] }}
+                  />
+                  <span className="text-mj-bone/80 max-w-[120px] truncate font-medium">
+                    {seat.seatName}
+                  </span>
+                  {isMe && (
+                    <span className="text-[10px] text-mj-gold/60">{t('matchEndYouLabel')}</span>
+                  )}
+                </div>
+                <span
+                  className="font-bold font-mono"
+                  style={{ color: scores[i] >= 0 ? '#7fc299' : '#e88080' }}
+                >
+                  {scores[i] >= 0 ? '+' : ''}
+                  {scores[i]}
+                </span>
               </div>
-              <span
-                className="font-bold font-mono"
-                style={{ color: scores[i] >= 0 ? '#7fc299' : '#e88080' }}
-              >
-                {scores[i] >= 0 ? '+' : ''}
-                {scores[i]}
-              </span>
+            );
+          })}
+        </div>
+
+        {/* ── Per-player stat breakdown ────────────────────────────────────── */}
+        {hasStats && (
+          <div
+            className="w-full rounded-xl p-4"
+            style={{
+              background: 'rgba(var(--felt-ink-rgb),0.05)',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+            }}
+          >
+            <p className="text-xs font-bold tracking-widest text-mj-gold/70 uppercase mb-3">
+              {t('matchEndPlayerStats')}
+            </p>
+
+            {/* Column headers */}
+            <div className="grid grid-cols-5 gap-1 text-[9px] font-bold text-mj-bone/30 uppercase mb-1 px-1">
+              <div />
+              <div className="text-center">{t('matchEndHandsWon')}</div>
+              <div className="text-center">{t('matchEndSpiritPoints')}</div>
+              <div className="text-center">{t('matchEndBonusTile')}</div>
+              <div className="text-center">{t('matchEndBestHand')}</div>
             </div>
-          );
-        })}
-      </div>
 
-      {ended && (
-        <p className="text-xs text-mj-bone/40">
-          {t('endGameHandsPlayed').replace('{{0}}', String(ended.handsPlayed))}
-        </p>
-      )}
+            {sortedSeatIndices.map((i) => {
+              const seat = snapshot.seats[i];
+              const isMe = i === viewerSeat;
+              const handsWon = ended!.handsWon![i] ?? 0;
+              const spirit = ended!.sessionSpiritPoints?.[i] ?? 0;
+              const bonus = ended!.sessionBonusTilePoints?.[i] ?? 0;
+              const best = ended!.bestHandPoints?.[i] ?? 0;
+              return (
+                <div
+                  key={i}
+                  className="grid grid-cols-5 gap-1 py-2 items-center"
+                  style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
+                >
+                  <div className="flex items-center gap-1 overflow-hidden">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: WIND_COLOR[seat.wind] }}
+                    />
+                    <span
+                      className="text-[11px] truncate"
+                      style={{
+                        color: isMe ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.6)',
+                        fontWeight: isMe ? 700 : 400,
+                      }}
+                    >
+                      {isMe ? t('matchEndYouLabel') : seat.seatName.split(' ')[0]}
+                    </span>
+                  </div>
+                  <div className="text-center font-mono text-xs text-mj-bone/80">{handsWon}</div>
+                  <div
+                    className="text-center font-mono text-xs"
+                    style={{
+                      color:
+                        spirit > 0
+                          ? '#7fc299'
+                          : spirit < 0
+                            ? '#e88080'
+                            : 'rgba(var(--felt-ink-rgb),0.4)',
+                    }}
+                  >
+                    {spirit !== 0 ? (spirit > 0 ? '+' : '') + spirit : '—'}
+                  </div>
+                  <div
+                    className="text-center font-mono text-xs"
+                    style={{
+                      color:
+                        bonus > 0
+                          ? '#7fc299'
+                          : bonus < 0
+                            ? '#e88080'
+                            : 'rgba(var(--felt-ink-rgb),0.4)',
+                    }}
+                  >
+                    {bonus !== 0 ? (bonus > 0 ? '+' : '') + bonus : '—'}
+                  </div>
+                  <div
+                    className="text-center font-mono text-xs"
+                    style={{ color: best > 0 ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.4)' }}
+                  >
+                    {best > 0 ? '+' + best : '—'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      <div className="flex flex-col gap-3 w-full max-w-[280px]">
-        {onViewDetails && (
+        {/* ── Action buttons ───────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-3 w-full max-w-[280px]">
+          {onViewFinalHand && (
+            <button
+              onClick={onViewFinalHand}
+              className="py-3 rounded-full text-sm font-bold text-mj-bone/80"
+              style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
+            >
+              {t('matchEndViewFinalHand')}
+            </button>
+          )}
+          {gameId && (
+            <button
+              onClick={() => navigate(`/replay/${gameId}`)}
+              className="py-3 rounded-full text-sm font-bold text-mj-bone/80"
+              style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
+            >
+              {t('historyViewReplay')}
+            </button>
+          )}
           <button
-            onClick={onViewDetails}
-            className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
-            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
-          >
-            {t('endGameViewDetails')}
-          </button>
-        )}
-        {gameId && (
-          <button
-            onClick={() => navigate(`/replay/${gameId}`)}
-            className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
-            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
-          >
-            {t('historyViewReplay')}
-          </button>
-        )}
-        {viewerSeat === 0 && !ended?.challengeId && (
-          <button
-            onClick={onRematch}
-            className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+            onClick={onHome}
+            className="py-4 rounded-full font-bold text-base text-mj-ink"
             style={{
               background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
               boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
             }}
           >
-            {t('endGameRematch')}
+            {t('matchEndReturnLobby')}
           </button>
-        )}
-        <button
-          onClick={onHome}
-          className="px-8 py-3 rounded-full text-sm font-bold text-mj-bone/80"
-          style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.2)' }}
-        >
-          {t('gamePlayAgain')}
-        </button>
+        </div>
       </div>
     </div>
   );
@@ -2827,6 +2957,7 @@ function GameTable({
   selectedTileIdx,
   claimWindow,
   canTsumo,
+  canAddToKong,
   toast,
   pendingMove,
   onSelect,
@@ -2842,6 +2973,7 @@ function GameTable({
   selectedTileIdx: number | null;
   claimWindow: ClaimWindowState | null;
   canTsumo: boolean;
+  canAddToKong: TileType | null;
   toast: GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number | null) => void;
@@ -3329,6 +3461,42 @@ function GameTable({
           />
         )}
 
+        {/* ── Add-to-kong bar (BUG-058) ─────────────────────────────────────── */}
+        {/* Proactive bar shown when player's drawn tile can extend an open pung. */}
+        {canAddToKong &&
+          isMyTurn &&
+          !showConcedeSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && (
+            <div
+              className="absolute left-0 right-0 flex items-center justify-between gap-2 px-4 py-2 animate-call-prompt-enter"
+              style={{
+                zIndex: 25,
+                bottom: canTsumo
+                  ? 'calc(var(--mj-hand-height, 80px) + 68px)'
+                  : 'calc(var(--mj-hand-height, 80px) + 8px)',
+                background: 'rgba(30,60,30,0.85)',
+                borderTop: '1px solid rgba(100,200,100,0.3)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <span className="text-sm font-semibold" style={{ color: '#7ecb7e' }}>
+                {t('addToKongPrompt')}
+              </span>
+              <button
+                onClick={() => onKongAdd(canAddToKong)}
+                className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
+                style={{
+                  background: 'rgba(100,200,100,0.2)',
+                  border: '1px solid rgba(100,200,100,0.5)',
+                  color: '#7ecb7e',
+                }}
+              >
+                {t('addToKong')}
+              </button>
+            </div>
+          )}
+
         {/* ── Tsumo bar (IMP-020) ─────────────────────────────────────────────── */}
         {/* Non-blocking compact bar — does NOT cover the hand/canvas.            */}
         {/* Dismissed → shows persistent "Declare Win" button instead (above).    */}
@@ -3437,7 +3605,6 @@ export function GamePage() {
     settlementPreview,
     handReveal,
     finalHandReveal,
-    rematchRoomCode,
     connection,
     selectedTileIdx,
     claimWindow,
@@ -3446,6 +3613,7 @@ export function GamePage() {
     gameError,
     selectTile,
     canTsumo,
+    canAddToKong,
     discard,
     declareTsumo,
     kongConcealed,
@@ -3455,7 +3623,6 @@ export function GamePage() {
     concede,
     advancePreGame,
     advanceHand,
-    requestRematch,
     rollDice,
     onDiceAnimationComplete,
     diceAnimation,
@@ -3511,37 +3678,15 @@ export function GamePage() {
     }
   }, [handReveal]);
 
-  // On the last hand the host client ends the session immediately — the old
-  // "View Final Scores" click added nothing, and ending now lets game:ended
-  // (placement, ELO) arrive while the announcement is still on screen. If the
-  // emit is lost, HandRevealScreen renders after the announcement with the
-  // manual button as a fallback.
-  const autoAdvancedRef = useRef<HandRevealPayload | null>(null);
-  useEffect(() => {
-    if (!handReveal?.isLastHand || ended) return;
-    const vs = snapshot?.viewerSeat;
-    if (vs === null || vs === undefined) return;
-    // Advance if: I am the dealer, OR the dealer is a bot and I'm the first human seat.
-    const botDealer = snapshot?.seats[snapshot.dealerSeat]?.isBot === true;
-    const firstHuman = snapshot?.seats.findIndex((s) => !s.isBot);
-    const shouldAdvance = vs === snapshot?.dealerSeat || (botDealer && vs === firstHuman);
-    if (!shouldAdvance) return;
-    if (autoAdvancedRef.current === handReveal) return;
-    autoAdvancedRef.current = handReveal;
-    advanceHand();
-  }, [handReveal, ended, snapshot, advanceHand]);
+  // On the last hand, the host must explicitly click "View Match Results" —
+  // this is intentional to give all players a chance to see the final hand
+  // reveal before transitioning to the match end statistics screen.
 
   // True while the player is reviewing the final hand's details from the
   // results screen — the last screen of the end-of-game sequence.
   const [showEndDetails, setShowEndDetails] = useState(false);
 
   const handleHome = useCallback(() => navigate('/lobby'), [navigate]);
-
-  useEffect(() => {
-    if (rematchRoomCode) {
-      navigate(`/room/${rematchRoomCode}`);
-    }
-  }, [rematchRoomCode, navigate]);
 
   // ── Active-game localStorage tracking ──────────────────────────────────────
   // Store the gameId so LobbyPage can show a "Rejoin" card if the player
@@ -3665,6 +3810,7 @@ export function GamePage() {
             selectedTileIdx={selectedTileIdx}
             claimWindow={claimWindow}
             canTsumo={canTsumo}
+            canAddToKong={canAddToKong}
             toast={toast}
             pendingMove={pendingMove}
             onSelect={selectTile}
@@ -3678,7 +3824,7 @@ export function GamePage() {
           />
         )}
 
-      {/* ── Session end — results screen, then hand-detail review (last) ──── */}
+      {/* ── Session end — match stats, then final hand review (optional) ─── */}
       {!handReveal &&
         !announcingReveal &&
         snapshot.preGamePhase === null &&
@@ -3692,14 +3838,13 @@ export function GamePage() {
             onBack={() => setShowEndDetails(false)}
           />
         ) : (
-          <GameEndScreen
+          <MatchEndStatsScreen
             snapshot={snapshot}
             ended={ended}
             viewerSeat={viewerSeat}
             gameId={gameId}
             onHome={handleHome}
-            onRematch={requestRematch}
-            onViewDetails={finalHandReveal ? () => setShowEndDetails(true) : undefined}
+            onViewFinalHand={finalHandReveal ? () => setShowEndDetails(true) : undefined}
           />
         ))}
 

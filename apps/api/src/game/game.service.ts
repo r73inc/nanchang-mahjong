@@ -25,6 +25,7 @@ import {
   isWinningHand,
   decomposeHand,
   decomposeConcealed,
+  addToKongOptions,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -679,6 +680,23 @@ export class GameService {
           this.server.to(socketId).emit('game:can-tsumo', { seat: activeSeat });
         }
       }
+
+      // ── Add-to-kong opportunity detection ─────────────────────────────────
+      // If the player's drawn tile matches an existing open pung, notify them
+      // so the UI can show a proactive "Add to Kong" button (BUG-058).
+      for (const meld of seatState.openMelds) {
+        if (meld.kind === 'pung') {
+          const pungTile = meld.tiles[0] as TileType;
+          if (addToKongOptions(seatState.hand, pungTile, jingTypes).length > 0) {
+            if (socketId && this.server) {
+              this.server
+                .to(socketId)
+                .emit('game:can-add-to-kong', { seat: activeSeat, tile: pungTile });
+            }
+            break;
+          }
+        }
+      }
     }
 
     // Player offline — fire a push notification (no-op if not subscribed or push disabled)
@@ -751,7 +769,37 @@ export class GameService {
       }
     }
 
-    const tile = getBotDiscard(state.seats[seat].hand, jingTypes, session.getBotDifficulty(seat));
+    // Add-to-kong: if the drawn tile matches an existing open pung, upgrade it
+    // before discarding (bots always take the free kong payout).
+    const seatState = state.seats[seat];
+    for (const meld of seatState.openMelds) {
+      if (meld.kind === 'pung') {
+        const pungTile = meld.tiles[0] as TileType;
+        if (addToKongOptions(seatState.hand, pungTile, jingTypes).length > 0) {
+          try {
+            session.engine = session.engine.addToKong(seat, pungTile);
+            session.touch(seat);
+            session.moveLog.push(...getNewEvents(session));
+          } catch (err) {
+            this.logger.error(
+              `Bot add-to-kong failed — seat ${seat}, game ${session.gameId}: ${err}`,
+            );
+            break;
+          }
+          this.broadcastEvent(session, { kind: 'kong_added', seat, tile: pungTile });
+          this.openRobKongWindow(session, seat, pungTile);
+          return;
+        }
+      }
+    }
+
+    const tile = getBotDiscard(
+      state.seats[seat].hand,
+      jingTypes,
+      session.getBotDifficulty(seat),
+      state,
+      seat,
+    );
 
     try {
       session.engine = session.engine.discard(tile);
@@ -913,11 +961,16 @@ export class GameService {
     const state = session.engine.state;
     const discardedTile = state.pendingDiscard ?? '1m';
     const openMeldCount = state.seats[seat].openMelds.length;
+    const jingTypesForClaim: TileType[] = [];
+    if (state.jingPrimary) jingTypesForClaim.push(state.jingPrimary);
+    if (state.jingSecondary) jingTypesForClaim.push(state.jingSecondary);
     const decision = getBotClaim(
       available,
       discardedTile,
       openMeldCount,
       session.getBotDifficulty(seat),
+      state.seats[seat].hand,
+      jingTypesForClaim,
     );
 
     if (!decision) {
@@ -1393,6 +1446,20 @@ export class GameService {
       | undefined;
     const openingJingDelta: HandRevealPayload['openingJingDelta'] = openingJingEvent?.scoreDelta;
 
+    // ── Accumulate session-level statistics ───────────────────────────────────
+    for (let i = 0; i < 4; i++) {
+      session.sessionSpiritPoints[i as Seat4] += spiritDeltas[i];
+      if (openingJingDelta) {
+        session.sessionBonusTilePoints[i as Seat4] += openingJingDelta[i];
+      }
+      if (handNetDeltas[i] > session.bestHandPoints[i as Seat4]) {
+        session.bestHandPoints[i as Seat4] = handNetDeltas[i];
+      }
+    }
+    if (result === 'win' && winnerSeat !== null) {
+      session.handsWon[winnerSeat]++;
+    }
+
     // ── Win meld kind (ron only) + winning tile ───────────────────────────────
     // prevEvent is events[n-2]: 'discard' for ron, 'draw' for tsumo, 'kong_added' for rob-kong.
     const engineEvents = session.engine.events;
@@ -1617,6 +1684,15 @@ export class GameService {
       endedAt,
       ratingDeltas,
       challengeId: session.challengeId,
+      sessionSpiritPoints: [...session.sessionSpiritPoints] as [number, number, number, number],
+      sessionBonusTilePoints: [...session.sessionBonusTilePoints] as [
+        number,
+        number,
+        number,
+        number,
+      ],
+      handsWon: [...session.handsWon] as [number, number, number, number],
+      bestHandPoints: [...session.bestHandPoints] as [number, number, number, number],
     };
 
     // Broadcast game:ended to all in room
