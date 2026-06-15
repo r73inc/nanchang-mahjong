@@ -17,6 +17,9 @@ import { HistoryPage } from './pages/history/history-page';
 import { ReplayPage } from './pages/replay/replay-page';
 import { LearnPage } from './pages/learn/learn-page';
 import { CustomizePage } from './pages/customize/customize-page';
+import { ChallengeCreatePage } from './pages/challenges/challenge-create-page';
+import { ChallengeDetailPage } from './pages/challenges/challenge-detail-page';
+import { ChallengesListPage } from './pages/challenges/challenges-list-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
 import { AppErrorBoundary } from './components/error-boundary';
@@ -67,6 +70,9 @@ export default function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/settings/change-password" element={<ChangePasswordPage />} />
         <Route path="/settings/delete-account" element={<DeleteAccountPage />} />
+        <Route path="/challenges" element={<ChallengesListPage />} />
+        <Route path="/challenges/create" element={<ChallengeCreatePage />} />
+        <Route path="/challenges/:challengeId" element={<ChallengeDetailPage />} />
       </Route>
 
       {/* Admin-only routes — non-admins are redirected to /home */}

@@ -110,4 +110,12 @@ export const DK = {
     PK: `USER#${sub}`,
     SK: `GAME#${ts}#${id}`,
   }),
+  // ── Challenge keys ──────────────────────────────────────────────────────────
+  /** Primary record for a Point Challenge. */
+  challenge: (id: string) => ({ PK: `CHALLENGE#${id}`, SK: 'META' }),
+  /** Per-user challenge index item (one per participant, including creator). */
+  userChallengeIdx: (sub: string, ts: string, id: string) => ({
+    PK: `USER#${sub}`,
+    SK: `CHALLENGE#${ts}#${id}`,
+  }),
 } as const;

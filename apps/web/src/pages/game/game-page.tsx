@@ -23,6 +23,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useGame } from '../../hooks/use-game';
 import { LangToggle, useI18n } from '../../i18n';
+import { connectSocket } from '../../lib/socket';
+import { useAuthStore } from '../../stores/auth.store';
 import {
   tileAriaLabel,
   engineToDesignTile,
@@ -1235,7 +1237,7 @@ function GameEndScreen({
             {t('historyViewReplay')}
           </button>
         )}
-        {viewerSeat === 0 && (
+        {viewerSeat === 0 && !ended?.challengeId && (
           <button
             onClick={onRematch}
             className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
@@ -3418,6 +3420,16 @@ export function GamePage() {
   const { t } = useI18n();
 
   const spectate = searchParams.get('spectate') === '1';
+
+  const accessToken = useAuthStore((s) => s.accessToken);
+  // Ensure the socket is connected before useGame's effect fires.
+  // GamePage can be entered directly from the challenge flow (POST /challenges
+  // → navigate to /game/:id), bypassing the lobby/room pages that normally
+  // call connectSocket(). This effect runs first (React runs effects in
+  // declaration order) so getSocket() inside useGame never throws.
+  useEffect(() => {
+    if (accessToken) connectSocket(accessToken);
+  }, [accessToken]);
 
   const {
     snapshot,

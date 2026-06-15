@@ -4,6 +4,7 @@ export * from './room.schemas';
 export * from './game.events';
 export * from './replay.types';
 export * from './tile-map';
+export * from './challenge.types';
 
 // Re-export engine helpers useful in frontend without adding engine as a direct web dep
 export {

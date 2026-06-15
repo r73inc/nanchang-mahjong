@@ -120,4 +120,18 @@ export class PushService implements OnModuleInit {
       gameId,
     });
   }
+
+  /** Notify a user that they have been challenged by another player. */
+  async sendChallengeInviteNotification(
+    userId: string,
+    challengeId: string,
+    creatorHandle: string,
+  ): Promise<void> {
+    await this.sendToUser(userId, {
+      title: 'Point Challenge',
+      body: `${creatorHandle} has challenged you to a Point Challenge!`,
+      challengeId,
+      url: `/challenges/${challengeId}`,
+    });
+  }
 }

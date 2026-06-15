@@ -13,12 +13,18 @@ export class BotConfigDto {
 
 export class RoomSettingsDto {
   @IsOptional()
-  @IsIn(['east', 'east+south'])
-  rounds?: 'east' | 'east+south';
+  @IsIn(['east', 'east+south', 'east+south+west', 'all'])
+  rounds?: 'east' | 'east+south' | 'east+south+west' | 'all';
 
   @IsOptional()
-  @IsIn(['rounds', 'bust'])
-  terminationType?: 'rounds' | 'bust';
+  @IsIn(['rounds', 'bust', 'fixed-hands'])
+  terminationType?: 'rounds' | 'bust' | 'fixed-hands';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  maxHands?: number;
 
   @IsOptional()
   @IsInt()
@@ -31,12 +37,6 @@ export class RoomSettingsDto {
   @Min(5)
   @Max(60)
   timerSecs?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(8)
-  minFan?: number;
 
   @IsOptional()
   @IsIn(['2D', '3D'])

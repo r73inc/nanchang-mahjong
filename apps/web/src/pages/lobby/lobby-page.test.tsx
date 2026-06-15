@@ -43,7 +43,6 @@ const SAMPLE_ROOM: RoomState = {
     terminationType: 'rounds',
     startingScore: 0,
     timerSecs: 30,
-    minFan: 1,
     viewMode: '3D',
     ruleTopBottomJing: false,
     claimWindowSecs: 8,

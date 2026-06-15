@@ -10,18 +10,28 @@ export type BotDifficulty = 'easy' | 'normal';
 export const RoomSettingsSchema = z.object({
   /**
    * Which rounds to play.
-   * 'east' = East round only (4 dealerships).
-   * 'east+south' = East + South rounds (8 dealerships).
+   * 'east'             = East round only (~4 hands).
+   * 'east+south'       = East + South rounds (~8 hands).
+   * 'east+south+west'  = East + South + West rounds (~12 hands).
+   * 'all'              = All four rounds (~16 hands).
    * Only applies when terminationType is 'rounds'.
+   * The three- and four-round variants are used exclusively by Point Challenges.
    */
-  rounds: z.enum(['east', 'east+south']).default('east+south'),
+  rounds: z.enum(['east', 'east+south', 'east+south+west', 'all']).default('east+south'),
 
   /**
    * How the session ends.
-   * 'rounds' — play the configured number of rounds, then settle scores.
-   * 'bust'   — play until any player's score drops below 0, then settle.
+   * 'rounds'      — play the configured number of wind-rounds, then settle scores.
+   * 'bust'        — play until any player's score drops below 0, then settle.
+   * 'fixed-hands' — play exactly maxHands hands, then settle scores.
    */
-  terminationType: z.enum(['rounds', 'bust']).default('rounds'),
+  terminationType: z.enum(['rounds', 'bust', 'fixed-hands']).default('rounds'),
+
+  /**
+   * Maximum number of hands to play (1–4).
+   * Only applies when terminationType is 'fixed-hands'.
+   */
+  maxHands: z.number().int().min(1).max(4).optional(),
 
   /**
    * Starting score for each player.
@@ -37,9 +47,6 @@ export const RoomSettingsSchema = z.object({
    * Value is stored so it can be activated later without a settings migration.
    */
   timerSecs: z.number().int().min(5).max(60).default(30),
-
-  /** Minimum fan required to win (reserved for future rule variants). */
-  minFan: z.number().int().min(1).max(8).default(1),
 
   /** Which game table renderer to use. Defaults to 2D; host can switch to 3D (WIP). */
   viewMode: z.enum(['2D', '3D']).default('2D'),
