@@ -15,10 +15,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 | BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile                                 |
 | BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded                                    |
 | BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own                           |
-| BUG-054 | Learn hands section shows partial hands  | Seven Pairs, Thirteen Misfits, and Seven Star examples are cut short — not full 14-tile hands                         |
-| BUG-058 | Add-to-kong (加杠) not triggered         | Drawing the 4th tile matching an open pung does not offer the add-to-kong action                                      |
-| BUG-059 | 精还原 + 德国胡 settlement wrong         | Spirit tile settlement payouts are wrong when spirit restoration triggers a German win on ron                         |
-| BUG-060 | Final hand scores wrong — playtest       | End-of-hand score totals incorrect due to compound of BUG-058 and BUG-059                                             |
 | BUG-061 | Mobile hand clipped at bottom            | On mobile, the player's hand is intermittently half cut off at the bottom of the screen for an entire hand            |
 | BUG-062 | Fixed-hands session never ends           | A room set to 1-hand fixed-hands mode does not terminate after the hand; "Continue" is shown instead of "End Session" |
 | IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                                               |
@@ -114,96 +110,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 - `apps/web/src/pages/customize/customize-page.tsx` — `PaletteCard` component (line ~107) and its call site (line ~279).
 - `apps/web/src/lib/theme.utils.ts` — `TILE_CONFIGS` (already exported) provides `faceTop`/`faceBottom` per palette.
-
----
-
-### BUG-054 · Learn page "Hands" tab shows incomplete example hands
-
-**Symptom:** In the Learn page → Hands tab, three of the five hand examples are cut short and do not show a complete 14-tile winning hand:
-
-- **Small Seven Pairs** — renders only 7 tiles (`slice(0, 7)`), showing half the pairs instead of all 7.
-- **Thirteen Misfits** — renders only 9 tiles (`slice(0, 9)`), omitting the honor tiles entirely.
-- **Seven Star Thirteen Misfits** — renders only 7 tiles (`[...WINDS, ...DRAGS]`), showing each honor once rather than a valid 14-tile hand with all 7 honors plus 7 numbered tiles.
-
-**Status:** OPEN — reported 2026-06-14.
-
-**Root cause:** All three hands use slice or partial arrays in `HandsSection`. `SEVEN_PAIRS_HAND` and `THIRTEEN_HAND` already contain the correct 14 tiles but are sliced at render time. Seven Star has no complete data array defined.
-
-**Fix needed:**
-
-- Remove `.slice(0, 7)` from the Seven Pairs `<TileRow>`.
-- Remove `.slice(0, 9)` from the Thirteen Misfits `<TileRow>`.
-- Add a `SEVEN_STAR_HAND: TileType[]` constant with all 7 unique honors (east, south, west, north, zhong, fa, bai) + 7 numbered tiles with inter-tile gaps > 2 (e.g. 1m, 4m, 7m, 1p, 4p, 7p, 1s) = 14 tiles total. Use that constant in the Seven Star `<TileRow>` instead of `[...WINDS, ...DRAGS]`.
-
-**Where to look:**
-
-- `apps/web/src/pages/learn/learn-page.tsx` — `HandsSection` (~line 360), `SEVEN_PAIRS_HAND` (~line 53), `THIRTEEN_HAND` (~line 78).
-
----
-
-### BUG-058 · Add-to-Kong (加杠) not triggered when drawing 4th tile matching an open pung
-
-**Symptom:** A player held an open pung (3 tiles claimed via 碰) and then drew the 4th tile of the same type. The add-to-kong (加杠) action button did not appear, so the kong could not be executed. As a result, the player received no kong settlement bonus. Reported: player (East/ww) had open pung of 八万 and drew 八万 — no 加杠 option shown.
-
-**Status:** OPEN — reported playtest 2026-06-15.
-
-**Suspected cause:** The client-side or server-side turn logic that checks for a possible 加杠 after a self-draw may not be scanning the player's open melds for a matching pung. A concealed kong (暗杠, all 4 in hand) appears to work; the failure mode is specifically the extend-pung-to-kong path (加杠).
-
-**Where to look:**
-
-- `apps/api/src/game/game.service.ts` — `startTurn()` / available-actions derivation after a self-draw; check that it includes `ACTION_KONG` when the drawn tile matches an existing open pung.
-- `packages/engine/src/` — `canAddToKong()` (or equivalent); verify it checks `openMelds` for a matching triplet, not only the closed hand.
-- `apps/web/src/pages/game/game-page.tsx` — `ActionBar` rendering; ensure the 加杠 button is rendered when the server reports a kong action is available.
-
----
-
-### BUG-059 · Spirit tile settlement payouts wrong when 精还原 triggers 德国胡 on a ron win
-
-**Symptom:** When a player wins by ron (someone else discards the winning tile) and spirit tile restoration (精还原) applies — transforming the hand into a 德国胡 (German win / all-open hand) — the per-player settlement payout amounts are calculated incorrectly. Reported in playtest 2026-06-15: South (qrx/@仁学) won with 七万 discarded by West (FifthBot); with spirit tiles 一索 (×2) and 二索 (×1), the settlement screen and final scores were both wrong.
-
-**Expected vs actual (playtest hand):**
-
-| Seat                    | Actual game | Expected |
-| ----------------------- | ----------- | -------- |
-| 東 ww                   | −9          | 0        |
-| 南 qrx (winner)         | +2          | +8       |
-| 西 FifthBot (discarder) | −1          | −6       |
-| 北 MelonBot             | +8          | +1       |
-
-**Breakdown per tester:** West discarded into German win: should pay base ron (4) + German win penalty (5) − spirit tile receipts (3 for 1 spirit tile held) = −6. North holds 1 spirit tile: receives 3 from spirit, pays 2 (non-discarder winner payout) = +1. South (winner): receives all payments + spirit bonus = +8.
-
-**Suspected causes:**
-
-1. The game may be treating the win as a tsumo (self-draw) rather than ron, causing the payout to be spread across all losers equally instead of concentrated on the discarder.
-2. The 精还原 + 德国胡 combination bonus may not be applied to the discarder's payment — the German win penalty (+5 extra) may be missing or applied to the wrong seat.
-3. Spirit tile payment direction (who pays whom) may be inverted when the spirit tile holder is also the discarder or one of the non-winning, non-discarding players.
-
-**Where to look:**
-
-- `packages/engine/src/scoring.ts` (or equivalent) — `settleHand()` / `computeRonPayouts()`; verify it correctly identifies the discarder and applies the German win multiplier only to them, not split across all losers.
-- `packages/engine/src/scoring.ts` — `精还原` logic; verify it correctly reclassifies the hand as 德国胡 before computing payouts, not after.
-- `apps/api/src/game/game.service.ts` — `endHand()` payload; confirm `winner.winType` is `'ron'` not `'tsumo'` when the winning tile was discarded.
-- `apps/web/src/pages/game/game-page.tsx` — `SettlementPreview` / spirit settlement display; confirm it reads `winType` from the payload rather than inferring it.
-
----
-
-### BUG-060 · Final hand score totals wrong — compound of BUG-058 and BUG-059
-
-**Symptom:** The end-of-hand score summary (所有手牌 screen) showed incorrect final totals that are the compound result of two separate bugs: (1) East's add-to-kong bonus was never applied (BUG-058), and (2) the settlement payouts for the ron + 精还原 + 德国胡 case were distributed incorrectly (BUG-059). The two errors compound, producing a net score difference of up to 9 points per seat from the correct value.
-
-**Status:** OPEN — reported playtest 2026-06-15. Dependent on BUG-058 and BUG-059; fixing both should resolve this.
-
-**Expected vs actual (same playtest hand):**
-
-| Seat        | Actual | Expected | Delta |
-| ----------- | ------ | -------- | ----- |
-| 東 ww       | −9     | 0        | +9    |
-| 南 qrx      | +2     | +8       | +6    |
-| 西 FifthBot | −1     | −6       | −5    |
-| 北 MelonBot | +8     | +1       | −7    |
-
-Zero-sum check (actual): −9 + 2 − 1 + 8 = 0 ✓ (internally consistent but wrong)
-Zero-sum check (expected): 0 + 8 − 6 + 1 = 3 — **this does not balance**. Tester's expected values may themselves need reconciliation once BUG-058 and BUG-059 are each fixed independently; the correct totals should be re-verified against the locked rules after those two root-cause fixes land.
 
 ---
 

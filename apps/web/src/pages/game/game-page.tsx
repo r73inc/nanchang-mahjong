@@ -2827,6 +2827,7 @@ function GameTable({
   selectedTileIdx,
   claimWindow,
   canTsumo,
+  canAddToKong,
   toast,
   pendingMove,
   onSelect,
@@ -2842,6 +2843,7 @@ function GameTable({
   selectedTileIdx: number | null;
   claimWindow: ClaimWindowState | null;
   canTsumo: boolean;
+  canAddToKong: TileType | null;
   toast: GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number | null) => void;
@@ -3329,6 +3331,42 @@ function GameTable({
           />
         )}
 
+        {/* ── Add-to-kong bar (BUG-058) ─────────────────────────────────────── */}
+        {/* Proactive bar shown when player's drawn tile can extend an open pung. */}
+        {canAddToKong &&
+          isMyTurn &&
+          !showConcedeSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && (
+            <div
+              className="absolute left-0 right-0 flex items-center justify-between gap-2 px-4 py-2 animate-call-prompt-enter"
+              style={{
+                zIndex: 25,
+                bottom: canTsumo
+                  ? 'calc(var(--mj-hand-height, 80px) + 68px)'
+                  : 'calc(var(--mj-hand-height, 80px) + 8px)',
+                background: 'rgba(30,60,30,0.85)',
+                borderTop: '1px solid rgba(100,200,100,0.3)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <span className="text-sm font-semibold" style={{ color: '#7ecb7e' }}>
+                {t('addToKongPrompt')}
+              </span>
+              <button
+                onClick={() => onKongAdd(canAddToKong)}
+                className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
+                style={{
+                  background: 'rgba(100,200,100,0.2)',
+                  border: '1px solid rgba(100,200,100,0.5)',
+                  color: '#7ecb7e',
+                }}
+              >
+                {t('addToKong')}
+              </button>
+            </div>
+          )}
+
         {/* ── Tsumo bar (IMP-020) ─────────────────────────────────────────────── */}
         {/* Non-blocking compact bar — does NOT cover the hand/canvas.            */}
         {/* Dismissed → shows persistent "Declare Win" button instead (above).    */}
@@ -3446,6 +3484,7 @@ export function GamePage() {
     gameError,
     selectTile,
     canTsumo,
+    canAddToKong,
     discard,
     declareTsumo,
     kongConcealed,
@@ -3665,6 +3704,7 @@ export function GamePage() {
             selectedTileIdx={selectedTileIdx}
             claimWindow={claimWindow}
             canTsumo={canTsumo}
+            canAddToKong={canAddToKong}
             toast={toast}
             pendingMove={pendingMove}
             onSelect={selectTile}

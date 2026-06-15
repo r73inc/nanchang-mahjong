@@ -4,7 +4,15 @@ import { isWinningHand } from '../hand';
 import { chowOptions } from '../calls';
 import { calculateSpiritSettlement } from '../scoring';
 import { tilesRemaining } from '../wall';
-import type { TileType, GameState, Meld, GameEvent, SeatState, SeatWind } from '../types';
+import type {
+  TileType,
+  GameState,
+  Meld,
+  GameEvent,
+  SeatState,
+  SeatWind,
+  WinPaymentResult,
+} from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1467,5 +1475,122 @@ describe('Engine·sacking-dealer', () => {
     for (let i = 0; i < 4; i++) {
       expect(after.state.seats[i].score).toBe(0);
     }
+  });
+});
+
+// ── BUG-059: German win detection with spirit tiles at face value ──────────────
+// Before the fix: isGerman = winJings === 0 incorrectly classified hands where
+// the winner holds spirit tiles at their natural tile value (e.g., a pung of 一索
+// when 一索 is jingPrimary) as non-German. The hand can win without any wildcard
+// substitution, so isGerman must be true.
+
+describe('Engine·BUG-059-german-detection', () => {
+  it('isGerman=true when jing tiles are held at face value (no wildcard substitution)', () => {
+    // Hand: pung of jingPrimary ('1s') + three chows + pair — all natural, no wildcards.
+    // [1s,1s,1s] + [3s,4s,5s] + [6s,7s,8s] + [5m,6m,7m] + [9s,9s] = 14 tiles ✓
+    const g = startedGame(42);
+    const jingPrimary: TileType = '1s';
+    const jingSecondary: TileType = '2s';
+
+    const winHand: TileType[] = [
+      '1s',
+      '1s',
+      '1s',
+      '3s',
+      '4s',
+      '5s',
+      '6s',
+      '7s',
+      '8s',
+      '5m',
+      '6m',
+      '7m',
+      '9s',
+      '9s',
+    ];
+
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: winHand, openMelds: [], score: 0 };
+    for (let i = 1; i < 4; i++) {
+      patchedSeats[i] = { ...g.state.seats[i], hand: [], openMelds: [], score: 0 };
+    }
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        dealerSeat: 3,
+        jingPrimary,
+        jingSecondary,
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    const finished = engine.declareWin(0);
+    const winEvent = finished.events.find((e: GameEvent) => e.kind === 'win') as
+      | { kind: 'win'; paymentResult: WinPaymentResult }
+      | undefined;
+
+    expect(winEvent).toBeDefined();
+    // German bonus: flatBonusPerLoser=5. Jing tiles at face value must NOT disqualify it.
+    expect(winEvent!.paymentResult.flatBonusPerLoser).toBe(5);
+  });
+
+  it('isGerman=false when a jing tile IS used as a wildcard — flatBonusPerLoser=0', () => {
+    // Hand requires '1s' (jingPrimary) to substitute for '3m' to complete:
+    // [1m,2m,1s/=3m] + [3s,4s,5s] + [6s,7s,8s] + [5m,6m,7m] + [9s,9s] = 14 tiles ✓
+    // Without wildcards the hand cannot decompose → not German → flatBonusPerLoser=0.
+    const g = startedGame(42);
+    const jingPrimary: TileType = '1s';
+    const jingSecondary: TileType = '2s';
+
+    const winHand: TileType[] = [
+      '1s',
+      '1m',
+      '2m',
+      '3s',
+      '4s',
+      '5s',
+      '6s',
+      '7s',
+      '8s',
+      '5m',
+      '6m',
+      '7m',
+      '9s',
+      '9s',
+    ];
+
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: winHand, openMelds: [], score: 0 };
+    for (let i = 1; i < 4; i++) {
+      patchedSeats[i] = { ...g.state.seats[i], hand: [], openMelds: [], score: 0 };
+    }
+
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        dealerSeat: 3,
+        jingPrimary,
+        jingSecondary,
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+
+    const finished = engine.declareWin(0);
+    const winEvent = finished.events.find((e: GameEvent) => e.kind === 'win') as
+      | { kind: 'win'; paymentResult: WinPaymentResult }
+      | undefined;
+
+    expect(winEvent).toBeDefined();
+    // 1s is used as a wildcard for 3m → not German → no flat bonus.
+    expect(winEvent!.paymentResult.flatBonusPerLoser).toBe(0);
   });
 });

@@ -25,6 +25,7 @@ import {
   isWinningHand,
   decomposeHand,
   decomposeConcealed,
+  addToKongOptions,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -679,6 +680,23 @@ export class GameService {
           this.server.to(socketId).emit('game:can-tsumo', { seat: activeSeat });
         }
       }
+
+      // ── Add-to-kong opportunity detection ─────────────────────────────────
+      // If the player's drawn tile matches an existing open pung, notify them
+      // so the UI can show a proactive "Add to Kong" button (BUG-058).
+      for (const meld of seatState.openMelds) {
+        if (meld.kind === 'pung') {
+          const pungTile = meld.tiles[0] as TileType;
+          if (addToKongOptions(seatState.hand, pungTile, jingTypes).length > 0) {
+            if (socketId && this.server) {
+              this.server
+                .to(socketId)
+                .emit('game:can-add-to-kong', { seat: activeSeat, tile: pungTile });
+            }
+            break;
+          }
+        }
+      }
     }
 
     // Player offline — fire a push notification (no-op if not subscribed or push disabled)
@@ -748,6 +766,30 @@ export class GameService {
         this.logger.log(`Bot auto-tsumo: seat ${seat} (game ${session.gameId})`);
         this.applyWinClaim(session, seat, 'tsumo', { isRobKong: false });
         return;
+      }
+    }
+
+    // Add-to-kong: if the drawn tile matches an existing open pung, upgrade it
+    // before discarding (bots always take the free kong payout).
+    const seatState = state.seats[seat];
+    for (const meld of seatState.openMelds) {
+      if (meld.kind === 'pung') {
+        const pungTile = meld.tiles[0] as TileType;
+        if (addToKongOptions(seatState.hand, pungTile, jingTypes).length > 0) {
+          try {
+            session.engine = session.engine.addToKong(seat, pungTile);
+            session.touch(seat);
+            session.moveLog.push(...getNewEvents(session));
+          } catch (err) {
+            this.logger.error(
+              `Bot add-to-kong failed — seat ${seat}, game ${session.gameId}: ${err}`,
+            );
+            break;
+          }
+          this.broadcastEvent(session, { kind: 'kong_added', seat, tile: pungTile });
+          this.openRobKongWindow(session, seat, pungTile);
+          return;
+        }
       }
     }
 
