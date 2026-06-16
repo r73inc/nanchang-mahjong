@@ -92,9 +92,9 @@ describe('GameService.isSessionOver', () => {
 
   // ── Bust mode ──────────────────────────────────────────────────────────────
 
-  it('SessionOver·bust·mid-round-negative — does NOT end when score negative but round not complete', () => {
+  it('SessionOver·bust·mid-round-negative — DOES end when any score is negative (regardless of roundComplete)', () => {
     const session = makeSession('bust', 'east', [20, -3, 5, 8]);
-    expect(svc.isSessionOver(session, nextInfo(false))).toBe(false);
+    expect(svc.isSessionOver(session, nextInfo(false))).toBe(true);
   });
 
   it('SessionOver·bust·round-end-negative — DOES end when round completes and a score is negative', () => {

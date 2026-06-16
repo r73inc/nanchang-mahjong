@@ -76,14 +76,25 @@ export interface GameTable2DProps {
    * into MotionConfig, correcting Framer Motion drag tracking for the 90° rotation.
    */
   isCssLandscape?: boolean;
+  /** True after player dismissed the TsumoBar — re-enables tile interaction so they can kong or discard. */
+  tsumoSuppressed?: boolean;
 }
 
 // ── Component — layout dispatcher ────────────────────────────────────────────
 
-export function GameTable2D({ onDiscard, isMobile, isCssLandscape }: GameTable2DProps) {
+export function GameTable2D({
+  onDiscard,
+  isMobile,
+  isCssLandscape,
+  tsumoSuppressed,
+}: GameTable2DProps) {
   return isMobile ? (
-    <MobileGameTable2D onDiscard={onDiscard} isCssLandscape={isCssLandscape} />
+    <MobileGameTable2D
+      onDiscard={onDiscard}
+      isCssLandscape={isCssLandscape}
+      tsumoSuppressed={tsumoSuppressed}
+    />
   ) : (
-    <DesktopGameTable2D onDiscard={onDiscard} />
+    <DesktopGameTable2D onDiscard={onDiscard} tsumoSuppressed={tsumoSuppressed} />
   );
 }
