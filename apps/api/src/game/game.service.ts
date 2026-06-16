@@ -54,6 +54,7 @@ import type {
   SpiritCount,
   GameSaveData,
   RestoreHistoryPayload,
+  RestoreStatusPayload,
 } from '@nanchang/shared';
 import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
@@ -337,7 +338,8 @@ export class GameService {
       },
     });
 
-    // For multi-player manual saves: generate a restore code for others to join
+    // For multi-player manual saves: generate a restore code and hold the turn
+    // loop until all human players have connected (restoreWaiting mode).
     let restoreCode: string | undefined;
     if (save.allowedPlayerSubs.length > 1) {
       restoreCode = this.generateRestoreCode();
@@ -345,23 +347,23 @@ export class GameService {
         gameId,
         allowedPlayerSubs: save.allowedPlayerSubs,
       });
+      session.restoreCode = restoreCode;
+      session.restoreWaiting = true;
     }
 
-    // If the game is mid-play (not in pre-game reveal), resume the turn loop.
-    // Bot seats will start acting; human seats will receive game:your-turn when connected.
-    if (session.preGamePhase === null) {
-      const enginePhase = session.engine.state.phase;
-      if (enginePhase === 'playing') {
-        this.startTurn(session);
-      } else if (enginePhase === 'awaiting_claims') {
-        // Re-open the claim window from the saved discard state
-        this.openClaimWindowAfterDiscard(session);
+    // Only start the turn loop immediately for single-player (bot) restores.
+    // Multi-player restores wait in restoreWaiting mode until host starts.
+    if (!session.restoreWaiting) {
+      if (session.preGamePhase === null) {
+        const enginePhase = session.engine.state.phase;
+        if (enginePhase === 'playing') {
+          this.startTurn(session);
+        } else if (enginePhase === 'awaiting_claims') {
+          this.openClaimWindowAfterDiscard(session);
+        }
+      } else if (session.preGamePhase === 'dealing' && session.pendingRoll) {
+        this.doBotRollIfNeeded(session);
       }
-      // For other engine phases ('dealing', 'rolling', etc.), the preGamePhase
-      // handling or pendingRoll mechanism takes over when players connect.
-    } else if (session.preGamePhase === 'dealing' && session.pendingRoll) {
-      // Bot roller present — schedule auto-roll after a short delay
-      this.doBotRollIfNeeded(session);
     }
 
     this.logger.log(
@@ -413,9 +415,9 @@ export class GameService {
       return this.emitError(socket, 'SAVE_FAILED');
     }
 
-    // Notify all players the game has been saved
+    // Notify all players the game has been saved (hostName for non-host overlay)
     this.server?.to(`game:${gameId}`).emit('game:saved', {
-      message: 'Game saved. Return to the home screen.',
+      hostName: session.seatNames[0],
     });
 
     this.destroySession(gameId);
@@ -495,6 +497,49 @@ export class GameService {
     return { events };
   }
 
+  /** Build the restore-status payload from the current session connection state. */
+  private buildRestoreStatusPayload(session: GameSession): RestoreStatusPayload {
+    const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i)) as (
+      | 0
+      | 1
+      | 2
+      | 3
+    )[];
+    const connectedSeats = humanSeats.filter((i) => session.connState[i].connected);
+    return { restoreCode: session.restoreCode, humanSeats, connectedSeats };
+  }
+
+  /**
+   * Handle game:start-restore — host-only action that clears restoreWaiting and
+   * starts the turn loop so the game resumes from the saved state.
+   */
+  handleStartRestore(socket: Socket, userId: string, gameId: string): void {
+    const session = this.sessions.get(gameId);
+    if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
+
+    const seat = session.getSeat(userId);
+    if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
+    if (seat !== 0) return this.emitError(socket, 'NOT_HOST');
+    if (!session.restoreWaiting) return; // already started — ignore duplicate
+
+    session.restoreWaiting = false;
+
+    // Broadcast to all players so they clear their restore-waiting overlays
+    this.server?.to(`game:${gameId}`).emit('game:restore-started', {});
+
+    // Resume the turn loop from the saved engine state
+    if (session.preGamePhase === null) {
+      const enginePhase = session.engine.state.phase;
+      if (enginePhase === 'playing') {
+        this.startTurn(session);
+      } else if (enginePhase === 'awaiting_claims') {
+        this.openClaimWindowAfterDiscard(session);
+      }
+    } else if (session.preGamePhase === 'dealing' && session.pendingRoll) {
+      this.doBotRollIfNeeded(session);
+    }
+  }
+
   /**
    * Handle game:join. Registers the socket, sends the current snapshot.
    * Spectators may join any game; players re-join to resync after disconnect.
@@ -547,6 +592,14 @@ export class GameService {
         .emit('game:restore-history', this.buildRestoreHistoryPayload(session));
     }
 
+    // For multi-player restores in waiting mode, broadcast updated status to all
+    // connected players so the waiting overlay stays in sync.
+    if (session.restoreWaiting) {
+      this.server
+        ?.to(`game:${gameId}`)
+        .emit('game:restore-status', this.buildRestoreStatusPayload(session));
+    }
+
     // Re-send pending events to reconnecting players so they don't miss a screen.
     if (
       (session.preGamePhase === 'jing' || session.preGamePhase === 'settlement') &&
@@ -561,8 +614,9 @@ export class GameService {
 
   /**
    * Handle socket disconnect. Updates connection state, notifies room.
+   * Async so auto-save completes before the session is torn down.
    */
-  handleDisconnect(socketId: string): void {
+  async handleDisconnect(socketId: string): Promise<void> {
     for (const session of this.sessions.values()) {
       const userId = session.disconnect(socketId);
       if (!userId) continue;
@@ -571,6 +625,14 @@ export class GameService {
       if (seat !== undefined) {
         this.logger.debug(`Player seat ${seat} disconnected from game ${session.gameId}`);
         this.broadcastPlayerConnection(session, seat, 'reconnecting');
+
+        // In restore-waiting mode, just update the status overlay — don't tear down.
+        if (session.restoreWaiting) {
+          this.server
+            ?.to(`game:${session.gameId}`)
+            .emit('game:restore-status', this.buildRestoreStatusPayload(session));
+          return;
+        }
 
         // If this is a bot game and no human remains connected, auto-save then tear down.
         if (session.hasBots) {
@@ -584,10 +646,10 @@ export class GameService {
             // Multi-human + bots is not eligible for auto-save.
             if (humanSeats.length === 1 && session.preGamePhase === null) {
               const humanSub = session.seatMap[humanSeats[0]];
-              this.gameSaves
+              await this.gameSaves
                 .saveAuto(session, humanSub)
-                .catch((err) =>
-                  this.logger.error(`Auto-save failed for game ${session.gameId}: ${err}`),
+                .catch((err: unknown) =>
+                  this.logger.error(`Auto-save failed for game ${session.gameId}: ${String(err)}`),
                 );
             }
             this.destroySession(session.gameId);

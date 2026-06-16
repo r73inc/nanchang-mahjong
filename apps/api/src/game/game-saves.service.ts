@@ -33,13 +33,20 @@ export class GameSavesService {
       .filter((i) => !session.isBotSeat(i))
       .map((i) => session.seatMap[i]);
 
+    // Use JSON round-trip to strip class-instance prototypes before DynamoDB
+    // marshaling — the AWS SDK throws on non-POJO values (see BUG-051).
+    const engineState = JSON.parse(
+      JSON.stringify(session.engine.state),
+    ) as typeof session.engine.state;
+    const settings = JSON.parse(JSON.stringify(session.settings)) as typeof session.settings;
+
     return {
       saveId: randomUUID(),
       slot,
       savedAt: Date.now(),
       gameId: session.gameId,
       roomId: session.roomId,
-      settings: session.settings,
+      settings,
       hostUserId,
       seatMap: [...session.seatMap] as [string, string, string, string],
       seatNames: [...session.seatNames] as [string, string, string, string],
@@ -49,7 +56,7 @@ export class GameSavesService {
         string | null,
         string | null,
       ],
-      engineState: session.engine.state,
+      engineState,
       cumulativeScores: [...session.cumulativeScores] as [number, number, number, number],
       sessionSpiritPoints: [...session.sessionSpiritPoints] as [number, number, number, number],
       sessionBonusTilePoints: [...session.sessionBonusTilePoints] as [

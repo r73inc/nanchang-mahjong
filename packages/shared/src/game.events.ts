@@ -417,6 +417,25 @@ export interface SnapshotPayload {
   state: ClientGameState;
 }
 /**
+ * Broadcast to all players when the host saves and closes a game.
+ * Non-host players use this to show a "game was saved" notification.
+ */
+export interface GameSavedPayload {
+  /** Display name of the host who triggered the save. */
+  hostName: string;
+}
+/**
+ * Emitted to all players in a restored session when anyone joins or disconnects,
+ * so the restore-waiting UI stays in sync.
+ */
+export interface RestoreStatusPayload {
+  restoreCode?: string;
+  /** Seat indices of human (non-bot) players in this session. */
+  humanSeats: ReadonlyArray<0 | 1 | 2 | 3>;
+  /** Seat indices of human players who are currently connected. */
+  connectedSeats: ReadonlyArray<0 | 1 | 2 | 3>;
+}
+/**
  * Sent once per joining player when they join a restored (save-loaded) session.
  * Contains the history-relevant public events from the current hand so the
  * client can bootstrap its in-game history panel without replaying from scratch.

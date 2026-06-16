@@ -223,6 +223,17 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     await this.gameService.handleSaveAndQuit(socket, user.sub, gameId);
   }
 
+  @SubscribeMessage('game:start-restore')
+  handleStartRestore(socket: Socket): void {
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = socket.data.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
+
+    this.gameService.handleStartRestore(socket, user.sub, gameId);
+  }
+
   @SubscribeMessage('game:roll-dice')
   handleRollDice(socket: Socket, raw: unknown): void {
     if (!this.checkRate(socket, 'game:roll-dice')) return;
