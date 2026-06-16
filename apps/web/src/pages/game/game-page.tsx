@@ -70,10 +70,6 @@ function getCompassSeats(viewerSeat: 0 | 1 | 2 | 3) {
 
 const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 
-// Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
-const ICON_HISTORY = '≡' as const;
-const ICON_CLOSE = '✕' as const;
-const ICON_SAVE = '↓' as const;
 const SCORE_SEP = ': ' as const;
 const MULT_CHAR = '×' as const;
 const CHEVRON_UP = '▲' as const;
@@ -2946,37 +2942,131 @@ function TsumoBar({
   );
 }
 
-// ── Mobile status-bar icon button ────────────────────────────────────────────
+const GAME_MENU_ICON = '···' as const;
 
-function MobileHeaderButton({
-  onClick,
-  icon,
-  isActive,
-  ariaLabel,
+// ── Game menu (replaces individual History / Save & Quit / Concede buttons) ──
+
+function GameMenu({
+  isHost,
+  canSaveAndQuit,
+  historyOpen,
+  onToggleHistory,
+  onOpenSave,
+  onOpenConcede,
 }: {
-  onClick: () => void;
-  icon: React.ReactNode;
-  isActive?: boolean;
-  ariaLabel: string;
+  isHost: boolean;
+  canSaveAndQuit: boolean;
+  historyOpen: boolean;
+  onToggleHistory: () => void;
+  onOpenSave: () => void;
+  onOpenConcede: () => void;
 }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+
+  const close = () => setOpen(false);
+
+  const handleHistory = () => {
+    close();
+    onToggleHistory();
+  };
+  const handleSave = () => {
+    close();
+    onOpenSave();
+  };
+  const handleConcede = () => {
+    close();
+    onOpenConcede();
+  };
+
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center justify-center"
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: 4,
-        border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-        color: isActive ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
-        fontSize: 12,
-        background: 'transparent',
-      }}
-      aria-label={ariaLabel}
-      aria-pressed={isActive !== undefined ? isActive : undefined}
-    >
-      {icon}
-    </button>
+    <div className="relative" style={{ zIndex: 31 }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label={t('gameMenuLabel')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        className="flex items-center justify-center font-bold"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 6,
+          border: open
+            ? '1px solid rgba(201,169,97,0.4)'
+            : '1px solid rgba(var(--felt-ink-rgb),0.15)',
+          color: open ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.5)',
+          fontSize: 16,
+          background: open ? 'rgba(201,169,97,0.08)' : 'transparent',
+          letterSpacing: 0,
+          lineHeight: 1,
+        }}
+      >
+        {GAME_MENU_ICON}
+      </button>
+
+      {open && (
+        <>
+          {/* Invisible backdrop — clicking outside closes the menu */}
+          <div
+            className="fixed inset-0"
+            style={{ zIndex: -1 }}
+            onClick={close}
+            aria-hidden="true"
+          />
+
+          {/* Menu panel */}
+          <div
+            role="menu"
+            className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden flex flex-col"
+            style={{
+              minWidth: 148,
+              background: '#1a1a1a',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.14)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}
+          >
+            {/* History */}
+            <button
+              role="menuitem"
+              onClick={handleHistory}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left w-full"
+              style={{
+                color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.75)',
+                background: historyOpen ? 'rgba(201,169,97,0.07)' : 'transparent',
+              }}
+            >
+              {t('gameHistoryTitle')}
+            </button>
+
+            {/* Save & Quit — host only */}
+            {isHost && canSaveAndQuit && (
+              <>
+                <div style={{ height: 1, background: 'rgba(var(--felt-ink-rgb),0.08)' }} />
+                <button
+                  role="menuitem"
+                  onClick={handleSave}
+                  className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left w-full"
+                  style={{ color: '#c9a961' }}
+                >
+                  {t('gameSaveAndQuit')}
+                </button>
+              </>
+            )}
+
+            {/* Concede */}
+            <div style={{ height: 1, background: 'rgba(var(--felt-ink-rgb),0.08)' }} />
+            <button
+              role="menuitem"
+              onClick={handleConcede}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left w-full"
+              style={{ color: 'rgba(192,57,43,0.9)' }}
+            >
+              {t('gameConcede')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -3335,51 +3425,15 @@ function GameTable({
             {/* Language toggle — available at all times during gameplay */}
             <LangToggle />
 
-            {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
-            {isMobile && (
-              <MobileHeaderButton
-                onClick={() => setHistoryOpen((o) => !o)}
-                icon={ICON_HISTORY}
-                isActive={historyOpen}
-                ariaLabel={t('gameHistoryTitle')}
-              />
-            )}
-
-            {/* Save & Quit button — host only */}
-            {isHost &&
-              onSaveAndQuit &&
-              (isMobile ? (
-                <MobileHeaderButton
-                  onClick={() => setShowSaveSheet(true)}
-                  icon={ICON_SAVE}
-                  ariaLabel={t('gameSaveAndQuit')}
-                />
-              ) : (
-                <button
-                  onClick={() => setShowSaveSheet(true)}
-                  className="text-[10px] text-mj-gold/60 px-2 py-1 rounded"
-                  style={{ border: '1px solid rgba(201,169,97,0.2)' }}
-                >
-                  {t('gameSaveAndQuit')}
-                </button>
-              ))}
-
-            {/* Concede button */}
-            {isMobile ? (
-              <MobileHeaderButton
-                onClick={() => setShowConcedeSheet(true)}
-                icon={ICON_CLOSE}
-                ariaLabel={t('gameConcede')}
-              />
-            ) : (
-              <button
-                onClick={() => setShowConcedeSheet(true)}
-                className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
-                style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
-              >
-                {t('gameConcede')}
-              </button>
-            )}
+            {/* Unified game menu — History, Save & Quit (host only), Concede */}
+            <GameMenu
+              isHost={isHost}
+              canSaveAndQuit={!!onSaveAndQuit}
+              historyOpen={historyOpen}
+              onToggleHistory={() => setHistoryOpen((o) => !o)}
+              onOpenSave={() => setShowSaveSheet(true)}
+              onOpenConcede={() => setShowConcedeSheet(true)}
+            />
           </div>
         </div>
 

@@ -653,6 +653,7 @@
   "savedGamesEmpty": "No saved games",
   "savedGamesRestoreCodeTitle": "Share This Code",
   "savedGamesRestoreCodeDesc": "Share this code with the other players so they can rejoin your saved game.",
+  "gameMenuLabel": "Game menu",
   "gameSaveAndQuit": "Save & Quit",
   "gameSaveAndQuitTitle": "Save Game?",
   "gameSaveAndQuitDesc": "Your progress will be saved to your manual save slot. The game will end for all players. Other players can rejoin using the code you'll receive.",

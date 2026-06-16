@@ -654,6 +654,7 @@
   "savedGamesEmpty": "无存档",
   "savedGamesRestoreCodeTitle": "分享此代码",
   "savedGamesRestoreCodeDesc": "将此代码分享给其他玩家，他们可以用此代码重新加入您的游戏。",
+  "gameMenuLabel": "游戏菜单",
   "gameSaveAndQuit": "存档并退出",
   "gameSaveAndQuitTitle": "保存游戏？",
   "gameSaveAndQuitDesc": "游戏进度将保存到您的手动存档位。游戏将对所有玩家结束。其他玩家可以使用您收到的代码重新加入。",
