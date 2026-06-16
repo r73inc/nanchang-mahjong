@@ -24,8 +24,8 @@ export class ChallengeGameConfigDto {
   @Max(4)
   numRounds!: 1 | 2 | 3 | 4;
 
-  @IsIn(['easy', 'normal'])
-  botDifficulty!: 'easy' | 'normal';
+  @IsIn(['easy', 'normal', 'hard'])
+  botDifficulty!: 'easy' | 'normal' | 'hard';
 
   @IsInt()
   @Min(0)
