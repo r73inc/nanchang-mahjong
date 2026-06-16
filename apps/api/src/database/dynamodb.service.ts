@@ -118,4 +118,10 @@ export const DK = {
     PK: `USER#${sub}`,
     SK: `CHALLENGE#${ts}#${id}`,
   }),
+  // ── Save keys ───────────────────────────────────────────────────────────────
+  /** Auto-save slot for a user (overwritten on each new auto-save). */
+  userSave: (sub: string, slot: 'auto' | 'manual') => ({
+    PK: `USER#${sub}`,
+    SK: `SAVE#${slot.toUpperCase()}`,
+  }),
 } as const;

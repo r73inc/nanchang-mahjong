@@ -15,11 +15,18 @@
  * all listeners.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getSocket } from '../lib/socket';
 import { useGameStore } from '../stores/game.store';
 import { useSound } from './use-sound';
-import type { TileType, ClientGameState } from '@nanchang/shared';
+import type {
+  TileType,
+  ClientGameState,
+  RestoreHistoryPayload,
+  RestoreStatusPayload,
+  GameSavedPayload,
+} from '@nanchang/shared';
 
 // Delay before showing the reconnecting overlay (PLAN §7.5: 1.5s)
 const RECONNECT_OVERLAY_DELAY_MS = 1500;
@@ -27,6 +34,10 @@ const RECONNECT_OVERLAY_DELAY_MS = 1500;
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useGame(gameId: string, spectate = false) {
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
   const {
     snapshot,
     ended,
@@ -90,6 +101,10 @@ export function useGame(gameId: string, spectate = false) {
     playCallOutPung,
     playCallOutKong,
   };
+
+  const [restoreEvents, setRestoreEvents] = useState<RestoreHistoryPayload['events'] | null>(null);
+  const [gameSaved, setGameSaved] = useState<GameSavedPayload | null>(null);
+  const [restoreStatus, setRestoreStatus] = useState<RestoreStatusPayload | null>(null);
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot queue: snapshots received during dice animation are held here and
@@ -270,6 +285,29 @@ export function useGame(gameId: string, spectate = false) {
       setRematchRoomCode(payload.roomCode);
     };
 
+    const handleSaved = (payload: GameSavedPayload) => {
+      const viewerSeat = useGameStore.getState().snapshot?.viewerSeat ?? null;
+      if (viewerSeat === 0) {
+        // Host initiated the save — navigate home immediately.
+        navigateRef.current('/');
+      } else {
+        // Non-host players: show an overlay so they know what happened.
+        setGameSaved(payload);
+      }
+    };
+
+    const handleRestoreHistory = (payload: RestoreHistoryPayload) => {
+      setRestoreEvents(payload.events);
+    };
+
+    const handleRestoreStatus = (payload: RestoreStatusPayload) => {
+      setRestoreStatus(payload);
+    };
+
+    const handleRestoreStarted = () => {
+      setRestoreStatus(null);
+    };
+
     // game:error — log to console so backend rejections are visible during debugging.
     // Surface ALL error codes in the store so GamePage renders an error screen
     // instead of leaving the user stuck on a perpetual LoadingScreen.
@@ -328,6 +366,10 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:settlement-preview', handleSettlementPreview);
     s.on('game:hand-reveal', handleHandReveal);
     s.on('game:rematch-ready', handleRematchReady);
+    s.on('game:saved', handleSaved);
+    s.on('game:restore-history', handleRestoreHistory);
+    s.on('game:restore-status', handleRestoreStatus);
+    s.on('game:restore-started', handleRestoreStarted);
     s.on('game:error', handleError);
 
     // ── Connection management ─────────────────────────────────────────────────
@@ -388,6 +430,10 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:settlement-preview', handleSettlementPreview);
       s.off('game:hand-reveal', handleHandReveal);
       s.off('game:rematch-ready', handleRematchReady);
+      s.off('game:saved', handleSaved);
+      s.off('game:restore-history', handleRestoreHistory);
+      s.off('game:restore-status', handleRestoreStatus);
+      s.off('game:restore-started', handleRestoreStarted);
       s.off('game:error', handleError);
       s.off('disconnect', handleDisconnect);
       s.off('connect', handleConnect);
@@ -506,6 +552,22 @@ export function useGame(gameId: string, spectate = false) {
     setDiceAnimation(null);
   }, [setSnapshot, setDiceAnimation]);
 
+  const saveAndQuit = useCallback(() => {
+    try {
+      getSocket().emit('game:save-and-quit', {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const startRestore = useCallback(() => {
+    try {
+      getSocket().emit('game:start-restore', {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const declareTsumo = useCallback(() => {
     setCanTsumo(false);
     setCanAddToKong(null);
@@ -556,12 +618,17 @@ export function useGame(gameId: string, spectate = false) {
     canTsumo,
     canAddToKong,
     diceAnimation,
+    restoreEvents,
+    gameSaved,
+    restoreStatus,
     // Actions
     selectTile,
     discard,
     claim,
     pass,
     concede,
+    saveAndQuit,
+    startRestore,
     revealJing,
     advancePreGame,
     advanceHand,

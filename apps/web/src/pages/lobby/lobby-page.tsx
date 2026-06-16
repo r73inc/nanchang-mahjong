@@ -15,6 +15,7 @@ import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
 import { useRoomActions } from '../../hooks/use-room';
 import { useRoomStore } from '../../stores/room.store';
+import { useJoinRestore } from '../../hooks/use-saves';
 import { connectSocket } from '../../lib/socket';
 import { useAuthStore } from '../../stores/auth.store';
 import { useChallenges } from '../../hooks/use-challenges';
@@ -29,6 +30,8 @@ export function LobbyPage() {
   const { createRoom, joinRoom } = useRoomActions();
   const loading = useRoomStore((s) => s.loading);
   const error = useRoomStore((s) => s.error);
+  const setRoomError = useRoomStore((s) => s.setError);
+  const joinRestore = useJoinRestore();
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [code, setCode] = useState('');
@@ -79,6 +82,15 @@ export function LobbyPage() {
     const room = await joinRoom(code);
     if (room) {
       navigate(`/room/${room.code}`);
+      return;
+    }
+    // Room not found — check if the code is a saved-game restore code instead.
+    try {
+      const { gameId } = await joinRestore.mutateAsync(code);
+      setRoomError(null); // clear the "room not found" error before navigating
+      navigate(`/game/${gameId}`);
+    } catch {
+      // Not a restore code either — the room store error is already showing.
     }
   }
 
@@ -219,21 +231,24 @@ export function LobbyPage() {
               />
               <button
                 onClick={handleJoin}
-                disabled={loading || !code.trim()}
+                disabled={loading || joinRestore.isPending || !code.trim()}
                 className="w-full py-3.5 rounded-[14px] font-bold text-sm text-mj-bone"
                 style={{
                   background:
-                    loading || !code.trim()
+                    loading || joinRestore.isPending || !code.trim()
                       ? 'rgba(var(--felt-ink-rgb),0.06)'
                       : 'rgba(201,169,97,0.2)',
                   border:
-                    loading || !code.trim()
+                    loading || joinRestore.isPending || !code.trim()
                       ? '1px solid rgba(var(--felt-ink-rgb),0.1)'
                       : '1px solid rgba(201,169,97,0.5)',
-                  color: loading || !code.trim() ? 'rgba(var(--felt-ink-rgb),0.4)' : '#c9a961',
+                  color:
+                    loading || joinRestore.isPending || !code.trim()
+                      ? 'rgba(var(--felt-ink-rgb),0.4)'
+                      : '#c9a961',
                 }}
               >
-                {loading ? t('joining') : t('joinRoom')}
+                {loading || joinRestore.isPending ? t('joining') : t('joinRoom')}
               </button>
             </div>
           )}

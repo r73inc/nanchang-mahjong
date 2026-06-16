@@ -144,6 +144,18 @@ export class GameSession {
   /** Full ordered move log (all hands). Serialized to S3 on game end. */
   readonly moveLog: GameEvent[] = [];
 
+  /** True when this session was restored from a save rather than started fresh. */
+  isRestored = false;
+
+  /**
+   * True when a multi-player restore is waiting for all human players to connect
+   * before starting the turn loop. Set by restoreSession(), cleared by handleStartRestore().
+   */
+  restoreWaiting = false;
+
+  /** Restore code for this session (set for multi-player restores). */
+  restoreCode?: string;
+
   /** Per-hand metadata for replay assembly. One entry per hand played. */
   readonly handLog: HandMeta[] = [];
 

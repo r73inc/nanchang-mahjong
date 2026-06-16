@@ -44,6 +44,9 @@ import type {
   SettlementPreviewPayload,
   HandRevealPayload,
   Meld,
+  RestoreHistoryPayload,
+  RestoreStatusPayload,
+  GameSavedPayload,
 } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
@@ -70,9 +73,6 @@ function getCompassSeats(viewerSeat: 0 | 1 | 2 | 3) {
 
 const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '西', north: '北' };
 
-// Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
-const ICON_HISTORY = '≡' as const;
-const ICON_CLOSE = '✕' as const;
 const SCORE_SEP = ': ' as const;
 const MULT_CHAR = '×' as const;
 const CHEVRON_UP = '▲' as const;
@@ -1972,6 +1972,146 @@ function ReconnectingOverlay() {
   );
 }
 
+/**
+ * Full-screen overlay shown to non-host players when the host saves and quits.
+ * Auto-navigates home after 5 seconds; "Return Home" button skips the timer.
+ */
+function GameSavedOverlay({ payload, onHome }: { payload: GameSavedPayload; onHome: () => void }) {
+  const { t } = useI18n();
+
+  useEffect(() => {
+    const id = setTimeout(onHome, 5000);
+    return () => clearTimeout(id);
+  }, [onHome]);
+
+  return (
+    <div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
+      style={{ background: 'rgba(10,10,10,0.92)', backdropFilter: 'blur(12px)' }}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center"
+        style={{ background: 'rgba(201,169,97,0.15)', border: '2px solid rgba(201,169,97,0.5)' }}
+        aria-hidden
+      >
+        <span className="text-2xl">💾</span>
+      </div>
+      <div>
+        <p className="text-lg font-bold text-mj-bone">{t('gameSavedByHost', payload.hostName)}</p>
+        <p className="text-sm text-mj-bone/50 mt-2 max-w-[260px]">{t('gameSavedSubtext')}</p>
+      </div>
+      <button
+        onClick={onHome}
+        className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+        style={{
+          background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+          boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
+        }}
+      >
+        {t('gameSavedGoHome')}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Full-screen overlay shown while a restored multi-player session waits for
+ * all human players to reconnect. The host sees the restore code and a
+ * "Start Game" button; other players see a waiting message.
+ */
+function RestoreWaitingOverlay({
+  status,
+  snapshot,
+  isHost,
+  onStart,
+}: {
+  status: RestoreStatusPayload;
+  snapshot: ClientGameState;
+  isHost: boolean;
+  onStart: () => void;
+}) {
+  const { t } = useI18n();
+  const allConnected = status.humanSeats.every((s) => status.connectedSeats.includes(s));
+
+  return (
+    <div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-8 px-6 text-center"
+      style={{ background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(12px)' }}
+    >
+      <div>
+        <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+          {t('restoreWaitingTitle')}
+        </p>
+        {status.restoreCode && (
+          <>
+            <p className="text-xs text-mj-bone/50 mb-2">{t('restoreWaitingShareCode')}</p>
+            <p className="text-5xl font-mono font-bold text-mj-bone tracking-widest mb-1">
+              {status.restoreCode}
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Per-seat connection status */}
+      <div className="flex flex-col gap-2 w-full max-w-[240px]">
+        {status.humanSeats.map((seatIdx) => {
+          const seat = snapshot.seats[seatIdx];
+          const isConnected = status.connectedSeats.includes(seatIdx);
+          return (
+            <div
+              key={seatIdx}
+              className="flex items-center justify-between px-3 py-2 rounded-lg"
+              style={{
+                background: isConnected
+                  ? 'rgba(100,200,100,0.1)'
+                  : 'rgba(var(--felt-ink-rgb),0.06)',
+                border: `1px solid ${isConnected ? 'rgba(100,200,100,0.3)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
+              }}
+            >
+              <span className="text-sm text-mj-bone/80">{seat.seatName}</span>
+              <span
+                className="text-xs font-bold"
+                style={{ color: isConnected ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.4)' }}
+              >
+                {isConnected ? t('restoreWaitingConnected') : t('restoreWaitingWaiting')}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {isHost ? (
+        <button
+          onClick={onStart}
+          disabled={!allConnected}
+          className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink disabled:opacity-40"
+          style={{
+            background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+            boxShadow: allConnected ? '0 6px 18px rgba(201,169,97,0.35)' : 'none',
+          }}
+        >
+          {t('restoreWaitingStart')} →
+        </button>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-mj-gold/40 animate-pulse"
+                style={{ animationDelay: `${i * 200}ms` }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-mj-bone/40">{t('restoreWaitingWaitingForHost')}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Concede confirmation sheet. */
 function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   const { t } = useI18n();
@@ -2002,6 +2142,49 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
             style={{ background: '#c0392b', color: '#f5efdf' }}
           >
             {t('gameConcedeConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Save & Quit confirmation sheet (host only). */
+function SaveAndQuitSheet({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
+    >
+      <div
+        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
+        role="dialog"
+        aria-label={t('gameSaveAndQuitTitle')}
+      >
+        <h2 className="font-bold text-lg text-mj-bone">{t('gameSaveAndQuitTitle')}</h2>
+        <p className="text-sm text-mj-bone/60">{t('gameSaveAndQuitDesc')}</p>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
+          >
+            {t('gameSaveAndQuitCancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl font-bold text-sm"
+            style={{ background: '#2e6b3e', color: '#f5efdf' }}
+          >
+            {t('gameSaveAndQuitConfirm')}
           </button>
         </div>
       </div>
@@ -2902,37 +3085,131 @@ function TsumoBar({
   );
 }
 
-// ── Mobile status-bar icon button ────────────────────────────────────────────
+const GAME_MENU_ICON = '···' as const;
 
-function MobileHeaderButton({
-  onClick,
-  icon,
-  isActive,
-  ariaLabel,
+// ── Game menu (replaces individual History / Save & Quit / Concede buttons) ──
+
+function GameMenu({
+  isHost,
+  canSaveAndQuit,
+  historyOpen,
+  onToggleHistory,
+  onOpenSave,
+  onOpenConcede,
 }: {
-  onClick: () => void;
-  icon: React.ReactNode;
-  isActive?: boolean;
-  ariaLabel: string;
+  isHost: boolean;
+  canSaveAndQuit: boolean;
+  historyOpen: boolean;
+  onToggleHistory: () => void;
+  onOpenSave: () => void;
+  onOpenConcede: () => void;
 }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+
+  const close = () => setOpen(false);
+
+  const handleHistory = () => {
+    close();
+    onToggleHistory();
+  };
+  const handleSave = () => {
+    close();
+    onOpenSave();
+  };
+  const handleConcede = () => {
+    close();
+    onOpenConcede();
+  };
+
   return (
-    <button
-      onClick={onClick}
-      className="flex items-center justify-center"
-      style={{
-        width: 24,
-        height: 24,
-        borderRadius: 4,
-        border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
-        color: isActive ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.4)',
-        fontSize: 12,
-        background: 'transparent',
-      }}
-      aria-label={ariaLabel}
-      aria-pressed={isActive !== undefined ? isActive : undefined}
-    >
-      {icon}
-    </button>
+    <div className="relative" style={{ zIndex: 31 }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label={t('gameMenuLabel')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        className="flex items-center justify-center font-bold"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 6,
+          border: open
+            ? '1px solid rgba(201,169,97,0.4)'
+            : '1px solid rgba(var(--felt-ink-rgb),0.15)',
+          color: open ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.5)',
+          fontSize: 16,
+          background: open ? 'rgba(201,169,97,0.08)' : 'transparent',
+          letterSpacing: 0,
+          lineHeight: 1,
+        }}
+      >
+        {GAME_MENU_ICON}
+      </button>
+
+      {open && (
+        <>
+          {/* Invisible backdrop — clicking outside closes the menu */}
+          <div
+            className="fixed inset-0"
+            style={{ zIndex: -1 }}
+            onClick={close}
+            aria-hidden="true"
+          />
+
+          {/* Menu panel */}
+          <div
+            role="menu"
+            className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden flex flex-col"
+            style={{
+              minWidth: 148,
+              background: '#1a1a1a',
+              border: '1px solid rgba(var(--felt-ink-rgb),0.14)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}
+          >
+            {/* History */}
+            <button
+              role="menuitem"
+              onClick={handleHistory}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left w-full"
+              style={{
+                color: historyOpen ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.75)',
+                background: historyOpen ? 'rgba(201,169,97,0.07)' : 'transparent',
+              }}
+            >
+              {t('gameHistoryTitle')}
+            </button>
+
+            {/* Save & Quit — host only */}
+            {isHost && canSaveAndQuit && (
+              <>
+                <div style={{ height: 1, background: 'rgba(var(--felt-ink-rgb),0.08)' }} />
+                <button
+                  role="menuitem"
+                  onClick={handleSave}
+                  className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left w-full"
+                  style={{ color: '#c9a961' }}
+                >
+                  {t('gameSaveAndQuit')}
+                </button>
+              </>
+            )}
+
+            {/* Concede */}
+            <div style={{ height: 1, background: 'rgba(var(--felt-ink-rgb),0.08)' }} />
+            <button
+              role="menuitem"
+              onClick={handleConcede}
+              className="flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left w-full"
+              style={{ color: 'rgba(192,57,43,0.9)' }}
+            >
+              {t('gameConcede')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -2967,7 +3244,9 @@ function GameTable({
   onClaim,
   onPass,
   onConcede,
+  onSaveAndQuit,
   onDeclareTsumo,
+  restoreEvents,
 }: {
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
@@ -2983,11 +3262,14 @@ function GameTable({
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
   onConcede: () => void;
+  onSaveAndQuit?: () => void;
   onDeclareTsumo: () => void;
+  restoreEvents?: RestoreHistoryPayload['events'] | null;
 }) {
   const { t } = useI18n();
   const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
+  const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [jingDiscardPending, setJingDiscardPending] = useState<TileType | null>(null);
   const [kongActionPending, setKongActionPending] = useState<KongActionPending | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -3138,6 +3420,62 @@ function GameTable({
     setHistoryEntries((prev) => [...prev, { ...entry, id: nextHistoryId.current++ }]);
   }, []);
 
+  // Bootstrap history entries when joining a restored session.
+  // The server sends game:restore-history once with the current hand's public
+  // events so the panel isn't empty after a save/load.
+  useEffect(() => {
+    if (!restoreEvents || restoreEvents.length === 0) return;
+    const bootstrapped: HistoryEntry[] = [];
+    for (const e of restoreEvents) {
+      const seatIdx = e.seat;
+      const seatWind = snapshot.seats[seatIdx]?.wind;
+      if (!seatWind) continue;
+
+      if (e.kind === 'discard') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'discard',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'concede') {
+        bootstrapped.push({ id: nextHistoryId.current++, kind: 'concede', seatWind, seatIdx });
+      } else if (e.kind === 'pung') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'pung',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'chow') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'chow',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'kong_open' || e.kind === 'kong_added') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'kong',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'kong_concealed') {
+        bootstrapped.push({ id: nextHistoryId.current++, kind: 'kong', seatWind, seatIdx });
+      } else if (e.kind === 'win') {
+        bootstrapped.push({ id: nextHistoryId.current++, kind: 'win', seatWind, seatIdx });
+      }
+    }
+    if (bootstrapped.length > 0) {
+      setHistoryEntries(bootstrapped);
+    }
+  }, [restoreEvents]); // snapshot.seats winds are stable within a hand; only run when restore events arrive
+
   // Detect discards and new open melds by diffing snapshots.
   useEffect(() => {
     const prev = prevSnapshotRef.current;
@@ -3183,6 +3521,13 @@ function GameTable({
     setShowConcedeSheet(false);
     onConcede();
   };
+
+  const handleSaveAndQuit = () => {
+    setShowSaveSheet(false);
+    onSaveAndQuit?.();
+  };
+
+  const isHost = viewerSeat === 0;
 
   return (
     <ForcedLandscapeWrapper
@@ -3281,32 +3626,15 @@ function GameTable({
             {/* Language toggle — available at all times during gameplay */}
             <LangToggle />
 
-            {/* History icon — mobile only (desktop uses the right-edge panel toggle) */}
-            {isMobile && (
-              <MobileHeaderButton
-                onClick={() => setHistoryOpen((o) => !o)}
-                icon={ICON_HISTORY}
-                isActive={historyOpen}
-                ariaLabel={t('gameHistoryTitle')}
-              />
-            )}
-
-            {/* Concede button */}
-            {isMobile ? (
-              <MobileHeaderButton
-                onClick={() => setShowConcedeSheet(true)}
-                icon={ICON_CLOSE}
-                ariaLabel={t('gameConcede')}
-              />
-            ) : (
-              <button
-                onClick={() => setShowConcedeSheet(true)}
-                className="text-[10px] text-mj-bone/40 px-2 py-1 rounded"
-                style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
-              >
-                {t('gameConcede')}
-              </button>
-            )}
+            {/* Unified game menu — History, Save & Quit (host only), Concede */}
+            <GameMenu
+              isHost={isHost}
+              canSaveAndQuit={!!onSaveAndQuit}
+              historyOpen={historyOpen}
+              onToggleHistory={() => setHistoryOpen((o) => !o)}
+              onOpenSave={() => setShowSaveSheet(true)}
+              onOpenConcede={() => setShowConcedeSheet(true)}
+            />
           </div>
         </div>
 
@@ -3354,18 +3682,22 @@ function GameTable({
         {/* where it overlays the R3F canvas (which has no mobile handling).      */}
         {/* Kept visible when canTsumo is true so the hand remains visible while  */}
         {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
-        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && !isMobile && (
-          <ViewerHandHUD
-            hand={viewerHand}
-            selectedTileIdx={selectedTileIdx}
-            onSelect={onSelect}
-            onDiscard={handleDiscardOrKong}
-            isMyTurn={isMyTurn && !canTsumo}
-            jingTypes={jingTypes}
-            pendingMove={pendingMove}
-            onDisplayOrderChange={setHudDisplayOrder}
-          />
-        )}
+        {!showConcedeSheet &&
+          !showSaveSheet &&
+          !kongActionPending &&
+          snapshot.viewMode !== '2D' &&
+          !isMobile && (
+            <ViewerHandHUD
+              hand={viewerHand}
+              selectedTileIdx={selectedTileIdx}
+              onSelect={onSelect}
+              onDiscard={handleDiscardOrKong}
+              isMyTurn={isMyTurn && !canTsumo}
+              jingTypes={jingTypes}
+              pendingMove={pendingMove}
+              onDisplayOrderChange={setHudDisplayOrder}
+            />
+          )}
 
         {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
         {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
@@ -3398,7 +3730,7 @@ function GameTable({
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}
-        {!showConcedeSheet && !jingDiscardPending && !kongActionPending && (
+        {!showConcedeSheet && !showSaveSheet && !jingDiscardPending && !kongActionPending && (
           <GameHistoryPanel
             entries={historyEntries}
             isOpen={historyOpen}
@@ -3409,14 +3741,17 @@ function GameTable({
         )}
 
         {/* ── Action toast ───────────────────────────────────────────────────── */}
-        {toast && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-          <ActionToast toast={toast} snapshot={snapshot} />
-        )}
+        {toast &&
+          !showConcedeSheet &&
+          !showSaveSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && <ActionToast toast={toast} snapshot={snapshot} />}
 
         {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
         {yourTurnFlash &&
           !claimWindow &&
           !showConcedeSheet &&
+          !showSaveSheet &&
           !jingDiscardPending &&
           !kongActionPending && <YourTurnBanner />}
 
@@ -3424,23 +3759,36 @@ function GameTable({
         {snapshot.phase === 'awaiting_claims' &&
           !claimWindow &&
           !showConcedeSheet &&
+          !showSaveSheet &&
           !jingDiscardPending &&
           !kongActionPending && <WaitingForClaimIndicator isMobile={isMobile} />}
 
         {/* ── Claim window rail ──────────────────────────────────────────────── */}
-        {claimWindow && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-          <SideRail
-            claimWindow={claimWindow}
-            pendingDiscard={snapshot.pendingDiscard}
-            onClaim={onClaim}
-            onPass={onPass}
-            isMobile={isMobile}
-          />
-        )}
+        {claimWindow &&
+          !showConcedeSheet &&
+          !showSaveSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && (
+            <SideRail
+              claimWindow={claimWindow}
+              pendingDiscard={snapshot.pendingDiscard}
+              onClaim={onClaim}
+              onPass={onPass}
+              isMobile={isMobile}
+            />
+          )}
 
         {/* ── Concede sheet ──────────────────────────────────────────────────── */}
         {showConcedeSheet && !jingDiscardPending && (
           <ConcedeSheet onConfirm={handleConcede} onCancel={() => setShowConcedeSheet(false)} />
+        )}
+
+        {/* ── Save & Quit sheet (host only) ─────────────────────────────────── */}
+        {showSaveSheet && !jingDiscardPending && (
+          <SaveAndQuitSheet
+            onConfirm={handleSaveAndQuit}
+            onCancel={() => setShowSaveSheet(false)}
+          />
         )}
 
         {/* ── Jing discard confirmation sheet ────────────────────────────────── */}
@@ -3621,11 +3969,16 @@ export function GamePage() {
     claim,
     pass,
     concede,
+    saveAndQuit,
     advancePreGame,
     advanceHand,
     rollDice,
     onDiceAnimationComplete,
     diceAnimation,
+    restoreEvents,
+    gameSaved,
+    restoreStatus,
+    startRestore,
   } = useGame(gameId ?? '', spectate);
 
   // ── Sound effects ─────────────────────────────────────────────────────────────
@@ -3820,7 +4173,9 @@ export function GamePage() {
             onClaim={claim}
             onPass={pass}
             onConcede={concede}
+            onSaveAndQuit={viewerSeat === 0 ? saveAndQuit : undefined}
             onDeclareTsumo={declareTsumo}
+            restoreEvents={restoreEvents}
           />
         )}
 
@@ -3856,6 +4211,19 @@ export function GamePage() {
         snapshot.phase !== 'finished' && <LoadingScreen />}
 
       {connection === 'reconnecting' && <ReconnectingOverlay />}
+
+      {/* ── Non-host: host saved the game overlay ─────────────────────────── */}
+      {gameSaved && <GameSavedOverlay payload={gameSaved} onHome={() => navigate('/')} />}
+
+      {/* ── Restore-waiting lobby: waiting for all human players ──────────── */}
+      {restoreStatus && snapshot && (
+        <RestoreWaitingOverlay
+          status={restoreStatus}
+          snapshot={snapshot}
+          isHost={viewerSeat === 0}
+          onStart={startRestore}
+        />
+      )}
     </>
   );
 }

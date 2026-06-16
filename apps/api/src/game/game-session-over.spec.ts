@@ -16,7 +16,9 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { ModuleRef } from '@nestjs/core';
 import { GameService } from './game.service';
+import { GameSavesService } from './game-saves.service';
 import { DynamoDBService } from '../database/dynamodb.service';
 import { StatsService } from './stats.service';
 import { StorageService } from '../storage/storage.service';
@@ -80,6 +82,8 @@ describe('GameService.isSessionOver', () => {
         { provide: StatsService, useValue: {} },
         { provide: StorageService, useValue: {} },
         { provide: PushService, useValue: {} },
+        { provide: GameSavesService, useValue: {} },
+        { provide: ModuleRef, useValue: {} },
       ],
     }).compile();
 

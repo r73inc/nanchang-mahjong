@@ -8,6 +8,136 @@ import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
 import { useThemeStore } from '../../stores/theme.store';
+import { useSaves, useLoadAutoSave, useLoadManualSave, useDeleteSave } from '../../hooks/use-saves';
+import type { SaveSlotInfo } from '@nanchang/shared';
+
+const SEP_DOT = ' · ' as const;
+
+// ── Saved Games UI ─────────────────────────────────────────────────────────────
+
+function SaveSlotCard({
+  info,
+  onResume,
+  onDelete,
+  isLoading,
+}: {
+  info: SaveSlotInfo;
+  onResume: () => void;
+  onDelete: () => void;
+  isLoading: boolean;
+}) {
+  const { t } = useI18n();
+  const label = info.slot === 'auto' ? t('savedGamesAutoLabel') : t('savedGamesManualLabel');
+  const date = new Date(info.savedAt).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return (
+    <div
+      className="w-full px-4 py-3 rounded-[14px] flex items-center gap-3"
+      style={{
+        background: 'rgba(var(--felt-ink-rgb),0.06)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-mj-gold/80 uppercase tracking-wide">{label}</span>
+          {info.challengeId && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+              style={{ background: 'rgba(201,169,97,0.15)', color: '#c9a961' }}
+            >
+              {t('savedGamesChallenge')}
+            </span>
+          )}
+        </div>
+        <p className="text-sm font-semibold text-mj-bone truncate mt-0.5">
+          {info.seatNames.filter((n) => !n.startsWith('bot-')).join(', ') || info.seatNames[0]}
+        </p>
+        <p className="text-xs text-mj-bone/40 mt-0.5">
+          {t('savedGamesHandsPlayed', String(info.handsPlayed))}
+          {SEP_DOT}
+          {date}
+        </p>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <button
+          onClick={onDelete}
+          disabled={isLoading}
+          className="text-xs text-mj-bone/40 px-2 py-1 rounded"
+          style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.12)' }}
+          aria-label={t('savedGamesDelete')}
+        >
+          {t('savedGamesDelete')}
+        </button>
+        <button
+          onClick={onResume}
+          disabled={isLoading}
+          className="text-xs font-bold text-mj-ink px-3 py-1 rounded"
+          style={{ background: '#c9a961', opacity: isLoading ? 0.6 : 1 }}
+        >
+          {isLoading ? t('savedGamesLoading') : t('savedGamesResume')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SavedGamesSection() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const { data: saves } = useSaves();
+  const loadAuto = useLoadAutoSave();
+  const loadManual = useLoadManualSave();
+  const deleteSave = useDeleteSave();
+
+  if (!saves || saves.length === 0) return null;
+
+  const autoSave = saves.find((s) => s.slot === 'auto');
+  const manualSave = saves.find((s) => s.slot === 'manual');
+
+  const handleResumeAuto = async () => {
+    const result = await loadAuto.mutateAsync();
+    navigate(`/game/${result.gameId}`);
+  };
+
+  const handleResumeManual = async () => {
+    const result = await loadManual.mutateAsync();
+    // Always navigate directly to the game. For multi-player restores the
+    // RestoreWaitingOverlay inside GamePage shows the code and manages the
+    // lobby — no intermediate screen needed here.
+    navigate(`/game/${result.gameId}`);
+  };
+
+  return (
+    <div className="mb-6">
+      <p className="text-xs font-bold text-mj-bone/50 uppercase tracking-wide mb-2 px-1">
+        {t('savedGamesTitle')}
+      </p>
+      <div className="space-y-2">
+        {autoSave && (
+          <SaveSlotCard
+            info={autoSave}
+            onResume={() => void handleResumeAuto()}
+            onDelete={() => deleteSave.mutate('auto')}
+            isLoading={loadAuto.isPending || deleteSave.isPending}
+          />
+        )}
+        {manualSave && (
+          <SaveSlotCard
+            info={manualSave}
+            onResume={() => void handleResumeManual()}
+            onDelete={() => deleteSave.mutate('manual')}
+            isLoading={loadManual.isPending || deleteSave.isPending}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Defined outside JSX so the no-literal-string rule doesn't flag path strings.
 const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
@@ -113,6 +243,9 @@ export function HomeStubPage() {
             </span>
           )}
         </div>
+
+        {/* Saved Games — shown when the player has at least one save */}
+        <SavedGamesSection />
 
         {/* Play with Friends — now live (Phase 6) */}
         <button

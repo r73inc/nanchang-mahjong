@@ -157,6 +157,14 @@ export class GameEngine {
   // ── Factory ─────────────────────────────────────────────────────────────────
 
   /**
+   * Restore a previously-serialized game state.
+   * Used by the save/load system to resume a session without replaying events.
+   */
+  static fromState(state: GameState): GameEngine {
+    return new GameEngine(state, []);
+  }
+
+  /**
    * Start a new game with the given seed.
    *
    * @param seed - Deterministic PRNG seed (store for replay).
