@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import { useSignout } from '../../hooks/use-auth';
@@ -94,13 +93,6 @@ function SavedGamesSection() {
   const loadAuto = useLoadAutoSave();
   const loadManual = useLoadManualSave();
   const deleteSave = useDeleteSave();
-  // pendingRestore: set when a multi-player manual save is loaded and needs a
-  // restore code shared before entering the game. Host sees the code here and
-  // clicks "Continue" to navigate to the game.
-  const [pendingRestore, setPendingRestore] = useState<{
-    gameId: string;
-    restoreCode: string;
-  } | null>(null);
 
   if (!saves || saves.length === 0) return null;
 
@@ -114,44 +106,11 @@ function SavedGamesSection() {
 
   const handleResumeManual = async () => {
     const result = await loadManual.mutateAsync();
-    if (result.restoreCode) {
-      // Multi-player save: show the restore code before entering the game so
-      // the host can share it with other players verbally.
-      setPendingRestore({ gameId: result.gameId, restoreCode: result.restoreCode });
-    } else {
-      // Single-player (bot) save: navigate directly.
-      navigate(`/game/${result.gameId}`);
-    }
+    // Always navigate directly to the game. For multi-player restores the
+    // RestoreWaitingOverlay inside GamePage shows the code and manages the
+    // lobby — no intermediate screen needed here.
+    navigate(`/game/${result.gameId}`);
   };
-
-  if (pendingRestore) {
-    return (
-      <div className="mb-6">
-        <div
-          className="px-4 py-5 rounded-[14px] flex flex-col gap-3"
-          style={{
-            background: 'rgba(201,169,97,0.08)',
-            border: '1px solid rgba(201,169,97,0.3)',
-          }}
-        >
-          <p className="text-xs font-bold text-mj-gold uppercase tracking-wide">
-            {t('savedGamesRestoreCodeTitle')}
-          </p>
-          <p className="text-3xl font-mono font-bold text-mj-bone tracking-widest">
-            {pendingRestore.restoreCode}
-          </p>
-          <p className="text-xs text-mj-bone/50">{t('savedGamesRestoreCodeDesc')}</p>
-          <button
-            onClick={() => navigate(`/game/${pendingRestore.gameId}`)}
-            className="mt-1 w-full py-3 rounded-xl font-bold text-sm text-mj-ink"
-            style={{ background: '#c9a961' }}
-          >
-            {t('savedGamesResume')}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="mb-6">

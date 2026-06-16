@@ -45,6 +45,8 @@ import type {
   HandRevealPayload,
   Meld,
   RestoreHistoryPayload,
+  RestoreStatusPayload,
+  GameSavedPayload,
 } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
@@ -1970,6 +1972,146 @@ function ReconnectingOverlay() {
   );
 }
 
+/**
+ * Full-screen overlay shown to non-host players when the host saves and quits.
+ * Auto-navigates home after 5 seconds; "Return Home" button skips the timer.
+ */
+function GameSavedOverlay({ payload, onHome }: { payload: GameSavedPayload; onHome: () => void }) {
+  const { t } = useI18n();
+
+  useEffect(() => {
+    const id = setTimeout(onHome, 5000);
+    return () => clearTimeout(id);
+  }, [onHome]);
+
+  return (
+    <div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-6 px-8 text-center"
+      style={{ background: 'rgba(10,10,10,0.92)', backdropFilter: 'blur(12px)' }}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div
+        className="w-14 h-14 rounded-full flex items-center justify-center"
+        style={{ background: 'rgba(201,169,97,0.15)', border: '2px solid rgba(201,169,97,0.5)' }}
+        aria-hidden
+      >
+        <span className="text-2xl">💾</span>
+      </div>
+      <div>
+        <p className="text-lg font-bold text-mj-bone">{t('gameSavedByHost', payload.hostName)}</p>
+        <p className="text-sm text-mj-bone/50 mt-2 max-w-[260px]">{t('gameSavedSubtext')}</p>
+      </div>
+      <button
+        onClick={onHome}
+        className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+        style={{
+          background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+          boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
+        }}
+      >
+        {t('gameSavedGoHome')}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Full-screen overlay shown while a restored multi-player session waits for
+ * all human players to reconnect. The host sees the restore code and a
+ * "Start Game" button; other players see a waiting message.
+ */
+function RestoreWaitingOverlay({
+  status,
+  snapshot,
+  isHost,
+  onStart,
+}: {
+  status: RestoreStatusPayload;
+  snapshot: ClientGameState;
+  isHost: boolean;
+  onStart: () => void;
+}) {
+  const { t } = useI18n();
+  const allConnected = status.humanSeats.every((s) => status.connectedSeats.includes(s));
+
+  return (
+    <div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center gap-8 px-6 text-center"
+      style={{ background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(12px)' }}
+    >
+      <div>
+        <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
+          {t('restoreWaitingTitle')}
+        </p>
+        {status.restoreCode && (
+          <>
+            <p className="text-xs text-mj-bone/50 mb-2">{t('restoreWaitingShareCode')}</p>
+            <p className="text-5xl font-mono font-bold text-mj-bone tracking-widest mb-1">
+              {status.restoreCode}
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Per-seat connection status */}
+      <div className="flex flex-col gap-2 w-full max-w-[240px]">
+        {status.humanSeats.map((seatIdx) => {
+          const seat = snapshot.seats[seatIdx];
+          const isConnected = status.connectedSeats.includes(seatIdx);
+          return (
+            <div
+              key={seatIdx}
+              className="flex items-center justify-between px-3 py-2 rounded-lg"
+              style={{
+                background: isConnected
+                  ? 'rgba(100,200,100,0.1)'
+                  : 'rgba(var(--felt-ink-rgb),0.06)',
+                border: `1px solid ${isConnected ? 'rgba(100,200,100,0.3)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
+              }}
+            >
+              <span className="text-sm text-mj-bone/80">{seat.seatName}</span>
+              <span
+                className="text-xs font-bold"
+                style={{ color: isConnected ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.4)' }}
+              >
+                {isConnected ? t('restoreWaitingConnected') : t('restoreWaitingWaiting')}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {isHost ? (
+        <button
+          onClick={onStart}
+          disabled={!allConnected}
+          className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink disabled:opacity-40"
+          style={{
+            background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+            boxShadow: allConnected ? '0 6px 18px rgba(201,169,97,0.35)' : 'none',
+          }}
+        >
+          {t('restoreWaitingStart')} →
+        </button>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-mj-gold/40 animate-pulse"
+                style={{ animationDelay: `${i * 200}ms` }}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-mj-bone/40">{t('restoreWaitingWaitingForHost')}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Concede confirmation sheet. */
 function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   const { t } = useI18n();
@@ -3834,6 +3976,9 @@ export function GamePage() {
     onDiceAnimationComplete,
     diceAnimation,
     restoreEvents,
+    gameSaved,
+    restoreStatus,
+    startRestore,
   } = useGame(gameId ?? '', spectate);
 
   // ── Sound effects ─────────────────────────────────────────────────────────────
@@ -4066,6 +4211,19 @@ export function GamePage() {
         snapshot.phase !== 'finished' && <LoadingScreen />}
 
       {connection === 'reconnecting' && <ReconnectingOverlay />}
+
+      {/* ── Non-host: host saved the game overlay ─────────────────────────── */}
+      {gameSaved && <GameSavedOverlay payload={gameSaved} onHome={() => navigate('/')} />}
+
+      {/* ── Restore-waiting lobby: waiting for all human players ──────────── */}
+      {restoreStatus && snapshot && (
+        <RestoreWaitingOverlay
+          status={restoreStatus}
+          snapshot={snapshot}
+          isHost={viewerSeat === 0}
+          onStart={startRestore}
+        />
+      )}
     </>
   );
 }

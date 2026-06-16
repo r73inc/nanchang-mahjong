@@ -660,5 +660,14 @@
   "gameSaveAndQuitDesc": "游戏进度将保存到您的手动存档位。游戏将对所有玩家结束。其他玩家可以使用您收到的代码重新加入。",
   "gameSaveAndQuitConfirm": "存档并退出",
   "gameSaveAndQuitCancel": "继续游戏",
-  "gameSavedToast": "游戏已保存！请将恢复代码分享给其他玩家。"
+  "gameSavedToast": "游戏已保存！请将恢复代码分享给其他玩家。",
+  "gameSavedByHost": "{{0}} 保存了游戏",
+  "gameSavedSubtext": "游戏已结束，5秒后返回主页。",
+  "gameSavedGoHome": "返回主页",
+  "restoreWaitingTitle": "恢复游戏",
+  "restoreWaitingShareCode": "将此代码分享给其他玩家以重新加入：",
+  "restoreWaitingConnected": "已连接",
+  "restoreWaitingWaiting": "等待中…",
+  "restoreWaitingStart": "开始游戏",
+  "restoreWaitingWaitingForHost": "等待房主开始游戏…"
 }

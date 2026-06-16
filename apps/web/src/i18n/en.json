@@ -659,5 +659,14 @@
   "gameSaveAndQuitDesc": "Your progress will be saved to your manual save slot. The game will end for all players. Other players can rejoin using the code you'll receive.",
   "gameSaveAndQuitConfirm": "Save & Exit",
   "gameSaveAndQuitCancel": "Keep Playing",
-  "gameSavedToast": "Game saved! Share your restore code with other players."
+  "gameSavedToast": "Game saved! Share your restore code with other players.",
+  "gameSavedByHost": "{{0}} saved the game",
+  "gameSavedSubtext": "The game has ended. You'll return home in 5 seconds.",
+  "gameSavedGoHome": "Return Home",
+  "restoreWaitingTitle": "Restore Game",
+  "restoreWaitingShareCode": "Share this code with the other players to rejoin:",
+  "restoreWaitingConnected": "Connected",
+  "restoreWaitingWaiting": "Waiting…",
+  "restoreWaitingStart": "Start Game",
+  "restoreWaitingWaitingForHost": "Waiting for host to start the game…"
 }
