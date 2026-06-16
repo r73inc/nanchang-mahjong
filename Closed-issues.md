@@ -8,13 +8,20 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ## `fix/bug-053-056-wify-bugs` (2026-06-16)
 
-### BUG-053 · Hand-type win labels may show untranslated in ZH
+### BUG-053 · Hand-type / scoring multiplier names untranslated in ZH
 
-**Root cause:** Not a code bug. All four hand-type i18n keys (`handTypeSevenPairs`, `handTypeAllTriplets`, `handTypeThirteenMisfits`, `handTypeSevenStarThirteen`) are present and correctly translated in both `en.json` and `zh.json`. The user observed the issue against the production build on `main`, which lagged behind the `pre-prod` branch where the translations were already present.
+**Root cause:** Two separate issues:
 
-**Fix:** No code change. Closed as a stale-production false positive; the keys have been correct in the codebase since before this investigation.
+1. **Hand-type badge** (`handTypeLabel` — `All Triplets`, `Seven Pairs`, etc.) — already translated via i18n keys (`handTypeAllTriplets` → `大七对`, etc.). The badge was correct in code; the initial investigation concluded it was a stale production build.
 
-**Key learning:** When a user reports a translation bug, confirm whether the observed environment (prod vs. local) matches the branch under investigation before making code changes. Production on `main` can lag weeks behind `pre-prod`.
+2. **Scoring breakdown multiplier names** (the row reading e.g. "底分 1 × All Triplets ×2 → 总 ×2") — `HandRevealScreen` rendered `{item.name}` from `MultiplierItem`, which is always the English name. `MultiplierItem.nameZh` was already populated for every multiplier in the engine (`All Triplets → 大七对`, `Heavenly Win → 天胡`, `German → 德国`, etc.) but was never read by the frontend.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Added `lang` to the `useI18n()` destructure in `HandRevealScreen`.
+- Changed `{item.name}` to `{lang === 'zh' ? item.nameZh : item.name}` in the multiplier chain row.
+
+**Key learning:** `MultiplierItem` has carried both `name` and `nameZh` from the start, but the frontend only read `name`. Any display of server-originated name strings must check `lang` and pick the right field — never assume a server-side `name` field is locale-aware.
 
 ---
 

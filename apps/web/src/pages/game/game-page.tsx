@@ -488,7 +488,7 @@ function HandRevealScreen({
   mode?: 'pause' | 'review';
   onBack?: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
 
   const [expandedSeat, setExpandedSeat] = useState<number | null>(null);
@@ -704,7 +704,7 @@ function HandRevealScreen({
                                   <span key={ii} className="flex items-center gap-1">
                                     <span className="text-mj-bone/30">{MULT_CHAR}</span>
                                     <span className="bg-white/8 px-1.5 py-0.5 rounded text-mj-bone/70">
-                                      {item.name} {MULT_CHAR}
+                                      {lang === 'zh' ? item.nameZh : item.name} {MULT_CHAR}
                                       {item.multiplier}
                                     </span>
                                   </span>
