@@ -640,5 +640,27 @@
   "challengePlaceFirst": "1st",
   "challengePlaceSecond": "2nd",
   "challengePlaceThird": "3rd",
-  "challengePlaceFourth": "4th"
+  "challengePlaceFourth": "4th",
+
+  "savedGamesTitle": "Saved Games",
+  "savedGamesAutoLabel": "Auto Save",
+  "savedGamesManualLabel": "Manual Save",
+  "savedGamesResume": "Resume",
+  "savedGamesDelete": "Delete",
+  "savedGamesHandsPlayed": "{{0}} hands played",
+  "savedGamesChallenge": "Challenge game",
+  "savedGamesLoading": "Loading save…",
+  "savedGamesEmpty": "No saved games",
+  "savedGamesRestoreCodeTitle": "Share This Code",
+  "savedGamesRestoreCodeDesc": "Share this code with the other players so they can rejoin your saved game.",
+  "savedGamesRestoreCodeInput": "Join a Saved Game",
+  "savedGamesRestoreCodePlaceholder": "Enter code (e.g. AB-1234)",
+  "savedGamesRestoreCodeJoin": "Join",
+  "savedGamesRestoreCodeError": "Code not found. Check with the host.",
+  "gameSaveAndQuit": "Save & Quit",
+  "gameSaveAndQuitTitle": "Save Game?",
+  "gameSaveAndQuitDesc": "Your progress will be saved to your manual save slot. The game will end for all players. Other players can rejoin using the code you'll receive.",
+  "gameSaveAndQuitConfirm": "Save & Exit",
+  "gameSaveAndQuitCancel": "Keep Playing",
+  "gameSavedToast": "Game saved! Share your restore code with other players."
 }

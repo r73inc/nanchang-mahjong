@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import { useSignout } from '../../hooks/use-auth';
@@ -8,6 +9,222 @@ import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
 import { useThemeStore } from '../../stores/theme.store';
+import {
+  useSaves,
+  useLoadAutoSave,
+  useLoadManualSave,
+  useDeleteSave,
+  useJoinRestore,
+} from '../../hooks/use-saves';
+import type { SaveSlotInfo } from '@nanchang/shared';
+
+const SEP_DOT = ' · ' as const;
+
+// ── Saved Games UI ─────────────────────────────────────────────────────────────
+
+function SaveSlotCard({
+  info,
+  onResume,
+  onDelete,
+  isLoading,
+}: {
+  info: SaveSlotInfo;
+  onResume: () => void;
+  onDelete: () => void;
+  isLoading: boolean;
+}) {
+  const { t } = useI18n();
+  const label = info.slot === 'auto' ? t('savedGamesAutoLabel') : t('savedGamesManualLabel');
+  const date = new Date(info.savedAt).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return (
+    <div
+      className="w-full px-4 py-3 rounded-[14px] flex items-center gap-3"
+      style={{
+        background: 'rgba(var(--felt-ink-rgb),0.06)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
+      }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-mj-gold/80 uppercase tracking-wide">{label}</span>
+          {info.challengeId && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+              style={{ background: 'rgba(201,169,97,0.15)', color: '#c9a961' }}
+            >
+              {t('savedGamesChallenge')}
+            </span>
+          )}
+        </div>
+        <p className="text-sm font-semibold text-mj-bone truncate mt-0.5">
+          {info.seatNames.filter((n) => !n.startsWith('bot-')).join(', ') || info.seatNames[0]}
+        </p>
+        <p className="text-xs text-mj-bone/40 mt-0.5">
+          {t('savedGamesHandsPlayed', String(info.handsPlayed))}
+          {SEP_DOT}
+          {date}
+        </p>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        <button
+          onClick={onDelete}
+          disabled={isLoading}
+          className="text-xs text-mj-bone/40 px-2 py-1 rounded"
+          style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.12)' }}
+          aria-label={t('savedGamesDelete')}
+        >
+          {t('savedGamesDelete')}
+        </button>
+        <button
+          onClick={onResume}
+          disabled={isLoading}
+          className="text-xs font-bold text-mj-ink px-3 py-1 rounded"
+          style={{ background: '#c9a961', opacity: isLoading ? 0.6 : 1 }}
+        >
+          {isLoading ? t('savedGamesLoading') : t('savedGamesResume')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RestoreCodePanel() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const joinRestore = useJoinRestore();
+
+  const handleJoin = async () => {
+    if (!code.trim()) return;
+    setError('');
+    try {
+      const { gameId } = await joinRestore.mutateAsync(code);
+      navigate(`/game/${gameId}`);
+    } catch {
+      setError(t('savedGamesRestoreCodeError'));
+    }
+  };
+
+  return (
+    <div
+      className="w-full px-4 py-3 rounded-[14px]"
+      style={{
+        background: 'rgba(var(--felt-ink-rgb),0.04)',
+        border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
+      }}
+    >
+      <p className="text-xs font-bold text-mj-bone/60 uppercase tracking-wide mb-2">
+        {t('savedGamesRestoreCodeInput')}
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          onKeyDown={(e) => e.key === 'Enter' && void handleJoin()}
+          placeholder={t('savedGamesRestoreCodePlaceholder')}
+          maxLength={7}
+          className="flex-1 bg-transparent text-sm text-mj-bone rounded-lg px-3 py-2 focus:outline-none"
+          style={{
+            border: '1px solid rgba(var(--felt-ink-rgb),0.2)',
+            background: 'rgba(var(--felt-ink-rgb),0.06)',
+          }}
+          aria-label={t('savedGamesRestoreCodeInput')}
+        />
+        <button
+          onClick={() => void handleJoin()}
+          disabled={joinRestore.isPending || !code.trim()}
+          className="px-4 py-2 rounded-lg text-sm font-bold text-mj-ink"
+          style={{
+            background: '#c9a961',
+            opacity: joinRestore.isPending || !code.trim() ? 0.5 : 1,
+          }}
+        >
+          {t('savedGamesRestoreCodeJoin')}
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-400 mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
+function SavedGamesSection() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const { data: saves } = useSaves();
+  const loadAuto = useLoadAutoSave();
+  const loadManual = useLoadManualSave();
+  const deleteSave = useDeleteSave();
+  const [restoreCode, setRestoreCode] = useState<string | null>(null);
+
+  if (!saves || saves.length === 0) return null;
+
+  const autoSave = saves.find((s) => s.slot === 'auto');
+  const manualSave = saves.find((s) => s.slot === 'manual');
+
+  const handleResumeAuto = async () => {
+    const result = await loadAuto.mutateAsync();
+    navigate(`/game/${result.gameId}`);
+  };
+
+  const handleResumeManual = async () => {
+    const result = await loadManual.mutateAsync();
+    setRestoreCode(result.restoreCode);
+    navigate(`/game/${result.gameId}`);
+  };
+
+  return (
+    <div className="mb-6">
+      <p className="text-xs font-bold text-mj-bone/50 uppercase tracking-wide mb-2 px-1">
+        {t('savedGamesTitle')}
+      </p>
+      <div className="space-y-2">
+        {autoSave && (
+          <SaveSlotCard
+            info={autoSave}
+            onResume={() => void handleResumeAuto()}
+            onDelete={() => deleteSave.mutate('auto')}
+            isLoading={loadAuto.isPending || deleteSave.isPending}
+          />
+        )}
+        {manualSave && (
+          <>
+            <SaveSlotCard
+              info={manualSave}
+              onResume={() => void handleResumeManual()}
+              onDelete={() => deleteSave.mutate('manual')}
+              isLoading={loadManual.isPending || deleteSave.isPending}
+            />
+            {restoreCode && (
+              <div
+                className="px-4 py-3 rounded-[14px]"
+                style={{
+                  background: 'rgba(201,169,97,0.08)',
+                  border: '1px solid rgba(201,169,97,0.25)',
+                }}
+              >
+                <p className="text-xs font-bold text-mj-gold mb-1">
+                  {t('savedGamesRestoreCodeTitle')}
+                </p>
+                <p className="text-2xl font-mono font-bold text-mj-bone tracking-widest">
+                  {restoreCode}
+                </p>
+                <p className="text-xs text-mj-bone/50 mt-1">{t('savedGamesRestoreCodeDesc')}</p>
+              </div>
+            )}
+          </>
+        )}
+        <RestoreCodePanel />
+      </div>
+    </div>
+  );
+}
 
 // Defined outside JSX so the no-literal-string rule doesn't flag path strings.
 const NAV_ITEMS: Array<{ key: StringKey; path: string; icon: string }> = [
@@ -113,6 +330,9 @@ export function HomeStubPage() {
             </span>
           )}
         </div>
+
+        {/* Saved Games — shown when the player has at least one save */}
+        <SavedGamesSection />
 
         {/* Play with Friends — now live (Phase 6) */}
         <button

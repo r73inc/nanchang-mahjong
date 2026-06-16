@@ -73,6 +73,7 @@ const WIND_CHAR: Record<SeatWind, string> = { east: '東', south: '南', west: '
 // Module-level icon constants (avoids i18next/no-literal-string on JSX text nodes).
 const ICON_HISTORY = '≡' as const;
 const ICON_CLOSE = '✕' as const;
+const ICON_SAVE = '↓' as const;
 const SCORE_SEP = ': ' as const;
 const MULT_CHAR = '×' as const;
 const CHEVRON_UP = '▲' as const;
@@ -2009,6 +2010,49 @@ function ConcedeSheet({ onConfirm, onCancel }: { onConfirm: () => void; onCancel
   );
 }
 
+/** Save & Quit confirmation sheet (host only). */
+function SaveAndQuitSheet({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
+    >
+      <div
+        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
+        role="dialog"
+        aria-label={t('gameSaveAndQuitTitle')}
+      >
+        <h2 className="font-bold text-lg text-mj-bone">{t('gameSaveAndQuitTitle')}</h2>
+        <p className="text-sm text-mj-bone/60">{t('gameSaveAndQuitDesc')}</p>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
+          >
+            {t('gameSaveAndQuitCancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl font-bold text-sm"
+            style={{ background: '#2e6b3e', color: '#f5efdf' }}
+          >
+            {t('gameSaveAndQuitConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Spirit-tile discard confirmation sheet. */
 function JingDiscardConfirmSheet({
   tile,
@@ -2967,6 +3011,7 @@ function GameTable({
   onClaim,
   onPass,
   onConcede,
+  onSaveAndQuit,
   onDeclareTsumo,
 }: {
   snapshot: ClientGameState;
@@ -2983,11 +3028,13 @@ function GameTable({
   onClaim: (kind: 'win' | 'pung' | 'kong' | 'chow', seq?: [TileType, TileType, TileType]) => void;
   onPass: () => void;
   onConcede: () => void;
+  onSaveAndQuit?: () => void;
   onDeclareTsumo: () => void;
 }) {
   const { t } = useI18n();
   const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
+  const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [jingDiscardPending, setJingDiscardPending] = useState<TileType | null>(null);
   const [kongActionPending, setKongActionPending] = useState<KongActionPending | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -3184,6 +3231,13 @@ function GameTable({
     onConcede();
   };
 
+  const handleSaveAndQuit = () => {
+    setShowSaveSheet(false);
+    onSaveAndQuit?.();
+  };
+
+  const isHost = viewerSeat === 0;
+
   return (
     <ForcedLandscapeWrapper
       active={landscapeMode === 'css-landscape'}
@@ -3291,6 +3345,25 @@ function GameTable({
               />
             )}
 
+            {/* Save & Quit button — host only */}
+            {isHost &&
+              onSaveAndQuit &&
+              (isMobile ? (
+                <MobileHeaderButton
+                  onClick={() => setShowSaveSheet(true)}
+                  icon={ICON_SAVE}
+                  ariaLabel={t('gameSaveAndQuit')}
+                />
+              ) : (
+                <button
+                  onClick={() => setShowSaveSheet(true)}
+                  className="text-[10px] text-mj-gold/60 px-2 py-1 rounded"
+                  style={{ border: '1px solid rgba(201,169,97,0.2)' }}
+                >
+                  {t('gameSaveAndQuit')}
+                </button>
+              ))}
+
             {/* Concede button */}
             {isMobile ? (
               <MobileHeaderButton
@@ -3354,18 +3427,22 @@ function GameTable({
         {/* where it overlays the R3F canvas (which has no mobile handling).      */}
         {/* Kept visible when canTsumo is true so the hand remains visible while  */}
         {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
-        {!showConcedeSheet && !kongActionPending && snapshot.viewMode !== '2D' && !isMobile && (
-          <ViewerHandHUD
-            hand={viewerHand}
-            selectedTileIdx={selectedTileIdx}
-            onSelect={onSelect}
-            onDiscard={handleDiscardOrKong}
-            isMyTurn={isMyTurn && !canTsumo}
-            jingTypes={jingTypes}
-            pendingMove={pendingMove}
-            onDisplayOrderChange={setHudDisplayOrder}
-          />
-        )}
+        {!showConcedeSheet &&
+          !showSaveSheet &&
+          !kongActionPending &&
+          snapshot.viewMode !== '2D' &&
+          !isMobile && (
+            <ViewerHandHUD
+              hand={viewerHand}
+              selectedTileIdx={selectedTileIdx}
+              onSelect={onSelect}
+              onDiscard={handleDiscardOrKong}
+              isMyTurn={isMyTurn && !canTsumo}
+              jingTypes={jingTypes}
+              pendingMove={pendingMove}
+              onDisplayOrderChange={setHudDisplayOrder}
+            />
+          )}
 
         {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
         {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
@@ -3398,7 +3475,7 @@ function GameTable({
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}
-        {!showConcedeSheet && !jingDiscardPending && !kongActionPending && (
+        {!showConcedeSheet && !showSaveSheet && !jingDiscardPending && !kongActionPending && (
           <GameHistoryPanel
             entries={historyEntries}
             isOpen={historyOpen}
@@ -3409,14 +3486,17 @@ function GameTable({
         )}
 
         {/* ── Action toast ───────────────────────────────────────────────────── */}
-        {toast && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-          <ActionToast toast={toast} snapshot={snapshot} />
-        )}
+        {toast &&
+          !showConcedeSheet &&
+          !showSaveSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && <ActionToast toast={toast} snapshot={snapshot} />}
 
         {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
         {yourTurnFlash &&
           !claimWindow &&
           !showConcedeSheet &&
+          !showSaveSheet &&
           !jingDiscardPending &&
           !kongActionPending && <YourTurnBanner />}
 
@@ -3424,23 +3504,36 @@ function GameTable({
         {snapshot.phase === 'awaiting_claims' &&
           !claimWindow &&
           !showConcedeSheet &&
+          !showSaveSheet &&
           !jingDiscardPending &&
           !kongActionPending && <WaitingForClaimIndicator isMobile={isMobile} />}
 
         {/* ── Claim window rail ──────────────────────────────────────────────── */}
-        {claimWindow && !showConcedeSheet && !jingDiscardPending && !kongActionPending && (
-          <SideRail
-            claimWindow={claimWindow}
-            pendingDiscard={snapshot.pendingDiscard}
-            onClaim={onClaim}
-            onPass={onPass}
-            isMobile={isMobile}
-          />
-        )}
+        {claimWindow &&
+          !showConcedeSheet &&
+          !showSaveSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && (
+            <SideRail
+              claimWindow={claimWindow}
+              pendingDiscard={snapshot.pendingDiscard}
+              onClaim={onClaim}
+              onPass={onPass}
+              isMobile={isMobile}
+            />
+          )}
 
         {/* ── Concede sheet ──────────────────────────────────────────────────── */}
         {showConcedeSheet && !jingDiscardPending && (
           <ConcedeSheet onConfirm={handleConcede} onCancel={() => setShowConcedeSheet(false)} />
+        )}
+
+        {/* ── Save & Quit sheet (host only) ─────────────────────────────────── */}
+        {showSaveSheet && !jingDiscardPending && (
+          <SaveAndQuitSheet
+            onConfirm={handleSaveAndQuit}
+            onCancel={() => setShowSaveSheet(false)}
+          />
         )}
 
         {/* ── Jing discard confirmation sheet ────────────────────────────────── */}
@@ -3621,6 +3714,7 @@ export function GamePage() {
     claim,
     pass,
     concede,
+    saveAndQuit,
     advancePreGame,
     advanceHand,
     rollDice,
@@ -3820,6 +3914,7 @@ export function GamePage() {
             onClaim={claim}
             onPass={pass}
             onConcede={concede}
+            onSaveAndQuit={viewerSeat === 0 ? saveAndQuit : undefined}
             onDeclareTsumo={declareTsumo}
           />
         )}

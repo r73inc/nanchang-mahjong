@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getSocket } from '../lib/socket';
 import { useGameStore } from '../stores/game.store';
 import { useSound } from './use-sound';
@@ -27,6 +28,10 @@ const RECONNECT_OVERLAY_DELAY_MS = 1500;
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useGame(gameId: string, spectate = false) {
+  const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
   const {
     snapshot,
     ended,
@@ -270,6 +275,11 @@ export function useGame(gameId: string, spectate = false) {
       setRematchRoomCode(payload.roomCode);
     };
 
+    const handleSaved = () => {
+      // Server saved the game — navigate all players back to home.
+      navigateRef.current('/');
+    };
+
     // game:error — log to console so backend rejections are visible during debugging.
     // Surface ALL error codes in the store so GamePage renders an error screen
     // instead of leaving the user stuck on a perpetual LoadingScreen.
@@ -328,6 +338,7 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:settlement-preview', handleSettlementPreview);
     s.on('game:hand-reveal', handleHandReveal);
     s.on('game:rematch-ready', handleRematchReady);
+    s.on('game:saved', handleSaved);
     s.on('game:error', handleError);
 
     // ── Connection management ─────────────────────────────────────────────────
@@ -388,6 +399,7 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:settlement-preview', handleSettlementPreview);
       s.off('game:hand-reveal', handleHandReveal);
       s.off('game:rematch-ready', handleRematchReady);
+      s.off('game:saved', handleSaved);
       s.off('game:error', handleError);
       s.off('disconnect', handleDisconnect);
       s.off('connect', handleConnect);
@@ -506,6 +518,14 @@ export function useGame(gameId: string, spectate = false) {
     setDiceAnimation(null);
   }, [setSnapshot, setDiceAnimation]);
 
+  const saveAndQuit = useCallback(() => {
+    try {
+      getSocket().emit('game:save-and-quit', {});
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const declareTsumo = useCallback(() => {
     setCanTsumo(false);
     setCanAddToKong(null);
@@ -562,6 +582,7 @@ export function useGame(gameId: string, spectate = false) {
     claim,
     pass,
     concede,
+    saveAndQuit,
     revealJing,
     advancePreGame,
     advanceHand,

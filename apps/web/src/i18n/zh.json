@@ -641,5 +641,27 @@
   "challengePlaceFirst": "第一名",
   "challengePlaceSecond": "第二名",
   "challengePlaceThird": "第三名",
-  "challengePlaceFourth": "第四名"
+  "challengePlaceFourth": "第四名",
+
+  "savedGamesTitle": "保存的游戏",
+  "savedGamesAutoLabel": "自动存档",
+  "savedGamesManualLabel": "手动存档",
+  "savedGamesResume": "继续游戏",
+  "savedGamesDelete": "删除",
+  "savedGamesHandsPlayed": "已打 {{0}} 局",
+  "savedGamesChallenge": "挑战赛",
+  "savedGamesLoading": "加载中…",
+  "savedGamesEmpty": "无存档",
+  "savedGamesRestoreCodeTitle": "分享此代码",
+  "savedGamesRestoreCodeDesc": "将此代码分享给其他玩家，他们可以用此代码重新加入您的游戏。",
+  "savedGamesRestoreCodeInput": "加入已保存游戏",
+  "savedGamesRestoreCodePlaceholder": "输入代码（如 AB-1234）",
+  "savedGamesRestoreCodeJoin": "加入",
+  "savedGamesRestoreCodeError": "代码无效，请向房主确认。",
+  "gameSaveAndQuit": "存档并退出",
+  "gameSaveAndQuitTitle": "保存游戏？",
+  "gameSaveAndQuitDesc": "游戏进度将保存到您的手动存档位。游戏将对所有玩家结束。其他玩家可以使用您收到的代码重新加入。",
+  "gameSaveAndQuitConfirm": "存档并退出",
+  "gameSaveAndQuitCancel": "继续游戏",
+  "gameSavedToast": "游戏已保存！请将恢复代码分享给其他玩家。"
 }
