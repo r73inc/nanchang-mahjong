@@ -53,6 +53,7 @@ import type {
   HandRevealPayload,
   SpiritCount,
   GameSaveData,
+  RestoreHistoryPayload,
 } from '@nanchang/shared';
 import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
@@ -316,6 +317,7 @@ export class GameService {
       session.pendingRoll = { ...save.pendingRoll };
     }
 
+    session.isRestored = true;
     this.sessions.set(gameId, session);
 
     // Persist a minimal DDB record so the game can be tracked
@@ -447,6 +449,53 @@ export class GameService {
   // ── Player join / reconnect ──────────────────────────────────────────────────
 
   /**
+   * Extract the history-relevant public events for the current hand from a
+   * session's moveLog. Used when a player joins a restored session so the
+   * client can bootstrap its in-game history panel.
+   *
+   * Only events since the last 'deal' are included (current hand only).
+   * Private data is stripped: 'deal' and 'draw' events are excluded entirely;
+   * 'kong_concealed' tile is omitted; 'win' paymentResult is renamed to payment.
+   */
+  private buildRestoreHistoryPayload(session: GameSession): RestoreHistoryPayload {
+    // Find the start of the current hand (last 'deal' event index).
+    let handStartIdx = 0;
+    for (let i = session.moveLog.length - 1; i >= 0; i--) {
+      if (session.moveLog[i].kind === 'deal') {
+        handStartIdx = i + 1;
+        break;
+      }
+    }
+
+    const events: RestoreHistoryPayload['events'] = [];
+    for (let i = handStartIdx; i < session.moveLog.length; i++) {
+      const e = session.moveLog[i];
+      if (
+        e.kind === 'discard' ||
+        e.kind === 'pung' ||
+        e.kind === 'chow' ||
+        e.kind === 'kong_open' ||
+        e.kind === 'kong_added'
+      ) {
+        events.push(e);
+      } else if (e.kind === 'kong_concealed') {
+        events.push({ kind: 'kong_concealed', seat: e.seat });
+      } else if (e.kind === 'win') {
+        events.push({
+          kind: 'win',
+          seat: e.seat,
+          winType: e.winType,
+          handType: e.handType,
+          payment: e.paymentResult,
+        });
+      } else if (e.kind === 'concede') {
+        events.push(e);
+      }
+    }
+    return { events };
+  }
+
+  /**
    * Handle game:join. Registers the socket, sends the current snapshot.
    * Spectators may join any game; players re-join to resync after disconnect.
    */
@@ -489,6 +538,14 @@ export class GameService {
 
     // Send current snapshot only to this socket
     this.emitSnapshotToSocket(socket.id, session, userId);
+
+    // For restored sessions, replay history-relevant events so the client can
+    // bootstrap its in-game history panel without missing prior moves.
+    if (session.isRestored) {
+      this.server
+        ?.to(socket.id)
+        .emit('game:restore-history', this.buildRestoreHistoryPayload(session));
+    }
 
     // Re-send pending events to reconnecting players so they don't miss a screen.
     if (

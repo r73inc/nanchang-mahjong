@@ -15,12 +15,12 @@
  * all listeners.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSocket } from '../lib/socket';
 import { useGameStore } from '../stores/game.store';
 import { useSound } from './use-sound';
-import type { TileType, ClientGameState } from '@nanchang/shared';
+import type { TileType, ClientGameState, RestoreHistoryPayload } from '@nanchang/shared';
 
 // Delay before showing the reconnecting overlay (PLAN §7.5: 1.5s)
 const RECONNECT_OVERLAY_DELAY_MS = 1500;
@@ -95,6 +95,8 @@ export function useGame(gameId: string, spectate = false) {
     playCallOutPung,
     playCallOutKong,
   };
+
+  const [restoreEvents, setRestoreEvents] = useState<RestoreHistoryPayload['events'] | null>(null);
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Snapshot queue: snapshots received during dice animation are held here and
@@ -280,6 +282,10 @@ export function useGame(gameId: string, spectate = false) {
       navigateRef.current('/');
     };
 
+    const handleRestoreHistory = (payload: RestoreHistoryPayload) => {
+      setRestoreEvents(payload.events);
+    };
+
     // game:error — log to console so backend rejections are visible during debugging.
     // Surface ALL error codes in the store so GamePage renders an error screen
     // instead of leaving the user stuck on a perpetual LoadingScreen.
@@ -339,6 +345,7 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:hand-reveal', handleHandReveal);
     s.on('game:rematch-ready', handleRematchReady);
     s.on('game:saved', handleSaved);
+    s.on('game:restore-history', handleRestoreHistory);
     s.on('game:error', handleError);
 
     // ── Connection management ─────────────────────────────────────────────────
@@ -400,6 +407,7 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:hand-reveal', handleHandReveal);
       s.off('game:rematch-ready', handleRematchReady);
       s.off('game:saved', handleSaved);
+      s.off('game:restore-history', handleRestoreHistory);
       s.off('game:error', handleError);
       s.off('disconnect', handleDisconnect);
       s.off('connect', handleConnect);
@@ -576,6 +584,7 @@ export function useGame(gameId: string, spectate = false) {
     canTsumo,
     canAddToKong,
     diceAnimation,
+    restoreEvents,
     // Actions
     selectTile,
     discard,

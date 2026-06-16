@@ -416,6 +416,26 @@ export interface RematchReadyPayload {
 export interface SnapshotPayload {
   state: ClientGameState;
 }
+/**
+ * Sent once per joining player when they join a restored (save-loaded) session.
+ * Contains the history-relevant public events from the current hand so the
+ * client can bootstrap its in-game history panel without replaying from scratch.
+ */
+export interface RestoreHistoryPayload {
+  events: Array<
+    Extract<
+      PublicGameEvent,
+      | { kind: 'discard' }
+      | { kind: 'pung' }
+      | { kind: 'chow' }
+      | { kind: 'kong_open' }
+      | { kind: 'kong_concealed' }
+      | { kind: 'kong_added' }
+      | { kind: 'win' }
+      | { kind: 'concede' }
+    >
+  >;
+}
 export interface GameEventPayload {
   event: PublicGameEvent;
 }

@@ -144,6 +144,9 @@ export class GameSession {
   /** Full ordered move log (all hands). Serialized to S3 on game end. */
   readonly moveLog: GameEvent[] = [];
 
+  /** True when this session was restored from a save rather than started fresh. */
+  isRestored = false;
+
   /** Per-hand metadata for replay assembly. One entry per hand played. */
   readonly handLog: HandMeta[] = [];
 

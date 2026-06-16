@@ -44,6 +44,7 @@ import type {
   SettlementPreviewPayload,
   HandRevealPayload,
   Meld,
+  RestoreHistoryPayload,
 } from '@nanchang/shared';
 import { useGameStore } from '../../stores/game.store';
 import type { ClaimWindowState, GameToast } from '../../stores/game.store';
@@ -3103,6 +3104,7 @@ function GameTable({
   onConcede,
   onSaveAndQuit,
   onDeclareTsumo,
+  restoreEvents,
 }: {
   snapshot: ClientGameState;
   selectedTileIdx: number | null;
@@ -3120,6 +3122,7 @@ function GameTable({
   onConcede: () => void;
   onSaveAndQuit?: () => void;
   onDeclareTsumo: () => void;
+  restoreEvents?: RestoreHistoryPayload['events'] | null;
 }) {
   const { t } = useI18n();
   const yourTurnFlash = useGameStore((s) => s.yourTurnFlash);
@@ -3274,6 +3277,62 @@ function GameTable({
   const addHistory = useCallback((entry: Omit<HistoryEntry, 'id'>) => {
     setHistoryEntries((prev) => [...prev, { ...entry, id: nextHistoryId.current++ }]);
   }, []);
+
+  // Bootstrap history entries when joining a restored session.
+  // The server sends game:restore-history once with the current hand's public
+  // events so the panel isn't empty after a save/load.
+  useEffect(() => {
+    if (!restoreEvents || restoreEvents.length === 0) return;
+    const bootstrapped: HistoryEntry[] = [];
+    for (const e of restoreEvents) {
+      const seatIdx = e.seat;
+      const seatWind = snapshot.seats[seatIdx]?.wind;
+      if (!seatWind) continue;
+
+      if (e.kind === 'discard') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'discard',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'concede') {
+        bootstrapped.push({ id: nextHistoryId.current++, kind: 'concede', seatWind, seatIdx });
+      } else if (e.kind === 'pung') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'pung',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'chow') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'chow',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'kong_open' || e.kind === 'kong_added') {
+        bootstrapped.push({
+          id: nextHistoryId.current++,
+          kind: 'kong',
+          seatWind,
+          seatIdx,
+          tile: e.tile,
+        });
+      } else if (e.kind === 'kong_concealed') {
+        bootstrapped.push({ id: nextHistoryId.current++, kind: 'kong', seatWind, seatIdx });
+      } else if (e.kind === 'win') {
+        bootstrapped.push({ id: nextHistoryId.current++, kind: 'win', seatWind, seatIdx });
+      }
+    }
+    if (bootstrapped.length > 0) {
+      setHistoryEntries(bootstrapped);
+    }
+  }, [restoreEvents]); // snapshot.seats winds are stable within a hand; only run when restore events arrive
 
   // Detect discards and new open melds by diffing snapshots.
   useEffect(() => {
@@ -3774,6 +3833,7 @@ export function GamePage() {
     rollDice,
     onDiceAnimationComplete,
     diceAnimation,
+    restoreEvents,
   } = useGame(gameId ?? '', spectate);
 
   // ── Sound effects ─────────────────────────────────────────────────────────────
@@ -3970,6 +4030,7 @@ export function GamePage() {
             onConcede={concede}
             onSaveAndQuit={viewerSeat === 0 ? saveAndQuit : undefined}
             onDeclareTsumo={declareTsumo}
+            restoreEvents={restoreEvents}
           />
         )}
 
