@@ -7,8 +7,8 @@ export class BotConfigDto {
   @Max(3)
   count!: number;
 
-  @IsIn(['easy', 'normal'])
-  difficulty!: 'easy' | 'normal';
+  @IsIn(['easy', 'normal', 'hard'])
+  difficulty!: 'easy' | 'normal' | 'hard';
 }
 
 export class RoomSettingsDto {

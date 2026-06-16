@@ -56,8 +56,10 @@ export function useGame(gameId: string, spectate = false) {
     setGameError,
     setDiceAnimation,
     canTsumo,
+    canAddToKong,
     setYourTurnFlash,
     setCanTsumo,
+    setCanAddToKong,
     setLastDiscard,
     reset,
   } = useGameStore();
@@ -298,6 +300,18 @@ export function useGame(gameId: string, spectate = false) {
       }
     };
 
+    // game:can-add-to-kong — server notifies the active player that their drawn
+    // tile can extend an existing open pung to a kong (BUG-058).
+    const handleCanAddToKong = (payload: {
+      seat: 0 | 1 | 2 | 3;
+      tile: import('@nanchang/shared').TileType;
+    }) => {
+      const viewerSeat = useGameStore.getState().snapshot?.viewerSeat ?? null;
+      if (viewerSeat === payload.seat) {
+        setCanAddToKong(payload.tile);
+      }
+    };
+
     // AFK warning — broadcast to the affected seat's socket (handled server-side);
     // on the FE we just need a toast/alert if it's us.
     // We rely on game:snapshot reflecting the afk flag; no extra state needed here.
@@ -305,6 +319,7 @@ export function useGame(gameId: string, spectate = false) {
     s.on('game:snapshot', handleSnapshot);
     s.on('game:your-turn', handleYourTurn);
     s.on('game:can-tsumo', handleCanTsumo);
+    s.on('game:can-add-to-kong', handleCanAddToKong);
     s.on('game:claim-window', handleClaimWindow);
     s.on('game:rob-kong-window', handleClaimWindow); // same UI
     s.on('game:contested', handleContested);
@@ -364,6 +379,7 @@ export function useGame(gameId: string, spectate = false) {
       s.off('game:snapshot', handleSnapshot);
       s.off('game:your-turn', handleYourTurn);
       s.off('game:can-tsumo', handleCanTsumo);
+      s.off('game:can-add-to-kong', handleCanAddToKong);
       s.off('game:claim-window', handleClaimWindow);
       s.off('game:rob-kong-window', handleClaimWindow);
       s.off('game:contested', handleContested);
@@ -389,14 +405,15 @@ export function useGame(gameId: string, spectate = false) {
     (tile: TileType) => {
       setPendingMove(true);
       selectTile(null);
-      setCanTsumo(false); // player chose to discard instead of declaring win
+      setCanTsumo(false);
+      setCanAddToKong(null);
       try {
         getSocket().emit('game:discard', { tile });
       } catch {
         setPendingMove(false);
       }
     },
-    [setPendingMove, selectTile, setCanTsumo],
+    [setPendingMove, selectTile, setCanTsumo, setCanAddToKong],
   );
 
   const claim = useCallback(
@@ -491,28 +508,37 @@ export function useGame(gameId: string, spectate = false) {
 
   const declareTsumo = useCallback(() => {
     setCanTsumo(false);
+    setCanAddToKong(null);
     try {
       getSocket().emit('game:tsumo', {});
     } catch {
       /* ignore */
     }
-  }, [setCanTsumo]);
+  }, [setCanTsumo, setCanAddToKong]);
 
-  const kongConcealed = useCallback((tile: TileType) => {
-    try {
-      getSocket().emit('game:kong-concealed', { tile });
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const kongConcealed = useCallback(
+    (tile: TileType) => {
+      setCanAddToKong(null);
+      try {
+        getSocket().emit('game:kong-concealed', { tile });
+      } catch {
+        /* ignore */
+      }
+    },
+    [setCanAddToKong],
+  );
 
-  const kongAdd = useCallback((tile: TileType) => {
-    try {
-      getSocket().emit('game:kong-add', { tile });
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const kongAdd = useCallback(
+    (tile: TileType) => {
+      setCanAddToKong(null);
+      try {
+        getSocket().emit('game:kong-add', { tile });
+      } catch {
+        /* ignore */
+      }
+    },
+    [setCanAddToKong],
+  );
 
   return {
     snapshot,
@@ -528,6 +554,7 @@ export function useGame(gameId: string, spectate = false) {
     toast,
     gameError,
     canTsumo,
+    canAddToKong,
     diceAnimation,
     // Actions
     selectTile,

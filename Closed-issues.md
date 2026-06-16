@@ -6,6 +6,140 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-061-062-match-end` (2026-06-15)
+
+### BUG-061 · Mobile player hand half cut off at bottom of screen
+
+**Root cause:** `ForcedLandscapeWrapper` used `width: calc(100dvh - ...)` to set its logical width in CSS-landscape mode. On iOS Safari (and some Android browsers), `dvh` (dynamic viewport height) updates lazily — its value is captured while the browser address bar is visible and then does not update as the bar hides mid-hand. Because the wrapper has `overflow: hidden`, the stale-larger `dvh` snapshot meant the visible area was smaller than the wrapper, clipping the bottom of the player hand. The clipping persisted for the entire hand because `dvh` only re-evaluates on scroll or explicit resize, not on browser-chrome toggle.
+
+**Fix (`apps/web/src/components/2d/ForcedLandscapeWrapper.tsx`):**
+
+Changed `100dvh` to `100svh` (smallest viewport height). `svh` is defined as the viewport height with the maximum browser chrome visible — it is always the smallest possible value and never changes as the address bar hides. This means the landscape wrapper is sized conservatively and the hand is never clipped regardless of browser-chrome state.
+
+```ts
+// Before (buggy — stale when address bar hides on iOS Safari):
+width: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+
+// After (stable — svh does not change as browser chrome toggles):
+width: 'calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+```
+
+**Key learning:** Never use `dvh` for a layout measurement that must remain stable for the duration of a UI state (e.g., one full hand). `dvh` is appropriate for full-page hero layouts that want to respond to browser-chrome changes; for game UI where tiles must stay anchored, use `svh` (the static minimum).
+
+---
+
+### BUG-062 · Fixed-hands session never ends after the final hand
+
+**Root cause:** The room settings schema declares `maxHands` as `.optional()` with no Zod default. When the host selects "Fixed Hands" in the room page but never explicitly clicks a hand-count button, `maxHands` remains `undefined` in DynamoDB. The UI masked this by displaying `room.settings.maxHands ?? 1` (visually showing "1"), but the underlying stored value was `undefined`.
+
+In `game.service.ts:createGame()`:
+
+```ts
+// Before (broken):
+targetHands:
+  challengeOpts?.numHands ??
+  (settings.terminationType === 'fixed-hands' ? settings.maxHands : undefined),
+```
+
+`settings.maxHands === undefined` → `targetHands = undefined`. In `isSessionOver()`:
+
+```ts
+if (session.targetHands !== undefined) { … }  // skipped
+```
+
+All branches were skipped → `isSessionOver()` always returned `false` for fixed-hands → `isLastHand = false` in every `HandRevealPayload` → client showed "Continue" forever.
+
+**Fix:**
+
+- **`apps/api/src/game/game.service.ts`** — Applied `?? 1` default in `createGame()`:
+  ```ts
+  targetHands:
+    challengeOpts?.numHands ??
+    (settings.terminationType === 'fixed-hands' ? (settings.maxHands ?? 1) : undefined),
+  ```
+- **`apps/web/src/pages/room/room-page.tsx`** — When switching to `fixed-hands` in the host UI, explicitly sends `maxHands: room.settings.maxHands ?? 1` so the stored value is always defined from that point on.
+
+**Key learning:** A `?? N` display default in the UI is invisible to the server — always apply the same default at the point the value is consumed server-side. Prefer explicit defaults at the schema layer (Zod `.default(1)`) or at the service layer over relying on UI fallbacks reaching the DB.
+
+---
+
+### Match End Statistics Screen (new feature, same PR)
+
+**Change:** Replaced the old `GameEndScreen` (which included a rematch button) with a new `MatchEndStatsScreen`. The new screen shows:
+
+- Final Standings sorted by total score with placement badges
+- Per-player breakdown: hands won, spirit tile points, bonus tile points, best hand score
+- ELO rating delta for the viewer
+- "View Final Hand" (links to hand-reveal for last hand) and "View Replay" optional buttons
+- Prominent "Return to Lobby" gold button — no rematch / "Play Again" button
+
+**Additional changes:**
+
+- `HandRevealScreen` now shows a gold "Final Hand" badge on the last hand, with a large "View Match Results →" CTA replacing the subtle "Continue" link. Non-host players see "Waiting for host to view match results…"
+- Removed the host auto-advance effect on the last hand — the host must explicitly click to end the session so all players can read the final hand reveal.
+- `GameEndedPayload` extended with `sessionSpiritPoints`, `sessionBonusTilePoints`, `handsWon`, and `bestHandPoints` for the stats screen.
+- `GameSession` accumulates these stats in `resolveHand()` across all hands.
+
+---
+
+## `fix/bug058-059-060-add-to-kong-german-win` (2026-06-15)
+
+### BUG-058 · Add-to-Kong (加杠) not triggered when drawing the 4th tile matching an open pung
+
+**Root cause:** Two separate gaps:
+
+1. **Bot never checked for add-to-kong.** `handleBotTurn()` in `apps/api/src/game/game.service.ts` checked tsumo then immediately picked a discard tile — it never scanned `openMelds` for a pung that the drawn tile could extend.
+2. **No proactive server notification for human players.** Unlike the tsumo case (server emits `game:can-tsumo` → client shows TsumoBar), add-to-kong had no equivalent server event. The client only detected the opportunity when the player clicked the matching tile, which is not discoverable.
+
+**Fix:**
+
+- `apps/api/src/game/game.service.ts` — Added `addToKongOptions` import. In `startTurn()`, after the tsumo check, iterates `seatState.openMelds` for kind=`'pung'` and emits `game:can-add-to-kong: { seat, tile }` to the player's socket when a match is found. In `handleBotTurn()`, inserted an add-to-kong check (using `addToKongOptions`) before the discard logic; bots that can extend a pung now call `engine.addToKong()` and return instead of discarding.
+- `apps/web/src/stores/game.store.ts` — Added `canAddToKong: TileType | null` state and `setCanAddToKong` action; cleared on every `setSnapshot` call.
+- `apps/web/src/hooks/use-game.ts` — Added `game:can-add-to-kong` socket handler that calls `setCanAddToKong(tile)` when the event targets the viewer's seat. Clears `canAddToKong` on discard, tsumo, and `kongAdd` actions.
+- `apps/web/src/pages/game/game-page.tsx` — Added `canAddToKong` prop to `GameTable`. When set and it is the player's turn, renders a proactive "Add to Kong (加杠)" bar above the hand (positioned above the TsumoBar when both are active). Clicking it calls `onKongAdd(canAddToKong)`.
+- `apps/web/src/i18n/en.json` + `zh.json` — Added `addToKongPrompt` and `addToKong` keys.
+
+**Key learning:** Any player action the server knows is available (like add-to-kong) should be proactively communicated to the client via a dedicated event, not left for the client to discover by clicking. Mirror the pattern used for `game:can-tsumo`.
+
+---
+
+### BUG-059 · German win (德国胡) not detected when winner holds spirit tiles at face value
+
+**Root cause:** In `packages/engine/src/engine.ts`, `declareWin()` determined German status for standard hands with:
+
+```ts
+isGerman = winJings === 0;
+```
+
+`winJings` is the count of ALL jing (spirit) tiles in the winning hand, regardless of how they are used. A player holding spirit tiles at their **face value** (e.g., a pung of 一索 when 一索 is jingPrimary) still has `winJings > 0`, so the German bonus was denied even though no wildcard substitution occurred. The rules definition of "German" is "win without using any Jing as a wildcard" — not "win without holding any Jing tile."
+
+**Fix (`packages/engine/src/engine.ts`):**
+
+```ts
+// Before (buggy):
+isGerman = winJings === 0;
+
+// After (correct):
+isGerman = decomposeHand(winningHand, []).length > 0;
+```
+
+Re-decomposing with `jingTypes=[]` treats all tiles as their natural type (no wildcards). If a valid standard decomposition exists, the hand can win without any substitution → German. If the hand can only win when jings stand in for other tiles, no natural decomp is found → not German.
+
+**Key learning:** "Holds a jing tile" ≠ "used a jing as a wildcard." The test must check whether the decomposition **requires** wildcard substitution, not whether jing tiles are present. The seven-pairs case already handled this correctly with its natural-singles check; the standard-hand case was the blind spot.
+
+---
+
+### BUG-060 · Final hand scores wrong — compound of BUG-058 and BUG-059
+
+**Root cause:** Compound bug — the incorrect scores observed in the playtest were the sum of:
+
+1. BUG-058: East's add-to-kong instant payout (+3 for East, −1 each for West/South/North) was never applied.
+2. BUG-059: The German win +5 flat-bonus-per-loser (×3 = +15 for South, −5 each for East/West/North) was not applied because `isGerman` was incorrectly false.
+
+**Fix:** Resolved by fixing BUG-058 and BUG-059 above.
+
+---
+
 ## `fix/bug055-kong-payout-opening-jing` (2026-06-14)
 
 ### BUG-055 · "Kong Payout" shown with no kongs — opening jing settlement leaks into kong line

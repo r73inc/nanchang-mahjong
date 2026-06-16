@@ -53,6 +53,7 @@ const HOST_ROOM: RoomState = {
   settings: {
     rounds: 'east+south',
     terminationType: 'rounds',
+    maxHands: 1,
     startingScore: 0,
     timerSecs: 30,
     viewMode: '3D',
