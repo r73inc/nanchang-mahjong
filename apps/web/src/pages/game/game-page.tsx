@@ -190,7 +190,7 @@ function PreGameFlow({
   isHost: boolean;
   onAdvance: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const phase = snapshot.preGamePhase;
   const viewerSeat = snapshot.viewerSeat;
   const myHand: TileType[] = viewerSeat !== null ? (snapshot.seats[viewerSeat].hand ?? []) : [];
@@ -298,7 +298,11 @@ function PreGameFlow({
           </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('gameSpiritTiles')}</h1>
           <p className="text-sm text-mj-bone/50 mt-1">
-            {t('gameSpiritDesc', primary ?? '', secondary ?? '')}
+            {t(
+              'gameSpiritDesc',
+              primary ? tileAriaLabel(primary, lang) : '',
+              secondary ? tileAriaLabel(secondary, lang) : '',
+            )}
           </p>
         </div>
 
@@ -3547,6 +3551,7 @@ function GameTable({
                 onDiscard={handleDiscardOrKong}
                 isMobile={isMobile}
                 isCssLandscape={landscapeMode === 'css-landscape'}
+                tsumoSuppressed={tsumoSuppressed}
               />
             </MobileLandscapeGate>
           ) : (
@@ -3692,7 +3697,7 @@ function GameTable({
               selectedTileIdx={selectedTileIdx}
               onSelect={onSelect}
               onDiscard={handleDiscardOrKong}
-              isMyTurn={isMyTurn && !canTsumo}
+              isMyTurn={isMyTurn && (!canTsumo || tsumoSuppressed)}
               jingTypes={jingTypes}
               pendingMove={pendingMove}
               onDisplayOrderChange={setHudDisplayOrder}
@@ -3725,7 +3730,7 @@ function GameTable({
           selectedTileIdx={pendingMove ? null : selectedTileIdx}
           onSelect={onSelect}
           onDiscard={handleDiscardOrKong}
-          isMyTurn={isMyTurn && !pendingMove && !canTsumo}
+          isMyTurn={isMyTurn && !pendingMove && (!canTsumo || tsumoSuppressed)}
           displayOrder={hudDisplayOrder}
         />
 

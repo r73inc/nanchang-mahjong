@@ -176,11 +176,17 @@ export interface MobileGameTable2DProps {
    * False for native-landscape (device rotated natively; coordinates are correct).
    */
   isCssLandscape?: boolean;
+  /** True after player dismissed the TsumoBar — re-enables tile interaction. */
+  tsumoSuppressed?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileGameTable2DProps) {
+export function MobileGameTable2D({
+  onDiscard,
+  isCssLandscape = false,
+  tsumoSuppressed,
+}: MobileGameTable2DProps) {
   const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
 
@@ -356,7 +362,7 @@ export function MobileGameTable2D({ onDiscard, isCssLandscape = false }: MobileG
               zIndex: 3,
             }}
           >
-            <PlayerHand2D onDiscard={onDiscard} confirmMode />
+            <PlayerHand2D onDiscard={onDiscard} confirmMode tsumoSuppressed={tsumoSuppressed} />
           </div>
         </div>
       </MotionConfig>

@@ -6,6 +6,65 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `fix/bug-053-056-wify-bugs` (2026-06-16)
+
+### BUG-053 · Hand-type win labels may show untranslated in ZH
+
+**Root cause:** Not a code bug. All four hand-type i18n keys (`handTypeSevenPairs`, `handTypeAllTriplets`, `handTypeThirteenMisfits`, `handTypeSevenStarThirteen`) are present and correctly translated in both `en.json` and `zh.json`. The user observed the issue against the production build on `main`, which lagged behind the `pre-prod` branch where the translations were already present.
+
+**Fix:** No code change. Closed as a stale-production false positive; the keys have been correct in the codebase since before this investigation.
+
+**Key learning:** When a user reports a translation bug, confirm whether the observed environment (prod vs. local) matches the branch under investigation before making code changes. Production on `main` can lag weeks behind `pre-prod`.
+
+---
+
+### BUG-054 · Spirit tile reveal screen shows raw tile codes instead of translated names
+
+**Root cause:** `apps/web/src/pages/game/game-page.tsx` `PreGameFlow` (line ~301) interpolated raw `TileType` engine strings (e.g. `5s`, `zhong`) directly into the `gameSpiritDesc` translation template. The `t()` helper has no way to convert an engine tile code to a human-readable name, so the raw code was displayed verbatim.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Added `lang` to the `useI18n()` destructure in `PreGameFlow`.
+- Changed the `gameSpiritDesc` call to pass `tileAriaLabel(primary, lang)` / `tileAriaLabel(secondary, lang)` instead of the raw `TileType` strings. `tileAriaLabel()` from `packages/shared/src/tile-map.ts` already has full EN/ZH name tables for all 34 tile types.
+
+**Key learning:** Never pass raw engine types as interpolation values into translated strings. Always run them through a named lookup (`tileAriaLabel`, `seatWindLabel`, etc.) that knows the current language before interpolating.
+
+---
+
+### BUG-055 · Cannot declare a concealed kong when a tsumo is also available
+
+**Root cause:** `apps/web/src/pages/game/game-page.tsx` `GameTable` blocked tile interaction with `isMyTurn && !canTsumo` in `ViewerHandHUD` and `AccessibleHand`. When the player's hand was also a winning Seven Pairs (which can occur with 4-of-a-kind counting as 2 pairs), `canTsumo = true` caused the TsumoBar to appear. The `tsumoSuppressed` flag was already set when the player clicked "Keep Playing," but it was never used to re-enable tile interaction — tiles remained non-interactive even after dismissal. The same bug existed in `PlayerHand2D` for 2D/mobile mode (`!canTsumo` with no `tsumoSuppressed` escape).
+
+**Fix:**
+
+- `apps/web/src/pages/game/game-page.tsx` — Changed both `ViewerHandHUD` and `AccessibleHand` `isMyTurn` guards from `isMyTurn && !canTsumo` to `isMyTurn && (!canTsumo || tsumoSuppressed)`. Added `tsumoSuppressed` to the `GameTable2D` call.
+- `apps/web/src/components/2d/GameTable2D.tsx`, `DesktopGameTable2D.tsx`, `MobileGameTable2D.tsx` — Added `tsumoSuppressed?: boolean` prop, threaded it down to `PlayerHand2D`.
+- `apps/web/src/components/2d/PlayerHand2D.tsx` — Added `tsumoSuppressed?: boolean` prop (default `false`), applied it to the `interactive` guard.
+
+**Key learning:** Client-side UI suppression flags (`tsumoSuppressed`) must be applied consistently to every interactive element that checks the same server-driven state (`canTsumo`). If one path ignores the suppression flag, the player is stuck.
+
+---
+
+### BUG-056 · Bust mode session never ends when a player's score goes negative
+
+**Root cause:** `isSessionOver()` in `apps/api/src/game/game.service.ts` had an extra `nextDealerInfo.roundComplete &&` guard on the bust termination check. `roundComplete` only becomes `true` when the dealer rotation returns to seat 0 — meaning bust mode could only end at one specific point per round, not immediately when a score dropped below zero. The UI tooltip correctly described bust as "ends when any player's score drops below zero," but the code contradicted this.
+
+**Fix (`apps/api/src/game/game.service.ts`):**
+
+- Removed `nextDealerInfo.roundComplete &&` from the bust condition. The check now fires at the end of any hand where a cumulative score is negative. Because `isSessionOver()` is only called from `endHand()`, this never triggers mid-hand — the timing is already correct.
+
+```ts
+// Before (buggy — only triggered when round completes back to seat 0):
+if (nextDealerInfo.roundComplete && cumulativeScores.some((s) => s < 0)) return true;
+
+// After (correct — fires at end of any hand with a negative score):
+if (cumulativeScores.some((s) => s < 0)) return true;
+```
+
+**Key learning:** Server-side session termination logic should match the UI description exactly. When a discrepancy is found, trust the documented user-facing description over an undocumented code comment.
+
+---
+
 ## `fix/bug-061-062-match-end` (2026-06-15)
 
 ### BUG-061 · Mobile player hand half cut off at bottom of screen

@@ -163,9 +163,15 @@ export interface PlayerHand2DProps {
    *  - First tap selects; second tap on the same tile discards.
    */
   confirmMode?: boolean;
+  /** True after player dismissed the TsumoBar — re-enables interaction so they can kong or discard. */
+  tsumoSuppressed?: boolean;
 }
 
-export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DProps) {
+export function PlayerHand2D({
+  onDiscard,
+  confirmMode = false,
+  tsumoSuppressed = false,
+}: PlayerHand2DProps) {
   const { t } = useI18n();
   const snapshot = useGameStore((s) => s.snapshot);
   const claimWindow = useGameStore((s) => s.claimWindow);
@@ -256,7 +262,7 @@ export function PlayerHand2D({ onDiscard, confirmMode = false }: PlayerHand2DPro
 
   // ── Interaction ───────────────────────────────────────────────────────────
 
-  const interactive = isMyTurn && !claimWindow && !pendingMove && !canTsumo;
+  const interactive = isMyTurn && !claimWindow && !pendingMove && (!canTsumo || tsumoSuppressed);
 
   /**
    * Drag-reorder eligibility.

@@ -1911,10 +1911,9 @@ export class GameService {
     }
 
     if (settings.terminationType === 'bust') {
-      // Bust: only eliminate after a full round completes (roundComplete = true).
-      // A player may go negative mid-round from spirit settlement and recover;
-      // the check must not fire until all hands in that rotation are done.
-      if (nextDealerInfo.roundComplete && cumulativeScores.some((s) => s < 0)) return true;
+      // Bust: end the session at the completion of any hand where a score goes below zero.
+      // Scores are updated at hand-end, so this never fires mid-hand.
+      if (cumulativeScores.some((s) => s < 0)) return true;
     }
 
     if (settings.terminationType === 'rounds') {
