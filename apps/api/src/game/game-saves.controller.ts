@@ -85,7 +85,7 @@ export class GameSavesController {
   @Throttle({ default: { ttl: 60_000, limit: 3 } })
   async loadManualSave(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<{ gameId: string; restoreCode: string }> {
+  ): Promise<{ gameId: string; restoreCode?: string }> {
     const save = await this.savesService.getSave(user.sub, 'manual');
     if (!save) throw new NotFoundException('No manual save found');
     if (save.hostUserId !== user.sub) {
@@ -93,7 +93,6 @@ export class GameSavesController {
     }
 
     const { gameId, restoreCode } = await this.gameService.restoreSession(save, user.sub);
-    if (!restoreCode) throw new BadRequestException('Manual save restore requires a code');
 
     // Delete the save now that the session is live.
     await this.savesService.deleteSave(user.sub, 'manual').catch(() => undefined);

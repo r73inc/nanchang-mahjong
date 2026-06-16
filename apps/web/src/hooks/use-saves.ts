@@ -24,8 +24,8 @@ export function useLoadAutoSave() {
 export function useLoadManualSave() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (): Promise<{ gameId: string; restoreCode: string }> =>
-      api.post<{ gameId: string; restoreCode: string }>('/saves/manual/load').then((r) => r.data),
+    mutationFn: (): Promise<{ gameId: string; restoreCode?: string }> =>
+      api.post<{ gameId: string; restoreCode?: string }>('/saves/manual/load').then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: SAVES_KEY }),
   });
 }

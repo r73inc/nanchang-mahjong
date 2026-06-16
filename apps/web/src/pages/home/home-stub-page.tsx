@@ -9,13 +9,7 @@ import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
 import { useThemeStore } from '../../stores/theme.store';
-import {
-  useSaves,
-  useLoadAutoSave,
-  useLoadManualSave,
-  useDeleteSave,
-  useJoinRestore,
-} from '../../hooks/use-saves';
+import { useSaves, useLoadAutoSave, useLoadManualSave, useDeleteSave } from '../../hooks/use-saves';
 import type { SaveSlotInfo } from '@nanchang/shared';
 
 const SEP_DOT = ' · ' as const;
@@ -93,67 +87,6 @@ function SaveSlotCard({
   );
 }
 
-function RestoreCodePanel() {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  const [code, setCode] = useState('');
-  const [error, setError] = useState('');
-  const joinRestore = useJoinRestore();
-
-  const handleJoin = async () => {
-    if (!code.trim()) return;
-    setError('');
-    try {
-      const { gameId } = await joinRestore.mutateAsync(code);
-      navigate(`/game/${gameId}`);
-    } catch {
-      setError(t('savedGamesRestoreCodeError'));
-    }
-  };
-
-  return (
-    <div
-      className="w-full px-4 py-3 rounded-[14px]"
-      style={{
-        background: 'rgba(var(--felt-ink-rgb),0.04)',
-        border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
-      }}
-    >
-      <p className="text-xs font-bold text-mj-bone/60 uppercase tracking-wide mb-2">
-        {t('savedGamesRestoreCodeInput')}
-      </p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          onKeyDown={(e) => e.key === 'Enter' && void handleJoin()}
-          placeholder={t('savedGamesRestoreCodePlaceholder')}
-          maxLength={7}
-          className="flex-1 bg-transparent text-sm text-mj-bone rounded-lg px-3 py-2 focus:outline-none"
-          style={{
-            border: '1px solid rgba(var(--felt-ink-rgb),0.2)',
-            background: 'rgba(var(--felt-ink-rgb),0.06)',
-          }}
-          aria-label={t('savedGamesRestoreCodeInput')}
-        />
-        <button
-          onClick={() => void handleJoin()}
-          disabled={joinRestore.isPending || !code.trim()}
-          className="px-4 py-2 rounded-lg text-sm font-bold text-mj-ink"
-          style={{
-            background: '#c9a961',
-            opacity: joinRestore.isPending || !code.trim() ? 0.5 : 1,
-          }}
-        >
-          {t('savedGamesRestoreCodeJoin')}
-        </button>
-      </div>
-      {error && <p className="text-xs text-red-400 mt-1.5">{error}</p>}
-    </div>
-  );
-}
-
 function SavedGamesSection() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -161,7 +94,13 @@ function SavedGamesSection() {
   const loadAuto = useLoadAutoSave();
   const loadManual = useLoadManualSave();
   const deleteSave = useDeleteSave();
-  const [restoreCode, setRestoreCode] = useState<string | null>(null);
+  // pendingRestore: set when a multi-player manual save is loaded and needs a
+  // restore code shared before entering the game. Host sees the code here and
+  // clicks "Continue" to navigate to the game.
+  const [pendingRestore, setPendingRestore] = useState<{
+    gameId: string;
+    restoreCode: string;
+  } | null>(null);
 
   if (!saves || saves.length === 0) return null;
 
@@ -175,9 +114,44 @@ function SavedGamesSection() {
 
   const handleResumeManual = async () => {
     const result = await loadManual.mutateAsync();
-    setRestoreCode(result.restoreCode);
-    navigate(`/game/${result.gameId}`);
+    if (result.restoreCode) {
+      // Multi-player save: show the restore code before entering the game so
+      // the host can share it with other players verbally.
+      setPendingRestore({ gameId: result.gameId, restoreCode: result.restoreCode });
+    } else {
+      // Single-player (bot) save: navigate directly.
+      navigate(`/game/${result.gameId}`);
+    }
   };
+
+  if (pendingRestore) {
+    return (
+      <div className="mb-6">
+        <div
+          className="px-4 py-5 rounded-[14px] flex flex-col gap-3"
+          style={{
+            background: 'rgba(201,169,97,0.08)',
+            border: '1px solid rgba(201,169,97,0.3)',
+          }}
+        >
+          <p className="text-xs font-bold text-mj-gold uppercase tracking-wide">
+            {t('savedGamesRestoreCodeTitle')}
+          </p>
+          <p className="text-3xl font-mono font-bold text-mj-bone tracking-widest">
+            {pendingRestore.restoreCode}
+          </p>
+          <p className="text-xs text-mj-bone/50">{t('savedGamesRestoreCodeDesc')}</p>
+          <button
+            onClick={() => navigate(`/game/${pendingRestore.gameId}`)}
+            className="mt-1 w-full py-3 rounded-xl font-bold text-sm text-mj-ink"
+            style={{ background: '#c9a961' }}
+          >
+            {t('savedGamesResume')}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mb-6">
@@ -194,33 +168,13 @@ function SavedGamesSection() {
           />
         )}
         {manualSave && (
-          <>
-            <SaveSlotCard
-              info={manualSave}
-              onResume={() => void handleResumeManual()}
-              onDelete={() => deleteSave.mutate('manual')}
-              isLoading={loadManual.isPending || deleteSave.isPending}
-            />
-            {restoreCode && (
-              <div
-                className="px-4 py-3 rounded-[14px]"
-                style={{
-                  background: 'rgba(201,169,97,0.08)',
-                  border: '1px solid rgba(201,169,97,0.25)',
-                }}
-              >
-                <p className="text-xs font-bold text-mj-gold mb-1">
-                  {t('savedGamesRestoreCodeTitle')}
-                </p>
-                <p className="text-2xl font-mono font-bold text-mj-bone tracking-widest">
-                  {restoreCode}
-                </p>
-                <p className="text-xs text-mj-bone/50 mt-1">{t('savedGamesRestoreCodeDesc')}</p>
-              </div>
-            )}
-          </>
+          <SaveSlotCard
+            info={manualSave}
+            onResume={() => void handleResumeManual()}
+            onDelete={() => deleteSave.mutate('manual')}
+            isLoading={loadManual.isPending || deleteSave.isPending}
+          />
         )}
-        <RestoreCodePanel />
       </div>
     </div>
   );
