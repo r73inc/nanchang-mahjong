@@ -389,6 +389,33 @@ export class ChallengesService {
     this.logger.log(`Challenge ${challengeId}: participant ${playerSub} result recorded`);
   }
 
+  /**
+   * Generic result recorder for restored sessions that don't have an onGameEnded callback.
+   * Inspects the challenge record to determine whether to call creator or participant logic.
+   */
+  async recordGameResult(
+    challengeId: string,
+    playerSub: string,
+    finalScore: number,
+    gameId: string,
+  ): Promise<void> {
+    const item = await this.getChallengeItem(challengeId);
+    if (!item) {
+      this.logger.error(`recordGameResult: challenge ${challengeId} not found`);
+      return;
+    }
+    const participant = item.participants[playerSub];
+    if (!participant) {
+      this.logger.warn(`recordGameResult: ${playerSub} not in challenge ${challengeId}`);
+      return;
+    }
+    if (participant.role === 'creator') {
+      await this.recordCreatorResult(challengeId, playerSub, finalScore, gameId);
+    } else {
+      await this.recordParticipantResult(challengeId, playerSub, finalScore, gameId);
+    }
+  }
+
   // ── Prepare challenge game for a participant ──────────────────────────────
 
   /**

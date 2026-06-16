@@ -14,6 +14,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { randomUUID } from 'crypto';
 import type { Server, Socket } from 'socket.io';
 import {
@@ -51,6 +52,9 @@ import type {
   GameEndedPayload,
   HandRevealPayload,
   SpiritCount,
+  GameSaveData,
+  RestoreHistoryPayload,
+  RestoreStatusPayload,
 } from '@nanchang/shared';
 import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
@@ -63,6 +67,7 @@ import type { SeatBotMeta } from './snapshot';
 import { StatsService } from './stats.service';
 import { StorageService } from '../storage/storage.service';
 import { PushService } from '../push/push.service';
+import { GameSavesService } from './game-saves.service';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -90,11 +95,22 @@ export class GameService {
   private readonly sessions = new Map<string, GameSession>();
   private server?: Server;
 
+  /** Maps restore code → { gameId, allowedPlayerSubs } for manual save restores. */
+  private readonly restoreCodes = new Map<
+    string,
+    { gameId: string; allowedPlayerSubs: string[] }
+  >();
+
+  /** Code-generation characters (no O/0, I/1/L to avoid confusion). */
+  private readonly CODE_CHARS = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
   constructor(
     private readonly db: DynamoDBService,
     private readonly stats: StatsService,
     private readonly storage: StorageService,
     private readonly push: PushService,
+    private readonly gameSaves: GameSavesService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /** Called by GameGateway.afterInit to wire in the Socket.IO server reference. */
@@ -231,11 +247,298 @@ export class GameService {
     session.clearAfkTimers();
     if (session.teardownTimer) clearTimeout(session.teardownTimer);
 
+    // Clean up any restore code pointing to this session
+    for (const [code, entry] of this.restoreCodes) {
+      if (entry.gameId === gameId) {
+        this.restoreCodes.delete(code);
+        break;
+      }
+    }
+
     this.sessions.delete(gameId);
     this.logger.log(`Session destroyed: ${gameId}`);
   }
 
+  // ── Save / restore ───────────────────────────────────────────────────────────
+
+  /**
+   * Restore a saved game session into the active sessions registry.
+   *
+   * For bot games (auto-save): pass the human playerSub so the session can be
+   * tagged to that user if needed. The returned restoreCode will be undefined.
+   *
+   * For multi-player saves (manual): a restoreCode is generated and stored in
+   * `restoreCodes`. Other original players use it via GET /saves/restore/:code
+   * to look up the gameId, then join normally with game:join.
+   */
+  async restoreSession(
+    save: GameSaveData,
+    _loaderSub: string,
+  ): Promise<{ gameId: string; restoreCode?: string }> {
+    const gameId = randomUUID();
+    const now = new Date().toISOString();
+
+    const engine = GameEngine.fromState(save.engineState);
+
+    const session = new GameSession({
+      engine,
+      gameId,
+      roomId: save.roomId,
+      settings: save.settings,
+      seatMap: save.seatMap,
+      seatNames: save.seatNames,
+      seatAvatarUrls: save.seatAvatarUrls,
+      startedAt: now,
+      challengeId: save.challengeId,
+      handSeeds: save.handSeeds,
+      targetHands: save.targetHands,
+      // Do NOT set onGameEnded here — restored challenge sessions use notifyChallengeComplete
+      // in endSession() instead (via ModuleRef lazy load, avoiding circular dep).
+      onGameEnded: undefined,
+    });
+
+    // Restore cumulative session state
+    session.cumulativeScores = [...save.cumulativeScores] as [number, number, number, number];
+    session.sessionSpiritPoints = [...save.sessionSpiritPoints] as [number, number, number, number];
+    session.sessionBonusTilePoints = [...save.sessionBonusTilePoints] as [
+      number,
+      number,
+      number,
+      number,
+    ];
+    session.handsWon = [...save.handsWon] as [number, number, number, number];
+    session.bestHandPoints = [...save.bestHandPoints] as [number, number, number, number];
+    session.handsPlayed = save.handsPlayed;
+    session.moveLog.push(...save.moveLog);
+    session.handLog.push(...save.handLog);
+
+    // Restore pre-game reveal phase and pending dice roll
+    session.preGamePhase = save.preGamePhase;
+    if (save.pendingRoll) {
+      session.pendingRoll = { ...save.pendingRoll };
+    }
+
+    session.isRestored = true;
+    this.sessions.set(gameId, session);
+
+    // Persist a minimal DDB record so the game can be tracked
+    await this.db.put({
+      Item: {
+        ...DK.game(gameId),
+        gameId,
+        roomId: save.roomId,
+        seatMap: Array.from(save.seatMap),
+        settings: save.settings,
+        status: 'active',
+        dealerSeat: save.engineState.dealerSeat,
+        roundWind: save.engineState.roundWind,
+        handsPlayed: save.handsPlayed,
+        startedAt: now,
+        restoredFromSaveId: save.saveId,
+      },
+    });
+
+    // For multi-player manual saves: generate a restore code and hold the turn
+    // loop until all human players have connected (restoreWaiting mode).
+    let restoreCode: string | undefined;
+    if (save.allowedPlayerSubs.length > 1) {
+      restoreCode = this.generateRestoreCode();
+      this.restoreCodes.set(restoreCode, {
+        gameId,
+        allowedPlayerSubs: save.allowedPlayerSubs,
+      });
+      session.restoreCode = restoreCode;
+      session.restoreWaiting = true;
+    }
+
+    // Only start the turn loop immediately for single-player (bot) restores.
+    // Multi-player restores wait in restoreWaiting mode until host starts.
+    if (!session.restoreWaiting) {
+      if (session.preGamePhase === null) {
+        const enginePhase = session.engine.state.phase;
+        if (enginePhase === 'playing') {
+          this.startTurn(session);
+        } else if (enginePhase === 'awaiting_claims') {
+          this.openClaimWindowAfterDiscard(session);
+        }
+      } else if (session.preGamePhase === 'dealing' && session.pendingRoll) {
+        this.doBotRollIfNeeded(session);
+      }
+    }
+
+    this.logger.log(
+      `Restored session ${gameId} from save ${save.saveId} (slot=${save.slot})` +
+        (restoreCode ? ` restoreCode=${restoreCode}` : ''),
+    );
+
+    return { gameId, restoreCode };
+  }
+
+  /** Look up a restore code; returns the gameId if the user is an allowed player. */
+  resolveRestoreCode(code: string, userSub: string): string | null {
+    const entry = this.restoreCodes.get(code.toUpperCase());
+    if (!entry) return null;
+    if (!entry.allowedPlayerSubs.includes(userSub)) return null;
+    return entry.gameId;
+  }
+
+  /**
+   * Handle game:save-and-quit — host-only action that serializes the session to
+   * DynamoDB, broadcasts game:saved to all players, then destroys the session.
+   */
+  async handleSaveAndQuit(socket: Socket, userId: string, gameId: string): Promise<void> {
+    const session = this.sessions.get(gameId);
+    if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
+
+    const seat = session.getSeat(userId);
+    if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
+
+    // Only the host (seat 0) may trigger a manual save
+    if (seat !== 0) {
+      return this.emitError(socket, 'NOT_HOST');
+    }
+
+    // Cannot save while a claim window is active
+    if (session.claimWindow) {
+      return this.emitError(socket, 'CANNOT_SAVE_NOW');
+    }
+
+    // Cannot save in pre-game reveal (no hands played yet)
+    if (session.preGamePhase !== null) {
+      return this.emitError(socket, 'CANNOT_SAVE_NOW');
+    }
+
+    try {
+      await this.gameSaves.saveManual(session, userId);
+    } catch (err) {
+      this.logger.error(`Manual save failed for game ${gameId}: ${err}`);
+      return this.emitError(socket, 'SAVE_FAILED');
+    }
+
+    // Notify all players the game has been saved (hostName for non-host overlay)
+    this.server?.to(`game:${gameId}`).emit('game:saved', {
+      hostName: session.seatNames[0],
+    });
+
+    this.destroySession(gameId);
+  }
+
+  /**
+   * Record a challenge result for a restored session (no onGameEnded callback available).
+   * Uses ModuleRef to lazy-load ChallengesService, avoiding a circular module dependency
+   * (ChallengesModule already imports GameModule).
+   */
+  private async notifyChallengeComplete(
+    challengeId: string,
+    playerSub: string,
+    finalScore: number,
+    gameId: string,
+  ): Promise<void> {
+    const { ChallengesService } = await import('../challenges/challenges.service');
+    const challenges = this.moduleRef.get(ChallengesService, { strict: false });
+    await challenges.recordGameResult(challengeId, playerSub, finalScore, gameId);
+  }
+
+  /** Generate a 6-character restore code in XX-XXXX format. */
+  private generateRestoreCode(): string {
+    let s = '';
+    for (let i = 0; i < 6; i++) {
+      s += this.CODE_CHARS[Math.floor(Math.random() * this.CODE_CHARS.length)];
+    }
+    return `${s.slice(0, 2)}-${s.slice(2)}`;
+  }
+
   // ── Player join / reconnect ──────────────────────────────────────────────────
+
+  /**
+   * Extract the history-relevant public events for the current hand from a
+   * session's moveLog. Used when a player joins a restored session so the
+   * client can bootstrap its in-game history panel.
+   *
+   * Only events since the last 'deal' are included (current hand only).
+   * Private data is stripped: 'deal' and 'draw' events are excluded entirely;
+   * 'kong_concealed' tile is omitted; 'win' paymentResult is renamed to payment.
+   */
+  private buildRestoreHistoryPayload(session: GameSession): RestoreHistoryPayload {
+    // Find the start of the current hand (last 'deal' event index).
+    let handStartIdx = 0;
+    for (let i = session.moveLog.length - 1; i >= 0; i--) {
+      if (session.moveLog[i].kind === 'deal') {
+        handStartIdx = i + 1;
+        break;
+      }
+    }
+
+    const events: RestoreHistoryPayload['events'] = [];
+    for (let i = handStartIdx; i < session.moveLog.length; i++) {
+      const e = session.moveLog[i];
+      if (
+        e.kind === 'discard' ||
+        e.kind === 'pung' ||
+        e.kind === 'chow' ||
+        e.kind === 'kong_open' ||
+        e.kind === 'kong_added'
+      ) {
+        events.push(e);
+      } else if (e.kind === 'kong_concealed') {
+        events.push({ kind: 'kong_concealed', seat: e.seat });
+      } else if (e.kind === 'win') {
+        events.push({
+          kind: 'win',
+          seat: e.seat,
+          winType: e.winType,
+          handType: e.handType,
+          payment: e.paymentResult,
+        });
+      } else if (e.kind === 'concede') {
+        events.push(e);
+      }
+    }
+    return { events };
+  }
+
+  /** Build the restore-status payload from the current session connection state. */
+  private buildRestoreStatusPayload(session: GameSession): RestoreStatusPayload {
+    const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i)) as (
+      | 0
+      | 1
+      | 2
+      | 3
+    )[];
+    const connectedSeats = humanSeats.filter((i) => session.connState[i].connected);
+    return { restoreCode: session.restoreCode, humanSeats, connectedSeats };
+  }
+
+  /**
+   * Handle game:start-restore — host-only action that clears restoreWaiting and
+   * starts the turn loop so the game resumes from the saved state.
+   */
+  handleStartRestore(socket: Socket, userId: string, gameId: string): void {
+    const session = this.sessions.get(gameId);
+    if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
+
+    const seat = session.getSeat(userId);
+    if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
+    if (seat !== 0) return this.emitError(socket, 'NOT_HOST');
+    if (!session.restoreWaiting) return; // already started — ignore duplicate
+
+    session.restoreWaiting = false;
+
+    // Broadcast to all players so they clear their restore-waiting overlays
+    this.server?.to(`game:${gameId}`).emit('game:restore-started', {});
+
+    // Resume the turn loop from the saved engine state
+    if (session.preGamePhase === null) {
+      const enginePhase = session.engine.state.phase;
+      if (enginePhase === 'playing') {
+        this.startTurn(session);
+      } else if (enginePhase === 'awaiting_claims') {
+        this.openClaimWindowAfterDiscard(session);
+      }
+    } else if (session.preGamePhase === 'dealing' && session.pendingRoll) {
+      this.doBotRollIfNeeded(session);
+    }
+  }
 
   /**
    * Handle game:join. Registers the socket, sends the current snapshot.
@@ -281,6 +584,22 @@ export class GameService {
     // Send current snapshot only to this socket
     this.emitSnapshotToSocket(socket.id, session, userId);
 
+    // For restored sessions, replay history-relevant events so the client can
+    // bootstrap its in-game history panel without missing prior moves.
+    if (session.isRestored) {
+      this.server
+        ?.to(socket.id)
+        .emit('game:restore-history', this.buildRestoreHistoryPayload(session));
+    }
+
+    // For multi-player restores in waiting mode, broadcast updated status to all
+    // connected players so the waiting overlay stays in sync.
+    if (session.restoreWaiting) {
+      this.server
+        ?.to(`game:${gameId}`)
+        .emit('game:restore-status', this.buildRestoreStatusPayload(session));
+    }
+
     // Re-send pending events to reconnecting players so they don't miss a screen.
     if (
       (session.preGamePhase === 'jing' || session.preGamePhase === 'settlement') &&
@@ -295,8 +614,9 @@ export class GameService {
 
   /**
    * Handle socket disconnect. Updates connection state, notifies room.
+   * Async so auto-save completes before the session is torn down.
    */
-  handleDisconnect(socketId: string): void {
+  async handleDisconnect(socketId: string): Promise<void> {
     for (const session of this.sessions.values()) {
       const userId = session.disconnect(socketId);
       if (!userId) continue;
@@ -306,16 +626,32 @@ export class GameService {
         this.logger.debug(`Player seat ${seat} disconnected from game ${session.gameId}`);
         this.broadcastPlayerConnection(session, seat, 'reconnecting');
 
-        // If this is a bot game and no human remains connected, tear down immediately
-        // to avoid orphaned sessions running forever.
+        // In restore-waiting mode, just update the status overlay — don't tear down.
+        if (session.restoreWaiting) {
+          this.server
+            ?.to(`game:${session.gameId}`)
+            .emit('game:restore-status', this.buildRestoreStatusPayload(session));
+          return;
+        }
+
+        // If this is a bot game and no human remains connected, auto-save then tear down.
         if (session.hasBots) {
-          const anyHumanConnected = [0, 1, 2, 3].some(
-            (i) => !session.isBotSeat(i as Seat4) && session.connState[i as Seat4].connected,
-          );
+          const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i));
+          const anyHumanConnected = humanSeats.some((i) => session.connState[i].connected);
           if (!anyHumanConnected) {
             this.logger.log(
-              `All humans disconnected from bot game ${session.gameId} — destroying session`,
+              `All humans disconnected from bot game ${session.gameId} — auto-saving and destroying`,
             );
+            // Auto-save only for single-human bot games (1 human + 3 bots).
+            // Multi-human + bots is not eligible for auto-save.
+            if (humanSeats.length === 1 && session.preGamePhase === null) {
+              const humanSub = session.seatMap[humanSeats[0]];
+              await this.gameSaves
+                .saveAuto(session, humanSub)
+                .catch((err: unknown) =>
+                  this.logger.error(`Auto-save failed for game ${session.gameId}: ${String(err)}`),
+                );
+            }
             this.destroySession(session.gameId);
           }
         }
@@ -1765,16 +2101,31 @@ export class GameService {
       .catch((err) => this.logger.error(`Failed to write replay for ${session.gameId}: ${err}`));
 
     // ── Notify challenge system if this was a Point Challenge game ────────────
-    if (session.onGameEnded) {
-      // The human player is always seat 0 in a challenge game (solo vs bots).
+    if (session.onGameEnded || session.challengeId) {
+      // The human player is always the sole non-bot seat in a challenge game.
       const humanSeat = ([0, 1, 2, 3] as const).find((i) => !session.isBotSeat(i)) ?? 0;
       const humanSub = session.seatMap[humanSeat];
       const humanFinalScore = finalScores[humanSeat];
-      await session
-        .onGameEnded(humanSub, humanFinalScore)
-        .catch((err) =>
+      if (session.onGameEnded) {
+        await session
+          .onGameEnded(humanSub, humanFinalScore)
+          .catch((err) =>
+            this.logger.error(
+              `Challenge result recording failed for game ${session.gameId}: ${err}`,
+            ),
+          );
+      } else if (session.challengeId) {
+        // Restored challenge session — onGameEnded was not set (can't serialize closures).
+        // Use ModuleRef to lazy-load ChallengesService and record the result.
+        await this.notifyChallengeComplete(
+          session.challengeId,
+          humanSub,
+          humanFinalScore,
+          session.gameId,
+        ).catch((err) =>
           this.logger.error(`Challenge result recording failed for game ${session.gameId}: ${err}`),
         );
+      }
     }
 
     // ── Schedule session teardown ──────────────────────────────────────────────

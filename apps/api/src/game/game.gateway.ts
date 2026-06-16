@@ -58,6 +58,7 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     'game:reveal-jing': { limit: 2, windowMs: 1_000 },
     'game:advance-pre-game': { limit: 3, windowMs: 2_000 },
     'game:advance-hand': { limit: 2, windowMs: 2_000 },
+    'game:save-and-quit': { limit: 1, windowMs: 10_000 },
     'game:rematch': { limit: 1, windowMs: 10_000 },
     'game:roll-dice': { limit: 2, windowMs: 1_000 },
   });
@@ -208,6 +209,29 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
 
     this.gameService.handleConcede(socket, user.sub, gameId);
+  }
+
+  @SubscribeMessage('game:save-and-quit')
+  async handleSaveAndQuit(socket: Socket): Promise<void> {
+    if (!this.checkRate(socket, 'game:save-and-quit')) return;
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = socket.data.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
+
+    await this.gameService.handleSaveAndQuit(socket, user.sub, gameId);
+  }
+
+  @SubscribeMessage('game:start-restore')
+  handleStartRestore(socket: Socket): void {
+    const user = this.getUser(socket);
+    if (!user) return;
+
+    const gameId = socket.data.gameId as string | undefined;
+    if (!gameId) return this.emitError(socket, 'NOT_IN_GAME');
+
+    this.gameService.handleStartRestore(socket, user.sub, gameId);
   }
 
   @SubscribeMessage('game:roll-dice')
