@@ -583,7 +583,9 @@ function HandRevealScreen({
               <div
                 key={seat}
                 className={`rounded-xl overflow-hidden ${
-                  isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
+                  isViewer
+                    ? 'bg-mj-east/15 border border-mj-east/30 text-mj-ink'
+                    : 'bg-[rgba(var(--felt-ink-rgb),0.05)]'
                 }`}
               >
                 {/* ── Collapsed row ── */}
@@ -715,7 +717,7 @@ function HandRevealScreen({
                                 {wp.items.map((item, ii) => (
                                   <span key={ii} className="flex items-center gap-1">
                                     <span className="text-mj-bone/30">{MULT_CHAR}</span>
-                                    <span className="bg-white/8 px-1.5 py-0.5 rounded text-mj-bone/70">
+                                    <span className="px-1.5 py-0.5 rounded text-mj-bone/70 bg-[rgba(var(--felt-ink-rgb),0.08)]">
                                       {lang === 'zh' ? item.nameZh : item.name} {MULT_CHAR}
                                       {item.multiplier}
                                     </span>
@@ -937,7 +939,11 @@ function HandRevealScreen({
               return (
                 <div
                   key={i}
-                  className={`rounded-xl p-3 ${isViewer ? 'bg-mj-gold/10 border border-mj-gold/20' : 'bg-white/4'}`}
+                  className={`rounded-xl p-3 ${
+                    isViewer
+                      ? 'bg-mj-east/10 border border-mj-east/20 text-mj-ink'
+                      : 'bg-[rgba(var(--felt-ink-rgb),0.04)]'
+                  }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>

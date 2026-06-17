@@ -192,7 +192,9 @@ export function SettlementPreview({
               <button
                 onClick={() => hasTransfers && toggleExpand(seat)}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${
-                  isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
+                  isViewer
+                    ? 'bg-mj-east/15 border border-mj-east/30 text-mj-ink'
+                    : 'bg-[rgba(var(--felt-ink-rgb),0.05)]'
                 } ${isExpanded ? 'rounded-b-none' : ''}`}
               >
                 <div className="flex items-center gap-2 flex-1 text-left min-w-0">
@@ -269,7 +271,9 @@ export function SettlementPreview({
               {isExpanded && hasTransfers && (
                 <div
                   className={`flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl ${
-                    isViewer ? 'bg-mj-gold/10 border-mj-gold/20' : 'bg-white/3 border-white/10'
+                    isViewer
+                      ? 'bg-mj-east/10 border-mj-east/20 text-mj-ink'
+                      : 'bg-[rgba(var(--felt-ink-rgb),0.03)] border-[rgba(var(--felt-ink-rgb),0.08)]'
                   }`}
                 >
                   {transfers.map((line, li) => (
