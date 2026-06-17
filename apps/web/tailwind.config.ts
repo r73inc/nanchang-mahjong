@@ -16,6 +16,7 @@ const config: Config = {
         // Ink
         'mj-bone': '#f5efdf',
         'mj-slate': '#1f2937',
+        'mj-ink': '#1f2937',
         // Semantic
         'mj-win': '#7fc299',
         'mj-win-deep': '#1f7a4d',
@@ -25,6 +26,9 @@ const config: Config = {
         'mj-bg-page': '#0a0a0a',
         'mj-bg-card': '#141414',
         'mj-bg-elev': '#1c1c1c',
+        // Spirit state badges
+        'mj-spirit-hot': '#f97316',
+        'mj-spirit-lone': '#a855f7',
         // Player winds (compass seats)
         'mj-east': '#c9a961', // You (bottom seat)
         'mj-south': '#a36d3e',

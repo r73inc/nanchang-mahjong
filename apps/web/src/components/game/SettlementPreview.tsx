@@ -191,9 +191,15 @@ export function SettlementPreview({
               {/* Main row */}
               <button
                 onClick={() => hasTransfers && toggleExpand(seat)}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${
-                  isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : 'bg-white/5'
-                } ${isExpanded ? 'rounded-b-none' : ''}`}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${isExpanded ? 'rounded-b-none' : ''}`}
+                style={
+                  isViewer
+                    ? {
+                        background: 'rgba(201,169,97,0.15)',
+                        border: '1px solid rgba(201,169,97,0.3)',
+                      }
+                    : { background: 'rgba(var(--felt-ink-rgb),0.05)' }
+                }
               >
                 <div className="flex items-center gap-2 flex-1 text-left min-w-0">
                   <span className="text-sm font-bold shrink-0" style={{ color: WIND_COLOR[wind] }}>
@@ -233,9 +239,9 @@ export function SettlementPreview({
                   <span
                     className={`text-sm font-bold tabular-nums ${
                       totalDelta > 0
-                        ? 'text-emerald-400'
+                        ? 'text-mj-win'
                         : totalDelta < 0
-                          ? 'text-red-400'
+                          ? 'text-mj-loss-light'
                           : 'text-mj-bone/40'
                     }`}
                   >
@@ -268,9 +274,15 @@ export function SettlementPreview({
               {/* Expanded per-player breakdown */}
               {isExpanded && hasTransfers && (
                 <div
-                  className={`flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl ${
-                    isViewer ? 'bg-mj-gold/10 border-mj-gold/20' : 'bg-white/3 border-white/10'
-                  }`}
+                  className="flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl"
+                  style={
+                    isViewer
+                      ? { background: 'rgba(201,169,97,0.10)', borderColor: 'rgba(201,169,97,0.2)' }
+                      : {
+                          background: 'rgba(var(--felt-ink-rgb),0.03)',
+                          borderColor: 'rgba(var(--felt-ink-rgb),0.08)',
+                        }
+                  }
                 >
                   {transfers.map((line, li) => (
                     <div key={li} className="flex items-center gap-2 text-xs">
