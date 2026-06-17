@@ -8,18 +8,14 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 
 ## Quick Reference
 
-| ID      | Name                                       | Summary                                                                                     |
-| ------- | ------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| BUG-045 | Bot dice roll animation not visible        | Bot roll animation and result flash by in under a frame; human roll works correctly         |
-| BUG-049 | Hand not visible in settlement (PC)        | On desktop, the player cannot see their own hand during the settlement phase                |
-| BUG-050 | Spirit settlement uses old glyph           | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile       |
-| BUG-051 | Discard blocked after declining win        | After drawing a winning tile and pressing "keep playing", no tile can be discarded          |
-| BUG-052 | Palette preview tiles use active palette   | All three Tile Face cards in Customize render tiles using the active palette, not their own |
-| IMP-032 | Global sound toggle                        | Add an always-available sound on/off toggle next to the language toggle                     |
-| IMP-033 | "Waiting…0 not ready" wording              | Room lobby's not-ready count message reads awkwardly and is not descriptive                 |
-| IMP-034 | Info button placement too close to options | "End Condition" and "Claim Window" info buttons sit too close to the first choice button    |
-| IMP-035 | Friend search clear "X" not visible        | The native browser search-input clear icon is low-contrast and hard to see                  |
-| IMP-036 | Bot names not localized                    | MilkyBot / MelonBot / FifthBot show their English names in both EN and ZH locales           |
+| ID      | Name                                     | Summary                                                                                     |
+| ------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| BUG-045 | Bot dice roll animation not visible      | Bot roll animation and result flash by in under a frame; human roll works correctly         |
+| BUG-049 | Hand not visible in settlement (PC)      | On desktop, the player cannot see their own hand during the settlement phase                |
+| BUG-050 | Spirit settlement uses old glyph         | Second table in end-of-round detail still renders the `节` glyph, not the spirit tile       |
+| BUG-051 | Discard blocked after declining win      | After drawing a winning tile and pressing "keep playing", no tile can be discarded          |
+| BUG-052 | Palette preview tiles use active palette | All three Tile Face cards in Customize render tiles using the active palette, not their own |
+| IMP-032 | Global sound toggle                      | Add an always-available sound on/off toggle next to the language toggle                     |
 
 ---
 
@@ -116,70 +112,6 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`. For issues tha
 ---
 
 ## Open Improvements
-
-### IMP-033 · "Waiting…0 not ready" wording on the create-room/lobby page
-
-**Request:** On the room page, when fewer than 4 players have joined/readied, the host's start-button label reads "Waiting… 0 not ready" — this wording is confusing/unclear, especially when the count is 0 (which actually means "waiting for seats to fill", not "0 players are not ready").
-
-**Status:** OPEN
-
-**Where to look:**
-
-- `apps/web/src/pages/room/room-page.tsx:883` — `` `${t('waiting')} ${filledSeats.filter(...).length} ${t('notReady').toLowerCase()}` `` builds this string from three separate i18n keys (`waiting`, `notReady`) rather than one descriptive sentence.
-- `apps/web/src/pages/room/room-page.test.tsx:119-126` — existing test asserts on the current "Waiting… N not ready" button text; will need updating alongside any wording change.
-
-**Notes:** Consider distinct messaging for "seats not yet filled" vs. "players seated but not marked ready", and add a single composed i18n key (with `{{count}}` interpolation) for both EN and ZH rather than concatenating fragments.
-
----
-
-### IMP-034 · Info button placement too close to the first option (End Condition / Claim Window rows)
-
-**Request:** The small circular info (`?`) buttons next to "End Condition" and "Claim Window" labels sit too close to the first choice button in the option group on the same row, making them easy to misclick.
-
-**Status:** OPEN
-
-**Investigation so far:** Both rows use `flex justify-between items-center` to split the row into a left label+`InfoButton` span (`gap-1` = 4px between label and button) and a right-hand `flex gap-1.5` button group (`apps/web/src/pages/room/room-page.tsx:541-603` for End Condition, `:694-759` for Claim Window). Because `justify-between` only guarantees spacing between the two flex children as a whole, there's no enforced minimum gap between the `InfoButton` and the first option button — on narrower viewports the available "between" space shrinks and the two visually crowd together.
-
-**Where to look:**
-
-- `apps/web/src/pages/room/room-page.tsx:45-65` — `InfoButton` component (14×14px circular button).
-- `apps/web/src/pages/room/room-page.tsx:546-549` (End Condition label+info), `:699-702` (Claim Window label+info).
-
-**Notes:** Same `InfoButton` pattern is used on other rows (View Mode, Rounds, Opening Spirit Flip) — check whether they have the same crowding issue or whether End Condition/Claim Window are unique due to longer label text or more option buttons.
-
----
-
-### IMP-035 · Friend search clear "X" not visible
-
-**Request:** In the Friends search bar, the small "X" used to clear the search text is hard to see.
-
-**Status:** OPEN
-
-**Root cause:** `apps/web/src/pages/friends/friends-page.tsx:202-209` uses a native `<input type="search">` with no custom clear button — the "X" the user sees is the browser's own default search-clear affordance, which is small and low-contrast against the app's dark theme and isn't styled by the app at all.
-
-**Fix needed:** Replace the native search-clear icon with a custom, app-styled clear button (absolutely positioned inside the input, similar to how the `Spinner` is already positioned at `friends-page.tsx:210-214`), shown only when `searchInput` is non-empty, that calls `handleSearch('')`.
-
-**Where to look:**
-
-- `apps/web/src/pages/friends/friends-page.tsx:201-215` — search input + existing spinner overlay pattern to follow.
-
----
-
-### IMP-036 · Bot display names not localized
-
-**Request:** Bot names (MilkyBot, MelonBot, FifthBot) should show a translated/localized name in Chinese rather than the English name in both locales. Use: MilkyBot = 葫芦机器人, MelonBot = 西瓜机器人, FifthBot = 第五机器人.
-
-**Status:** OPEN
-
-**Where to look:**
-
-- `packages/shared/src/bot-profiles.ts:14-16` — `name: 'MilkyBot'`, `'MelonBot'`, `'FifthBot'` are currently hard-coded plain strings used directly as the display name (not i18n keys).
-- `apps/api/src/game/game-session.ts:98` and `apps/api/src/rooms/rooms.service.ts:97` — bot display name is set server-side as `seatNames[i]` and sent to all clients as plain text, not a translation key — so the server would need to either send a bot-id/locale-aware name, or the client would need to map known bot names to i18n keys for display.
-- `apps/web/src/i18n/en.json` / `zh.json` — no existing `botName*` keys; will need new entries.
-
-**Notes:** Since bot names are baked into the session as plain display strings server-side (visible to all 4 seats regardless of each viewer's locale), this likely needs either (a) the client mapping bot IDs (`milkybot`/`melonbot`/`fifthbot`) to localized names at render time instead of trusting the server-sent `seatNames` string for bot seats, or (b) the server resending per-viewer-localized names — (a) is simpler and avoids per-viewer snapshot divergence.
-
----
 
 **Request:** Add a sound on/off toggle next to the language (translations) toggle so sound can be turned on or off at all times, from anywhere in the app.
 

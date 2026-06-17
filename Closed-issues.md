@@ -6,6 +6,68 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `wify-imp-33-36` (2026-06-16)
+
+### IMP-033 · "Waiting…0 not ready" wording on the room lobby start button
+
+**Root cause:** The start button label for the host was built by concatenating three separate i18n fragments: `"${t('waiting')} ${count} ${t('notReady').toLowerCase()}"`. When the room wasn't full (no non-host, non-bot un-ready players), the count was 0, producing the confusing "Waiting… 0 not ready". More importantly, there was no distinction between "seats not yet filled" and "seats full but players unready."
+
+**Fix (`apps/web/src/pages/room/room-page.tsx`, `en.json`, `zh.json`):**
+
+- Added two new i18n keys:
+  - `waitingSeats`: "Waiting for seats…" (EN) / "等待玩家加入…" (ZH) — shown when `filledSeats.length < 4`.
+  - `waitingNotReady`: "{{0}} not ready" (EN) / "{{0}} 人未准备" (ZH) — shown when all 4 seats are filled but `not allReady`, interpolated with the count of non-host, non-bot, non-ready players.
+- Start button now branches: `allReady → "Start Match"` / `filledSeats.length < 4 → t('waitingSeats')` / else → `t('waitingNotReady', count)`.
+
+**Key learning:** Never build a user-facing label by concatenating i18n fragments — the result collapses two distinct states into one and breaks in locales where word order differs. Use a single composed key with interpolation for each distinct message.
+
+---
+
+### IMP-034 · Info button placement too close to first option button
+
+**Root cause:** End Condition and Claim Window rows used `flex justify-between items-center` with no enforced minimum gap. On narrow viewports the label+InfoButton span and the option-button group crowded each other because `justify-between` only guarantees the two flex children are pushed to opposite ends — it adds no minimum gap between them.
+
+**Fix (`apps/web/src/pages/room/room-page.tsx`):**
+
+- Added `gap-3` to the `className` of both the End Condition and Claim Window row `<div>` containers. CSS flex `gap` sets a minimum gap of 12 px between the label span and the option buttons regardless of viewport width.
+- Also added `shrink-0` to the label `<span>` on both rows so the label text never wraps or shrinks to push the InfoButton closer to the option buttons.
+
+**Key learning:** `justify-between` does not guarantee minimum spacing between children — pair it with `gap-*` when a minimum gap is needed on narrow viewports. Mark the non-growing side `shrink-0` so flex doesn't compress the label.
+
+---
+
+### IMP-035 · Friend search clear "X" not visible
+
+**Root cause:** The Friends page used `<input type="search">` which delegates the clear affordance to the browser's native search-clear icon — small, low-contrast, and unstyled.
+
+**Fix (`apps/web/src/pages/friends/friends-page.tsx`, `en.json`, `zh.json`):**
+
+- Replaced the native-clear approach with a custom absolutely-positioned `<button>` rendered inside the search input wrapper, visible only when `searchInput` is non-empty and not fetching.
+- The button is styled to match the app's dark theme (semi-transparent background, muted bone color).
+- Added `friendsSearchClear` i18n key for the `aria-label` (EN "Clear search" / ZH "清空搜索").
+- The spinner takes precedence: `searchFetching ? <Spinner /> : searchInput ? <ClearBtn /> : null`.
+
+**Key learning:** Never rely on the browser's native search-clear affordance for a custom-themed app — it ignores app CSS and is invisible in dark themes. Always implement a custom clear button with accessible labelling and explicit visibility control.
+
+---
+
+### IMP-036 · Bot display names not localized in ZH
+
+**Root cause:** Bot display names (`MilkyBot`, `MelonBot`, `FifthBot`) were hard-coded English strings in `bot-profiles.ts` and baked into the server-sent `seatName` / `handle` fields. The client rendered these strings directly with no locale mapping.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`, `apps/web/src/pages/room/room-page.tsx`, `en.json`, `zh.json`):**
+
+- Added three new i18n key pairs:
+  - `botNameMilky`: "MilkyBot" / "葫芦机器人"
+  - `botNameMelon`: "MelonBot" / "西瓜机器人"
+  - `botNameFifth`: "FifthBot" / "第五机器人"
+- Added a module-level `BOT_NAME_KEYS` lookup map in `game-page.tsx` and local `sdn()` / `botDisplayName()` helpers in each component that displays bot names. Each helper checks `isBot` and maps the English name to the appropriate i18n key.
+- Applied the helpers to all bot-name display sites: `Nameplate`, `HandRevealScreen` (winner/concede/liable-seat/loser payment rows), `MatchEndStatsScreen` (final standings + stat breakdown), and the room lobby seat list.
+
+**Key learning:** Server-sent display names must never be assumed locale-aware. Client-side mapping via a known-key lookup is the right approach when the server sends a small fixed set of identifiable names — avoids per-viewer snapshot divergence and keeps the mapping colocated with the UI layer that knows the current locale.
+
+---
+
 ## `fix/bug-053-056-wify-bugs` (2026-06-16)
 
 ### BUG-053 · Hand-type / scoring multiplier names untranslated in ZH
