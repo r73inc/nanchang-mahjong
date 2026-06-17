@@ -15,7 +15,7 @@ import type { StringKey } from '../../i18n/strings';
 import { useThemeStore } from '../../stores/theme.store';
 import type { FeltTheme, TilePalette, TileSize } from '../../stores/theme.store';
 import { FELT_CONFIGS, TILE_CONFIGS } from '../../lib/theme.utils';
-import { themeToVariant } from '../../r3f/utils/tile-texture-map';
+import { tileTexturePath, themeToVariant } from '../../r3f/utils/tile-texture-map';
 import type { TileType } from '@nanchang/shared';
 
 // ── Constants (outside JSX for no-literal-string rule) ────────────────────────
@@ -134,18 +134,34 @@ function PaletteCard({
         border: selected ? '1.5px solid #c9a961' : '1.5px solid rgba(var(--felt-ink-rgb),0.08)',
       }}
     >
-      {/* Tile preview hard-coded to this card's own palette so each card always shows its own texture */}
-      <div
-        className="flex gap-1 items-center"
-        style={
-          {
-            '--tile-face-top': cfg.faceTop,
-            '--tile-face-bottom': cfg.faceBottom,
-          } as React.CSSProperties
-        }
-      >
+      {/* Preview tiles rendered directly so each card always shows its own palette's texture,
+          independent of the globally active theme selection. Texture variant is derived from
+          themeToVariant(id), the same routing function used at runtime. */}
+      <div className="flex gap-1 items-center">
         {PREVIEW_TILES.slice(0, 3).map((tile) => (
-          <MahjongTile2D key={tile} tile={tile} size="xs" paletteOverride={themeToVariant(id)} />
+          <div
+            key={tile}
+            style={{
+              width: 20,
+              height: 27,
+              borderRadius: 3,
+              background: `linear-gradient(to bottom, ${cfg.faceTop}, ${cfg.faceBottom})`,
+              border: '1px solid rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              flexShrink: 0,
+            }}
+          >
+            <img
+              src={tileTexturePath(tile, themeToVariant(id))}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              style={{ width: '85%', height: '85%', objectFit: 'contain' }}
+            />
+          </div>
         ))}
       </div>
       <span

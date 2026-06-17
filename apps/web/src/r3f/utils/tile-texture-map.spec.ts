@@ -157,18 +157,68 @@ describe('ALL_TILE_TYPES', () => {
 // ── themeToVariant ────────────────────────────────────────────────────────────
 
 describe('themeToVariant', () => {
-  it('maps dark, tomato-jam, and indigo-ink to Black', () => {
+  // Black-texture palettes — each tested individually so a regression is
+  // immediately identifiable by name rather than buried in a multi-assertion it.
+
+  it('maps dark to Black', () => {
     expect(themeToVariant('dark')).toBe('Black');
+  });
+
+  it('maps tomato-jam to Black', () => {
     expect(themeToVariant('tomato-jam')).toBe('Black');
+  });
+
+  it('maps indigo-ink to Black', () => {
     expect(themeToVariant('indigo-ink')).toBe('Black');
   });
 
-  it('maps classic, sepia, lime, frosted-blue, pastel-petal, and radioactive-grass to Regular', () => {
+  // Regular-texture palettes
+
+  it('maps classic to Regular', () => {
     expect(themeToVariant('classic')).toBe('Regular');
+  });
+
+  it('maps sepia to Regular', () => {
     expect(themeToVariant('sepia')).toBe('Regular');
+  });
+
+  it('maps lime to Regular', () => {
     expect(themeToVariant('lime')).toBe('Regular');
+  });
+
+  it('maps frosted-blue to Regular', () => {
     expect(themeToVariant('frosted-blue')).toBe('Regular');
+  });
+
+  it('maps pastel-petal to Regular', () => {
     expect(themeToVariant('pastel-petal')).toBe('Regular');
+  });
+
+  it('maps radioactive-grass to Regular', () => {
     expect(themeToVariant('radioactive-grass')).toBe('Regular');
+  });
+
+  it('returns a valid TilePaletteVariant for every known palette', () => {
+    const VALID: readonly string[] = ['Regular', 'Black'];
+    const ALL_PALETTES = [
+      'classic',
+      'sepia',
+      'dark',
+      'lime',
+      'frosted-blue',
+      'tomato-jam',
+      'pastel-petal',
+      'radioactive-grass',
+      'indigo-ink',
+    ] as const;
+    for (const p of ALL_PALETTES) {
+      expect(VALID).toContain(themeToVariant(p));
+    }
+  });
+
+  it('falls back to Regular for any unrecognised palette value at runtime', () => {
+    // Cast to bypass TypeScript so we can verify the runtime guard.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(themeToVariant('unknown-future-palette' as any)).toBe('Regular');
   });
 });

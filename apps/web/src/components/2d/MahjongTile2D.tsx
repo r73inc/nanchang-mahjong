@@ -20,7 +20,6 @@ import { tileAriaLabel } from '@nanchang/shared';
 import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
 import { tileTexturePath, backTexturePath, themeToVariant } from '../../r3f/utils/tile-texture-map';
-import type { TilePaletteVariant } from '../../r3f/utils/tile-texture-map';
 import { useTable2DScale } from './Table2DContext';
 import { useThemeStore, TILE_USER_SCALE } from '../../stores/theme.store';
 import type { SeatRole } from './layout-2d';
@@ -139,11 +138,6 @@ export interface MahjongTile2DProps {
    * screen to mark the tile that completed the winning hand.
    */
   isWinningTile?: boolean;
-  /**
-   * When provided, overrides the theme store's tile palette for this tile only.
-   * Used by palette preview cards so each card always shows its own texture.
-   */
-  paletteOverride?: TilePaletteVariant;
   /** Fired when an interactive tile is clicked or activated via keyboard. */
   onSelect?: () => void;
 }
@@ -161,13 +155,12 @@ export function MahjongTile2D({
   layoutId,
   isLastDiscard = false,
   isWinningTile = false,
-  paletteOverride,
   onSelect,
 }: MahjongTile2DProps) {
   const { lang } = useI18n();
   const { tileScale } = useTable2DScale();
   const { tileSize, tilePalette } = useThemeStore();
-  const palette = paletteOverride ?? themeToVariant(tilePalette);
+  const palette = themeToVariant(tilePalette);
 
   // Combine viewport-fit scale (from Table2DContext) with the user's size preference.
   // tileScale handles responsive viewport fitting; userScale reflects the player's
