@@ -224,6 +224,13 @@ export function RoomPage() {
   const allReady =
     filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.isBot || s.ready);
 
+  const botDisplayName = (handle: string) => {
+    if (handle === 'MilkyBot') return t('botNameMilky');
+    if (handle === 'MelonBot') return t('botNameMelon');
+    if (handle === 'FifthBot') return t('botNameFifth');
+    return handle;
+  };
+
   return (
     <ScreenShell title={t('privateRoom')} onBack={handleLeave}>
       <div className="px-4 py-4 flex flex-col gap-4">
@@ -335,7 +342,11 @@ export function RoomPage() {
                       <p className="text-sm font-semibold text-mj-bone truncate">
                         {isEmpty
                           ? t('waiting')
-                          : [seat.handle, isMe && t('youSuffix'), seat.isHost && t('hostBadge')]
+                          : [
+                              seat.isBot && seat.handle ? botDisplayName(seat.handle) : seat.handle,
+                              isMe && t('youSuffix'),
+                              seat.isHost && t('hostBadge'),
+                            ]
                               .filter(Boolean)
                               .join(' ')}
                       </p>
@@ -540,7 +551,7 @@ export function RoomPage() {
 
             {/* ── End Condition row ─────────────────────────────────────── */}
             <div
-              className="flex justify-between items-center px-4 py-3 text-sm"
+              className="flex justify-between items-center gap-3 px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
@@ -693,7 +704,7 @@ export function RoomPage() {
 
             {/* ── Claim Window row ──────────────────────────────────────── */}
             <div
-              className="flex justify-between items-center px-4 py-3 text-sm"
+              className="flex justify-between items-center gap-3 px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
@@ -880,7 +891,12 @@ export function RoomPage() {
           >
             {allReady
               ? t('startMatch')
-              : `${t('waiting')} ${filledSeats.filter((s) => !s.isHost && !s.isBot && !s.ready).length} ${t('notReady').toLowerCase()}`}
+              : filledSeats.length < 4
+                ? t('waitingSeats')
+                : t(
+                    'waitingNotReady',
+                    String(filledSeats.filter((s) => !s.isHost && !s.isBot && !s.ready).length),
+                  )}
           </button>
         )}
       </div>

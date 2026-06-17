@@ -63,6 +63,18 @@ import { useSound } from '../../hooks/use-sound';
 
 // ── Seat compass helpers ──────────────────────────────────────────────────────
 
+const BOT_NAME_KEYS: Partial<Record<string, 'botNameMilky' | 'botNameMelon' | 'botNameFifth'>> = {
+  MilkyBot: 'botNameMilky',
+  MelonBot: 'botNameMelon',
+  FifthBot: 'botNameFifth',
+};
+
+/** Returns the localized display name for any seat, translating known bot names via i18n. */
+function sdn(s: { seatName: string; isBot?: boolean }, t: ReturnType<typeof useI18n>['t']): string {
+  const key = s.isBot ? BOT_NAME_KEYS[s.seatName] : undefined;
+  return key ? t(key) : s.seatName;
+}
+
 function getCompassSeats(viewerSeat: 0 | 1 | 2 | 3) {
   return {
     right: ((viewerSeat + 1) % 4) as 0 | 1 | 2 | 3,
@@ -526,7 +538,7 @@ function HandRevealScreen({
   }
   const headingLabel =
     handReveal.result === 'win'
-      ? t('handRevealWinsHeading', snapshot.seats[handReveal.winnerSeat!].seatName)
+      ? t('handRevealWinsHeading', sdn(snapshot.seats[handReveal.winnerSeat!], t))
       : handReveal.result === 'concede'
         ? t('handRevealResultConcede')
         : t('handRevealResultDraw');
@@ -542,7 +554,7 @@ function HandRevealScreen({
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
-              {t('handRevealConcedeBy', snapshot.seats[handReveal.concedeSeat].seatName)}
+              {t('handRevealConcedeBy', sdn(snapshot.seats[handReveal.concedeSeat], t))}
             </p>
           )}
         </div>
@@ -551,7 +563,7 @@ function HandRevealScreen({
         <div className="flex flex-col gap-2 w-full">
           {sortedSeats.map((seat) => {
             const wind = snapshot.seats[seat].wind;
-            const seatName = snapshot.seats[seat].seatName;
+            const seatName = sdn(snapshot.seats[seat], t);
             const isViewer = seat === viewerSeat;
             const isWinner = seat === handReveal.winnerSeat;
             const delta = handReveal.handNetDeltas[seat];
@@ -666,7 +678,7 @@ function HandRevealScreen({
                         if (isWinner) {
                           const liableName =
                             handReveal.liableSeat !== undefined
-                              ? snapshot.seats[handReveal.liableSeat].seatName
+                              ? sdn(snapshot.seats[handReveal.liableSeat], t)
                               : undefined;
                           const ronKey =
                             handReveal.winMeldKind === 'chow'
@@ -733,7 +745,7 @@ function HandRevealScreen({
                                       {t(
                                         'handRevealBreakdownReceivedFrom',
                                         String(received),
-                                        snapshot.seats[loser].seatName,
+                                        sdn(snapshot.seats[loser], t),
                                       )}
                                     </p>
                                   );
@@ -755,7 +767,7 @@ function HandRevealScreen({
                           const paid = Math.abs(wp.scoreDelta[seat]);
                           const winnerName =
                             handReveal.winnerSeat !== undefined
-                              ? snapshot.seats[handReveal.winnerSeat].seatName
+                              ? sdn(snapshot.seats[handReveal.winnerSeat], t)
                               : '';
                           return (
                             <div className="flex flex-col gap-1.5">
@@ -932,7 +944,7 @@ function HandRevealScreen({
                       {WIND_CHAR[wind]}
                     </span>
                     <span className="text-xs text-mj-bone/70 font-medium">
-                      {snapshot.seats[i].seatName}
+                      {sdn(snapshot.seats[i], t)}
                     </span>
                     {isWinner && (
                       <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
@@ -1252,7 +1264,7 @@ function MatchEndStatsScreen({
                     style={{ background: WIND_COLOR[seat.wind] }}
                   />
                   <span className="text-mj-bone/80 max-w-[120px] truncate font-medium">
-                    {seat.seatName}
+                    {sdn(seat, t)}
                   </span>
                   {isMe && (
                     <span className="text-[10px] text-mj-gold/60">{t('matchEndYouLabel')}</span>
@@ -1317,7 +1329,7 @@ function MatchEndStatsScreen({
                         fontWeight: isMe ? 700 : 400,
                       }}
                     >
-                      {isMe ? t('matchEndYouLabel') : seat.seatName.split(' ')[0]}
+                      {isMe ? t('matchEndYouLabel') : sdn(seat, t).split(' ')[0]}
                     </span>
                   </div>
                   <div className="text-center font-mono text-xs text-mj-bone/80">{handsWon}</div>
@@ -1426,6 +1438,8 @@ function Nameplate({
   const isActive = snapshot.currentSeat === seatIdx;
   const isDealer = snapshot.dealerSeat === seatIdx;
   const { t } = useI18n();
+  const nameKey = seat.isBot ? BOT_NAME_KEYS[seat.seatName] : undefined;
+  const displayName = nameKey ? t(nameKey) : seat.seatName;
 
   return (
     <div
@@ -1464,7 +1478,7 @@ function Nameplate({
           display: seat.avatarUrl ? 'none' : undefined,
         }}
       />
-      <span className="font-semibold text-mj-bone/90 flex-1 min-w-0 truncate">{seat.seatName}</span>
+      <span className="font-semibold text-mj-bone/90 flex-1 min-w-0 truncate">{displayName}</span>
       {isDealer && (
         <span
           className="text-[9px] font-bold px-1 rounded shrink-0"
