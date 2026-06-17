@@ -79,7 +79,7 @@ export function buildCheatContext(
   // Lookahead window: slice the next N tile IDs from draw position, convert to types
   const wallLookahead: TileType[] = wall.drawOrder
     .slice(wall.drawPtr, wall.drawPtr + PSYCHIC_LOOKAHEAD_DEPTH)
-    .map(typeOf);
+    .map((tile) => typeOf(tile));
 
   // Opponent Ting distances: computed from their full concealed hands
   // (only accessible server-side; never available in the client snapshot)

@@ -38,7 +38,8 @@ export function isOpponentThreatening(
     for (const [seatStr, dist] of Object.entries(cheatContext.opponentTingDistances)) {
       if (Number(seatStr) !== botSeat && dist === 0) return true;
     }
-    return false;
+    // No opponent is confirmed in Ting — fall through to visual heuristics.
+    // Exact distances enhance defense; they don't replace it.
   }
 
   // Standard visual heuristic for hard (and below) bots.
