@@ -203,7 +203,6 @@
   "botDifficultyHardFull": "困难机器人",
   "botDifficultyPsychic": "通灵",
   "botDifficultyPsychicFull": "通灵机器人",
-  "botNameOracle": "先知机器人",
   "roomAddBot": "添加机器人",
 
   "settingStyleLabel": "玩法",
@@ -462,8 +461,8 @@
   "matchEndSpiritPoints": "精牌",
   "matchEndBonusTile": "开局结算",
   "matchEndBestHand": "最佳单局",
-  "matchEndReturnLobby": "返回大厅",
-  "matchEndViewFinalHand": "查看最后一局",
+  "matchEndReturnLobby": "退出对局，返回大厅",
+  "matchEndViewFinalHand": "查看最终成绩",
   "matchEndYouLabel": "我",
   "matchEndRatingChange": "积分变化",
 
