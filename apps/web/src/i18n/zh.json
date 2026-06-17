@@ -158,6 +158,7 @@
   "createRoom": "创建房间",
   "createRoomSub": "将房间号分享给最多 3 位好友",
   "joinRoomSub": "输入房主分享的房间号",
+  "lobbyOrDivider": "或",
   "roomCodeLabel": "房间号",
   "roomCodePlaceholder": "AB-1234",
   "privateRoom": "私人房间",
