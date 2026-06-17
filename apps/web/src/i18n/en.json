@@ -158,6 +158,7 @@
   "createRoom": "Create a Room",
   "createRoomSub": "Share the code with up to 3 friends",
   "joinRoomSub": "Enter the code your host shared",
+  "lobbyOrDivider": "OR",
   "roomCodeLabel": "Room code",
   "roomCodePlaceholder": "AB-1234",
   "privateRoom": "Private Room",

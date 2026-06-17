@@ -184,7 +184,7 @@ export function LobbyPage() {
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-mj-bone/15" />
-          <span className="text-xs text-mj-bone/40 font-semibold">OR</span>
+          <span className="text-xs text-mj-bone/55 font-semibold">{t('lobbyOrDivider')}</span>
           <div className="flex-1 h-px bg-mj-bone/15" />
         </div>
 
