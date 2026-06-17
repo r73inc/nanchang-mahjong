@@ -3,9 +3,6 @@
  *
  * Unit tests for the TileType → SVG path mapping utility.
  * Pure TS — no browser, no WebGL context needed.
- *
- * NOTE: The Black palette SVG set has been removed from the project.
- * Only the Regular palette is available; tests for Black paths are removed.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -70,6 +67,10 @@ describe('backTexturePath', () => {
   it('returns Regular Back.svg when palette is explicitly Regular', () => {
     expect(backTexturePath('Regular')).toBe('/textures/Tiles/Regular/Back.svg');
   });
+
+  it('returns Black Back.svg for the Black palette', () => {
+    expect(backTexturePath('Black')).toBe('/textures/Tiles/Black/Back.svg');
+  });
 });
 
 // ── allFaceTexturePaths ───────────────────────────────────────────────────────
@@ -88,6 +89,18 @@ describe('allFaceTexturePaths', () => {
   it('all paths are unique within the Regular palette', () => {
     const paths = allFaceTexturePaths('Regular');
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it('returns 34 unique paths for the Black palette', () => {
+    const paths = allFaceTexturePaths('Black');
+    expect(paths).toHaveLength(34);
+    expect(new Set(paths).size).toBe(34);
+  });
+
+  it('all Black paths start with /textures/Tiles/Black/', () => {
+    for (const p of allFaceTexturePaths('Black')) {
+      expect(p).toMatch(/^\/textures\/Tiles\/Black\/.+\.svg$/);
+    }
   });
 
   it('order matches ALL_TILE_TYPES order (stable index for useTexture preload)', () => {
@@ -144,9 +157,18 @@ describe('ALL_TILE_TYPES', () => {
 // ── themeToVariant ────────────────────────────────────────────────────────────
 
 describe('themeToVariant', () => {
-  it('always returns Regular (Black assets removed from project)', () => {
-    expect(themeToVariant('dark')).toBe('Regular');
+  it('maps dark, tomato-jam, and indigo-ink to Black', () => {
+    expect(themeToVariant('dark')).toBe('Black');
+    expect(themeToVariant('tomato-jam')).toBe('Black');
+    expect(themeToVariant('indigo-ink')).toBe('Black');
+  });
+
+  it('maps classic, sepia, lime, frosted-blue, pastel-petal, and radioactive-grass to Regular', () => {
     expect(themeToVariant('classic')).toBe('Regular');
     expect(themeToVariant('sepia')).toBe('Regular');
+    expect(themeToVariant('lime')).toBe('Regular');
+    expect(themeToVariant('frosted-blue')).toBe('Regular');
+    expect(themeToVariant('pastel-petal')).toBe('Regular');
+    expect(themeToVariant('radioactive-grass')).toBe('Regular');
   });
 });
