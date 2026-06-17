@@ -100,7 +100,7 @@ export function countEffectiveDraws(
  * Given a 14-tile hand (after drawing), find the minimum distance achievable
  * by discarding any single natural tile.
  */
-function bestDistAfterDraw(hand14: TileType[], jingTypes: TileType[]): number {
+export function bestDistAfterDraw(hand14: TileType[], jingTypes: TileType[]): number {
   const { naturals } = separateJing(hand14, jingTypes);
   if (naturals.length === 0) return overallDist(hand14.slice(1), jingTypes);
 

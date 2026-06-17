@@ -84,9 +84,9 @@ export function buildCheatContext(
   // Opponent Ting distances: computed from their full concealed hands
   // (only accessible server-side; never available in the client snapshot)
   const opponentTingDistances: Record<number, number> = {};
-  for (let i = 0 as 0 | 1 | 2 | 3; i < 4; i++) {
+  for (let i = 0; i < 4; i++) {
     if (i === botSeat) continue;
-    opponentTingDistances[i] = overallDist(state.seats[i].hand, jingTypes);
+    opponentTingDistances[i] = overallDist(state.seats[i as 0 | 1 | 2 | 3].hand, jingTypes);
   }
 
   return { wallLookahead, opponentTingDistances };

@@ -19,6 +19,7 @@ import {
   simulatePung,
   simulateChow,
   bestDistAfterClaim,
+  bestDistAfterDraw,
 } from './effective-draws';
 import { isOpponentThreatening, safestDiscard } from './defense';
 import { buildCheatContext } from './cheat-api';
@@ -125,6 +126,7 @@ function getHardBotClaim(
   discardedTile: TileType,
   hand: TileType[],
   jingTypes: TileType[],
+  cheatContext?: CheatContext | null,
 ): BotClaimDecision | null {
   // Kong is always worth claiming (extra draw + instant payout)
   const kong = available.find((a) => a.kind === 'kong');
@@ -132,6 +134,21 @@ function getHardBotClaim(
 
   // Current distance from the 13-tile concealed hand
   const currentDist = overallDist(hand, jingTypes);
+
+  // ── Psychic lookahead heuristic ──────────────────────────────────────────────
+  // If the immediately upcoming wall tile would naturally reduce our Ting
+  // distance on its own, pass on any non-kong claim. Claiming a pung or chow
+  // opens a meld and forfeits the natural draw — the psychic bot knows that
+  // draw is a guaranteed improvement and keeps its hand concealed instead.
+  if (cheatContext && cheatContext.wallLookahead.length > 0) {
+    const distIfNaturalDraw = bestDistAfterDraw(
+      [...hand, cheatContext.wallLookahead[0]],
+      jingTypes,
+    );
+    if (distIfNaturalDraw < currentDist) {
+      return null; // upcoming draw is better — do not interrupt with a claim
+    }
+  }
 
   // ── Pung evaluation ──────────────────────────────────────────────────────────
   const pung = available.find((a) => a.kind === 'pung');
@@ -233,9 +250,11 @@ export function getBotDiscard(
  * @param available     Claim options offered by the engine for this seat.
  * @param discardedTile The tile currently pending in the claim window.
  * @param openMeldCount Number of open melds this bot already holds.
- * @param difficulty    'easy' | 'normal' | 'hard'
- * @param hand          Bot's current concealed hand (required for 'hard').
- * @param jingTypes     Active Jing tile types (required for 'hard').
+ * @param difficulty    'easy' | 'normal' | 'hard' | 'psychic'
+ * @param hand          Bot's current concealed hand (required for 'hard'/'psychic').
+ * @param jingTypes     Active Jing tile types (required for 'hard'/'psychic').
+ * @param state         Full authoritative game state (required for 'psychic' lookahead).
+ * @param botSeat       The bot's own seat index (required for 'psychic' lookahead).
  */
 export function getBotClaim(
   available: BotClaimOption[],
@@ -244,10 +263,12 @@ export function getBotClaim(
   difficulty: BotDifficulty,
   hand?: TileType[],
   jingTypes?: TileType[],
+  state?: GameState,
+  botSeat?: 0 | 1 | 2 | 3,
 ): BotClaimDecision | null {
   if (available.length === 0) return null;
 
-  // Both difficulties always claim a winning hand — never pass up a win.
+  // All difficulties always claim a winning hand — never pass up a win.
   const win = available.find((a) => a.kind === 'win');
   if (win) return { kind: 'win' };
 
@@ -268,7 +289,11 @@ export function getBotClaim(
     hand !== undefined &&
     jingTypes !== undefined
   ) {
-    return getHardBotClaim(available, discardedTile, hand, jingTypes);
+    const cheatContext =
+      state !== undefined && botSeat !== undefined
+        ? buildCheatContext(state, botSeat, difficulty)
+        : null;
+    return getHardBotClaim(available, discardedTile, hand, jingTypes, cheatContext);
   }
 
   // Normal difficulty heuristics (also used as hard fallback when hand not provided):

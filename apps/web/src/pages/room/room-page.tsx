@@ -11,6 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { AvatarImg } from '../../components/ui/avatar-img';
 import { useI18n } from '../../i18n';
+import type { StringKey } from '../../i18n/strings';
 import { useRoomStore } from '../../stores/room.store';
 import { useRoomActions, useRoomSubscription } from '../../hooks/use-room';
 import { useAuthStore } from '../../stores/auth.store';
@@ -19,6 +20,15 @@ import type { BotDifficulty, WsRoomStartedPayload } from '@nanchang/shared';
 
 // Wind symbols in seat-index order (East/South/West/North)
 const WIND_SYMBOLS = ['東', '南', '西', '北'];
+
+// Maps each difficulty to its full i18n key — single source of truth for the
+// badge display and the bot-picker button labels.
+const botDifficultyTranslationMap: Record<BotDifficulty, StringKey> = {
+  easy: 'botDifficultyEasyFull',
+  normal: 'botDifficultyNormalFull',
+  hard: 'botDifficultyHardFull',
+  psychic: 'botDifficultyPsychicFull',
+};
 
 // Purely decorative info glyph — constant avoids i18n/no-literal-string lint
 const INFO_GLYPH = 'ⓘ' as const;
@@ -369,15 +379,7 @@ export function RoomPage() {
                       {isEmpty
                         ? t('openSeat')
                         : seat.isBot
-                          ? t(
-                              seat.botDifficulty === 'psychic'
-                                ? 'botDifficultyPsychicFull'
-                                : seat.botDifficulty === 'hard'
-                                  ? 'botDifficultyHardFull'
-                                  : seat.botDifficulty === 'normal'
-                                    ? 'botDifficultyNormalFull'
-                                    : 'botDifficultyEasyFull',
-                            )
+                          ? t(botDifficultyTranslationMap[seat.botDifficulty ?? 'easy'])
                           : seat.isHost || seat.ready
                             ? t('ready')
                             : t('notReady')}
@@ -389,34 +391,27 @@ export function RoomPage() {
                         {addingBotToSeat === seat.seatIdx ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {(['easy', 'normal', 'hard', 'psychic'] as BotDifficulty[]).map(
-                              (diff) => (
-                                <button
-                                  key={diff}
-                                  onClick={() => void handleAddBot(seat.seatIdx, diff)}
-                                  className="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                                  style={{
-                                    background:
-                                      diff === 'psychic'
+                              (diff) => {
+                                const isPsychic = diff === 'psychic';
+                                return (
+                                  <button
+                                    key={diff}
+                                    onClick={() => void handleAddBot(seat.seatIdx, diff)}
+                                    className="px-2.5 py-1 rounded-full text-[10px] font-bold"
+                                    style={{
+                                      background: isPsychic
                                         ? 'rgba(130,80,180,0.2)'
                                         : 'rgba(90,125,140,0.2)',
-                                    border:
-                                      diff === 'psychic'
+                                      border: isPsychic
                                         ? '1px solid rgba(130,80,180,0.5)'
                                         : '1px solid rgba(90,125,140,0.5)',
-                                    color: diff === 'psychic' ? '#c090e8' : '#7ab5cc',
-                                  }}
-                                >
-                                  {t(
-                                    diff === 'psychic'
-                                      ? 'botDifficultyPsychicFull'
-                                      : diff === 'easy'
-                                        ? 'botDifficultyEasyFull'
-                                        : diff === 'normal'
-                                          ? 'botDifficultyNormalFull'
-                                          : 'botDifficultyHardFull',
-                                  )}
-                                </button>
-                              ),
+                                      color: isPsychic ? '#c090e8' : '#7ab5cc',
+                                    }}
+                                  >
+                                    {t(botDifficultyTranslationMap[diff])}
+                                  </button>
+                                );
+                              },
                             )}
                             <button
                               onClick={() => setAddingBotToSeat(null)}
