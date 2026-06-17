@@ -336,7 +336,7 @@
       "refersTo": "button-primary",
       "description": "The only action that warrants gold. Full-width on mobile. Dark slate text on gold gradient.",
       "html": "<button class=\"ds-btn-primary\">Play with Friends →</button>",
-      "css": ".ds-btn-primary { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 20px; border-radius: 14px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 15px; font-weight: 700; color: #1f2937; background: linear-gradient(180deg, #c9a961 0%, #a88a45 100%); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 6px 18px rgba(201,169,97,0.3); cursor: pointer; transition: opacity 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: linear-gradient(180deg, #d4b872 0%, #c9a961 100%); box-shadow: 0 8px 24px rgba(201,169,97,0.45); } .ds-btn-primary:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; } .ds-btn-primary:disabled { opacity: 0.7; cursor: wait; }"
+      "css": ".ds-btn-primary { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 20px; border-radius: 14px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 17px; font-weight: 700; color: #1f2937; background: linear-gradient(180deg, #c9a961 0%, #a88a45 100%); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 6px 18px rgba(201,169,97,0.3); cursor: pointer; transition: opacity 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: linear-gradient(180deg, #d4b872 0%, #c9a961 100%); box-shadow: 0 8px 24px rgba(201,169,97,0.45); } .ds-btn-primary:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; } .ds-btn-primary:disabled { opacity: 0.7; cursor: wait; }"
     },
     {
       "name": "Ghost Button",
@@ -344,7 +344,7 @@
       "refersTo": "button-ghost",
       "description": "Secondary / de-emphasis action. Used for sign-out, cancel, low-stakes navigation.",
       "html": "<button class=\"ds-btn-ghost\">Sign out</button>",
-      "css": ".ds-btn-ghost { display: block; width: 100%; padding: 14px 20px; border-radius: 14px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 600; color: rgba(245,239,223,0.7); background: transparent; border: 1px solid rgba(245,239,223,0.15); cursor: pointer; transition: background 150ms, border-color 150ms; } .ds-btn-ghost:hover { background: rgba(245,239,223,0.04); border-color: rgba(245,239,223,0.25); } .ds-btn-ghost:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; }"
+      "css": ".ds-btn-ghost { display: block; width: 100%; padding: 14px 20px; border-radius: 14px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 600; color: rgba(var(--felt-ink-rgb), 0.7); background: transparent; border: 1px solid rgba(245,239,223,0.15); cursor: pointer; transition: background 150ms, border-color 150ms; } .ds-btn-ghost:hover { background: rgba(245,239,223,0.04); border-color: rgba(245,239,223,0.25); } .ds-btn-ghost:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; }"
     },
     {
       "name": "Surface Card",
@@ -360,7 +360,7 @@
       "refersTo": "input-field",
       "description": "Form field with label above, error below. Gold focus border signals interaction.",
       "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-inp\">Handle</label><input class=\"ds-field-input\" id=\"ds-inp\" type=\"text\" placeholder=\"@your-handle\" /></div>",
-      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; } .ds-field-label { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(245,239,223,0.7); } .ds-field-input { padding: 12px 14px; border-radius: 12px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; color: #f5efdf; background: rgba(245,239,223,0.07); border: 1px solid rgba(245,239,223,0.15); outline: none; transition: border-color 200ms; } .ds-field-input:focus { border-color: rgba(201,169,97,0.5); } .ds-field-input::placeholder { color: rgba(245,239,223,0.35); }"
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; } .ds-field-label { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(var(--felt-ink-rgb), 0.7); } .ds-field-input { padding: 12px 14px; border-radius: 12px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; color: var(--felt-ink); background: rgba(245,239,223,0.07); border: 1px solid rgba(245,239,223,0.15); outline: none; transition: border-color 200ms; } .ds-field-input:focus { border-color: rgba(201,169,97,0.5); } .ds-field-input::placeholder { color: rgba(var(--felt-ink-rgb), 0.35); }"
     },
     {
       "name": "Toggle Switch",
