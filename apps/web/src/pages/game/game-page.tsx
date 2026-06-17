@@ -1491,7 +1491,7 @@ function Nameplate({
       {seat.isBot ? (
         <span
           className="text-[8px] font-bold px-1 rounded shrink-0"
-          style={{ background: 'rgba(90,125,140,0.3)', color: '#7ab5cc' }}
+          style={{ background: 'rgba(90,125,140,0.3)', color: '#8aaab8' }}
           aria-label={t(
             seat.botDifficulty === 'normal' ? 'botDifficultyNormalFull' : 'botDifficultyEasyFull',
           )}
@@ -2083,9 +2083,9 @@ function RestoreWaitingOverlay({
               className="flex items-center justify-between px-3 py-2 rounded-lg"
               style={{
                 background: isConnected
-                  ? 'rgba(100,200,100,0.1)'
+                  ? 'rgba(127,194,153,0.1)'
                   : 'rgba(var(--felt-ink-rgb),0.06)',
-                border: `1px solid ${isConnected ? 'rgba(100,200,100,0.3)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
+                border: `1px solid ${isConnected ? 'rgba(127,194,153,0.3)' : 'rgba(var(--felt-ink-rgb),0.1)'}`,
               }}
             >
               <span className="text-sm text-mj-bone/80">{seat.seatName}</span>
@@ -2200,50 +2200,7 @@ function SaveAndQuitSheet({
           <button
             onClick={onConfirm}
             className="flex-1 py-3 rounded-xl font-bold text-sm"
-            style={{ background: '#2e6b3e', color: '#f5efdf' }}
-          >
-            {t('gameSaveAndQuitConfirm')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Save & Quit confirmation sheet (host only). */
-function SaveAndQuitSheet({
-  onConfirm,
-  onCancel,
-}: {
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <div
-      className="absolute inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
-    >
-      <div
-        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
-        role="dialog"
-        aria-label={t('gameSaveAndQuitTitle')}
-      >
-        <h2 className="font-bold text-lg text-mj-bone">{t('gameSaveAndQuitTitle')}</h2>
-        <p className="text-sm text-mj-bone/60">{t('gameSaveAndQuitDesc')}</p>
-        <div className="flex gap-3 mt-2">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
-          >
-            {t('gameSaveAndQuitCancel')}
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 py-3 rounded-xl font-bold text-sm"
-            style={{ background: '#2e6b3e', color: '#f5efdf' }}
+            style={{ background: '#1f7a4d', color: '#f5efdf' }}
           >
             {t('gameSaveAndQuitConfirm')}
           </button>
@@ -3885,8 +3842,8 @@ function GameTable({
                 bottom: canTsumo
                   ? 'calc(var(--mj-hand-height, 80px) + 68px)'
                   : 'calc(var(--mj-hand-height, 80px) + 8px)',
-                background: 'rgba(30,60,30,0.85)',
-                borderTop: '1px solid rgba(100,200,100,0.3)',
+                background: 'rgba(13,51,32,0.85)',
+                borderTop: '1px solid rgba(127,194,153,0.3)',
                 backdropFilter: 'blur(8px)',
               }}
             >
@@ -3897,9 +3854,9 @@ function GameTable({
                 onClick={() => onKongAdd(canAddToKong)}
                 className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
                 style={{
-                  background: 'rgba(100,200,100,0.2)',
-                  border: '1px solid rgba(100,200,100,0.5)',
-                  color: '#7ecb7e',
+                  background: 'rgba(127,194,153,0.2)',
+                  border: '1px solid rgba(127,194,153,0.5)',
+                  color: '#7fc299',
                 }}
               >
                 {t('addToKong')}
