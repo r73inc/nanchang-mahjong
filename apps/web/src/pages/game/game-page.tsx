@@ -2210,6 +2210,49 @@ function SaveAndQuitSheet({
   );
 }
 
+/** Save & Quit confirmation sheet (host only). */
+function SaveAndQuitSheet({
+  onConfirm,
+  onCancel,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
+    >
+      <div
+        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
+        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
+        role="dialog"
+        aria-label={t('gameSaveAndQuitTitle')}
+      >
+        <h2 className="font-bold text-lg text-mj-bone">{t('gameSaveAndQuitTitle')}</h2>
+        <p className="text-sm text-mj-bone/60">{t('gameSaveAndQuitDesc')}</p>
+        <div className="flex gap-3 mt-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
+            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
+          >
+            {t('gameSaveAndQuitCancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-3 rounded-xl font-bold text-sm"
+            style={{ background: '#2e6b3e', color: '#f5efdf' }}
+          >
+            {t('gameSaveAndQuitConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Spirit-tile discard confirmation sheet. */
 function JingDiscardConfirmSheet({
   tile,
