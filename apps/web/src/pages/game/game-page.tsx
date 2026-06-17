@@ -3711,7 +3711,7 @@ function GameTable({
               selectedTileIdx={selectedTileIdx}
               onSelect={onSelect}
               onDiscard={handleDiscardOrKong}
-              isMyTurn={isMyTurn && (!canTsumo || tsumoSuppressed)}
+              isMyTurn={isMyTurn && !canTsumo}
               jingTypes={jingTypes}
               pendingMove={pendingMove}
               onDisplayOrderChange={setHudDisplayOrder}
