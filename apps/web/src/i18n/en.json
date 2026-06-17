@@ -201,6 +201,9 @@
   "botDifficultyNormalFull": "Normal Bot",
   "botDifficultyHard": "Hard",
   "botDifficultyHardFull": "Hard Bot",
+  "botDifficultyPsychic": "Psychic",
+  "botDifficultyPsychicFull": "Psychic Bot",
+  "botNameOracle": "OracleBot",
   "roomAddBot": "Add Bot",
 
   "settingStyleLabel": "Style",

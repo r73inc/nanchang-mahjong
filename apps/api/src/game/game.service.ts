@@ -1307,6 +1307,8 @@ export class GameService {
       session.getBotDifficulty(seat),
       state.seats[seat].hand,
       jingTypesForClaim,
+      state,
+      seat,
     );
 
     if (!decision) {
