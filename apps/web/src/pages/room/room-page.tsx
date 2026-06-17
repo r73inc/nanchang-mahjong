@@ -228,6 +228,7 @@ export function RoomPage() {
     if (handle === 'MilkyBot') return t('botNameMilky');
     if (handle === 'MelonBot') return t('botNameMelon');
     if (handle === 'FifthBot') return t('botNameFifth');
+    if (handle === 'OracleBot') return t('botNameOracle');
     return handle;
   };
 
@@ -369,11 +370,13 @@ export function RoomPage() {
                         ? t('openSeat')
                         : seat.isBot
                           ? t(
-                              seat.botDifficulty === 'hard'
-                                ? 'botDifficultyHardFull'
-                                : seat.botDifficulty === 'normal'
-                                  ? 'botDifficultyNormalFull'
-                                  : 'botDifficultyEasyFull',
+                              seat.botDifficulty === 'psychic'
+                                ? 'botDifficultyPsychicFull'
+                                : seat.botDifficulty === 'hard'
+                                  ? 'botDifficultyHardFull'
+                                  : seat.botDifficulty === 'normal'
+                                    ? 'botDifficultyNormalFull'
+                                    : 'botDifficultyEasyFull',
                             )
                           : seat.isHost || seat.ready
                             ? t('ready')
@@ -385,26 +388,36 @@ export function RoomPage() {
                       <div className="mt-2">
                         {addingBotToSeat === seat.seatIdx ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {(['easy', 'normal', 'hard'] as BotDifficulty[]).map((diff) => (
-                              <button
-                                key={diff}
-                                onClick={() => void handleAddBot(seat.seatIdx, diff)}
-                                className="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                                style={{
-                                  background: 'rgba(90,125,140,0.2)',
-                                  border: '1px solid rgba(90,125,140,0.5)',
-                                  color: '#7ab5cc',
-                                }}
-                              >
-                                {t(
-                                  diff === 'easy'
-                                    ? 'botDifficultyEasyFull'
-                                    : diff === 'normal'
-                                      ? 'botDifficultyNormalFull'
-                                      : 'botDifficultyHardFull',
-                                )}
-                              </button>
-                            ))}
+                            {(['easy', 'normal', 'hard', 'psychic'] as BotDifficulty[]).map(
+                              (diff) => (
+                                <button
+                                  key={diff}
+                                  onClick={() => void handleAddBot(seat.seatIdx, diff)}
+                                  className="px-2.5 py-1 rounded-full text-[10px] font-bold"
+                                  style={{
+                                    background:
+                                      diff === 'psychic'
+                                        ? 'rgba(130,80,180,0.2)'
+                                        : 'rgba(90,125,140,0.2)',
+                                    border:
+                                      diff === 'psychic'
+                                        ? '1px solid rgba(130,80,180,0.5)'
+                                        : '1px solid rgba(90,125,140,0.5)',
+                                    color: diff === 'psychic' ? '#c090e8' : '#7ab5cc',
+                                  }}
+                                >
+                                  {t(
+                                    diff === 'psychic'
+                                      ? 'botDifficultyPsychicFull'
+                                      : diff === 'easy'
+                                        ? 'botDifficultyEasyFull'
+                                        : diff === 'normal'
+                                          ? 'botDifficultyNormalFull'
+                                          : 'botDifficultyHardFull',
+                                  )}
+                                </button>
+                              ),
+                            )}
                             <button
                               onClick={() => setAddingBotToSeat(null)}
                               className="text-[10px] text-mj-bone/40 px-1.5 py-1"

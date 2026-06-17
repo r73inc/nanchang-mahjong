@@ -21,8 +21,10 @@ import {
   bestDistAfterClaim,
 } from './effective-draws';
 import { isOpponentThreatening, safestDiscard } from './defense';
+import { buildCheatContext } from './cheat-api';
+import type { CheatContext } from './cheat-api';
 
-export type BotDifficulty = 'easy' | 'normal' | 'hard';
+export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'psychic';
 
 /**
  * Available call options offered to the bot during a claim window.
@@ -88,6 +90,7 @@ function getHardBotDiscard(
   jingTypes: TileType[],
   state: GameState,
   botSeat: 0 | 1 | 2 | 3,
+  cheatContext?: CheatContext | null,
 ): TileType {
   const { naturals } = separateJing(hand, jingTypes);
 
@@ -95,17 +98,19 @@ function getHardBotDiscard(
   if (naturals.length === 0) return hand[0];
 
   const visible = getVisibleTiles(hand, state.seats);
-  const candidates = rankDiscardCandidates(hand, jingTypes, visible);
+  const candidates = rankDiscardCandidates(hand, jingTypes, visible, cheatContext);
 
   if (candidates.length === 0) return naturals[0];
 
   const bestDist = candidates[0].distAfterDiscard;
 
-  // Check whether any opponent is threatening
-  const threatened = isOpponentThreatening(state.seats, botSeat, jingTypes);
+  const threatened = isOpponentThreatening(state.seats, botSeat, jingTypes, cheatContext);
 
-  // Defense mode: switch when threatened AND we are more than 1 step from Ting
-  if (threatened && bestDist > 1) {
+  // Psychic: hard-pivot to defense whenever any opponent is confirmed in Ting,
+  //          regardless of our own distance.
+  // Hard:    defend only when threatened AND we are more than 1 step from Ting.
+  const shouldDefend = cheatContext ? threatened : threatened && bestDist > 1;
+  if (shouldDefend) {
     return safestDiscard(naturals, visible, state.seats, botSeat);
   }
 
@@ -201,8 +206,13 @@ export function getBotDiscard(
     return naturals[Math.floor(Math.random() * naturals.length)];
   }
 
-  if (difficulty === 'hard' && state !== undefined && botSeat !== undefined) {
-    return getHardBotDiscard(hand, wildcards, state, botSeat);
+  if (
+    (difficulty === 'hard' || difficulty === 'psychic') &&
+    state !== undefined &&
+    botSeat !== undefined
+  ) {
+    const cheatContext = buildCheatContext(state, botSeat, difficulty);
+    return getHardBotDiscard(hand, wildcards, state, botSeat, cheatContext);
   }
 
   // Normal (and hard fallback when state not available):
@@ -253,7 +263,11 @@ export function getBotClaim(
     return { kind: choice.kind as 'pung' | 'kong' };
   }
 
-  if (difficulty === 'hard' && hand !== undefined && jingTypes !== undefined) {
+  if (
+    (difficulty === 'hard' || difficulty === 'psychic') &&
+    hand !== undefined &&
+    jingTypes !== undefined
+  ) {
     return getHardBotClaim(available, discardedTile, hand, jingTypes);
   }
 

@@ -131,3 +131,9 @@ export type { ReplayHandConfig } from './replay';
 
 export { getBotDiscard, getBotClaim } from './bot/bot-engine';
 export type { BotDifficulty, BotClaimOption, BotClaimDecision } from './bot/bot-engine';
+export {
+  buildCheatContext,
+  PSYCHIC_LOOKAHEAD_DEPTH,
+  PSYCHIC_LOOKAHEAD_BOOST,
+} from './bot/cheat-api';
+export type { CheatContext } from './bot/cheat-api';

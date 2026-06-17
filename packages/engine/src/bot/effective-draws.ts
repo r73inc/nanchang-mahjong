@@ -13,6 +13,8 @@ import { separateJing } from '../jing';
 import { isWinningHand } from '../hand';
 import type { TileType, SeatState } from '../types';
 import { overallDist } from './ting-distance';
+import { PSYCHIC_LOOKAHEAD_BOOST } from './cheat-api';
+import type { CheatContext } from './cheat-api';
 
 // ── Visible tile tracking ─────────────────────────────────────────────────────
 
@@ -137,14 +139,17 @@ export interface DiscardCandidate {
  *
  * Sorted: lowest distAfterDiscard first, then highest effectiveDraws.
  *
- * @param hand14   Full 14-tile hand including the newly drawn tile.
- * @param jingTypes Active jing tile types.
- * @param visible  Visible tile map from getVisibleTiles.
+ * @param hand14      Full 14-tile hand including the newly drawn tile.
+ * @param jingTypes   Active jing tile types.
+ * @param visible     Visible tile map from getVisibleTiles.
+ * @param cheatContext Optional psychic lookahead — boosts candidates that
+ *                    can catch confirmed upcoming wall tiles.
  */
 export function rankDiscardCandidates(
   hand14: TileType[],
   jingTypes: TileType[],
   visible: Map<TileType, number>,
+  cheatContext?: CheatContext | null,
 ): DiscardCandidate[] {
   const { naturals } = separateJing(hand14, jingTypes);
   const seen = new Set<TileType>();
@@ -156,7 +161,19 @@ export function rankDiscardCandidates(
 
     const hand13 = removeOneTile(hand14, tile);
     const dist = overallDist(hand13, jingTypes);
-    const effective = countEffectiveDraws(hand13, jingTypes, visible);
+    let effective = countEffectiveDraws(hand13, jingTypes, visible);
+
+    // Psychic offense: for each wall lookahead tile that would reduce this
+    // hand's distance to Ting, apply a large bonus. The bot actively shapes
+    // its hand to catch the tiles it knows are coming.
+    if (cheatContext) {
+      for (const lookaheadTile of cheatContext.wallLookahead) {
+        const hand14sim = [...hand13, lookaheadTile];
+        if (bestDistAfterDraw(hand14sim, jingTypes) < dist) {
+          effective += PSYCHIC_LOOKAHEAD_BOOST;
+        }
+      }
+    }
 
     candidates.push({ tile, distAfterDiscard: dist, effectiveDraws: effective });
   }

@@ -201,6 +201,9 @@
   "botDifficultyNormalFull": "普通机器人",
   "botDifficultyHard": "困难",
   "botDifficultyHardFull": "困难机器人",
+  "botDifficultyPsychic": "通灵",
+  "botDifficultyPsychicFull": "通灵机器人",
+  "botNameOracle": "先知机器人",
   "roomAddBot": "添加机器人",
 
   "settingStyleLabel": "玩法",

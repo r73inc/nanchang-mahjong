@@ -14,4 +14,5 @@ export const BOT_PROFILES: readonly BotProfile[] = [
   { id: 'milkybot', name: 'MilkyBot', avatarPath: '/avatars/bots/MilkyBot.jpg' },
   { id: 'melonbot', name: 'MelonBot', avatarPath: '/avatars/bots/MelonBot.jpg' },
   { id: 'fifthbot', name: 'FifthBot', avatarPath: '/avatars/bots/FifthBot.jpg' },
+  { id: 'oraclebot', name: 'OracleBot', avatarPath: '/avatars/bots/OracleBot.jpg' },
 ];
