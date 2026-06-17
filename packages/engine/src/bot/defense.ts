@@ -10,6 +10,7 @@
 
 import { isHonor } from '../tiles';
 import type { TileType, SeatState } from '../types';
+import type { CheatContext } from './cheat-api';
 
 // ── Opponent threat detection ─────────────────────────────────────────────────
 
@@ -29,7 +30,19 @@ export function isOpponentThreatening(
   seats: SeatState[],
   botSeat: number,
   jingTypes: TileType[],
+  cheatContext?: CheatContext | null,
 ): boolean {
+  // Psychic mode: use exact Ting distances instead of visual heuristics.
+  // An opponent at distance 0 is in Ting — treat as an immediate threat.
+  if (cheatContext) {
+    for (const [seatStr, dist] of Object.entries(cheatContext.opponentTingDistances)) {
+      if (Number(seatStr) !== botSeat && dist === 0) return true;
+    }
+    // No opponent is confirmed in Ting — fall through to visual heuristics.
+    // Exact distances enhance defense; they don't replace it.
+  }
+
+  // Standard visual heuristic for hard (and below) bots.
   for (let i = 0; i < seats.length; i++) {
     if (i === botSeat) continue;
     const seat = seats[i];

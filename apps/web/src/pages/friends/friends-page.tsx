@@ -15,6 +15,9 @@ import {
   type FriendStatus,
 } from '../../hooks/use-friends';
 
+// Purely decorative clear glyph — constant avoids i18n/no-literal-string lint
+const CLEAR_GLYPH = '×' as const;
+
 // ── Style tokens ──────────────────────────────────────────────────────────────
 
 const rowStyle = {
@@ -207,11 +210,24 @@ export function FriendsPage() {
             className="w-full px-3 py-2.5 rounded-[10px] text-sm text-mj-bone bg-mj-bone/[0.07]
                        border border-mj-bone/15 focus:border-mj-gold/50 outline-none pr-8"
           />
-          {searchFetching && (
+          {searchFetching ? (
             <span className="absolute right-3 top-1/2 -translate-y-1/2">
               <Spinner />
             </span>
-          )}
+          ) : searchInput ? (
+            <button
+              type="button"
+              onClick={() => handleSearch('')}
+              aria-label={t('friendsSearchClear')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full text-[11px] font-bold leading-none transition-colors"
+              style={{
+                background: 'rgba(var(--felt-ink-rgb),0.15)',
+                color: 'rgba(var(--felt-ink-rgb),0.6)',
+              }}
+            >
+              {CLEAR_GLYPH}
+            </button>
+          ) : null}
         </div>
 
         {/* Search results */}

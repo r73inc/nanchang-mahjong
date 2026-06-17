@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-16T00:00:00.000Z",
+  "title": "Design System: Nanchang Mahjong",
+  "extensions": {
+    "colorMeta": {
+      "jade-deep": {
+        "role": "neutral",
+        "displayName": "Deep Jade",
+        "canonical": "oklch(8% 0.04 165)",
+        "tonalRamp": [
+          "#030b07",
+          "#051a13",
+          "#082a1e",
+          "#0d3b2e",
+          "#14543f",
+          "#1f7a5a",
+          "#35a07a",
+          "#6dcba4"
+        ]
+      },
+      "jade-felt": {
+        "role": "neutral",
+        "displayName": "Jade Felt",
+        "canonical": "oklch(22% 0.06 165)",
+        "tonalRamp": [
+          "#030b07",
+          "#051a13",
+          "#082a1e",
+          "#0d3b2e",
+          "#14543f",
+          "#1f7a5a",
+          "#35a07a",
+          "#6dcba4"
+        ]
+      },
+      "gold": {
+        "role": "primary",
+        "displayName": "Heirloom Gold",
+        "canonical": "oklch(72% 0.12 80)",
+        "tonalRamp": [
+          "#2a1d00",
+          "#4a3500",
+          "#6b5010",
+          "#8e6e28",
+          "#c9a961",
+          "#d8c089",
+          "#e5d3a8",
+          "#f2e9cc"
+        ]
+      },
+      "gold-deep": {
+        "role": "primary",
+        "displayName": "Deep Gold",
+        "canonical": "oklch(60% 0.11 80)",
+        "tonalRamp": [
+          "#2a1d00",
+          "#4a3500",
+          "#6b5010",
+          "#8e6e28",
+          "#a88a45",
+          "#c9a961",
+          "#d8c089",
+          "#e5d3a8"
+        ]
+      },
+      "bone": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "oklch(95% 0.015 95)",
+        "tonalRamp": [
+          "#1a1916",
+          "#2e2c27",
+          "#4a4740",
+          "#6b6860",
+          "#919080",
+          "#b5b3a6",
+          "#d6d3c8",
+          "#f5efdf"
+        ]
+      },
+      "win": {
+        "role": "tertiary",
+        "displayName": "Win Green",
+        "canonical": "oklch(75% 0.10 155)",
+        "tonalRamp": [
+          "#091f13",
+          "#0d3320",
+          "#145a38",
+          "#1f7a4d",
+          "#2fa068",
+          "#7fc299",
+          "#aad9bf",
+          "#d5f0e5"
+        ]
+      },
+      "win-deep": {
+        "role": "tertiary",
+        "displayName": "Deep Win",
+        "canonical": "oklch(45% 0.10 155)",
+        "tonalRamp": [
+          "#091f13",
+          "#0d3320",
+          "#145a38",
+          "#1f7a4d",
+          "#2fa068",
+          "#7fc299",
+          "#aad9bf",
+          "#d5f0e5"
+        ]
+      },
+      "loss": {
+        "role": "secondary",
+        "displayName": "Loss Red",
+        "canonical": "oklch(45% 0.18 25)",
+        "tonalRamp": [
+          "#200606",
+          "#3d0b0b",
+          "#6b1010",
+          "#a01a1a",
+          "#c0392b",
+          "#d96a5d",
+          "#ec9e95",
+          "#f7d0cc"
+        ]
+      },
+      "loss-light": {
+        "role": "secondary",
+        "displayName": "Loss Light",
+        "canonical": "oklch(68% 0.14 25)",
+        "tonalRamp": [
+          "#200606",
+          "#3d0b0b",
+          "#6b1010",
+          "#a01a1a",
+          "#c0392b",
+          "#e88080",
+          "#f0a8a8",
+          "#f9d5d5"
+        ]
+      },
+      "bg-page": {
+        "role": "neutral",
+        "displayName": "Page Black",
+        "canonical": "oklch(6% 0 0)",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1c1c1c",
+          "#282828",
+          "#363636",
+          "#555555",
+          "#888888",
+          "#cccccc"
+        ]
+      },
+      "bg-card": {
+        "role": "neutral",
+        "displayName": "Card Surface",
+        "canonical": "oklch(10% 0 0)",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1c1c1c",
+          "#282828",
+          "#363636",
+          "#555555",
+          "#888888",
+          "#cccccc"
+        ]
+      },
+      "bg-elevated": {
+        "role": "neutral",
+        "displayName": "Elevated Surface",
+        "canonical": "oklch(13% 0 0)",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1c1c1c",
+          "#282828",
+          "#363636",
+          "#555555",
+          "#888888",
+          "#cccccc"
+        ]
+      },
+      "seat-east": {
+        "role": "primary",
+        "displayName": "Seat East (You)",
+        "canonical": "oklch(72% 0.12 80)",
+        "tonalRamp": [
+          "#2a1d00",
+          "#4a3500",
+          "#6b5010",
+          "#8e6e28",
+          "#c9a961",
+          "#d8c089",
+          "#e5d3a8",
+          "#f2e9cc"
+        ]
+      },
+      "seat-south": {
+        "role": "tertiary",
+        "displayName": "Seat South",
+        "canonical": "oklch(52% 0.09 55)",
+        "tonalRamp": [
+          "#1f0e00",
+          "#3d1e05",
+          "#6b3810",
+          "#8e5428",
+          "#a36d3e",
+          "#c49068",
+          "#dbb898",
+          "#f0dcc8"
+        ]
+      },
+      "seat-west": {
+        "role": "tertiary",
+        "displayName": "Seat West",
+        "canonical": "oklch(52% 0.07 220)",
+        "tonalRamp": [
+          "#060e14",
+          "#0c1d28",
+          "#163040",
+          "#244d63",
+          "#3a6b82",
+          "#5a7d8c",
+          "#8aaab8",
+          "#bdd4de"
+        ]
+      },
+      "seat-north": {
+        "role": "tertiary",
+        "displayName": "Seat North",
+        "canonical": "oklch(42% 0.07 10)",
+        "tonalRamp": [
+          "#1a0808",
+          "#311212",
+          "#521e1e",
+          "#6e2e2e",
+          "#7d4f4f",
+          "#a07070",
+          "#c4a0a0",
+          "#e8d0d0"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display (Noto Serif SC)",
+        "purpose": "Cultural anchors only: brand hanzi, section hero moments. Never for UI labels or body."
+      },
+      "headline": {
+        "displayName": "Headline (Inter)",
+        "purpose": "User-facing names, welcome header. Rare — one per major screen."
+      },
+      "title": {
+        "displayName": "Title (Inter)",
+        "purpose": "Screen headers inside ScreenShell. One per shell."
+      },
+      "body": {
+        "displayName": "Body (Inter)",
+        "purpose": "Settings descriptions, help text, game state copy. Max 65ch."
+      },
+      "label": {
+        "displayName": "Label (Inter)",
+        "purpose": "Content-type labels inside data rows (AUTO, SAVED). Not decorative eyebrows."
+      }
+    },
+    "shadows": [
+      {
+        "name": "cta-glow",
+        "value": "0 6px 18px rgba(201, 169, 97, 0.3)",
+        "purpose": "Primary gold button only. The gold button is the only elevated element on most screens."
+      },
+      {
+        "name": "overlay",
+        "value": "0 12px 40px rgba(0, 0, 0, 0.55)",
+        "purpose": "Bottom sheets, modals, and overlays. Grounds them above the game surface."
+      },
+      {
+        "name": "viewport-frame",
+        "value": "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(201, 169, 97, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+        "purpose": "Game canvas only. The three-layer frame of the table."
+      },
+      {
+        "name": "turn-pulse",
+        "value": "inset 0 0 0 3px rgba(201, 169, 97, 0.6), inset 0 0 30px rgba(201, 169, 97, 0.2)",
+        "purpose": "Active turn viewport border. Pulses at 1.6s ease-in-out (see .mj-turn-border-glow)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default easing for all state transitions."
+      },
+      {
+        "name": "ease-emphasized",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Emphasized moments: bottom sheet entrances, win animations."
+      },
+      {
+        "name": "duration-fast",
+        "value": "200ms",
+        "purpose": "Micro-interactions: hover, focus, toggle."
+      },
+      {
+        "name": "duration-base",
+        "value": "400ms",
+        "purpose": "Standard transitions: page elements, card reveals."
+      },
+      {
+        "name": "duration-emphasized",
+        "value": "600ms",
+        "purpose": "Meaningful moments: winner pop, game-end reveal."
+      },
+      {
+        "name": "duration-ambient",
+        "value": "1600ms",
+        "purpose": "Ambient loops only: turn-pulse border, opponent badge active."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone-column",
+        "value": "460px",
+        "purpose": "Max-width for the centered phone column. No responsive layout changes — the design is intentionally phone-shaped at this width."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The only action that warrants gold. Full-width on mobile. Dark slate text on gold gradient.",
+      "html": "<button class=\"ds-btn-primary\">Play with Friends →</button>",
+      "css": ".ds-btn-primary { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 20px; border-radius: 14px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 17px; font-weight: 700; color: #1f2937; background: linear-gradient(180deg, #c9a961 0%, #a88a45 100%); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 6px 18px rgba(201,169,97,0.3); cursor: pointer; transition: opacity 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: linear-gradient(180deg, #d4b872 0%, #c9a961 100%); box-shadow: 0 8px 24px rgba(201,169,97,0.45); } .ds-btn-primary:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; } .ds-btn-primary:disabled { opacity: 0.7; cursor: wait; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Secondary / de-emphasis action. Used for sign-out, cancel, low-stakes navigation.",
+      "html": "<button class=\"ds-btn-ghost\">Sign out</button>",
+      "css": ".ds-btn-ghost { display: block; width: 100%; padding: 14px 20px; border-radius: 14px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 600; color: rgba(var(--felt-ink-rgb), 0.7); background: transparent; border: 1px solid rgba(245,239,223,0.15); cursor: pointer; transition: background 150ms, border-color 150ms; } .ds-btn-ghost:hover { background: rgba(245,239,223,0.04); border-color: rgba(245,239,223,0.25); } .ds-btn-ghost:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; }"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "surface-card",
+      "description": "The standard container for settings rows, save slots, and list items. Adapts to felt theme via CSS var.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-title\">Auto Save</p><p class=\"ds-card-body\">2 hands played · Jun 14</p></div>",
+      "css": ".ds-card { padding: 12px 16px; border-radius: 14px; background: rgba(245,239,223,0.06); border: 1px solid rgba(245,239,223,0.1); } .ds-card-title { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 600; color: #f5efdf; margin: 0 0 2px; } .ds-card-body { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 12px; color: rgba(245,239,223,0.4); margin: 0; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Form field with label above, error below. Gold focus border signals interaction.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-inp\">Handle</label><input class=\"ds-field-input\" id=\"ds-inp\" type=\"text\" placeholder=\"@your-handle\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; } .ds-field-label { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(var(--felt-ink-rgb), 0.7); } .ds-field-input { padding: 12px 14px; border-radius: 12px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; color: var(--felt-ink); background: rgba(245,239,223,0.07); border: 1px solid rgba(245,239,223,0.15); outline: none; transition: border-color 200ms; } .ds-field-input:focus { border-color: rgba(201,169,97,0.5); } .ds-field-input::placeholder { color: rgba(var(--felt-ink-rgb), 0.35); }"
+    },
+    {
+      "name": "Toggle Switch",
+      "kind": "custom",
+      "refersTo": "toggle-active",
+      "description": "Used for sound, push notifications, and settings booleans. Gold = active.",
+      "html": "<div class=\"ds-toggle-row\"><div><p class=\"ds-toggle-title\">Sound Effects</p><p class=\"ds-toggle-desc\">Tile click and win sounds</p></div><button class=\"ds-toggle ds-toggle--on\" role=\"switch\" aria-checked=\"true\" aria-label=\"Sound Effects\"><span class=\"ds-toggle-thumb\"></span></button></div>",
+      "css": ".ds-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-radius: 14px; background: rgba(245,239,223,0.06); border: 1px solid rgba(245,239,223,0.08); gap: 12px; } .ds-toggle-title { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; color: #f5efdf; margin: 0 0 2px; } .ds-toggle-desc { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 11px; color: rgba(245,239,223,0.4); margin: 0; } .ds-toggle { position: relative; width: 44px; height: 24px; border-radius: 9999px; border: none; cursor: pointer; flex-shrink: 0; transition: background 150ms; } .ds-toggle--on { background: #c9a961; } .ds-toggle--off { background: rgba(245,239,223,0.15); border: 1px solid rgba(245,239,223,0.2); } .ds-toggle-thumb { position: absolute; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 150ms; } .ds-toggle--on .ds-toggle-thumb { transform: translateX(20px); left: 2px; } .ds-toggle--off .ds-toggle-thumb { transform: translateX(0); left: 2px; } .ds-toggle:focus-visible { outline: 2px solid #c9a961; outline-offset: 3px; }"
+    },
+    {
+      "name": "Screen Shell Header",
+      "kind": "nav",
+      "refersTo": "button-ghost",
+      "description": "Sticky blurred header present on every ScreenShell screen. Carries title, optional back button, lang toggle.",
+      "html": "<div class=\"ds-shell-header\"><button class=\"ds-back-btn\" aria-label=\"Go back\">←</button><h1 class=\"ds-shell-title\">Home</h1><span class=\"ds-lang-toggle\">中/EN</span></div>",
+      "css": ".ds-shell-header { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: rgba(8,30,23,0.6); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(201,169,97,0.15); } .ds-back-btn { width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #c9a961; background: rgba(201,169,97,0.12); border: none; cursor: pointer; flex-shrink: 0; } .ds-back-btn:hover { background: rgba(201,169,97,0.2); } .ds-back-btn:focus-visible { outline: 2px solid #c9a961; outline-offset: 2px; } .ds-shell-title { flex: 1; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 17px; font-weight: 700; color: #f5efdf; margin: 0; } .ds-lang-toggle { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 12px; color: rgba(245,239,223,0.5); cursor: pointer; flex-shrink: 0; padding: 4px 8px; border-radius: 6px; transition: color 150ms, background 150ms; } .ds-lang-toggle:hover { color: #f5efdf; background: rgba(245,239,223,0.08); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Family Heirloom",
+    "overview": "This is not a product someone shipped. It is something made, used, and passed around among people who know each other and know this game. The interface is built from the same physical vocabulary as the table itself: deep jade felt for surfaces, bone-white tiles for text, gold for the moments that matter. There is no branding, no marketing energy, no attempt to impress strangers. Every screen should feel like it was already here.\n\nThe visual register is restrained and dark — not minimal for minimalism's sake, but because the game is the content. Screens exist to get the player to the table; they should not linger or perform. Motion is used only to convey state: a turn starting, a tile being claimed, a hand resolving. The chrome should nearly disappear.\n\nThe system is bilingual (EN/ZH) and themeable — jade, crimson, slate, navy, and yellow felts are all first-class. Any new component must work across all felt themes.",
+    "keyCharacteristics": [
+      "Dark jade surfaces; bone text; gold accent used sparingly and always meaningfully",
+      "Components feel warm and tactile — slight weight, responsive to touch — not flat or clinical",
+      "Maximum width 460px; mobile-first column; all screens are phone-shaped",
+      "No animations that don't convey state; every transition serves a purpose",
+      "All text in t() — EN and ZH keys in strict parity; no literal strings in JSX"
+    ],
+    "rules": [
+      {
+        "name": "The Gold Rarity Rule",
+        "body": "Gold (#c9a961) appears on ≤ one primary action per screen and on active/selected state indicators. No decoration, no gradient text, no accent borders just because. If something is gold, it is important.",
+        "section": "colors"
+      },
+      {
+        "name": "The Felt Adaptation Rule",
+        "body": "Any surface inside ScreenShell must use rgba(var(--felt-ink-rgb), α) for backgrounds and borders — never a hardcoded rgba. This ensures correctness across all five felt themes.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Culture Voice Rule",
+        "body": "Noto Serif SC is the cultural voice. It appears in at most one place per screen. Using it for UI chrome or body copy will make the interface feel costumed, not authentic.",
+        "section": "typography"
+      },
+      {
+        "name": "The Fixed Scale Rule",
+        "body": "No clamp() or vw font sizes. This is a phone-first product at a fixed 460px column. Fluid type adds complexity with no benefit.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces inside ScreenShell are flat. Shadows appear only on primary CTAs (gold glow), modals/sheets (overlay shadow), and the game canvas (viewport frame).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use rgba(var(--felt-ink-rgb), α) for all backgrounds and borders inside ScreenShell.",
+      "Do use gold (#c9a961) only on primary CTAs, active/selected states, and state-signaling indicators.",
+      "Do keep all animations ≤ 400ms except ambient loops (turn pulse: 1600ms).",
+      "Do provide a prefers-reduced-motion fallback for every animation.",
+      "Do use MahjongTile2D for every mahjong tile rendered on screen.",
+      "Do write every visible string through t() with EN and ZH keys in parity.",
+      "Do target WCAG AAA contrast (7:1) for body text on jade surfaces."
+    ],
+    "donts": [
+      "Don't build anything that reads as a cold SaaS dashboard.",
+      "Don't build anything with generic mobile game UI energy.",
+      "Don't use gold (#c9a961) as a decorative color.",
+      "Don't use Noto Serif SC for UI labels, button text, or body copy.",
+      "Don't add animation to elements that aren't changing state.",
+      "Don't nest cards.",
+      "Don't use border-left greater than 1px as a colored accent stripe.",
+      "Don't use gradient text (background-clip: text).",
+      "Don't hardcode felt colors on surfaces inside ScreenShell.",
+      "Don't use modals as a first-choice pattern."
+    ]
+  }
+}

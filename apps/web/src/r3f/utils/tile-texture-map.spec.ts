@@ -3,9 +3,6 @@
  *
  * Unit tests for the TileType → SVG path mapping utility.
  * Pure TS — no browser, no WebGL context needed.
- *
- * NOTE: The Black palette SVG set has been removed from the project.
- * Only the Regular palette is available; tests for Black paths are removed.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -70,6 +67,10 @@ describe('backTexturePath', () => {
   it('returns Regular Back.svg when palette is explicitly Regular', () => {
     expect(backTexturePath('Regular')).toBe('/textures/Tiles/Regular/Back.svg');
   });
+
+  it('returns Black Back.svg for the Black palette', () => {
+    expect(backTexturePath('Black')).toBe('/textures/Tiles/Black/Back.svg');
+  });
 });
 
 // ── allFaceTexturePaths ───────────────────────────────────────────────────────
@@ -88,6 +89,18 @@ describe('allFaceTexturePaths', () => {
   it('all paths are unique within the Regular palette', () => {
     const paths = allFaceTexturePaths('Regular');
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it('returns 34 unique paths for the Black palette', () => {
+    const paths = allFaceTexturePaths('Black');
+    expect(paths).toHaveLength(34);
+    expect(new Set(paths).size).toBe(34);
+  });
+
+  it('all Black paths start with /textures/Tiles/Black/', () => {
+    for (const p of allFaceTexturePaths('Black')) {
+      expect(p).toMatch(/^\/textures\/Tiles\/Black\/.+\.svg$/);
+    }
   });
 
   it('order matches ALL_TILE_TYPES order (stable index for useTexture preload)', () => {
@@ -144,9 +157,68 @@ describe('ALL_TILE_TYPES', () => {
 // ── themeToVariant ────────────────────────────────────────────────────────────
 
 describe('themeToVariant', () => {
-  it('always returns Regular (Black assets removed from project)', () => {
-    expect(themeToVariant('dark')).toBe('Regular');
+  // Black-texture palettes — each tested individually so a regression is
+  // immediately identifiable by name rather than buried in a multi-assertion it.
+
+  it('maps dark to Black', () => {
+    expect(themeToVariant('dark')).toBe('Black');
+  });
+
+  it('maps tomato-jam to Black', () => {
+    expect(themeToVariant('tomato-jam')).toBe('Black');
+  });
+
+  it('maps indigo-ink to Black', () => {
+    expect(themeToVariant('indigo-ink')).toBe('Black');
+  });
+
+  // Regular-texture palettes
+
+  it('maps classic to Regular', () => {
     expect(themeToVariant('classic')).toBe('Regular');
+  });
+
+  it('maps sepia to Regular', () => {
     expect(themeToVariant('sepia')).toBe('Regular');
+  });
+
+  it('maps lime to Regular', () => {
+    expect(themeToVariant('lime')).toBe('Regular');
+  });
+
+  it('maps frosted-blue to Regular', () => {
+    expect(themeToVariant('frosted-blue')).toBe('Regular');
+  });
+
+  it('maps pastel-petal to Regular', () => {
+    expect(themeToVariant('pastel-petal')).toBe('Regular');
+  });
+
+  it('maps radioactive-grass to Regular', () => {
+    expect(themeToVariant('radioactive-grass')).toBe('Regular');
+  });
+
+  it('returns a valid TilePaletteVariant for every known palette', () => {
+    const VALID: readonly string[] = ['Regular', 'Black'];
+    const ALL_PALETTES = [
+      'classic',
+      'sepia',
+      'dark',
+      'lime',
+      'frosted-blue',
+      'tomato-jam',
+      'pastel-petal',
+      'radioactive-grass',
+      'indigo-ink',
+    ] as const;
+    for (const p of ALL_PALETTES) {
+      expect(VALID).toContain(themeToVariant(p));
+    }
+  });
+
+  it('falls back to Regular for any unrecognised palette value at runtime', () => {
+    // Cast to bypass TypeScript so we can verify the runtime guard.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(themeToVariant('unknown-future-palette' as any)).toBe('Regular');
   });
 });

@@ -4,9 +4,9 @@
  * Maps every engine TileType to the correct FluffyStuff SVG filename and
  * builds the public URL for use with Three.js TextureLoader / useTexture().
  *
- * FluffyStuff tile sets (Regular + Black) are pre-placed at:
- *   apps/web/public/textures/Tiles/Regular/*.svg
- *   apps/web/public/textures/Tiles/Black/*.svg
+ * FluffyStuff tile sets are pre-placed at:
+ *   apps/web/public/textures/Tiles/Regular/*.svg  (classic + sepia palettes)
+ *   apps/web/public/textures/Tiles/Black/*.svg    (dark palette)
  *
  * Wind tile naming follows Japanese mahjong conventions used by FluffyStuff:
  *   East  → Ton   (東 ton-puu)
@@ -67,12 +67,8 @@ const TILE_TO_FLUFFY: Record<TileType, string> = {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * FluffyStuff palette variant.
- * NOTE: The Black SVG set has been removed from the project — only 'Regular'
- * (white-background tiles) is available. `themeToVariant` always returns 'Regular'.
- */
-export type TilePaletteVariant = 'Regular';
+/** FluffyStuff palette variant. */
+export type TilePaletteVariant = 'Regular' | 'Black';
 
 /**
  * Returns the public URL for a tile's face SVG texture.
@@ -155,8 +151,22 @@ export const ALL_TILE_TYPES: readonly TileType[] = [
 
 /**
  * Derives the correct TilePaletteVariant from the app's ThemeStore tilePalette.
- * Always returns 'Regular' — the Black SVG asset folder has been removed.
+ * 'classic' and 'sepia' use the Regular (white-background) texture set.
+ * 'dark' uses the Black texture set.
  */
-export function themeToVariant(_tilePalette: 'classic' | 'sepia' | 'dark'): TilePaletteVariant {
-  return 'Regular';
+export function themeToVariant(
+  tilePalette:
+    | 'classic'
+    | 'sepia'
+    | 'dark'
+    | 'lime'
+    | 'frosted-blue'
+    | 'tomato-jam'
+    | 'pastel-petal'
+    | 'radioactive-grass'
+    | 'indigo-ink',
+): TilePaletteVariant {
+  return tilePalette === 'dark' || tilePalette === 'tomato-jam' || tilePalette === 'indigo-ink'
+    ? 'Black'
+    : 'Regular';
 }

@@ -43,11 +43,12 @@ const SEAT_INDICES = [0, 1, 2, 3] as const;
 
 export interface DesktopGameTable2DProps {
   onDiscard: (tile: TileType) => void;
+  tsumoSuppressed?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function DesktopGameTable2D({ onDiscard }: DesktopGameTable2DProps) {
+export function DesktopGameTable2D({ onDiscard, tsumoSuppressed }: DesktopGameTable2DProps) {
   const snapshot = useGameStore((s) => s.snapshot);
   const viewerSeat = (snapshot?.viewerSeat ?? 0) as 0 | 1 | 2 | 3;
 
@@ -130,7 +131,7 @@ export function DesktopGameTable2D({ onDiscard }: DesktopGameTable2DProps) {
                     >
                       <OpenMelds2D seatIdx={seatIdx} role={cfg.role} />
                     </div>
-                    <PlayerHand2D onDiscard={onDiscard} />
+                    <PlayerHand2D onDiscard={onDiscard} tsumoSuppressed={tsumoSuppressed} />
                   </div>
                 );
               }

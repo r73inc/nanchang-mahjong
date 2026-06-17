@@ -6,6 +6,134 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## `wify-imp-33-36` (2026-06-16)
+
+### IMP-033 · "Waiting…0 not ready" wording on the room lobby start button
+
+**Root cause:** The start button label for the host was built by concatenating three separate i18n fragments: `"${t('waiting')} ${count} ${t('notReady').toLowerCase()}"`. When the room wasn't full (no non-host, non-bot un-ready players), the count was 0, producing the confusing "Waiting… 0 not ready". More importantly, there was no distinction between "seats not yet filled" and "seats full but players unready."
+
+**Fix (`apps/web/src/pages/room/room-page.tsx`, `en.json`, `zh.json`):**
+
+- Added two new i18n keys:
+  - `waitingSeats`: "Waiting for seats…" (EN) / "等待玩家加入…" (ZH) — shown when `filledSeats.length < 4`.
+  - `waitingNotReady`: "{{0}} not ready" (EN) / "{{0}} 人未准备" (ZH) — shown when all 4 seats are filled but `not allReady`, interpolated with the count of non-host, non-bot, non-ready players.
+- Start button now branches: `allReady → "Start Match"` / `filledSeats.length < 4 → t('waitingSeats')` / else → `t('waitingNotReady', count)`.
+
+**Key learning:** Never build a user-facing label by concatenating i18n fragments — the result collapses two distinct states into one and breaks in locales where word order differs. Use a single composed key with interpolation for each distinct message.
+
+---
+
+### IMP-034 · Info button placement too close to first option button
+
+**Root cause:** End Condition and Claim Window rows used `flex justify-between items-center` with no enforced minimum gap. On narrow viewports the label+InfoButton span and the option-button group crowded each other because `justify-between` only guarantees the two flex children are pushed to opposite ends — it adds no minimum gap between them.
+
+**Fix (`apps/web/src/pages/room/room-page.tsx`):**
+
+- Added `gap-3` to the `className` of both the End Condition and Claim Window row `<div>` containers. CSS flex `gap` sets a minimum gap of 12 px between the label span and the option buttons regardless of viewport width.
+- Also added `shrink-0` to the label `<span>` on both rows so the label text never wraps or shrinks to push the InfoButton closer to the option buttons.
+
+**Key learning:** `justify-between` does not guarantee minimum spacing between children — pair it with `gap-*` when a minimum gap is needed on narrow viewports. Mark the non-growing side `shrink-0` so flex doesn't compress the label.
+
+---
+
+### IMP-035 · Friend search clear "X" not visible
+
+**Root cause:** The Friends page used `<input type="search">` which delegates the clear affordance to the browser's native search-clear icon — small, low-contrast, and unstyled.
+
+**Fix (`apps/web/src/pages/friends/friends-page.tsx`, `en.json`, `zh.json`):**
+
+- Replaced the native-clear approach with a custom absolutely-positioned `<button>` rendered inside the search input wrapper, visible only when `searchInput` is non-empty and not fetching.
+- The button is styled to match the app's dark theme (semi-transparent background, muted bone color).
+- Added `friendsSearchClear` i18n key for the `aria-label` (EN "Clear search" / ZH "清空搜索").
+- The spinner takes precedence: `searchFetching ? <Spinner /> : searchInput ? <ClearBtn /> : null`.
+
+**Key learning:** Never rely on the browser's native search-clear affordance for a custom-themed app — it ignores app CSS and is invisible in dark themes. Always implement a custom clear button with accessible labelling and explicit visibility control.
+
+---
+
+### IMP-036 · Bot display names not localized in ZH
+
+**Root cause:** Bot display names (`MilkyBot`, `MelonBot`, `FifthBot`) were hard-coded English strings in `bot-profiles.ts` and baked into the server-sent `seatName` / `handle` fields. The client rendered these strings directly with no locale mapping.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`, `apps/web/src/pages/room/room-page.tsx`, `en.json`, `zh.json`):**
+
+- Added three new i18n key pairs:
+  - `botNameMilky`: "MilkyBot" / "葫芦机器人"
+  - `botNameMelon`: "MelonBot" / "西瓜机器人"
+  - `botNameFifth`: "FifthBot" / "第五机器人"
+- Added a module-level `BOT_NAME_KEYS` lookup map in `game-page.tsx` and local `sdn()` / `botDisplayName()` helpers in each component that displays bot names. Each helper checks `isBot` and maps the English name to the appropriate i18n key.
+- Applied the helpers to all bot-name display sites: `Nameplate`, `HandRevealScreen` (winner/concede/liable-seat/loser payment rows), `MatchEndStatsScreen` (final standings + stat breakdown), and the room lobby seat list.
+
+**Key learning:** Server-sent display names must never be assumed locale-aware. Client-side mapping via a known-key lookup is the right approach when the server sends a small fixed set of identifiable names — avoids per-viewer snapshot divergence and keeps the mapping colocated with the UI layer that knows the current locale.
+
+---
+
+## `fix/bug-053-056-wify-bugs` (2026-06-16)
+
+### BUG-053 · Hand-type / scoring multiplier names untranslated in ZH
+
+**Root cause:** Two separate issues:
+
+1. **Hand-type badge** (`handTypeLabel` — `All Triplets`, `Seven Pairs`, etc.) — already translated via i18n keys (`handTypeAllTriplets` → `大七对`, etc.). The badge was correct in code; the initial investigation concluded it was a stale production build.
+
+2. **Scoring breakdown multiplier names** (the row reading e.g. "底分 1 × All Triplets ×2 → 总 ×2") — `HandRevealScreen` rendered `{item.name}` from `MultiplierItem`, which is always the English name. `MultiplierItem.nameZh` was already populated for every multiplier in the engine (`All Triplets → 大七对`, `Heavenly Win → 天胡`, `German → 德国`, etc.) but was never read by the frontend.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Added `lang` to the `useI18n()` destructure in `HandRevealScreen`.
+- Changed `{item.name}` to `{lang === 'zh' ? item.nameZh : item.name}` in the multiplier chain row.
+
+**Key learning:** `MultiplierItem` has carried both `name` and `nameZh` from the start, but the frontend only read `name`. Any display of server-originated name strings must check `lang` and pick the right field — never assume a server-side `name` field is locale-aware.
+
+---
+
+### BUG-054 · Spirit tile reveal screen shows raw tile codes instead of translated names
+
+**Root cause:** `apps/web/src/pages/game/game-page.tsx` `PreGameFlow` (line ~301) interpolated raw `TileType` engine strings (e.g. `5s`, `zhong`) directly into the `gameSpiritDesc` translation template. The `t()` helper has no way to convert an engine tile code to a human-readable name, so the raw code was displayed verbatim.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Added `lang` to the `useI18n()` destructure in `PreGameFlow`.
+- Changed the `gameSpiritDesc` call to pass `tileAriaLabel(primary, lang)` / `tileAriaLabel(secondary, lang)` instead of the raw `TileType` strings. `tileAriaLabel()` from `packages/shared/src/tile-map.ts` already has full EN/ZH name tables for all 34 tile types.
+
+**Key learning:** Never pass raw engine types as interpolation values into translated strings. Always run them through a named lookup (`tileAriaLabel`, `seatWindLabel`, etc.) that knows the current language before interpolating.
+
+---
+
+### BUG-055 · Cannot declare a concealed kong when a tsumo is also available
+
+**Root cause:** `apps/web/src/pages/game/game-page.tsx` `GameTable` blocked tile interaction with `isMyTurn && !canTsumo` in `ViewerHandHUD` and `AccessibleHand`. When the player's hand was also a winning Seven Pairs (which can occur with 4-of-a-kind counting as 2 pairs), `canTsumo = true` caused the TsumoBar to appear. The `tsumoSuppressed` flag was already set when the player clicked "Keep Playing," but it was never used to re-enable tile interaction — tiles remained non-interactive even after dismissal. The same bug existed in `PlayerHand2D` for 2D/mobile mode (`!canTsumo` with no `tsumoSuppressed` escape).
+
+**Fix:**
+
+- `apps/web/src/pages/game/game-page.tsx` — Changed both `ViewerHandHUD` and `AccessibleHand` `isMyTurn` guards from `isMyTurn && !canTsumo` to `isMyTurn && (!canTsumo || tsumoSuppressed)`. Added `tsumoSuppressed` to the `GameTable2D` call.
+- `apps/web/src/components/2d/GameTable2D.tsx`, `DesktopGameTable2D.tsx`, `MobileGameTable2D.tsx` — Added `tsumoSuppressed?: boolean` prop, threaded it down to `PlayerHand2D`.
+- `apps/web/src/components/2d/PlayerHand2D.tsx` — Added `tsumoSuppressed?: boolean` prop (default `false`), applied it to the `interactive` guard.
+
+**Key learning:** Client-side UI suppression flags (`tsumoSuppressed`) must be applied consistently to every interactive element that checks the same server-driven state (`canTsumo`). If one path ignores the suppression flag, the player is stuck.
+
+---
+
+### BUG-056 · Bust mode session never ends when a player's score goes negative
+
+**Root cause:** `isSessionOver()` in `apps/api/src/game/game.service.ts` had an extra `nextDealerInfo.roundComplete &&` guard on the bust termination check. `roundComplete` only becomes `true` when the dealer rotation returns to seat 0 — meaning bust mode could only end at one specific point per round, not immediately when a score dropped below zero. The UI tooltip correctly described bust as "ends when any player's score drops below zero," but the code contradicted this.
+
+**Fix (`apps/api/src/game/game.service.ts`):**
+
+- Removed `nextDealerInfo.roundComplete &&` from the bust condition. The check now fires at the end of any hand where a cumulative score is negative. Because `isSessionOver()` is only called from `endHand()`, this never triggers mid-hand — the timing is already correct.
+
+```ts
+// Before (buggy — only triggered when round completes back to seat 0):
+if (nextDealerInfo.roundComplete && cumulativeScores.some((s) => s < 0)) return true;
+
+// After (correct — fires at end of any hand with a negative score):
+if (cumulativeScores.some((s) => s < 0)) return true;
+```
+
+**Key learning:** Server-side session termination logic should match the UI description exactly. When a discrepancy is found, trust the documented user-facing description over an undocumented code comment.
+
+---
+
 ## `fix/bug-061-062-match-end` (2026-06-15)
 
 ### BUG-061 · Mobile player hand half cut off at bottom of screen
