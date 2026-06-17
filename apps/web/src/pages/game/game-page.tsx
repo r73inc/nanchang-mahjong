@@ -142,7 +142,7 @@ function GameErrorScreen({ errorCode, onHome }: { errorCode: string; onHome: () 
       <p className="text-[10px] text-mj-bone/30 font-mono">{errorCode}</p>
       <button
         onClick={onHome}
-        className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+        className="px-8 py-3.5 rounded-[14px] font-bold text-sm text-mj-ink"
         style={{
           background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
           boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
@@ -160,7 +160,7 @@ function GoldButton({ onClick, children }: { onClick: () => void; children: Reac
   return (
     <button
       onClick={onClick}
-      className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+      className="px-8 py-3.5 rounded-[14px] font-bold text-sm text-mj-ink"
       style={{
         background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
         boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
@@ -236,11 +236,8 @@ function PreGameFlow({
         aria-label={t('preGameYourHand')}
       >
         <div>
-          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
-            {t('preGameHandTitle')}
-          </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('preGameYourHand')}</h1>
-          <p className="text-sm text-mj-bone/50 mt-1">{t('preGameHandDesc')}</p>
+          <p className="text-sm text-mj-bone/60 mt-1">{t('preGameHandDesc')}</p>
         </div>
 
         {myHand.length > 0 && (
@@ -267,7 +264,7 @@ function PreGameFlow({
         ) : (
           <div className="flex flex-col items-center gap-3">
             <WaitingDots />
-            <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+            <p className="text-xs text-mj-bone/55">{t('preGameWaitingHost')}</p>
           </div>
         )}
       </div>
@@ -305,11 +302,8 @@ function PreGameFlow({
         aria-label={t('gameSpiritTiles')}
       >
         <div>
-          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
-            {t('gameSpirit')}
-          </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{t('gameSpiritTiles')}</h1>
-          <p className="text-sm text-mj-bone/50 mt-1">
+          <p className="text-sm text-mj-bone/60 mt-1">
             {t(
               'gameSpiritDesc',
               primary ? tileAriaLabel(primary, lang) : '',
@@ -343,7 +337,7 @@ function PreGameFlow({
         ) : (
           <div className="flex flex-col items-center gap-3">
             <WaitingDots />
-            <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
+            <p className="text-xs text-mj-bone/55">{t('preGameWaitingHost')}</p>
           </div>
         )}
       </div>
@@ -548,9 +542,6 @@ function HandRevealScreen({
       <div className="flex flex-col items-center gap-6 px-4 py-8 max-w-lg mx-auto">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="text-center">
-          <p className="text-[11px] font-bold tracking-widest text-mj-gold/70 uppercase mb-1">
-            {t('handRevealTitle')}
-          </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
@@ -582,11 +573,15 @@ function HandRevealScreen({
             return (
               <div
                 key={seat}
-                className={`rounded-xl overflow-hidden ${
+                className="rounded-xl overflow-hidden"
+                style={
                   isViewer
-                    ? 'bg-mj-east/15 border border-mj-east/30 text-mj-ink'
-                    : 'bg-[rgba(var(--felt-ink-rgb),0.05)]'
-                }`}
+                    ? {
+                        background: 'rgba(201,169,97,0.15)',
+                        border: '1px solid rgba(201,169,97,0.3)',
+                      }
+                    : { background: 'rgba(var(--felt-ink-rgb),0.05)' }
+                }
               >
                 {/* ── Collapsed row ── */}
                 <button
@@ -623,9 +618,9 @@ function HandRevealScreen({
                       <span
                         className={`text-base font-bold tabular-nums ${
                           delta > 0
-                            ? 'text-emerald-400'
+                            ? 'text-mj-win'
                             : delta < 0
-                              ? 'text-red-400'
+                              ? 'text-mj-loss-light'
                               : 'text-mj-bone/40'
                         }`}
                       >
@@ -634,7 +629,7 @@ function HandRevealScreen({
                       {delta !== 0 && (
                         <span
                           className={`text-[11px] tabular-nums leading-none ${
-                            delta > 0 ? 'text-emerald-400/60' : 'text-red-400/60'
+                            delta > 0 ? 'text-mj-win/60' : 'text-mj-loss-light/60'
                           }`}
                         >
                           {delta > 0 ? '+' : ''}
@@ -661,9 +656,9 @@ function HandRevealScreen({
                       <p
                         className={`text-sm font-bold tabular-nums ${
                           delta > 0
-                            ? 'text-emerald-400'
+                            ? 'text-mj-win'
                             : delta < 0
-                              ? 'text-red-400'
+                              ? 'text-mj-loss-light'
                               : 'text-mj-bone/40'
                         }`}
                       >
@@ -702,7 +697,7 @@ function HandRevealScreen({
                           return (
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-[10px] font-bold bg-emerald-400/15 text-emerald-400 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                <span className="text-[10px] font-bold bg-mj-win/15 text-mj-win px-1.5 py-0.5 rounded uppercase tracking-wide">
                                   {winTypeLabel}
                                 </span>
                                 {handTypeLabel && (
@@ -717,7 +712,10 @@ function HandRevealScreen({
                                 {wp.items.map((item, ii) => (
                                   <span key={ii} className="flex items-center gap-1">
                                     <span className="text-mj-bone/30">{MULT_CHAR}</span>
-                                    <span className="px-1.5 py-0.5 rounded text-mj-bone/70 bg-[rgba(var(--felt-ink-rgb),0.08)]">
+                                    <span
+                                      className="px-1.5 py-0.5 rounded text-mj-bone/70"
+                                      style={{ background: 'rgba(var(--felt-ink-rgb),0.08)' }}
+                                    >
                                       {lang === 'zh' ? item.nameZh : item.name} {MULT_CHAR}
                                       {item.multiplier}
                                     </span>
@@ -743,7 +741,7 @@ function HandRevealScreen({
                                   const received = -wp.scoreDelta[loser];
                                   if (received === 0) return null;
                                   return (
-                                    <p key={loser} className="text-[12px] text-emerald-400/80">
+                                    <p key={loser} className="text-[12px] text-mj-win/80">
                                       {t(
                                         'handRevealBreakdownReceivedFrom',
                                         String(received),
@@ -752,7 +750,7 @@ function HandRevealScreen({
                                     </p>
                                   );
                                 })}
-                              <p className="text-sm font-bold text-emerald-400">
+                              <p className="text-sm font-bold text-mj-win">
                                 {t('handRevealBreakdownWinTotal', String(wp.winnerTotal))}
                               </p>
                             </div>
@@ -773,11 +771,11 @@ function HandRevealScreen({
                               : '';
                           return (
                             <div className="flex flex-col gap-1.5">
-                              <span className="text-[10px] font-bold bg-red-400/15 text-red-400 px-1.5 py-0.5 rounded uppercase tracking-wide self-start">
+                              <span className="text-[10px] font-bold bg-mj-loss-light/15 text-mj-loss-light px-1.5 py-0.5 rounded uppercase tracking-wide self-start">
                                 {loseTypeLabel}
                               </span>
                               {paid > 0 && (
-                                <p className="text-[12px] text-red-400/80">
+                                <p className="text-[12px] text-mj-loss-light/80">
                                   {t('handRevealBreakdownPaidWinner', winnerName, String(paid))}
                                 </p>
                               )}
@@ -849,12 +847,12 @@ function HandRevealScreen({
                             {effScore > 0 && (
                               <div className="flex flex-wrap gap-1 text-[11px]">
                                 {isExplosive && (
-                                  <span className="bg-orange-400/15 text-orange-400 px-1.5 py-0.5 rounded">
+                                  <span className="bg-mj-spirit-hot/15 text-mj-spirit-hot px-1.5 py-0.5 rounded">
                                     {t('handRevealBreakdownSpiritExplosive')}
                                   </span>
                                 )}
                                 {isIndomitable && (
-                                  <span className="bg-purple-400/15 text-purple-400 px-1.5 py-0.5 rounded">
+                                  <span className="bg-mj-spirit-lone/15 text-mj-spirit-lone px-1.5 py-0.5 rounded">
                                     {t('handRevealBreakdownSpiritIndomitable')}
                                   </span>
                                 )}
@@ -866,9 +864,9 @@ function HandRevealScreen({
                             <p
                               className={`text-sm font-bold tabular-nums ${
                                 sDelta > 0
-                                  ? 'text-emerald-400'
+                                  ? 'text-mj-win'
                                   : sDelta < 0
-                                    ? 'text-red-400'
+                                    ? 'text-mj-loss-light'
                                     : 'text-mj-bone/40'
                               }`}
                             >
@@ -889,7 +887,7 @@ function HandRevealScreen({
                         </p>
                         <p
                           className={`text-sm font-bold tabular-nums ${
-                            kongDelta > 0 ? 'text-emerald-400' : 'text-red-400'
+                            kongDelta > 0 ? 'text-mj-win' : 'text-mj-loss-light'
                           }`}
                         >
                           {t(
@@ -908,7 +906,7 @@ function HandRevealScreen({
                         </p>
                         <p
                           className={`text-sm font-bold tabular-nums ${
-                            bonusTileDelta > 0 ? 'text-emerald-400' : 'text-red-400'
+                            bonusTileDelta > 0 ? 'text-mj-win' : 'text-mj-loss-light'
                           }`}
                         >
                           {t(
@@ -939,11 +937,15 @@ function HandRevealScreen({
               return (
                 <div
                   key={i}
-                  className={`rounded-xl p-3 ${
+                  className="rounded-xl p-3"
+                  style={
                     isViewer
-                      ? 'bg-mj-east/10 border border-mj-east/20 text-mj-ink'
-                      : 'bg-[rgba(var(--felt-ink-rgb),0.04)]'
-                  }`}
+                      ? {
+                          background: 'rgba(201,169,97,0.10)',
+                          border: '1px solid rgba(201,169,97,0.2)',
+                        }
+                      : { background: 'rgba(var(--felt-ink-rgb),0.04)' }
+                  }
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-sm font-bold" style={{ color: WIND_COLOR[wind] }}>
@@ -2028,7 +2030,7 @@ function GameSavedOverlay({ payload, onHome }: { payload: GameSavedPayload; onHo
       </div>
       <button
         onClick={onHome}
-        className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink"
+        className="px-8 py-3.5 rounded-[14px] font-bold text-sm text-mj-ink"
         style={{
           background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
           boxShadow: '0 6px 18px rgba(201,169,97,0.35)',
@@ -2110,7 +2112,7 @@ function RestoreWaitingOverlay({
         <button
           onClick={onStart}
           disabled={!allConnected}
-          className="px-8 py-3.5 rounded-full font-bold text-sm text-mj-ink disabled:opacity-40"
+          className="px-8 py-3.5 rounded-[14px] font-bold text-sm text-mj-ink disabled:opacity-40"
           style={{
             background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
             boxShadow: allConnected ? '0 6px 18px rgba(201,169,97,0.35)' : 'none',

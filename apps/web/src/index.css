@@ -125,10 +125,12 @@
     box-shadow: 0 0 0 2px #c9a961 !important;
   }
 
-  /* Kill the viewport turn-glow animation, fall back to a static inset border. */
+  /* Kill the viewport turn-glow animation, fall back to a static inset outline. */
   .mj-turn-border-glow {
     animation: none !important;
-    box-shadow: inset 0 0 0 3px rgba(201, 169, 97, 0.85) !important;
+    outline: 4px solid rgba(201, 169, 97, 0.85) !important;
+    outline-offset: -4px !important;
+    box-shadow: none !important;
   }
 
   /* Kill the turn-pill pulse, fall back to a static gold outline. */
@@ -139,24 +141,22 @@
 }
 
 /* ── Active turn border glow ────────────────────────────────────────────────── */
-/* Applied to .mj-game-surface when it is the viewer's turn. Pulsing inset      */
-/* box-shadow creates an unmistakable golden border around the entire viewport.  */
-/* The prefers-reduced-motion block above overrides to a static border.          */
+/* Applied to .mj-game-surface when it is the viewer's turn.                    */
+/* Animates outline-color only (GPU-composited) rather than box-shadow (paint). */
+/* The prefers-reduced-motion block above overrides to a static outline.         */
 @keyframes mj-turn-pulse {
   0%,
   100% {
-    box-shadow:
-      inset 0 0 0 3px rgba(201, 169, 97, 0.6),
-      inset 0 0 30px rgba(201, 169, 97, 0.2);
+    outline-color: rgba(201, 169, 97, 0.55);
   }
   50% {
-    box-shadow:
-      inset 0 0 0 5px rgba(201, 169, 97, 1),
-      inset 0 0 55px rgba(201, 169, 97, 0.42);
+    outline-color: rgba(201, 169, 97, 1);
   }
 }
 
 .mj-turn-border-glow {
+  outline: 4px solid rgba(201, 169, 97, 0.55);
+  outline-offset: -4px;
   animation: mj-turn-pulse 1.6s ease-in-out infinite;
 }
 
