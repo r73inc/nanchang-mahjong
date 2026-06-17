@@ -13,7 +13,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export type FeltTheme = 'jade' | 'crimson' | 'slate' | 'navy' | 'yellow';
-export type TilePalette = 'classic' | 'sepia' | 'dark';
+export type TilePalette =
+  | 'classic'
+  | 'sepia'
+  | 'dark'
+  | 'lime'
+  | 'frosted-blue'
+  | 'tomato-jam'
+  | 'pastel-petal'
+  | 'radioactive-grass'
+  | 'indigo-ink';
 export type TileSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 /** Scale multipliers for each user-selectable tile size. */

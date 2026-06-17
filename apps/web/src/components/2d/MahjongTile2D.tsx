@@ -19,7 +19,7 @@ import { useState, useCallback } from 'react';
 import { tileAriaLabel } from '@nanchang/shared';
 import type { TileType } from '@nanchang/shared';
 import { useI18n } from '../../i18n';
-import { tileTexturePath, backTexturePath } from '../../r3f/utils/tile-texture-map';
+import { tileTexturePath, backTexturePath, themeToVariant } from '../../r3f/utils/tile-texture-map';
 import { useTable2DScale } from './Table2DContext';
 import { useThemeStore, TILE_USER_SCALE } from '../../stores/theme.store';
 import type { SeatRole } from './layout-2d';
@@ -159,7 +159,8 @@ export function MahjongTile2D({
 }: MahjongTile2DProps) {
   const { lang } = useI18n();
   const { tileScale } = useTable2DScale();
-  const { tileSize } = useThemeStore();
+  const { tileSize, tilePalette } = useThemeStore();
+  const palette = themeToVariant(tilePalette);
 
   // Combine viewport-fit scale (from Table2DContext) with the user's size preference.
   // tileScale handles responsive viewport fitting; userScale reflects the player's
@@ -187,7 +188,7 @@ export function MahjongTile2D({
   const liftY = Math.round(-6 * effectiveScale);
 
   const isBack = tile === 'back';
-  const baseSrc = isBack ? backTexturePath() : tileTexturePath(tile as TileType);
+  const baseSrc = isBack ? backTexturePath(palette) : tileTexturePath(tile as TileType, palette);
   const ariaLabel = isBack ? ARIA_HIDDEN_TILE : tileAriaLabel(tile as TileType, lang);
 
   // ── Image error recovery ──────────────────────────────────────────────────
