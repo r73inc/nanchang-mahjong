@@ -238,6 +238,7 @@ export function RoomPage() {
     if (handle === 'MilkyBot') return t('botNameMilky');
     if (handle === 'MelonBot') return t('botNameMelon');
     if (handle === 'FifthBot') return t('botNameFifth');
+    if (handle === 'OracleBot') return t('botNameOracle');
     return handle;
   };
 
