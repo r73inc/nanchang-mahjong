@@ -554,7 +554,7 @@ export function RoomPage() {
               className="flex justify-between items-center gap-3 px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
-              <span className="flex items-center gap-1 text-mj-bone/70 shrink-0">
+              <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTerminationLabel')}
                 <InfoButton onClick={() => setInfoKey('settingTerminationInfo')} />
               </span>
@@ -707,7 +707,7 @@ export function RoomPage() {
               className="flex justify-between items-center gap-3 px-4 py-3 text-sm"
               style={{ borderTop: '1px solid rgba(var(--felt-ink-rgb),0.07)' }}
             >
-              <span className="flex items-center gap-1 text-mj-bone/70 shrink-0">
+              <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingClaimWindowLabel')}
                 <InfoButton onClick={() => setInfoKey('settingClaimWindowInfo')} />
               </span>

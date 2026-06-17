@@ -69,6 +69,12 @@ const BOT_NAME_KEYS: Partial<Record<string, 'botNameMilky' | 'botNameMelon' | 'b
   FifthBot: 'botNameFifth',
 };
 
+/** Returns the localized display name for any seat, translating known bot names via i18n. */
+function sdn(s: { seatName: string; isBot?: boolean }, t: ReturnType<typeof useI18n>['t']): string {
+  const key = s.isBot ? BOT_NAME_KEYS[s.seatName] : undefined;
+  return key ? t(key) : s.seatName;
+}
+
 function getCompassSeats(viewerSeat: 0 | 1 | 2 | 3) {
   return {
     right: ((viewerSeat + 1) % 4) as 0 | 1 | 2 | 3,
@@ -497,11 +503,6 @@ function HandRevealScreen({
   const { t, lang } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
 
-  const sdn = (s: { seatName: string; isBot?: boolean }) => {
-    const key = s.isBot ? BOT_NAME_KEYS[s.seatName] : undefined;
-    return key ? t(key) : s.seatName;
-  };
-
   const [expandedSeat, setExpandedSeat] = useState<number | null>(null);
 
   const MELD_KIND_LABEL: Record<Meld['kind'], string> = {
@@ -537,7 +538,7 @@ function HandRevealScreen({
   }
   const headingLabel =
     handReveal.result === 'win'
-      ? t('handRevealWinsHeading', sdn(snapshot.seats[handReveal.winnerSeat!]))
+      ? t('handRevealWinsHeading', sdn(snapshot.seats[handReveal.winnerSeat!], t))
       : handReveal.result === 'concede'
         ? t('handRevealResultConcede')
         : t('handRevealResultDraw');
@@ -553,7 +554,7 @@ function HandRevealScreen({
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
-              {t('handRevealConcedeBy', sdn(snapshot.seats[handReveal.concedeSeat]))}
+              {t('handRevealConcedeBy', sdn(snapshot.seats[handReveal.concedeSeat], t))}
             </p>
           )}
         </div>
@@ -562,7 +563,7 @@ function HandRevealScreen({
         <div className="flex flex-col gap-2 w-full">
           {sortedSeats.map((seat) => {
             const wind = snapshot.seats[seat].wind;
-            const seatName = sdn(snapshot.seats[seat]);
+            const seatName = sdn(snapshot.seats[seat], t);
             const isViewer = seat === viewerSeat;
             const isWinner = seat === handReveal.winnerSeat;
             const delta = handReveal.handNetDeltas[seat];
@@ -677,7 +678,7 @@ function HandRevealScreen({
                         if (isWinner) {
                           const liableName =
                             handReveal.liableSeat !== undefined
-                              ? sdn(snapshot.seats[handReveal.liableSeat])
+                              ? sdn(snapshot.seats[handReveal.liableSeat], t)
                               : undefined;
                           const ronKey =
                             handReveal.winMeldKind === 'chow'
@@ -744,7 +745,7 @@ function HandRevealScreen({
                                       {t(
                                         'handRevealBreakdownReceivedFrom',
                                         String(received),
-                                        sdn(snapshot.seats[loser]),
+                                        sdn(snapshot.seats[loser], t),
                                       )}
                                     </p>
                                   );
@@ -766,7 +767,7 @@ function HandRevealScreen({
                           const paid = Math.abs(wp.scoreDelta[seat]);
                           const winnerName =
                             handReveal.winnerSeat !== undefined
-                              ? sdn(snapshot.seats[handReveal.winnerSeat])
+                              ? sdn(snapshot.seats[handReveal.winnerSeat], t)
                               : '';
                           return (
                             <div className="flex flex-col gap-1.5">
@@ -943,7 +944,7 @@ function HandRevealScreen({
                       {WIND_CHAR[wind]}
                     </span>
                     <span className="text-xs text-mj-bone/70 font-medium">
-                      {sdn(snapshot.seats[i])}
+                      {sdn(snapshot.seats[i], t)}
                     </span>
                     {isWinner && (
                       <span className="text-[10px] bg-mj-gold/20 text-mj-gold px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
@@ -1178,10 +1179,6 @@ function MatchEndStatsScreen({
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const sdn = (s: { seatName: string; isBot?: boolean }) => {
-    const key = s.isBot ? BOT_NAME_KEYS[s.seatName] : undefined;
-    return key ? t(key) : s.seatName;
-  };
   // Prefer the authoritative finalScores from game:ended — snapshot seat scores
   // exclude the final hand's spirit settlement (no snapshot follows endSession).
   const scores = (ended ? ended.finalScores : snapshot.seats.map((s) => s.score)) as [
@@ -1267,7 +1264,7 @@ function MatchEndStatsScreen({
                     style={{ background: WIND_COLOR[seat.wind] }}
                   />
                   <span className="text-mj-bone/80 max-w-[120px] truncate font-medium">
-                    {sdn(seat)}
+                    {sdn(seat, t)}
                   </span>
                   {isMe && (
                     <span className="text-[10px] text-mj-gold/60">{t('matchEndYouLabel')}</span>
@@ -1332,7 +1329,7 @@ function MatchEndStatsScreen({
                         fontWeight: isMe ? 700 : 400,
                       }}
                     >
-                      {isMe ? t('matchEndYouLabel') : sdn(seat).split(' ')[0]}
+                      {isMe ? t('matchEndYouLabel') : sdn(seat, t).split(' ')[0]}
                     </span>
                   </div>
                   <div className="text-center font-mono text-xs text-mj-bone/80">{handsWon}</div>
