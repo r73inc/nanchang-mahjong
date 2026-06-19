@@ -66,7 +66,7 @@ describe('replayHand', () => {
     expect(replayedFinal.phase).toBe(finalState.phase);
   });
 
-  it('Replay·deterministic — wall count matches at each step', () => {
+  it('Replay·deterministic — wall count decreases monotonically as tiles are drawn', () => {
     const seed = 99999;
     const { events } = playToEnd(seed);
 
@@ -75,10 +75,15 @@ describe('replayHand', () => {
       events,
     );
 
-    // Every replayed state should have a built wall with a non-negative count
+    // Wall must be present throughout replay, and count must never increase
+    // (each draw removes a tile; no operation can restore tiles to the wall)
+    expect(replayedStates.length).toBeGreaterThan(0);
+    let prevCount = tilesRemaining(replayedStates[0].wall!);
     for (const state of replayedStates) {
       expect(state.wall).not.toBeNull();
-      expect(tilesRemaining(state.wall!)).toBeGreaterThanOrEqual(0);
+      const count = tilesRemaining(state.wall!);
+      expect(count).toBeLessThanOrEqual(prevCount);
+      prevCount = count;
     }
   });
 

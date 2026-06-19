@@ -53,8 +53,8 @@ describe('standardDist', () => {
     expect(standardDist(nat, 0)).toBe(0);
   });
 
-  it('returns 1 for one-away from tenpai', () => {
-    // Isolated honor + mostly complete hand that needs 1 more step
+  it('returns 0 for tenpai: pair + 3 melds + partial chow', () => {
+    // pair: east east; melds: 1m2m3m, 4m5m6m, 7m8m9m; partial: 1p2p waiting for 3p
     const nat: TileType[] = [
       '1m',
       '2m',
@@ -70,8 +70,8 @@ describe('standardDist', () => {
       'east',
       'east',
     ];
-    // Has pair (east), 3 complete melds from 1m-9m, partial pair 1p2p → 1 swap to tenpai
-    expect(standardDist(nat, 0)).toBeLessThanOrEqual(1);
+    // Already tenpai (waiting for 3p to complete 1p2p3p chow)
+    expect(standardDist(nat, 0)).toBe(0);
   });
 
   it('jing wildcard reduces distance: 1 jing replaces 1 missing meld tile', () => {
@@ -439,8 +439,8 @@ describe('overallDist', () => {
       '8m',
     ];
     const dist = overallDist(hand, []);
-    // sevenPairsDist = 1, standardDist could be higher
-    expect(dist).toBeLessThanOrEqual(1);
+    // Hand is already tenpai for standard (pair=5m5m + melds 1m2m3m,1m2m3m,6m7m8m + pung-wait 4m4m)
+    expect(dist).toBe(0);
   });
 
   it('jings reduce overall distance', () => {

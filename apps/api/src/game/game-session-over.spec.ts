@@ -5,7 +5,7 @@
  * (service as any) after constructing GameService with fully-mocked deps.
  *
  * Feature coverage:
- *  SessionOver·bust·mid-round-negative    — negative score mid-round does NOT end session
+ *  SessionOver·bust·mid-round-negative    — negative score mid-round DOES end session (bust triggers immediately)
  *  SessionOver·bust·round-end-negative    — negative score at round end DOES end session
  *  SessionOver·bust·round-end-all-positive — all positive at round end does NOT end session
  *  SessionOver·bust·round-end-all-zero    — zero scores at round end does NOT end session

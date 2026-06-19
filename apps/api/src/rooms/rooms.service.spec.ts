@@ -349,7 +349,7 @@ describe('RoomsService', () => {
       const { gameId } = await service.startGame('room-full', 'user-host');
 
       expect(typeof gameId).toBe('string');
-      expect(gameId.length).toBeGreaterThan(0);
+      expect(gameId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       const input = updateInput(db);
       const attrs = input['ExpressionAttributeValues'] as Record<string, unknown>;
       expect(attrs[':status']).toBe('playing');
