@@ -52,6 +52,11 @@ export class GameSavesController {
       throw new BadRequestException('slot must be "auto" or "manual"');
     }
     await this.savesService.deleteSave(user.sub, slot as SaveSlot);
+    // Destroy any active solo-bot session so a future socket disconnect
+    // cannot re-create the auto-save the user just explicitly deleted.
+    if (slot === 'auto') {
+      this.gameService.abandonBotSession(user.sub);
+    }
   }
 
   /**

@@ -231,6 +231,22 @@ export class GameService {
     return this.sessions.get(gameId);
   }
 
+  /**
+   * Destroy the active single-human bot session for a user without auto-saving.
+   * Called when the user explicitly deletes their auto-save so that a future
+   * socket disconnect cannot resurrect the save from the still-live session.
+   */
+  abandonBotSession(userSub: string): void {
+    for (const [gameId, session] of this.sessions) {
+      if (!session.hasBots) continue;
+      const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i));
+      if (humanSeats.length === 1 && session.seatMap[humanSeats[0]] === userSub) {
+        this.destroySession(gameId);
+        break;
+      }
+    }
+  }
+
   /** Resolves after a random human-like delay (BOT_THINK_MIN_MS – BOT_THINK_MAX_MS). */
   private botDelay(): Promise<void> {
     const ms =

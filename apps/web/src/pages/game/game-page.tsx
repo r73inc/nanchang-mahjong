@@ -4080,6 +4080,20 @@ export function GamePage() {
     if (snapshot?.phase === 'finished') localStorage.removeItem(ACTIVE_GAME_KEY);
   }, [snapshot?.phase]);
 
+  // Also clear on any terminal/error state so a destroyed backend session
+  // doesn't leave a stale rejoin card in the lobby indefinitely.
+  useEffect(() => {
+    if (gameError) localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [gameError]);
+
+  useEffect(() => {
+    if (timedOut) localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [timedOut]);
+
+  useEffect(() => {
+    if (ended) localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [ended]);
+
   // ── Back-button / navigation intercept ─────────────────────────────────────
   // Block any navigation attempt while the game is actively in progress.
   // On mobile the OS back gesture fires the same popstate event that
