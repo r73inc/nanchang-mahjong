@@ -152,6 +152,27 @@
   "adminSaving": "Saving…",
   "adminDisabledBadge": "Disabled",
 
+  "playNanchang": "Play Nanchang Mahjong",
+  "playNanchangSub": "Choose your game mode",
+  "playModeWithFriends": "Play with Friends",
+  "playModeWithFriendsSub": "Create or join a private room",
+  "playModeSolo": "Play Solo",
+  "playModeSoloSub": "1 vs 3 — you against three bots",
+  "playModeChallenges": "Challenges",
+  "playModeChallengesSub": "Compete across multiple sessions",
+
+  "playSoloTitle": "Play Solo",
+  "playSoloBotNote": "3 bots will join automatically — one per open seat",
+  "playSoloStartBtn": "Create Solo Game",
+  "playSoloStarting": "Setting up…",
+
+  "playChallengesTitle": "Challenges",
+  "playChallengesPointChallengeTitle": "Point Challenge",
+  "playChallengesPointChallengeSub": "Challenge friends to accumulate points across multiple hands",
+  "playChallengesStart": "Start a Challenge",
+  "playChallengesViewAll": "View All",
+  "playChallengesMoreSoon": "More challenge modes coming soon",
+
   "playFriends": "Play with Friends",
   "playFriendsSub": "Create or join a private room",
   "joinRoom": "Join a Room",

@@ -233,6 +233,10 @@ export function RoomPage() {
   // Host and bots are implicitly ready — host confirms by clicking Start.
   const allReady =
     filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.isBot || s.ready);
+  // Solo mode: exactly 1 human (the host) and 3 bots — bots cannot be kicked.
+  const isSoloRoom =
+    room.seats.filter((s) => s.userId !== null && !s.isBot).length === 1 &&
+    room.seats.filter((s) => s.isBot).length === 3;
 
   const botDisplayName = (handle: string) => {
     if (handle === 'MilkyBot') return t('botNameMilky');
@@ -453,17 +457,21 @@ export function RoomPage() {
                     </span>
                   )}
 
-                  {/* Host kick button — bots can be kicked like any seat */}
-                  {isHost && !isEmpty && !isMe && room.status === 'waiting' && (
-                    <button
-                      onClick={() => handleKick(seat.seatIdx)}
-                      className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
-                      style={{ background: 'rgba(192,57,43,0.12)' }}
-                      aria-label={`Kick ${seat.handle ?? ''}`}
-                    >
-                      {t('kickPlayerBtn')}
-                    </button>
-                  )}
+                  {/* Host kick button — hidden for bots in solo rooms */}
+                  {isHost &&
+                    !isEmpty &&
+                    !isMe &&
+                    room.status === 'waiting' &&
+                    !(isSoloRoom && seat.isBot) && (
+                      <button
+                        onClick={() => handleKick(seat.seatIdx)}
+                        className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
+                        style={{ background: 'rgba(192,57,43,0.12)' }}
+                        aria-label={`Kick ${seat.handle ?? ''}`}
+                      >
+                        {t('kickPlayerBtn')}
+                      </button>
+                    )}
                 </div>
               );
             })}
