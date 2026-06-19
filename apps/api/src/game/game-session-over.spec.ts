@@ -36,6 +36,7 @@ const BASE_SETTINGS: RoomSettings = {
   viewMode: '3D',
   ruleTopBottomJing: false,
   claimWindowSecs: 8,
+  isSolo: false,
 };
 
 function makeSession(

@@ -26,13 +26,11 @@ function PlayModeCard({
   return (
     <button
       onClick={onClick}
-      className="w-full px-5 py-5 rounded-2xl font-bold text-left flex items-center justify-between"
+      className={`w-full px-5 py-5 rounded-2xl font-bold text-left flex items-center justify-between${primary ? ' btn-heirloom' : ''}`}
       style={
         primary
           ? {
-              background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
               border: '1px solid rgba(255,255,255,0.3)',
-              boxShadow: '0 8px 24px rgba(201,169,97,0.35)',
               color: '#1a1a1a',
             }
           : {

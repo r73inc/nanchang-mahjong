@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
+import { InfoIconButton } from '../../components/ui/info-icon-button';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { useRoomActions } from '../../hooks/use-room';
@@ -9,7 +10,7 @@ import { useAuthStore } from '../../stores/auth.store';
 import { connectSocket } from '../../lib/socket';
 import type { BotDifficulty } from '@nanchang/shared';
 
-// ── Constants (mirroring room-page.tsx) ──────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const VIEW_MODES = ['3D', '2D'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
@@ -34,7 +35,6 @@ const botDifficultyTranslationMap: Record<BotDifficulty, StringKey> = {
   psychic: 'botDifficultyPsychicFull',
 };
 
-// Claim-window secs → i18n key
 function claimWindowKey(opt: ClaimWindowOption): StringKey {
   if (opt === 0) return 'settingClaimWindowInfinite';
   if (opt === 5) return 'settingClaimWindow5';
@@ -43,37 +43,7 @@ function claimWindowKey(opt: ClaimWindowOption): StringKey {
   return 'settingClaimWindow30';
 }
 
-// ── Section row component ─────────────────────────────────────────────────────
-
-const INFO_GLYPH = 'ⓘ' as const;
-
-function InfoButton({ onClick }: { onClick: () => void }) {
-  const { t } = useI18n();
-  return (
-    <button
-      onClick={onClick}
-      aria-label={t('settingInfoOpen')}
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: '50%',
-        border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-        color: 'rgba(var(--felt-ink-rgb),0.35)',
-        fontSize: 9,
-        fontWeight: 700,
-        cursor: 'pointer',
-        background: 'none',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        lineHeight: 1,
-      }}
-    >
-      {INFO_GLYPH}
-    </button>
-  );
-}
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function SettingRow({
   label,
@@ -88,6 +58,7 @@ function SettingRow({
   children: React.ReactNode;
   borderTop?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div
       className="flex justify-between items-center gap-3 px-4 py-3 text-sm"
@@ -95,7 +66,7 @@ function SettingRow({
     >
       <span className="flex items-center gap-1 text-mj-bone/70">
         {label}
-        {infoKey && onInfo && <InfoButton onClick={onInfo} />}
+        {infoKey && onInfo && <InfoIconButton ariaLabel={t('settingInfoOpen')} onClick={onInfo} />}
       </span>
       {children}
     </div>
@@ -139,17 +110,30 @@ function ToggleGroup<T extends string | number | boolean>({
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Settings info key → i18n key map ─────────────────────────────────────────
+
+const INFO_KEYS: Partial<Record<string, StringKey>> = {
+  settingStyleInfo: 'settingStyleInfo',
+  settingJingInfo: 'settingJingInfo',
+  settingTimerInfo: 'settingTimerInfo',
+  settingViewModeInfo: 'settingViewModeInfo',
+  settingTerminationInfo: 'settingTerminationInfo',
+  settingRoundsInfo: 'settingRoundsInfo',
+  settingClaimWindowInfo: 'settingClaimWindowInfo',
+  settingTopBottomJingInfo: 'settingTopBottomJingInfo',
+};
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export function PlaySoloPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { createRoom, updateSettings, addBotToSeat } = useRoomActions();
+  const { createRoom } = useRoomActions();
   const loading = useRoomStore((s) => s.loading);
   const error = useRoomStore((s) => s.error);
   const accessToken = useAuthStore((s) => s.accessToken);
 
-  // Local settings state — matches server defaults
+  // Local settings state — sent as one atomic payload on submit
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>('normal');
   const [viewMode, setViewMode] = useState<ViewMode>('3D');
   const [terminationType, setTerminationType] = useState<TerminationOption>('rounds');
@@ -158,48 +142,27 @@ export function PlaySoloPage() {
   const [claimWindowSecs, setClaimWindowSecs] = useState<ClaimWindowOption>(8);
   const [ruleTopBottomJing, setRuleTopBottomJing] = useState(false);
 
-  // Info modal
   const [infoKey, setInfoKey] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false);
 
   async function handleStart() {
-    setStarting(true);
     if (accessToken) connectSocket(accessToken);
-
-    const room = await createRoom();
-    if (!room) {
-      setStarting(false);
-      return;
-    }
-
-    // Apply all settings in one patch
-    await updateSettings(room.roomId, {
-      viewMode,
-      terminationType,
-      rounds,
-      maxHands,
-      claimWindowSecs,
-      ruleTopBottomJing,
+    // Single atomic call: create room + all settings + 3 bots in one request.
+    // isSolo=true is stored immutably on the room so the room page can rely on
+    // it without counting seats (which would race during sequential bot joins).
+    const room = await createRoom({
+      settings: {
+        viewMode,
+        terminationType,
+        rounds,
+        maxHands,
+        claimWindowSecs,
+        ruleTopBottomJing,
+        isSolo: true,
+      },
+      bots: { count: 3, difficulty: botDifficulty },
     });
-
-    // Fill the three empty seats with bots (seats 1, 2, 3 — seat 0 is the host)
-    await addBotToSeat(room.roomId, 1, botDifficulty);
-    await addBotToSeat(room.roomId, 2, botDifficulty);
-    await addBotToSeat(room.roomId, 3, botDifficulty);
-
-    navigate(`/room/${room.code}`);
+    if (room) navigate(`/room/${room.code}`);
   }
-
-  const infoTexts: Record<string, StringKey> = {
-    settingStyleInfo: 'settingStyleInfo',
-    settingJingInfo: 'settingJingInfo',
-    settingTimerInfo: 'settingTimerInfo',
-    settingViewModeInfo: 'settingViewModeInfo',
-    settingTerminationInfo: 'settingTerminationInfo',
-    settingRoundsInfo: 'settingRoundsInfo',
-    settingClaimWindowInfo: 'settingClaimWindowInfo',
-    settingTopBottomJingInfo: 'settingTopBottomJingInfo',
-  };
 
   return (
     <ScreenShell title={t('playSoloTitle')} onBack={() => navigate('/play')}>
@@ -273,7 +236,7 @@ export function PlaySoloPage() {
               border: '1px solid rgba(var(--felt-ink-rgb),0.1)',
             }}
           >
-            {/* Static rows */}
+            {/* Static read-only rows */}
             {[
               { label: t('settingStyleLabel'), value: t('settingStyle'), info: 'settingStyleInfo' },
               {
@@ -296,13 +259,15 @@ export function PlaySoloPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {label}
-                  <InfoButton onClick={() => setInfoKey(info)} />
+                  <InfoIconButton
+                    ariaLabel={t('settingInfoOpen')}
+                    onClick={() => setInfoKey(info)}
+                  />
                 </span>
                 <span className="text-mj-gold font-semibold">{value}</span>
               </div>
             ))}
 
-            {/* View mode */}
             <SettingRow
               label={t('settingViewModeLabel')}
               infoKey="settingViewModeInfo"
@@ -316,7 +281,6 @@ export function PlaySoloPage() {
               />
             </SettingRow>
 
-            {/* End condition */}
             <SettingRow
               label={t('settingTerminationLabel')}
               infoKey="settingTerminationInfo"
@@ -338,7 +302,6 @@ export function PlaySoloPage() {
               />
             </SettingRow>
 
-            {/* Rounds — only in Fixed Rounds mode */}
             {terminationType === 'rounds' && (
               <SettingRow
                 label={t('settingRoundsLabel')}
@@ -356,7 +319,6 @@ export function PlaySoloPage() {
               </SettingRow>
             )}
 
-            {/* Max hands — only in Fixed Hands mode */}
             {terminationType === 'fixed-hands' && (
               <SettingRow label={t('settingMaxHandsLabel')}>
                 <ToggleGroup
@@ -368,7 +330,6 @@ export function PlaySoloPage() {
               </SettingRow>
             )}
 
-            {/* Claim window */}
             <SettingRow
               label={t('settingClaimWindowLabel')}
               infoKey="settingClaimWindowInfo"
@@ -382,7 +343,6 @@ export function PlaySoloPage() {
               />
             </SettingRow>
 
-            {/* Opening spirit flip */}
             <SettingRow
               label={t('settingTopBottomJingLabel')}
               infoKey="settingTopBottomJingInfo"
@@ -398,20 +358,14 @@ export function PlaySoloPage() {
           </div>
         </div>
 
-        {/* Start button */}
+        {/* Start button — uses CSS utility class; only loading-state bg stays inline */}
         <button
           onClick={() => void handleStart()}
-          disabled={loading || starting}
-          className="w-full py-4 rounded-2xl font-bold text-base text-mj-ink"
-          style={{
-            background:
-              loading || starting
-                ? 'rgba(201,169,97,0.5)'
-                : 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
-            boxShadow: loading || starting ? 'none' : '0 6px 18px rgba(201,169,97,0.3)',
-          }}
+          disabled={loading}
+          className={`w-full py-4 rounded-2xl font-bold text-base text-mj-ink ${loading ? '' : 'btn-heirloom-sm'}`}
+          style={loading ? { background: 'rgba(201,169,97,0.5)' } : undefined}
         >
-          {loading || starting ? t('playSoloStarting') : t('playSoloStartBtn')}
+          {loading ? t('playSoloStarting') : t('playSoloStartBtn')}
         </button>
       </div>
 
@@ -430,7 +384,7 @@ export function PlaySoloPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-mj-bone/80 leading-relaxed">
-              {t(infoTexts[infoKey] ?? ('settingStyleInfo' as StringKey))}
+              {t(INFO_KEYS[infoKey] ?? 'settingStyleInfo')}
             </p>
             <button
               onClick={() => setInfoKey(null)}

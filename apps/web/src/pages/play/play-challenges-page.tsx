@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
+import { InfoIconButton } from '../../components/ui/info-icon-button';
 import { useI18n } from '../../i18n';
 import { useChallenges } from '../../hooks/use-challenges';
 import type { ChallengeSummary, ChallengeParticipantStatus } from '@nanchang/shared';
 
 const BULLET = '·';
-const INFO_GLYPH = 'ⓘ' as const;
+const CHALLENGE_INFO_BORDER = 'rgba(150,100,200,0.4)' as const;
+const CHALLENGE_INFO_COLOR = 'rgba(150,100,200,0.7)' as const;
 
 export function PlayChallengesPage() {
   const { t } = useI18n();
@@ -38,28 +40,13 @@ export function PlayChallengesPage() {
               <h2 className="text-base font-bold text-mj-bone">
                 {t('playChallengesPointChallengeTitle')}
               </h2>
-              <button
+              <InfoIconButton
                 onClick={() => setShowInfo(true)}
-                aria-label={t('pointChallengeInfoLabel')}
-                style={{
-                  width: 15,
-                  height: 15,
-                  borderRadius: '50%',
-                  border: '1px solid rgba(150,100,200,0.4)',
-                  color: 'rgba(150,100,200,0.7)',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  lineHeight: 1,
-                }}
-              >
-                {INFO_GLYPH}
-              </button>
+                ariaLabel={t('pointChallengeInfoLabel')}
+                size={15}
+                borderColor={CHALLENGE_INFO_BORDER}
+                color={CHALLENGE_INFO_COLOR}
+              />
             </div>
             <button
               onClick={() => navigate('/challenges')}

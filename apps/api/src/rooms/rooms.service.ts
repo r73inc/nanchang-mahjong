@@ -185,6 +185,7 @@ export class RoomsService {
       viewMode: dto?.settings?.viewMode ?? '2D',
       ruleTopBottomJing: dto?.settings?.ruleTopBottomJing ?? true,
       claimWindowSecs: dto?.settings?.claimWindowSecs ?? 0,
+      isSolo: dto?.settings?.isSolo ?? false,
     };
 
     // Build bot seat items (seats filled from the high end: 3, 2, 1).

@@ -216,3 +216,17 @@
     border-color: rgba(245, 239, 223, 0.18);
   }
 }
+
+@layer components {
+  /* Primary heirloom-gold gradient button — full-size CTA (e.g. home hero, play hub) */
+  .btn-heirloom {
+    background: linear-gradient(180deg, #c9a961 0%, #a88a45 100%);
+    box-shadow: 0 8px 24px rgba(201, 169, 97, 0.35);
+  }
+
+  /* Smaller heirloom-gold gradient button — secondary CTAs (e.g. lobby create, solo start) */
+  .btn-heirloom-sm {
+    background: linear-gradient(180deg, #c9a961 0%, #a88a45 100%);
+    box-shadow: 0 6px 18px rgba(201, 169, 97, 0.3);
+  }
+}

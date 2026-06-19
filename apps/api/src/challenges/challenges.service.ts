@@ -195,6 +195,7 @@ export class ChallengesService {
       viewMode: dto.config.viewMode,
       ruleTopBottomJing: dto.config.ruleTopBottomJing,
       claimWindowSecs: dto.config.claimWindowSecs,
+      isSolo: false,
     };
 
     this.logger.log(`Challenge created: ${challengeId} by ${creatorSub}`);
@@ -467,6 +468,7 @@ export class ChallengesService {
       viewMode: item.config.viewMode,
       ruleTopBottomJing: item.config.ruleTopBottomJing,
       claimWindowSecs: item.config.claimWindowSecs,
+      isSolo: false,
     };
 
     const onGameEnded = async (sub: string, finalScore: number, gameId: string) => {
@@ -717,6 +719,7 @@ export class ChallengesService {
       viewMode: config.viewMode,
       ruleTopBottomJing: config.ruleTopBottomJing,
       claimWindowSecs: config.claimWindowSecs,
+      isSolo: false,
     };
   }
 

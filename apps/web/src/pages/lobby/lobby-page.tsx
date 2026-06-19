@@ -151,13 +151,8 @@ export function LobbyPage() {
           <button
             onClick={handleCreate}
             disabled={loading}
-            className="w-full py-3.5 rounded-[14px] font-bold text-sm text-mj-ink"
-            style={{
-              background: loading
-                ? 'rgba(201,169,97,0.5)'
-                : 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
-              boxShadow: loading ? 'none' : '0 6px 18px rgba(201,169,97,0.3)',
-            }}
+            className={`w-full py-3.5 rounded-[14px] font-bold text-sm text-mj-ink${loading ? '' : ' btn-heirloom-sm'}`}
+            style={loading ? { background: 'rgba(201,169,97,0.5)' } : undefined}
           >
             {loading ? t('creating') : t('createRoom')}
           </button>
