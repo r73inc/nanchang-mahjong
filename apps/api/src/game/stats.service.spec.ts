@@ -102,8 +102,10 @@ describe('StatsService', () => {
 
     const deltas = await svc.updateAfterGame(seatMap, [1, 2, 3, 4]);
 
-    expect(deltas[0]).toBeGreaterThan(0); // winner gains
-    expect(deltas[3]).toBeLessThan(0); // last place loses
+    // With equal ratings (1500 each) K=32: seat 0 beats 3 opponents → +3*K*(1-0.5)=+48
+    // seat 3 loses to 3 opponents → +3*K*(0-0.5)=-48
+    expect(deltas[0]).toBe(48);
+    expect(deltas[3]).toBe(-48);
 
     // Verify the DDB update for the winner includes the correct delta
     const seat0Call = db.calls.find((c) => c.Key?.PK === 'USER#u0');

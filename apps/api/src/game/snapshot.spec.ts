@@ -40,10 +40,10 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
       const engine = dealedEngine();
       const snap = toClientSnapshot(engine.state, GAME_ID, 0, connState);
 
-      // Seat 0 is the viewer — full hand
+      // Seat 0 is the viewer and dealer — full hand of 14 tiles after deal
       expect(snap.seats[0].hand).not.toBeNull();
       expect(snap.seats[0].hand!.length).toBe(snap.seats[0].handCount);
-      expect(snap.seats[0].hand!.length).toBeGreaterThan(0);
+      expect(snap.seats[0].hand!.length).toBe(14);
     });
 
     it('opponent seats have null hand', () => {
@@ -52,7 +52,7 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
 
       for (let i = 1; i <= 3; i++) {
         expect(snap.seats[i].hand).toBeNull();
-        expect(snap.seats[i].handCount).toBeGreaterThan(0); // count is still present
+        expect(snap.seats[i].handCount).toBe(13); // count is still present; non-dealer dealt 13
       }
     });
 
@@ -88,7 +88,8 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
       for (let i = 0; i < 4; i++) {
         // Gameplay·spectator-cannot-see-concealed
         expect(snap.seats[i].hand).toBeNull();
-        expect(snap.seats[i].handCount).toBeGreaterThan(0);
+        // Dealer (seat 0) gets 14 tiles; other seats get 13
+        expect(snap.seats[i].handCount).toBe(i === 0 ? 14 : 13);
       }
     });
 
@@ -107,7 +108,7 @@ describe('snapshot · Gameplay·snapshot-redaction', () => {
       // The redacted wall must NOT carry drawOrder (the tile identities)
       expect(snap.wall).not.toBeNull();
       expect('drawOrder' in (snap.wall as object)).toBe(false);
-      expect(snap.wallCount).toBeGreaterThan(0);
+      expect(snap.wallCount).toBe(83); // 136 total − 53 dealt (13×4 + 1 extra for dealer)
       // Public positional state is present
       expect(snap.wall!.wallSelectionDice).toHaveLength(2);
       expect(snap.wall!.dealStartDice).toHaveLength(2);

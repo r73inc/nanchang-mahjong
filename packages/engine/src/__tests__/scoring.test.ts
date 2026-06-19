@@ -230,7 +230,7 @@ describe('Engine·scoring-hand-types', () => {
         handType: 'seven_star_thirteen',
       }),
     );
-    expect(r.totalMultiplier).toBeGreaterThanOrEqual(4);
+    expect(r.totalMultiplier).toBe(4);
     expect(r.items.some((i) => i.name === 'Seven Star Thirteen Misfits')).toBe(true);
     assertZeroSum(r);
   });
