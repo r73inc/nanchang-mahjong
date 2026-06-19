@@ -542,6 +542,9 @@ function HandRevealScreen({
       <div className="flex flex-col items-center gap-6 px-4 py-8 max-w-lg mx-auto">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="text-center">
+          <p className="text-xs uppercase tracking-widest text-mj-bone/40 mb-1">
+            {t('handRevealTitle')}
+          </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
@@ -2733,7 +2736,7 @@ function GameHistoryPanel({
           background: 'rgba(14,14,14,0.92)',
           border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
           borderRight: 'none',
-          borderRadius: '6px 0 0 6px',
+          borderRadius: '8px 0 0 8px',
           color: 'rgba(var(--felt-ink-rgb),0.5)',
           fontSize: 14,
           transition: 'right 0.22s ease',
@@ -3855,9 +3858,7 @@ function GameTable({
                 backdropFilter: 'blur(8px)',
               }}
             >
-              <span className="text-sm font-semibold" style={{ color: '#7ecb7e' }}>
-                {t('addToKongPrompt')}
-              </span>
+              <span className="text-sm font-semibold text-mj-win">{t('addToKongPrompt')}</span>
               <button
                 onClick={() => onKongAdd(canAddToKong)}
                 className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
@@ -4083,16 +4084,8 @@ export function GamePage() {
   // Also clear on any terminal/error state so a destroyed backend session
   // doesn't leave a stale rejoin card in the lobby indefinitely.
   useEffect(() => {
-    if (gameError) localStorage.removeItem(ACTIVE_GAME_KEY);
-  }, [gameError]);
-
-  useEffect(() => {
-    if (timedOut) localStorage.removeItem(ACTIVE_GAME_KEY);
-  }, [timedOut]);
-
-  useEffect(() => {
-    if (ended) localStorage.removeItem(ACTIVE_GAME_KEY);
-  }, [ended]);
+    if (gameError || timedOut || ended) localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [gameError, timedOut, ended]);
 
   // ── Back-button / navigation intercept ─────────────────────────────────────
   // Block any navigation attempt while the game is actively in progress.
