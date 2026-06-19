@@ -2736,7 +2736,7 @@ function GameHistoryPanel({
           background: 'rgba(14,14,14,0.92)',
           border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
           borderRight: 'none',
-          borderRadius: '6px 0 0 6px',
+          borderRadius: '8px 0 0 8px',
           color: 'rgba(var(--felt-ink-rgb),0.5)',
           fontSize: 14,
           transition: 'right 0.22s ease',
@@ -3858,9 +3858,7 @@ function GameTable({
                 backdropFilter: 'blur(8px)',
               }}
             >
-              <span className="text-sm font-semibold" style={{ color: '#7ecb7e' }}>
-                {t('addToKongPrompt')}
-              </span>
+              <span className="text-sm font-semibold text-mj-win">{t('addToKongPrompt')}</span>
               <button
                 onClick={() => onKongAdd(canAddToKong)}
                 className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
@@ -4082,6 +4080,12 @@ export function GamePage() {
   useEffect(() => {
     if (snapshot?.phase === 'finished') localStorage.removeItem(ACTIVE_GAME_KEY);
   }, [snapshot?.phase]);
+
+  // Also clear on any terminal/error state so a destroyed backend session
+  // doesn't leave a stale rejoin card in the lobby indefinitely.
+  useEffect(() => {
+    if (gameError || timedOut || ended) localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [gameError, timedOut, ended]);
 
   // ── Back-button / navigation intercept ─────────────────────────────────────
   // Block any navigation attempt while the game is actively in progress.

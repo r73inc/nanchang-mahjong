@@ -6,6 +6,51 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## (2026-06-19)
+
+### BUG-063 · "Game in progress" rejoin popup appears for games that no longer exist on the backend
+
+**Root cause:** `mj:active-game` in `localStorage` was set whenever `GamePage` had a `gameId`, but was only cleared when `snapshot?.phase === 'finished'`. Three paths left it stale forever:
+
+1. Server returned `game:error` (e.g. `GAME_NOT_FOUND` after a restart or auto-save teardown) — `gameError` was set but the key was never removed.
+2. The 12-second join timeout fired (`timedOut = true`) — same gap.
+3. `game:ended` arrived (game session completed normally) — the store's `ended` field was set but `snapshot.phase` was not updated to `'finished'` in the same tick, so the existing `phase === 'finished'` effect didn't fire.
+
+All three cases resulted in a stale key surviving in `localStorage`, so `LobbyPage` (which reads the key on mount) always showed the rejoin card — even when the session had been destroyed.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+Added three `useEffect` hooks alongside the existing `snapshot.phase` effect, each calling `localStorage.removeItem(ACTIVE_GAME_KEY)` when its condition becomes truthy:
+
+- `gameError` set → key cleared
+- `timedOut` set → key cleared
+- `ended` set → key cleared
+
+**Key learning:** Any in-memory or localStorage-backed state that must reflect server-side liveness should be cleared on ALL error/terminal paths, not just the happy-path terminal state. A single `phase === 'finished'` guard is fragile when the server can tear down the session through multiple code paths.
+
+---
+
+### BUG-064 · Deleted auto-save reappears after the user dismisses it from the home page
+
+**Root cause:** When the user navigates away from `GamePage` via React Router (back button, home link, etc.), the global `Socket.IO` singleton stays connected to the `game:${gameId}` server room — only the React event listeners are torn down in `use-game.ts` cleanup. The backend session remains alive. When the socket eventually disconnects (app backgrounded, tab closed, network drop, sign-out), `GameService.handleDisconnect` fires, finds the bot-game session still in its `sessions` map with no humans connected, and writes a new auto-save — overwriting the DDB record the user had just explicitly deleted.
+
+The trigger sequence:
+
+1. User plays a solo-bot game; socket connects to session S1.
+2. A previous auto-save S0 exists (from an earlier abandoned session).
+3. User navigates home; socket remains in room `game:${S1.gameId}`.
+4. User deletes S0 from the home page — `DELETE /saves/auto` succeeds.
+5. Socket disconnects later → `handleDisconnect` → S1 has no humans → `saveAuto` writes a new record.
+6. User sees the slot filled again.
+
+**Fix:**
+
+- **`GameService.abandonBotSession(userSub)`** (new public method): iterates `this.sessions`, finds the single-human bot session owned by `userSub`, and calls `destroySession` on it (no auto-save). This is safe because the user is explicitly discarding the game.
+- **`GameSavesController.deleteSave`**: after deleting the DDB record, calls `gameService.abandonBotSession(user.sub)` when `slot === 'auto'`. The session is torn down immediately, so the socket's eventual disconnect can no longer trigger a re-save.
+
+**Key learning:** Auto-save-on-disconnect and explicit user deletion are in a race if the session is still alive when the user deletes. The delete endpoint must also destroy the live session to close that race. The pattern: when the user explicitly removes a derived artifact (the save), also remove the source that would re-derive it (the session).
+
+---
+
 ## (2026-06-18)
 
 ### BUG-050 · End-of-round detail "second table" still renders the old `节` glyph
