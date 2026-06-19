@@ -77,6 +77,7 @@ describe('replayHand', () => {
 
     // Wall must be present throughout replay, and count must never increase
     // (each draw removes a tile; no operation can restore tiles to the wall)
+    expect(replayedStates.length).toBeGreaterThan(0);
     let prevCount = tilesRemaining(replayedStates[0].wall!);
     for (const state of replayedStates) {
       expect(state.wall).not.toBeNull();
