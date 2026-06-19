@@ -162,7 +162,7 @@
   "playModeChallengesSub": "Compete across multiple sessions",
 
   "playSoloTitle": "Play Solo",
-  "playSoloBotNote": "3 bots will join automatically — one per open seat",
+  "playSoloBotNote": "Set a difficulty for each bot opponent",
   "playSoloStartBtn": "Create Solo Game",
   "playSoloStarting": "Setting up…",
 
@@ -211,7 +211,10 @@
 
   "botCountLabel": "Computer Players",
   "botCountNone": "None — friends only",
-  "botDifficultyLabel": "Bot Difficulty",
+  "botDifficultyLabel": "Bot Difficulties",
+  "botSlot1": "Bot 1",
+  "botSlot2": "Bot 2",
+  "botSlot3": "Bot 3",
   "botDifficultyEasy": "Easy",
   "botDifficultyNormal": "Normal",
   "botBadge": "BOT",
@@ -361,6 +364,8 @@
   "diceRollButton": "Roll Dice",
   "diceRollWaiting": "Waiting for {{0}} to roll…",
   "diceRollResult": "{{0}} + {{1}} = {{2}}",
+  "diceRollWallSource": "Tiles dealt from {{0}}'s wall",
+  "diceRollDistributeHand": "Distribute Hand",
 
   "handRevealTitle": "Hand Complete",
   "handRevealResultDraw": "Draw — No Winner",
@@ -380,6 +385,7 @@
   "settlementReceived": "Received {{0}}",
   "settlementPaid": "Paid {{0}}",
   "settlementEven": "—",
+  "settlementMonopoly": "Solo Hold ×2",
   "settlementReceivedFrom": "Received {{0}} from {{1}}",
   "settlementPaidTo": "Paid {{0}} to {{1}}",
   "handRevealBreakdownHandNetLabel": "This hand",

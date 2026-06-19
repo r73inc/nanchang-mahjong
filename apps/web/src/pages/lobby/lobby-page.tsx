@@ -192,7 +192,12 @@ export function LobbyPage() {
               <input
                 type="text"
                 value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  // Strip any existing dashes, uppercase, cap at 6 raw chars,
+                  // then re-insert the dash at position 2 (XX-XXXX format).
+                  const raw = e.target.value.replace(/-/g, '').toUpperCase().slice(0, 6);
+                  setCode(raw.length > 2 ? `${raw.slice(0, 2)}-${raw.slice(2)}` : raw);
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                 placeholder={t('roomCodePlaceholder')}
                 maxLength={7}

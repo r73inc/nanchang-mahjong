@@ -10,9 +10,14 @@
  *    spins two dice and settles on the actual result. After the animation
  *    completes, `onAnimationComplete` is called so the parent can flush the
  *    queued ClientGameState snapshot.
+ *
+ * For deal_start (second roll) a "Distribute Hand" confirmation step is
+ * inserted after the animation: the result stays visible with the wall-source
+ * callout and a gold button. Auto-advances after 5 s so bots never stall.
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
 import { useI18n } from '../../i18n';
 import type { ClientGameState } from '@nanchang/shared';
 
@@ -148,6 +153,50 @@ function GoldButton({ onClick, children }: { onClick: () => void; children: Reac
 export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationComplete }: Props) {
   const { t } = useI18n();
 
+  // After the deal_start animation completes we hold the overlay open so the
+  // player can read the result and wall-source before the hand is dealt.
+  const [awaitingDealConfirm, setAwaitingDealConfirm] = useState(false);
+  const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset confirm state whenever diceAnimation changes (new roll or cleared).
+  useEffect(() => {
+    if (!diceAnimation) {
+      setAwaitingDealConfirm(false);
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
+    }
+  }, [diceAnimation]);
+
+  // Clean up the timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+    };
+  }, []);
+
+  const confirmDeal = () => {
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+    setAwaitingDealConfirm(false);
+    onAnimationComplete();
+  };
+
+  // Called by the motion.p onAnimationComplete for the dice-sum text.
+  const handleSumAnimationComplete = () => {
+    if (diceAnimation?.purpose === 'deal_start') {
+      // Hold the overlay open — show wall source + confirm button.
+      // Auto-advance after 5 s so a solo game with bots never stalls.
+      setAwaitingDealConfirm(true);
+      autoAdvanceTimerRef.current = setTimeout(confirmDeal, 5000);
+    } else {
+      onAnimationComplete();
+    }
+  };
+
   const pendingRoll = snapshot.pendingRoll;
   const viewerSeat = snapshot.viewerSeat;
 
@@ -197,8 +246,8 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <DieFace value={diceAnimation.dice[0]} isAnimating />
-                <DieFace value={diceAnimation.dice[1]} isAnimating />
+                <DieFace value={diceAnimation.dice[0]} isAnimating={!awaitingDealConfirm} />
+                <DieFace value={diceAnimation.dice[1]} isAnimating={!awaitingDealConfirm} />
               </motion.div>
             ) : (
               <motion.div
@@ -222,10 +271,10 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
               key="result"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.0, duration: 2.0, times: [0, 0.125, 1] }}
+              transition={{ delay: 1.0, duration: 0.3 }}
               exit={{ opacity: 0 }}
               className="text-mj-gold font-bold text-lg"
-              onAnimationComplete={onAnimationComplete}
+              onAnimationComplete={handleSumAnimationComplete}
             >
               {t('diceRollResult')
                 .replace('{{0}}', String(diceAnimation.dice[0]))
@@ -235,8 +284,36 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
           )}
         </AnimatePresence>
 
-        {/* Button / waiting state — only when not animating */}
-        {!diceAnimation && pendingRoll && (
+        {/* Wall source callout — only during deal_start (second roll) */}
+        <AnimatePresence>
+          {diceAnimation?.purpose === 'deal_start' && awaitingDealConfirm && (
+            <motion.p
+              key="wall-source"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="text-sm text-mj-bone/70 font-semibold"
+            >
+              {t('diceRollWallSource').replace('{{0}}', rollerName)}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        {/* Confirm button — deal_start confirmation step */}
+        {awaitingDealConfirm && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="mt-2"
+          >
+            <GoldButton onClick={confirmDeal}>{t('diceRollDistributeHand')}</GoldButton>
+          </motion.div>
+        )}
+
+        {/* Roll button / waiting state — only when not animating and not confirming */}
+        {!diceAnimation && !awaitingDealConfirm && pendingRoll && (
           <div className="flex flex-col items-center gap-3 mt-2">
             {isMyRoll ? (
               <GoldButton onClick={onRoll}>{t('diceRollButton')} 🎲</GoldButton>

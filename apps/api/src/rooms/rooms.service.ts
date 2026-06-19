@@ -192,11 +192,13 @@ export class RoomsService {
     // Shuffle the three named profiles so different games get different bots.
     // Each bot is pre-marked ready so the host can start without waiting for them.
     const botCount = Math.min(dto?.bots?.count ?? 0, 3);
-    const botDifficulty: BotDifficulty = dto?.bots?.difficulty ?? 'easy';
+    const defaultDifficulty: BotDifficulty = dto?.bots?.difficulty ?? 'easy';
     const shuffledProfiles = [...BOT_PROFILES].sort(() => Math.random() - 0.5);
     const botSeatPuts = Array.from({ length: botCount }, (_, i) => {
       const seatIdx = 3 - i; // seats 3, 2, 1 for bots 1, 2, 3
       const profile = shuffledProfiles[i];
+      // Per-bot difficulty: use difficulties[i] if provided, else fall back to default
+      const botDifficulty: BotDifficulty = dto?.bots?.difficulties?.[i] ?? defaultDifficulty;
       return {
         Put: {
           TableName: this.db.tableName,

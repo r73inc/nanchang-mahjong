@@ -134,8 +134,10 @@ export function PlaySoloPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
 
   // Local settings state — sent as one atomic payload on submit
-  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>('normal');
-  const [viewMode, setViewMode] = useState<ViewMode>('3D');
+  const [botDifficulties, setBotDifficulties] = useState<
+    [BotDifficulty, BotDifficulty, BotDifficulty]
+  >(['normal', 'normal', 'normal']);
+  const [viewMode, setViewMode] = useState<ViewMode>('2D');
   const [terminationType, setTerminationType] = useState<TerminationOption>('rounds');
   const [rounds, setRounds] = useState<RoundsOption>('east+south');
   const [maxHands, setMaxHands] = useState<number>(2);
@@ -159,7 +161,7 @@ export function PlaySoloPage() {
         ruleTopBottomJing,
         isSolo: true,
       },
-      bots: { count: 3, difficulty: botDifficulty },
+      bots: { count: 3, difficulties: botDifficulties },
     });
     if (room) navigate(`/room/${room.code}`);
   }
@@ -179,7 +181,7 @@ export function PlaySoloPage() {
           </div>
         )}
 
-        {/* Bot difficulty */}
+        {/* Bot difficulties — one selector per bot */}
         <div
           className="rounded-2xl p-5"
           style={{
@@ -189,36 +191,56 @@ export function PlaySoloPage() {
         >
           <h2 className="text-base font-bold text-mj-bone mb-1">{t('botDifficultyLabel')}</h2>
           <p className="text-xs text-mj-bone/55 mb-4">{t('playSoloBotNote')}</p>
-          <div className="flex gap-2 flex-wrap">
-            {BOT_DIFFICULTIES.map((diff) => {
-              const isPsychic = diff === 'psychic';
-              const isActive = botDifficulty === diff;
+          <div className="flex flex-col gap-3">
+            {([0, 1, 2] as const).map((botIdx) => {
+              const slotKey = (['botSlot1', 'botSlot2', 'botSlot3'] as const)[botIdx];
               return (
-                <button
-                  key={diff}
-                  onClick={() => setBotDifficulty(diff)}
-                  className="px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
-                  style={{
-                    background: isActive
-                      ? isPsychic
-                        ? 'rgba(130,80,180,0.3)'
-                        : 'rgba(90,125,140,0.3)'
-                      : isPsychic
-                        ? 'rgba(130,80,180,0.1)'
-                        : 'rgba(90,125,140,0.1)',
-                    border: isActive
-                      ? isPsychic
-                        ? '1px solid rgba(130,80,180,0.7)'
-                        : '1px solid rgba(90,125,140,0.7)'
-                      : isPsychic
-                        ? '1px solid rgba(130,80,180,0.3)'
-                        : '1px solid rgba(90,125,140,0.3)',
-                    color: isPsychic ? '#c090e8' : '#7ab5cc',
-                  }}
-                  aria-pressed={isActive}
-                >
-                  {t(botDifficultyTranslationMap[diff])}
-                </button>
+                <div key={botIdx} className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-mj-bone/60 shrink-0 w-14">
+                    {t(slotKey)}
+                  </span>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    {BOT_DIFFICULTIES.map((diff) => {
+                      const isPsychic = diff === 'psychic';
+                      const isActive = botDifficulties[botIdx] === diff;
+                      return (
+                        <button
+                          key={diff}
+                          onClick={() => {
+                            const next = [...botDifficulties] as [
+                              BotDifficulty,
+                              BotDifficulty,
+                              BotDifficulty,
+                            ];
+                            next[botIdx] = diff;
+                            setBotDifficulties(next);
+                          }}
+                          className="px-2.5 py-1 rounded-full text-xs font-bold transition-colors"
+                          style={{
+                            background: isActive
+                              ? isPsychic
+                                ? 'rgba(130,80,180,0.3)'
+                                : 'rgba(90,125,140,0.3)'
+                              : isPsychic
+                                ? 'rgba(130,80,180,0.1)'
+                                : 'rgba(90,125,140,0.1)',
+                            border: isActive
+                              ? isPsychic
+                                ? '1px solid rgba(130,80,180,0.7)'
+                                : '1px solid rgba(90,125,140,0.7)'
+                              : isPsychic
+                                ? '1px solid rgba(130,80,180,0.3)'
+                                : '1px solid rgba(90,125,140,0.3)',
+                            color: isPsychic ? '#c090e8' : '#7ab5cc',
+                          }}
+                          aria-pressed={isActive}
+                        >
+                          {t(botDifficultyTranslationMap[diff])}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </div>

@@ -474,12 +474,21 @@ export class GameEngine {
       const nextInSeq = stepAbove(settlementTile);
       const scoreDelta1 = calculateOpeningJingSettlement(nextInSeq, this.state.seats, 1);
       // Combined zero-sum delta (both settlements applied together)
-      const scoreDelta = scoreDelta0.map((d, i) => d + scoreDelta1[i]) as [
+      let scoreDelta = scoreDelta0.map((d, i) => d + scoreDelta1[i]) as [
         number,
         number,
         number,
         number,
       ];
+      // Monopoly doubling: if exactly ONE player holds ANY settlement tile
+      // (either 2pt or 1pt type), their payout is doubled. Multiplying the
+      // entire zero-sum array by 2 preserves the zero-sum invariant.
+      const playersWithAny = this.state.seats.filter((s) =>
+        s.hand.some((t) => t === settlementTile || t === nextInSeq),
+      ).length;
+      if (playersWithAny === 1) {
+        scoreDelta = scoreDelta.map((d) => d * 2) as [number, number, number, number];
+      }
 
       const seatsAfterSettlement = [...this.state.seats] as GameState['seats'];
       for (let i = 0; i < 4; i++) {
