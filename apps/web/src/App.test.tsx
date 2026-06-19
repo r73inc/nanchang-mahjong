@@ -51,7 +51,7 @@ describe('App routing', () => {
   it('shows the home page when authenticated', () => {
     mockUseAuthStore.mockReturnValue('fake-token' as never);
     renderApp('/home');
-    // HomeStubPage renders the home title
-    expect(screen.getByText(/nanchang mahjong/i)).toBeInTheDocument();
+    // HomeStubPage renders the home title (exact string avoids matching the "Play Nanchang Mahjong" button)
+    expect(screen.getByText('Nanchang Mahjong')).toBeInTheDocument();
   });
 });

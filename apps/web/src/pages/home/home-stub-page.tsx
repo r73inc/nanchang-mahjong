@@ -247,19 +247,15 @@ export function HomeStubPage() {
         {/* Saved Games — shown when the player has at least one save */}
         <SavedGamesSection />
 
-        {/* Play with Friends — now live (Phase 6) */}
+        {/* Play Nanchang Mahjong — entry to all game modes */}
         <button
-          onClick={() => navigate('/lobby')}
-          className="w-full mb-6 px-5 py-5 rounded-2xl font-bold text-lg text-mj-ink flex items-center justify-between"
-          style={{
-            background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            boxShadow: '0 8px 24px rgba(201,169,97,0.35)',
-          }}
+          onClick={() => navigate('/play')}
+          className="w-full mb-6 px-5 py-5 rounded-2xl font-bold text-lg text-mj-ink flex items-center justify-between btn-heirloom"
+          style={{ border: '1px solid rgba(255,255,255,0.3)' }}
         >
           <div className="text-left">
-            <div>{t('playFriends')}</div>
-            <div className="text-sm opacity-70 font-normal mt-0.5">{t('playFriendsSub')}</div>
+            <div>{t('playNanchang')}</div>
+            <div className="text-sm opacity-70 font-normal mt-0.5">{t('playNanchangSub')}</div>
           </div>
           <span className="text-2xl" aria-hidden="true">
             →

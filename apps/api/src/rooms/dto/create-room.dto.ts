@@ -51,6 +51,10 @@ export class RoomSettingsDto {
   @Min(0)
   @Max(60)
   claimWindowSecs?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isSolo?: boolean;
 }
 
 export class CreateRoomDto {

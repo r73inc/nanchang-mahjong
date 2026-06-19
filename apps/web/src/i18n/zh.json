@@ -152,6 +152,27 @@
   "adminSaving": "保存中…",
   "adminDisabledBadge": "已停用",
 
+  "playNanchang": "南昌麻将",
+  "playNanchangSub": "选择游戏模式",
+  "playModeWithFriends": "与好友对局",
+  "playModeWithFriendsSub": "创建或加入私人房间",
+  "playModeSolo": "单人对局",
+  "playModeSoloSub": "1 对 3 — 你与三个机器人对阵",
+  "playModeChallenges": "挑战赛",
+  "playModeChallengesSub": "跨多局竞争积分",
+
+  "playSoloTitle": "单人对局",
+  "playSoloBotNote": "将自动加入 3 个机器人，各占一个空位",
+  "playSoloStartBtn": "创建单人对局",
+  "playSoloStarting": "设置中…",
+
+  "playChallengesTitle": "挑战赛",
+  "playChallengesPointChallengeTitle": "积分挑战",
+  "playChallengesPointChallengeSub": "挑战好友，跨多局积累积分",
+  "playChallengesStart": "发起挑战",
+  "playChallengesViewAll": "查看全部",
+  "playChallengesMoreSoon": "更多挑战模式即将推出",
+
   "playFriends": "与好友对局",
   "playFriendsSub": "创建或加入私人房间",
   "joinRoom": "加入房间",

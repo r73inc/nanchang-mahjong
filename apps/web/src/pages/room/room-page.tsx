@@ -10,6 +10,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { AvatarImg } from '../../components/ui/avatar-img';
+import { InfoIconButton } from '../../components/ui/info-icon-button';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { useRoomStore } from '../../stores/room.store';
@@ -30,9 +31,6 @@ const botDifficultyTranslationMap: Record<BotDifficulty, StringKey> = {
   psychic: 'botDifficultyPsychicFull',
 };
 
-// Purely decorative info glyph — constant avoids i18n/no-literal-string lint
-const INFO_GLYPH = 'ⓘ' as const;
-
 // API values for the view-mode toggle — not i18n strings
 const VIEW_MODES = ['3D', '2D'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
@@ -51,34 +49,6 @@ const MAX_HANDS_OPTIONS = [1, 2, 3, 4] as const;
 // Claim window options in seconds (0 = unlimited)
 const CLAIM_WINDOW_OPTIONS = [5, 8, 15, 30, 0] as const;
 type ClaimWindowOption = (typeof CLAIM_WINDOW_OPTIONS)[number];
-
-function InfoButton({ onClick }: { onClick: () => void }) {
-  const { t } = useI18n();
-  return (
-    <button
-      onClick={onClick}
-      aria-label={t('settingInfoOpen')}
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: '50%',
-        border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-        color: 'rgba(var(--felt-ink-rgb),0.35)',
-        fontSize: 9,
-        fontWeight: 700,
-        cursor: 'pointer',
-        background: 'none',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        lineHeight: 1,
-      }}
-    >
-      {INFO_GLYPH}
-    </button>
-  );
-}
 
 export function RoomPage() {
   const { t } = useI18n();
@@ -233,6 +203,8 @@ export function RoomPage() {
   // Host and bots are implicitly ready — host confirms by clicking Start.
   const allReady =
     filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.isBot || s.ready);
+  // Solo mode: immutable flag set at room creation — bots cannot be kicked.
+  const isSoloRoom = room.settings.isSolo ?? false;
 
   const botDisplayName = (handle: string) => {
     if (handle === 'MilkyBot') return t('botNameMilky');
@@ -453,17 +425,21 @@ export function RoomPage() {
                     </span>
                   )}
 
-                  {/* Host kick button — bots can be kicked like any seat */}
-                  {isHost && !isEmpty && !isMe && room.status === 'waiting' && (
-                    <button
-                      onClick={() => handleKick(seat.seatIdx)}
-                      className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
-                      style={{ background: 'rgba(192,57,43,0.12)' }}
-                      aria-label={`Kick ${seat.handle ?? ''}`}
-                    >
-                      {t('kickPlayerBtn')}
-                    </button>
-                  )}
+                  {/* Host kick button — hidden for bots in solo rooms */}
+                  {isHost &&
+                    !isEmpty &&
+                    !isMe &&
+                    room.status === 'waiting' &&
+                    !(isSoloRoom && seat.isBot) && (
+                      <button
+                        onClick={() => handleKick(seat.seatIdx)}
+                        className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
+                        style={{ background: 'rgba(192,57,43,0.12)' }}
+                        aria-label={`Kick ${seat.handle ?? ''}`}
+                      >
+                        {t('kickPlayerBtn')}
+                      </button>
+                    )}
                 </div>
               );
             })}
@@ -507,7 +483,10 @@ export function RoomPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {label}
-                  <InfoButton onClick={() => setInfoKey(infoK)} />
+                  <InfoIconButton
+                    ariaLabel={t('settingInfoOpen')}
+                    onClick={() => setInfoKey(infoK)}
+                  />
                 </span>
                 <span className="text-mj-gold font-semibold">{value}</span>
               </div>
@@ -520,7 +499,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingViewModeLabel')}
-                <InfoButton onClick={() => setInfoKey('settingViewModeInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingViewModeInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div className="flex gap-1.5" role="group" aria-label={t('settingViewModeLabel')}>
@@ -563,7 +545,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTerminationLabel')}
-                <InfoButton onClick={() => setInfoKey('settingTerminationInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingTerminationInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div
@@ -628,7 +613,10 @@ export function RoomPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {t('settingRoundsLabel')}
-                  <InfoButton onClick={() => setInfoKey('settingRoundsInfo')} />
+                  <InfoIconButton
+                    ariaLabel={t('settingInfoOpen')}
+                    onClick={() => setInfoKey('settingRoundsInfo')}
+                  />
                 </span>
                 {isHost && room.status === 'waiting' ? (
                   <div className="flex gap-1.5" role="group" aria-label={t('settingRoundsLabel')}>
@@ -716,7 +704,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingClaimWindowLabel')}
-                <InfoButton onClick={() => setInfoKey('settingClaimWindowInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingClaimWindowInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div
@@ -783,7 +774,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTopBottomJingLabel')}
-                <InfoButton onClick={() => setInfoKey('settingTopBottomJingInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingTopBottomJingInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <button

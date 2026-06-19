@@ -15,6 +15,7 @@ import type {
   WsRoomUpdatePayload,
   WsRoomStartedPayload,
   BotDifficulty,
+  CreateRoomInput,
 } from '@nanchang/shared';
 
 // ── REST action hooks ─────────────────────────────────────────────────────────
@@ -22,20 +23,23 @@ import type {
 export function useRoomActions() {
   const { setRoom, setLoading, setError } = useRoomStore();
 
-  const createRoom = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await api.post<RoomState>('/rooms', {});
-      setRoom(data);
-      return data;
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [setRoom, setLoading, setError]);
+  const createRoom = useCallback(
+    async (input?: CreateRoomInput) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.post<RoomState>('/rooms', input ?? {});
+        setRoom(data);
+        return data;
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [setRoom, setLoading, setError],
+  );
 
   const joinRoom = useCallback(
     async (code: string) => {
