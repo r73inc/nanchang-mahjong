@@ -6,6 +6,48 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## (2026-06-18)
+
+### BUG-050 · End-of-round detail "second table" still renders the old `节` glyph
+
+**Root cause:** The spirit settlement rows in `HandRevealScreen` used a hard-coded `JING_CHAR = '节'` constant rather than rendering the actual spirit tile via `MahjongTile2D`. Other tables on the same screen already rendered tile textures correctly.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Removed the `JING_CHAR` constant entirely.
+- Spirit settlement rows now render `<MahjongTile2D tile={handReveal.jingPrimary} size="xs" isJing />` and `<MahjongTile2D tile={handReveal.jingSecondary} size="xs" isJing showJingLabel={false} />` inline with the `×N` count, matching the tile-texture treatment used in the rest of the reveal screen.
+
+**Key learning:** Any tile displayed in-app must go through `MahjongTile2D` — never use a text glyph as a substitute. Per CLAUDE.md, `MahjongTile2D` is the only sanctioned tile renderer for new and refactored code.
+
+---
+
+### BUG-051 · Discard blocked after declining tsumo win
+
+**Root cause:** When `canTsumo` was true and the player pressed "Keep Playing", the UI did not re-enable tile interaction. `ViewerHandHUD` and `AccessibleHand` both guarded tile interaction with `isMyTurn && !canTsumo` — the `tsumoSuppressed` flag (set by "Keep Playing") was not factored in, so tiles remained non-interactive even after dismissal.
+
+**Fix (`apps/web/src/pages/game/game-page.tsx`):**
+
+- Changed the `isMyTurn` guards in `ViewerHandHUD` and `AccessibleHand` from `isMyTurn && !canTsumo` to `isMyTurn && (!canTsumo || tsumoSuppressed)`.
+- The `tsumoSuppressed` state is set to `true` on `onDismiss` (the "Keep Playing" click) and cleared automatically when `canTsumo` resets to `false` (i.e. when a new turn begins).
+- The persistent "Declare Win" floating button (`canTsumo && tsumoSuppressed && isMyTurn`) lets the player still declare a win after suppressing the bar.
+
+**Key learning:** Client-side suppression flags must be applied consistently to every interactive guard that checks the same server-driven boolean. If one path ignores the suppression flag, the player is stuck in a dead state.
+
+---
+
+### BUG-052 · Customize palette cards show tiles using the active palette instead of their own
+
+**Root cause:** `PaletteCard` rendered `MahjongTile2D`, which derived its tile-face gradient from global CSS custom properties `--tile-face-top` / `--tile-face-bottom`. These are written to `:root` by `applyTheme()` using the currently active palette only, so all three preview cards inherited the same global values regardless of which palette each card represented.
+
+**Fix (`apps/web/src/pages/customize/customize-page.tsx`):**
+
+- Replaced the `MahjongTile2D` usage inside `PaletteCard` with inline `<img>` elements that load the tile texture directly via `tileTexturePath(tile, themeToVariant(id))`.
+- The tile face background is set as an inline `style` using `cfg.faceTop` / `cfg.faceBottom` from `TILE_CONFIGS[id]`, which is keyed to the card's own palette — entirely independent of the global CSS vars and the currently selected theme.
+
+**Key learning:** When the same component must render in multiple palette contexts simultaneously (e.g. a compare/preview screen), scoped inline styles are necessary. Global CSS custom properties on `:root` are single-valued and cannot serve multiple palette contexts at once.
+
+---
+
 ## `wify-imp-33-36` (2026-06-16)
 
 ### IMP-033 · "Waiting…0 not ready" wording on the room lobby start button

@@ -39,31 +39,17 @@ const ARIA_HIDDEN_TILE = 'Hidden tile' as const;
 // `initial`, so repeat:Infinity only touches boxShadow and never bleeds into
 // the entry opacity/scale keyframes of the parent wrapper.
 
-// Keyframes for the pulsing glow on the last-discarded tile.
-// Using actual blur radius (not zero) so the glow is visible on any background.
-// The static border: '2px solid' on the overlay div provides an always-on fallback
-// so even if boxShadow rendering is clipped by a parent, a hard edge is visible.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const LAST_DISCARD_SHADOW: any[] = [
-  '0 0 4px 1px rgb(220, 38, 38)',
-  '0 0 10px 3px rgb(220, 38, 38)',
-  '0 0 4px 1px rgb(220, 38, 38)',
-];
-const LAST_DISCARD_ANIMATE = { boxShadow: LAST_DISCARD_SHADOW };
+// Pulse overlays animate opacity (GPU-composited) rather than box-shadow (paint).
+// The static border + box-shadow on each overlay provides the always-on ring;
+// opacity pulses from 0.45 → 1 to create the breathing glow effect.
+const LAST_DISCARD_ANIMATE = { opacity: [0.45, 1, 0.45] };
 const LAST_DISCARD_TRANSITION = {
   duration: 0.85,
   repeat: Infinity,
   ease: 'easeInOut' as const,
 };
 
-// Keyframes for the pulsing glow on the winning tile in the hand-reveal screen.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const WINNING_TILE_SHADOW: any[] = [
-  '0 0 4px 1px rgb(34, 197, 94)',
-  '0 0 10px 3px rgb(34, 197, 94)',
-  '0 0 4px 1px rgb(34, 197, 94)',
-];
-const WINNING_TILE_ANIMATE = { boxShadow: WINNING_TILE_SHADOW };
+const WINNING_TILE_ANIMATE = { opacity: [0.45, 1, 0.45] };
 const WINNING_TILE_TRANSITION = {
   duration: 0.85,
   repeat: Infinity,
