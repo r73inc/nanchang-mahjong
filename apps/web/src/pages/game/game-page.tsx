@@ -542,6 +542,9 @@ function HandRevealScreen({
       <div className="flex flex-col items-center gap-6 px-4 py-8 max-w-lg mx-auto">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="text-center">
+          <p className="text-xs uppercase tracking-widest text-mj-bone/40 mb-1">
+            {t('handRevealTitle')}
+          </p>
           <h1 className="text-2xl font-serif font-bold text-mj-bone">{headingLabel}</h1>
           {handReveal.concedeSeat !== undefined && (
             <p className="text-sm text-mj-bone/60 mt-1">
