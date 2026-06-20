@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
@@ -6,6 +6,7 @@ import {
   useChallenge,
   useStartChallengeGame,
   useDeclineChallenge,
+  useMarkChallengeResultsViewed,
 } from '../../hooks/use-challenges';
 import { useAuthStore } from '../../stores/auth.store';
 import type {
@@ -24,8 +25,17 @@ export function ChallengeDetailPage() {
   const { data: challenge, isLoading, isError } = useChallenge(challengeId!);
   const startGame = useStartChallengeGame();
   const declineChallenge = useDeclineChallenge();
+  const markViewed = useMarkChallengeResultsViewed();
 
   const [confirmDecline, setConfirmDecline] = useState(false);
+
+  // Auto-mark results as viewed when the player opens a completed challenge.
+  // Guard on resultsViewed to avoid spamming the mutation on every re-render.
+  useEffect(() => {
+    if (challenge?.status === 'completed' && !challenge?.resultsViewed && challengeId) {
+      void markViewed.mutateAsync(challengeId);
+    }
+  }, [challenge?.status, challenge?.resultsViewed, challengeId]);
 
   if (isLoading) {
     return (
