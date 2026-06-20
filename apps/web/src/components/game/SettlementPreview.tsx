@@ -155,13 +155,7 @@ export function SettlementPreview({
           </p>
         )}
         {settlementPreview.isMonopoly && (
-          <div
-            className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full"
-            style={{
-              background: 'rgba(201,169,97,0.18)',
-              border: '1px solid rgba(201,169,97,0.45)',
-            }}
-          >
+          <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full bg-mj-gold/[18%] border border-mj-gold/45">
             <span className="text-xs font-bold text-mj-gold tracking-wide">
               {t('settlementMonopoly')}
             </span>
