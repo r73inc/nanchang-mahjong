@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
+import { useRoomActions } from '../../hooks/use-room';
+import { useRoomStore } from '../../stores/room.store';
+import { useAuthStore } from '../../stores/auth.store';
+import { connectSocket } from '../../lib/socket';
 
 interface PlayModeCardProps {
   title: string;
@@ -11,6 +15,7 @@ interface PlayModeCardProps {
   onClick: () => void;
   badge?: string;
   primary?: boolean;
+  disabled?: boolean;
 }
 
 function PlayModeCard({
@@ -22,20 +27,27 @@ function PlayModeCard({
   onClick,
   badge,
   primary = false,
+  disabled = false,
 }: PlayModeCardProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full px-5 py-5 rounded-2xl font-bold text-left flex items-center justify-between${primary ? ' btn-heirloom' : ''}`}
+      disabled={disabled}
+      className={`w-full px-5 py-5 rounded-2xl font-bold text-left flex items-center justify-between${primary && !disabled ? ' btn-heirloom' : ''}`}
       style={
-        primary
+        primary && !disabled
           ? {
               border: '1px solid rgba(255,255,255,0.3)',
               color: '#1a1a1a',
+              opacity: disabled ? 0.5 : 1,
             }
           : {
-              background: accentBg,
-              border: `1px solid ${accentBorder}`,
+              background: disabled ? 'rgba(var(--felt-ink-rgb),0.04)' : accentBg,
+              border: disabled
+                ? '1px solid rgba(var(--felt-ink-rgb),0.1)'
+                : `1px solid ${accentBorder}`,
+              opacity: disabled ? 0.6 : 1,
+              cursor: disabled ? 'not-allowed' : 'pointer',
             }
       }
     >
@@ -68,7 +80,7 @@ function PlayModeCard({
         aria-hidden="true"
         style={{ color: primary ? '#1a1a1a' : accent }}
       >
-        →
+        {disabled ? '…' : '→'}
       </span>
     </button>
   );
@@ -88,6 +100,18 @@ const CHALLENGE_BORDER = 'rgba(150,100,200,0.3)' as const;
 export function PlayPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { createRoom } = useRoomActions();
+  const loading = useRoomStore((s) => s.loading);
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  async function handleSolo() {
+    if (accessToken) connectSocket(accessToken);
+    const room = await createRoom({
+      settings: { isSolo: true, viewMode: '2D' },
+      bots: { count: 3, difficulties: ['normal', 'normal', 'normal'] },
+    });
+    if (room) navigate(`/room/${room.code}`);
+  }
 
   return (
     <ScreenShell title={t('playNanchang')} onBack={() => navigate('/home')}>
@@ -108,7 +132,8 @@ export function PlayPage() {
           accent={SOLO_ACCENT}
           accentBg={SOLO_BG}
           accentBorder={SOLO_BORDER}
-          onClick={() => navigate('/play/solo')}
+          onClick={() => void handleSolo()}
+          disabled={loading}
         />
 
         <PlayModeCard

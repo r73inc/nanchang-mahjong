@@ -162,7 +162,7 @@
   "playModeChallengesSub": "跨多局竞争积分",
 
   "playSoloTitle": "单人对局",
-  "playSoloBotNote": "将自动加入 3 个机器人，各占一个空位",
+  "playSoloBotNote": "为每个机器人对手单独设置难度",
   "playSoloStartBtn": "创建单人对局",
   "playSoloStarting": "设置中…",
 
@@ -211,7 +211,10 @@
 
   "botCountLabel": "电脑玩家",
   "botCountNone": "无 — 仅好友",
-  "botDifficultyLabel": "机器人难度",
+  "botDifficultyLabel": "机器人难度设置",
+  "botSlot1": "机器人 1",
+  "botSlot2": "机器人 2",
+  "botSlot3": "机器人 3",
   "botDifficultyEasy": "简单",
   "botDifficultyNormal": "普通",
   "botBadge": "机器人",
@@ -226,6 +229,7 @@
   "botDifficultyPsychic": "通灵",
   "botDifficultyPsychicFull": "通灵机器人",
   "roomAddBot": "添加机器人",
+  "botChangeDifficulty": "更改难度",
 
   "settingStyleLabel": "玩法",
   "settingStyle": "南昌麻将",
@@ -361,6 +365,8 @@
   "diceRollButton": "掷骰子",
   "diceRollWaiting": "等待 {{0}} 掷骰子…",
   "diceRollResult": "{{0}} + {{1}} = {{2}}",
+  "diceRollWallSource": "从 {{0}} 的牌墙取牌",
+  "diceRollDistributeHand": "发牌",
 
   "handRevealTitle": "本局结束",
   "handRevealResultDraw": "流局 — 无人获胜",
@@ -380,6 +386,7 @@
   "settlementReceived": "收 {{0}}",
   "settlementPaid": "付 {{0}}",
   "settlementEven": "—",
+  "settlementMonopoly": "独占加倍 ×2",
   "settlementReceivedFrom": "从{{1}}收 {{0}}",
   "settlementPaidTo": "付 {{0}} 给{{1}}",
   "handRevealBreakdownHandNetLabel": "本局",

@@ -21,7 +21,6 @@ import { ChallengeCreatePage } from './pages/challenges/challenge-create-page';
 import { ChallengeDetailPage } from './pages/challenges/challenge-detail-page';
 import { ChallengesListPage } from './pages/challenges/challenges-list-page';
 import { PlayPage } from './pages/play/play-page';
-import { PlaySoloPage } from './pages/play/play-solo-page';
 import { PlayChallengesPage } from './pages/play/play-challenges-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
@@ -74,7 +73,6 @@ export default function App() {
         <Route path="/settings/change-password" element={<ChangePasswordPage />} />
         <Route path="/settings/delete-account" element={<DeleteAccountPage />} />
         <Route path="/play" element={<PlayPage />} />
-        <Route path="/play/solo" element={<PlaySoloPage />} />
         <Route path="/play/challenges" element={<PlayChallengesPage />} />
         <Route path="/challenges" element={<ChallengesListPage />} />
         <Route path="/challenges/create" element={<ChallengeCreatePage />} />

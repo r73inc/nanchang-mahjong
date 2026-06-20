@@ -107,6 +107,20 @@ export function useRoomActions() {
     [setRoom, setError],
   );
 
+  const updateBotDifficulty = useCallback(
+    async (roomId: string, seatIdx: number, difficulty: BotDifficulty) => {
+      try {
+        const { data } = await api.patch<RoomState>(`/rooms/${roomId}/seats/${seatIdx}/bot`, {
+          difficulty,
+        });
+        setRoom(data);
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      }
+    },
+    [setRoom, setError],
+  );
+
   const startGame = useCallback(
     async (roomId: string) => {
       setLoading(true);
@@ -175,6 +189,7 @@ export function useRoomActions() {
     setReady,
     kickSeat,
     addBotToSeat,
+    updateBotDifficulty,
     startGame,
     getRoomByCode,
     updateSettings,

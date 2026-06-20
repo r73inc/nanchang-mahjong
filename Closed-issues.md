@@ -51,6 +51,21 @@ The trigger sequence:
 
 ---
 
+### BUG-045 · Bot dice roll (deal_2) flashes through with no visible result; settlement sound fires during dice animation
+
+**Root cause (deal_2 flash):** The `DiceRollOverlay` immediately called `onAnimationComplete` once the Framer Motion sum-text animation finished (`delay: 1.0s + duration: 2.0s`). For deal_2 (wall-selection result), there was no hold phase — control was returned to the game immediately, clearing the overlay before any player could read the wall-source. Bot rolls compounded this: the 3500 ms server timer meant the second roll arrived and cleared in a single render batch with no perceptible pause.
+
+**Root cause (settlement sound timing):** The `playPointTransfer()` call was gated on `toast?.kind === 'opening_settlement'`. The `opening_jing_settlement` toast was set by the socket handler the moment the server event arrived — which happened while the jing_reveal dice animation was still playing. Because the toast was set before `isDiceAnimatingRef` cleared, the sound fired during the dice animation rather than when the settlement screen appeared.
+
+**Fix:**
+
+- **`DiceRollOverlay.tsx`** — for `deal_start` purpose only, `handleSumAnimationComplete` now sets `awaitingDealConfirm = true` instead of calling `onAnimationComplete`. The overlay holds open showing the wall-source callout ("Tiles dealt from X's wall") and a gold "Distribute Hand" button. A 5-second `setTimeout` auto-advances for bot/solo games. Dice visuals stop spinning during the confirm phase (`isAnimating={!awaitingDealConfirm}`). The timer is cleared and state is reset whenever `diceAnimation` changes.
+- **`game-page.tsx`** — replaced the toast-based `playPointTransfer` trigger with one gated on `snapshot?.preGamePhase === 'settlement' && !diceAnimation`. This fires only when the dice overlay is gone and the settlement screen is visible.
+
+**Key learning:** Any audio trigger derived from a socket event should be gated on visible UI state, not just event arrival — socket events can arrive during UI animations. For dice-roll result readability, always insert an explicit hold phase rather than relying on animation duration alone; Framer Motion `onAnimationComplete` fires as soon as the animation finishes, with no built-in dwell time.
+
+---
+
 ## (2026-06-18)
 
 ### BUG-050 · End-of-round detail "second table" still renders the old `节` glyph

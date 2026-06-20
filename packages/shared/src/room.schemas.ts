@@ -104,8 +104,10 @@ export interface RoomState {
 export const BotConfigSchema = z.object({
   /** Number of bot seats to fill (0–3). */
   count: z.number().int().min(0).max(3),
-  /** Difficulty applied to all bots in this room. */
-  difficulty: z.enum(['easy', 'normal', 'hard', 'psychic']),
+  /** Difficulty applied to all bots (fallback when `difficulties` is absent). */
+  difficulty: z.enum(['easy', 'normal', 'hard', 'psychic']).optional(),
+  /** Per-bot difficulties (index 0 = first bot slot). Overrides `difficulty`. */
+  difficulties: z.array(z.enum(['easy', 'normal', 'hard', 'psychic'])).optional(),
 });
 export type BotConfig = z.infer<typeof BotConfigSchema>;
 

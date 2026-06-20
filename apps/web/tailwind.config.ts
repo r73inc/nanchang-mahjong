@@ -34,6 +34,11 @@ const config: Config = {
         'mj-south': '#a36d3e',
         'mj-west': '#5a7d8c',
         'mj-north': '#7d4f4f',
+        // Bot difficulty UI
+        'mj-bot': '#7ab5cc',
+        'mj-psychic': '#c090e8',
+        'mj-bot-bg': '#5a7d8c',
+        'mj-psychic-bg': '#8250b4',
       },
 
       // ── Typography ───────────────────────────────────────────

@@ -192,7 +192,13 @@ export function LobbyPage() {
               <input
                 type="text"
                 value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const raw = e.target.value
+                    .replace(/[^A-Za-z0-9]/g, '')
+                    .toUpperCase()
+                    .slice(0, 6);
+                  setCode(raw.length > 2 ? `${raw.slice(0, 2)}-${raw.slice(2)}` : raw);
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                 placeholder={t('roomCodePlaceholder')}
                 maxLength={7}

@@ -23,6 +23,7 @@ import {
   previewJingReveal,
   calculateSpiritSettlement,
   calculateOpeningJingSettlement,
+  checkMonopoly,
   isWinningHand,
   decomposeHand,
   decomposeConcealed,
@@ -848,6 +849,7 @@ export class GameService {
           (s) => s.hand.filter((t) => t === nextTile).length,
         ) as [number, number, number, number];
         const nextTileDelta = calculateOpeningJingSettlement(nextTile, stateBeforeReveal.seats, 1);
+        const isMonopoly = checkMonopoly(stateBeforeReveal.seats, settlementTile, nextTile);
         session.lastSettlementPreview = {
           dice: jingPreview.dice,
           stackGlobal: jingPreview.stackGlobal,
@@ -857,6 +859,7 @@ export class GameService {
           delta,
           nextTileSeatCounts,
           nextTileDelta,
+          isMonopoly,
         };
       }
 

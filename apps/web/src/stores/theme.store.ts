@@ -54,7 +54,7 @@ export const useThemeStore = create<ThemeState>()(
       tilePalette: 'classic',
       soundEnabled: true,
       tileSize: 'md',
-      autoSortDrawnTile: false,
+      autoSortDrawnTile: true,
       setFelt: (felt) => set({ felt }),
       setTilePalette: (tilePalette) => set({ tilePalette }),
       setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
