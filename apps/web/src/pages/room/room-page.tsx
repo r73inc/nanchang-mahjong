@@ -126,6 +126,8 @@ export function RoomPage() {
 
   // Which empty seat is showing the bot difficulty picker (null = none open)
   const [addingBotToSeat, setAddingBotToSeat] = useState<number | null>(null);
+  // Which bot seat in a solo room is showing the difficulty-change picker
+  const [changingBotDifficulty, setChangingBotDifficulty] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   // Which setting's info modal is open (stores the info i18n key, null = closed)
   const [infoKey, setInfoKey] = useState<string | null>(null);
@@ -133,6 +135,14 @@ export function RoomPage() {
   async function handleAddBot(seatIdx: number, difficulty: BotDifficulty) {
     if (!room) return;
     setAddingBotToSeat(null);
+    await addBotToSeat(room.roomId, seatIdx, difficulty);
+  }
+
+  async function handleChangeBotDifficulty(seatIdx: number, difficulty: BotDifficulty) {
+    if (!room) return;
+    setChangingBotDifficulty(null);
+    // Kick + re-add at new difficulty — the seat is immediately refilled server-side.
+    await kickSeat(room.roomId, seatIdx);
     await addBotToSeat(room.roomId, seatIdx, difficulty);
   }
 
@@ -355,6 +365,71 @@ export function RoomPage() {
                             ? t('ready')
                             : t('notReady')}
                     </p>
+
+                    {/* ── Bot difficulty changer — host only, bot seats in solo rooms ── */}
+                    {isHost && isSoloRoom && seat.isBot && room.status === 'waiting' && (
+                      <div className="mt-2">
+                        {changingBotDifficulty === seat.seatIdx ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {(['easy', 'normal', 'hard', 'psychic'] as BotDifficulty[]).map(
+                              (diff) => {
+                                const isPsychic = diff === 'psychic';
+                                const isActive = seat.botDifficulty === diff;
+                                return (
+                                  <button
+                                    key={diff}
+                                    onClick={() =>
+                                      !isActive &&
+                                      void handleChangeBotDifficulty(seat.seatIdx, diff)
+                                    }
+                                    disabled={isActive}
+                                    className="px-2.5 py-1 rounded-full text-[10px] font-bold"
+                                    style={{
+                                      background: isActive
+                                        ? isPsychic
+                                          ? 'rgba(130,80,180,0.35)'
+                                          : 'rgba(90,125,140,0.35)'
+                                        : isPsychic
+                                          ? 'rgba(130,80,180,0.12)'
+                                          : 'rgba(90,125,140,0.12)',
+                                      border: isActive
+                                        ? isPsychic
+                                          ? '1px solid rgba(130,80,180,0.7)'
+                                          : '1px solid rgba(90,125,140,0.7)'
+                                        : isPsychic
+                                          ? '1px solid rgba(130,80,180,0.3)'
+                                          : '1px solid rgba(90,125,140,0.3)',
+                                      color: isPsychic ? '#c090e8' : '#7ab5cc',
+                                      cursor: isActive ? 'default' : 'pointer',
+                                    }}
+                                  >
+                                    {t(botDifficultyTranslationMap[diff])}
+                                  </button>
+                                );
+                              },
+                            )}
+                            <button
+                              onClick={() => setChangingBotDifficulty(null)}
+                              className="text-[10px] text-mj-bone/40 px-1.5 py-1"
+                            >
+                              {t('cancel')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setChangingBotDifficulty(seat.seatIdx)}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+                            style={{
+                              background: 'rgba(90,125,140,0.12)',
+                              border: '1px solid rgba(90,125,140,0.3)',
+                              color: '#7ab5cc',
+                            }}
+                          >
+                            {t('botChangeDifficulty')}
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {/* ── Bot picker — host only, empty seats only ──────── */}
                     {isHost && isEmpty && room.status === 'waiting' && (
