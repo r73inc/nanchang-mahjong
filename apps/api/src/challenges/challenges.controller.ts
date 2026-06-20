@@ -201,6 +201,19 @@ export class ChallengesController {
     await this.challenges.declineChallenge(challengeId, user.sub);
   }
 
+  /**
+   * Mark that the current user has viewed the final results of a completed challenge.
+   * Idempotent — safe to call on every visit to the results screen.
+   */
+  @Post(':id/mark-viewed')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async markResultsViewed(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') challengeId: string,
+  ) {
+    await this.challenges.markResultsViewed(challengeId, user.sub);
+  }
+
   // ── Private helpers ─────────────────────────────────────────────────────
 
   /**

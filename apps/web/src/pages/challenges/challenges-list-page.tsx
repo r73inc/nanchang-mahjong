@@ -89,6 +89,18 @@ function ChallengeRow({
         </p>
       </div>
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        {challenge.status === 'completed' && !challenge.resultsViewed && (
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+            style={{
+              background: 'rgba(201,169,97,0.18)',
+              color: '#c9a961',
+              border: '1px solid rgba(201,169,97,0.4)',
+            }}
+          >
+            {t('challengeNewResults')}
+          </span>
+        )}
         <span
           className="text-[10px] font-bold"
           style={{ color: overallStatusColor[challenge.status] }}

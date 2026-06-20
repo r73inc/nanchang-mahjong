@@ -113,6 +113,43 @@ function OpenChallengeCard({
   );
 }
 
+function UnviewedChallengesBanner() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const { data: challenges } = useChallenges();
+
+  const unviewedCount = (challenges ?? []).filter(
+    (c) => c.status === 'completed' && !c.resultsViewed,
+  ).length;
+
+  if (unviewedCount === 0) return null;
+
+  return (
+    <button
+      onClick={() => navigate('/challenges')}
+      className="w-full mb-4 px-4 py-3.5 rounded-[14px] flex items-center justify-between text-left"
+      style={{
+        background: 'rgba(201,169,97,0.1)',
+        border: '1px solid rgba(201,169,97,0.35)',
+      }}
+    >
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span
+          className="shrink-0 w-2 h-2 rounded-full"
+          style={{ background: '#c9a961' }}
+          aria-hidden="true"
+        />
+        <p className="text-sm font-semibold text-mj-gold truncate">
+          {t('homeUnviewedChallengeNotice')}
+        </p>
+      </div>
+      <span className="text-mj-gold/60 text-lg ml-3 shrink-0" aria-hidden="true">
+        ›
+      </span>
+    </button>
+  );
+}
+
 function OpenChallengesSection() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -384,6 +421,9 @@ export function HomeStubPage() {
             </span>
           )}
         </div>
+
+        {/* Unviewed completed challenges — shown when results are waiting to be seen */}
+        <UnviewedChallengesBanner />
 
         {/* Open Challenges — shown above saves when player has challenges to play */}
         <OpenChallengesSection />

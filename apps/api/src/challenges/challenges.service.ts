@@ -606,6 +606,7 @@ export class ChallengesService {
       role: 'creator' | 'challenged';
       participantStatus: string;
       challengeStatus: string;
+      resultsViewed?: boolean;
     }>;
 
     if (indexItems.length === 0) return [];
@@ -628,6 +629,7 @@ export class ChallengesService {
           completedCount,
           myStatus,
           createdAt: item.createdAt,
+          resultsViewed: idx.resultsViewed ?? false,
         } satisfies ChallengeSummary;
       }),
     );
@@ -690,6 +692,29 @@ export class ChallengesService {
       createdAt: item.createdAt,
       completedAt: item.completedAt,
     };
+  }
+
+  // ── Results-viewed tracking ───────────────────────────────────────────────
+
+  /**
+   * Mark that the requesting player has seen the final scoreboard for a
+   * completed challenge. Idempotent — safe to call multiple times.
+   * Silently no-ops if the challenge or participant is not found.
+   */
+  async markResultsViewed(challengeId: string, playerSub: string): Promise<void> {
+    const item = await this.getChallengeItem(challengeId);
+    if (!item) return;
+    if (!item.participants[playerSub]) return;
+
+    await this.db
+      .update({
+        Key: DK.userChallengeIdx(playerSub, item.createdAt, challengeId),
+        UpdateExpression: 'SET resultsViewed = :v',
+        ExpressionAttributeValues: { ':v': true },
+      })
+      .catch((err) =>
+        this.logger.warn(`markResultsViewed failed for ${playerSub}/${challengeId}: ${err}`),
+      );
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
