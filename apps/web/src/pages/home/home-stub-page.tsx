@@ -9,9 +9,150 @@ import type { StringKey } from '../../i18n/strings';
 import { usePushNotifications } from '../../hooks/use-push-notifications';
 import { useThemeStore } from '../../stores/theme.store';
 import { useSaves, useLoadAutoSave, useLoadManualSave, useDeleteSave } from '../../hooks/use-saves';
-import type { SaveSlotInfo } from '@nanchang/shared';
+import { useChallenges, useChallenge, useStartChallengeGame } from '../../hooks/use-challenges';
+import type { SaveSlotInfo, Challenge } from '@nanchang/shared';
 
 const SEP_DOT = ' · ' as const;
+
+// ── Open Challenges UI ─────────────────────────────────────────────────────────
+
+function OpenChallengeCard({
+  challenge,
+  mySub,
+  isLoading,
+}: {
+  challenge: Challenge | undefined;
+  mySub: string;
+  isLoading: boolean;
+}) {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const startGame = useStartChallengeGame();
+
+  if (isLoading || !challenge) {
+    return (
+      <div className="w-full px-4 py-4 rounded-[14px] text-xs text-mj-bone/40 bg-mj-bone/6 border border-mj-bone/10">
+        …
+      </div>
+    );
+  }
+
+  const myParticipant = challenge.participants.find((p) => p.sub === mySub);
+  const myStatus = myParticipant?.status;
+  const isCreator = myParticipant?.role === 'creator';
+  const canStart = !isCreator && myStatus === 'pending' && challenge.status === 'open';
+  const resumeGameId = myParticipant?.gameId;
+  const canResume =
+    !!resumeGameId && (isCreator ? myStatus !== 'completed' : myStatus === 'accepted');
+  const creatorParticipant = challenge.participants.find((p) => p.role === 'creator');
+  const creatorHandle = creatorParticipant?.handle ?? '';
+  const completedCount = challenge.participants.filter((p) => p.status === 'completed').length;
+  const totalCount = challenge.participants.length;
+
+  const difficultyKey =
+    challenge.config.botDifficulty === 'easy'
+      ? 'challengeBotEasy'
+      : challenge.config.botDifficulty === 'hard'
+        ? 'challengeBotHard'
+        : 'challengeBotNormal';
+
+  // Capture before closures — TypeScript doesn't carry narrowing into closure scope.
+  const challengeId = challenge.challengeId;
+
+  async function handleStart() {
+    const result = await startGame.mutateAsync(challengeId);
+    navigate(`/game/${result.gameId}`);
+  }
+
+  function handleResume() {
+    if (resumeGameId) navigate(`/game/${resumeGameId}`);
+  }
+
+  return (
+    <div className="w-full rounded-[14px] overflow-hidden border border-mj-gold/30">
+      {/* Header */}
+      <div className="px-4 py-3 flex items-center justify-between bg-mj-gold/10">
+        <span className="text-xs font-bold text-mj-gold uppercase tracking-wide">
+          {t('pointChallenge')}
+        </span>
+        <span className="text-xs text-mj-bone/50">
+          {t('homeChallengeProgress', String(completedCount), String(totalCount))}
+        </span>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 py-3 flex flex-col gap-2 bg-mj-bone/4">
+        <p className="text-sm text-mj-bone/70">
+          {isCreator ? t('challengeYouCreated') : t('challengeCreatedBy', creatorHandle)}
+        </p>
+        <p className="text-xs text-mj-bone/50">
+          {t('challengeRoundsLabel', String(challenge.config.numRounds))}
+          {SEP_DOT}
+          {t(difficultyKey)}
+        </p>
+
+        {canStart && (
+          <button
+            onClick={() => void handleStart()}
+            disabled={startGame.isPending}
+            className="mt-1 w-full py-3 rounded-xl font-bold text-sm text-mj-ink btn-heirloom disabled:opacity-70"
+          >
+            {startGame.isPending ? '…' : t('challengeStartGame')}
+          </button>
+        )}
+        {canResume && (
+          <button
+            onClick={handleResume}
+            className="mt-1 w-full py-3 rounded-xl font-bold text-sm text-mj-ink btn-heirloom"
+          >
+            {t('challengeResumeGame')}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OpenChallengesSection() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const mySub = useAuthStore((s) => s.user?.sub ?? '');
+  const { data: challenges } = useChallenges();
+
+  const actionable = (challenges ?? [])
+    .filter(
+      (c) =>
+        (c.myStatus === 'pending' || c.myStatus === 'accepted') &&
+        c.status !== 'completed' &&
+        c.status !== 'cancelled',
+    )
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const oldest = actionable[0];
+
+  // Fetch full challenge detail for the card (needs participant gameIds for resume).
+  const { data: challenge, isLoading } = useChallenge(oldest?.challengeId ?? '');
+
+  if (!oldest) return null;
+
+  return (
+    <div className="mb-6">
+      <p className="text-xs font-bold text-mj-bone/50 uppercase tracking-wide mb-2 px-1">
+        {t('homeChallengesSection')}
+      </p>
+      <OpenChallengeCard challenge={challenge} mySub={mySub} isLoading={isLoading} />
+      {actionable.length > 1 && (
+        <button
+          onClick={() => navigate('/challenges')}
+          className="mt-2 w-full py-2.5 rounded-[14px] text-xs font-semibold text-mj-gold flex items-center justify-center gap-1 bg-mj-gold/8 border border-mj-gold/20"
+        >
+          {t('homeChallengeViewAll')}
+          <span aria-hidden="true">›</span>
+        </button>
+      )}
+    </div>
+  );
+}
 
 // ── Saved Games UI ─────────────────────────────────────────────────────────────
 
@@ -243,6 +384,9 @@ export function HomeStubPage() {
             </span>
           )}
         </div>
+
+        {/* Open Challenges — shown above saves when player has challenges to play */}
+        <OpenChallengesSection />
 
         {/* Saved Games — shown when the player has at least one save */}
         <SavedGamesSection />
