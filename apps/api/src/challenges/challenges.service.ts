@@ -649,6 +649,13 @@ export class ChallengesService {
     const myParticipant = item.participants[playerSub];
     if (!myParticipant) throw new ForbiddenException('You are not a participant in this challenge');
 
+    // Read resultsViewed from the user's index item (written by markResultsViewed).
+    const idxRes = await this.db.get({
+      Key: DK.userChallengeIdx(playerSub, item.createdAt, challengeId),
+    });
+    const resultsViewed =
+      (idxRes.Item as { resultsViewed?: boolean } | undefined)?.resultsViewed ?? false;
+
     const myCompleted = myParticipant.status === 'completed' || item.status === 'completed';
 
     // Build the participants list in a randomised order (to avoid leaking rank info
@@ -691,6 +698,7 @@ export class ChallengesService {
       winners: item.winners,
       createdAt: item.createdAt,
       completedAt: item.completedAt,
+      resultsViewed,
     };
   }
 

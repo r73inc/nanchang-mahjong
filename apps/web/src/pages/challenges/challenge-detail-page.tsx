@@ -30,11 +30,12 @@ export function ChallengeDetailPage() {
   const [confirmDecline, setConfirmDecline] = useState(false);
 
   // Auto-mark results as viewed when the player opens a completed challenge.
+  // Guard on resultsViewed to avoid spamming the mutation on every re-render.
   useEffect(() => {
-    if (challenge?.status === 'completed' && challengeId) {
+    if (challenge?.status === 'completed' && !challenge?.resultsViewed && challengeId) {
       void markViewed.mutateAsync(challengeId);
     }
-  }, [challenge?.status, challengeId]);
+  }, [challenge?.status, challenge?.resultsViewed, challengeId]);
 
   if (isLoading) {
     return (

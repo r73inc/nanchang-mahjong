@@ -67,6 +67,8 @@ export interface Challenge {
   winners?: string[];
   createdAt: string;
   completedAt?: string;
+  /** Whether the requesting user has already viewed the final scoreboard. */
+  resultsViewed: boolean;
 }
 
 /** Lightweight summary for list views (no per-participant scores). */
