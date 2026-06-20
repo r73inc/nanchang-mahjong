@@ -200,15 +200,8 @@ export function SettlementPreview({
               {/* Main row */}
               <button
                 onClick={() => hasTransfers && toggleExpand(seat)}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${isExpanded ? 'rounded-b-none' : ''}`}
-                style={
-                  isViewer
-                    ? {
-                        background: 'rgba(201,169,97,0.15)',
-                        border: '1px solid rgba(201,169,97,0.3)',
-                      }
-                    : { background: 'rgba(var(--felt-ink-rgb),0.05)' }
-                }
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${isExpanded ? 'rounded-b-none' : ''} ${isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : ''}`}
+                style={!isViewer ? { background: 'rgba(var(--felt-ink-rgb),0.05)' } : undefined}
               >
                 <div className="flex items-center gap-2 flex-1 text-left min-w-0">
                   <span className="text-sm font-bold shrink-0" style={{ color: WIND_COLOR[wind] }}>
@@ -283,14 +276,14 @@ export function SettlementPreview({
               {/* Expanded per-player breakdown */}
               {isExpanded && hasTransfers && (
                 <div
-                  className="flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl"
+                  className={`flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl ${isViewer ? 'bg-mj-gold/10 border-mj-gold/20' : ''}`}
                   style={
-                    isViewer
-                      ? { background: 'rgba(201,169,97,0.10)', borderColor: 'rgba(201,169,97,0.2)' }
-                      : {
+                    !isViewer
+                      ? {
                           background: 'rgba(var(--felt-ink-rgb),0.03)',
                           borderColor: 'rgba(var(--felt-ink-rgb),0.08)',
                         }
+                      : undefined
                   }
                 >
                   {transfers.map((line, li) => (
