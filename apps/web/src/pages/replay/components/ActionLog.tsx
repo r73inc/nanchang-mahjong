@@ -45,7 +45,7 @@ export function ActionLog({ steps, currentIdx, onPick }: ActionLogProps) {
   return (
     <div
       ref={logRef}
-      className="rounded-xl overflow-y-auto max-h-60 border border-[rgba(var(--felt-ink-rgb),0.08)] bg-[rgba(var(--felt-ink-rgb),0.02)]"
+      className="rounded-xl overflow-y-auto max-h-60 border border-mj-ink/[8%] bg-mj-ink/[2%]"
     >
       {steps.map((s, n) => {
         if (!s.event) return null;
@@ -61,9 +61,9 @@ export function ActionLog({ steps, currentIdx, onPick }: ActionLogProps) {
             key={n}
             data-step={n}
             onClick={() => onPick(n)}
-            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left border-b border-b-[rgba(var(--felt-ink-rgb),0.04)] border-l-[3px] ${
-              isCurrent ? 'bg-mj-gold/12 border-l-mj-gold' : 'bg-transparent border-l-transparent'
-            } ${past ? 'text-mj-bone' : 'text-[rgba(var(--felt-ink-rgb),0.35)]'}`}
+            className={`flex w-full items-center gap-2 px-3 py-1.5 text-left border-b border-b-mj-ink/[4%] border-l-[3px] ${
+              isCurrent ? 'bg-mj-gold/12 border-l-mj-gold' : 'border-l-transparent'
+            } ${past ? 'text-mj-bone' : 'text-mj-ink/35'}`}
           >
             <span className="font-mono text-[9px] font-bold text-mj-bone/40 w-5 shrink-0">
               {String(n).padStart(2, '0')}

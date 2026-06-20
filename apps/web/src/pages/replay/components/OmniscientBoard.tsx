@@ -27,8 +27,12 @@ import {
   getSeatFromEvent,
 } from './PlaybackControls';
 
-// Events that carry a tile field — used to avoid `as object` casts
-type EventWithTile = Extract<GameEvent, { tile: TileType }>;
+// Returns the tile carried by an event, or null when the event kind has none.
+// TS 5.7 `in` narrowing correctly resolves event.tile to TileType for the
+// union members that carry the field (draw, discard, pung, kong_*, chow, sacking_dealer).
+function getTileFromEvent(event: GameEvent): TileType | null {
+  return 'tile' in event ? event.tile : null;
+}
 
 // ── Wind badge ────────────────────────────────────────────────────────────────
 
@@ -142,7 +146,7 @@ function CentralDiscardPool({
 }) {
   const { t } = useI18n();
   return (
-    <div className="rounded-xl p-2 h-full flex flex-col gap-1 min-w-[120px] border border-[rgba(var(--felt-ink-rgb),0.08)] bg-[rgba(var(--felt-ink-rgb),0.05)]">
+    <div className="rounded-xl p-2 h-full flex flex-col gap-1 min-w-[120px] border border-mj-ink/[8%] bg-mj-ink/5">
       <p className="text-[8px] font-bold tracking-widest uppercase text-mj-bone/30 text-center">
         {t('replayDiscardPool')}
       </p>
@@ -209,9 +213,10 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
   const { state, event, claimedDiscardIndices } = step;
 
   const activeSeat = event ? getSeatFromEvent(event) : null;
+  const actionTile = event ? getTileFromEvent(event) : null;
 
   return (
-    <div className="rounded-2xl overflow-hidden relative border border-[rgba(var(--felt-ink-rgb),0.10)] bg-[rgba(var(--felt-ink-rgb),0.03)]">
+    <div className="rounded-2xl overflow-hidden relative border border-mj-ink/10 bg-mj-ink/5">
       {/* Active-action banner */}
       {event && (
         <div
@@ -229,7 +234,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
           >
             {activeSeat !== null ? seatMap[activeSeat] : ''}
           </span>
-          {'tile' in event && <MahjongTile2D tile={(event as EventWithTile).tile} size="xs" />}
+          {actionTile && <MahjongTile2D tile={actionTile} size="xs" />}
         </div>
       )}
 
@@ -281,7 +286,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
 
       {/* Jing indicator strip */}
       {state.jingPrimary && (
-        <div className="px-3 py-1.5 flex items-center gap-2 border-t border-[rgba(var(--felt-ink-rgb),0.08)]">
+        <div className="px-3 py-1.5 flex items-center gap-2 border-t border-mj-ink/[8%]">
           <span className="text-[9px] font-bold tracking-widest uppercase text-mj-bone/30">
             {t('replayJingIndicator')}
           </span>
@@ -294,7 +299,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
 
       {/* Overlay (e.g. "Match Concluded") */}
       {overlay && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[rgba(var(--felt-ink-rgb),0.82)] backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-mj-ink/[82%] backdrop-blur-sm">
           {overlay}
         </div>
       )}
