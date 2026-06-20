@@ -18,11 +18,6 @@ import { useRoomStore } from '../../stores/room.store';
 import { useJoinRestore } from '../../hooks/use-saves';
 import { connectSocket } from '../../lib/socket';
 import { useAuthStore } from '../../stores/auth.store';
-import { useChallenges } from '../../hooks/use-challenges';
-import type { ChallengeSummary, ChallengeParticipantStatus } from '@nanchang/shared';
-
-const BULLET = '·';
-const INFO_GLYPH = 'ⓘ' as const;
 
 export function LobbyPage() {
   const { t } = useI18n();
@@ -35,7 +30,6 @@ export function LobbyPage() {
 
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
   const [code, setCode] = useState('');
-  const [showChallengeInfo, setShowChallengeInfo] = useState(false);
 
   // Rejoin card — shown when a gameId was stored by game-page before navigating away.
   const [activeGameId, setActiveGameId] = useState<string | null>(() =>
@@ -48,18 +42,6 @@ export function LobbyPage() {
   }
 
   const accessToken = useAuthStore((s) => s.accessToken);
-  const { data: challenges } = useChallenges();
-
-  // Challenges the user should see in the lobby:
-  // - Waiting for their action (pending invite or accepted but not yet played)
-  // - They already completed but the overall challenge is still open (waiting for others)
-  const actionableChallenges = (challenges ?? [])
-    .filter(
-      (c) =>
-        c.status === 'open' &&
-        (c.myStatus === 'pending' || c.myStatus === 'accepted' || c.myStatus === 'completed'),
-    )
-    .slice(0, 3);
 
   /** Ensure the socket is connected before navigating to the room screen. */
   function ensureSocket() {
@@ -95,7 +77,7 @@ export function LobbyPage() {
   }
 
   return (
-    <ScreenShell title={t('joinRoom')} onBack={() => navigate('/home')}>
+    <ScreenShell title={t('joinRoom')} onBack={() => navigate('/play')}>
       <div className="px-4 py-6 flex flex-col gap-6">
         {/* ── Rejoin in-progress game ─────────────────────────────────── */}
         {activeGameId && (
@@ -169,13 +151,8 @@ export function LobbyPage() {
           <button
             onClick={handleCreate}
             disabled={loading}
-            className="w-full py-3.5 rounded-[14px] font-bold text-sm text-mj-ink"
-            style={{
-              background: loading
-                ? 'rgba(201,169,97,0.5)'
-                : 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
-              boxShadow: loading ? 'none' : '0 6px 18px rgba(201,169,97,0.3)',
-            }}
+            className={`w-full py-3.5 rounded-[14px] font-bold text-sm text-mj-ink${loading ? '' : ' btn-heirloom-sm'}`}
+            style={loading ? { background: 'rgba(201,169,97,0.5)' } : undefined}
           >
             {loading ? t('creating') : t('createRoom')}
           </button>
@@ -215,7 +192,13 @@ export function LobbyPage() {
               <input
                 type="text"
                 value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const raw = e.target.value
+                    .replace(/[^A-Za-z0-9]/g, '')
+                    .toUpperCase()
+                    .slice(0, 6);
+                  setCode(raw.length > 2 ? `${raw.slice(0, 2)}-${raw.slice(2)}` : raw);
+                }}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                 placeholder={t('roomCodePlaceholder')}
                 maxLength={7}
@@ -253,154 +236,7 @@ export function LobbyPage() {
             </div>
           )}
         </div>
-
-        {/* ── Point Challenge ─────────────────────────────────────────────── */}
-        <div
-          className="rounded-2xl p-5"
-          style={{
-            background: 'rgba(90,60,120,0.08)',
-            border: '1px solid rgba(150,100,200,0.25)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <h2 className="text-base font-bold text-mj-bone">{t('pointChallenge')}</h2>
-              <button
-                onClick={() => setShowChallengeInfo(true)}
-                aria-label={t('pointChallengeInfoLabel')}
-                style={{
-                  width: 15,
-                  height: 15,
-                  borderRadius: '50%',
-                  border: '1px solid rgba(150,100,200,0.4)',
-                  color: 'rgba(150,100,200,0.7)',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  lineHeight: 1,
-                }}
-              >
-                {INFO_GLYPH}
-              </button>
-            </div>
-            <button
-              onClick={() => navigate('/challenges')}
-              className="text-xs font-semibold"
-              style={{ color: 'rgba(150,100,200,0.9)' }}
-            >
-              {t('challengeViewAll')}
-            </button>
-          </div>
-          <p className="text-xs text-mj-bone/60 mb-4">{t('pointChallengeSub')}</p>
-
-          {/* Open challenges that need action */}
-          {actionableChallenges.length > 0 && (
-            <div className="flex flex-col gap-2 mb-4">
-              {actionableChallenges.map((c) => (
-                <ChallengeSummaryRow
-                  key={c.challengeId}
-                  challenge={c}
-                  onClick={() => navigate(`/challenges/${c.challengeId}`)}
-                />
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={() => navigate('/challenges/create')}
-            className="w-full py-3.5 rounded-[14px] font-bold text-sm"
-            style={{
-              background: 'rgba(150,100,200,0.15)',
-              border: '1px solid rgba(150,100,200,0.4)',
-              color: 'rgba(190,150,240,0.95)',
-            }}
-          >
-            {t('challengeCreate')}
-          </button>
-        </div>
       </div>
-
-      {/* ── Point Challenge info modal ──────────────────────────────────────── */}
-      {showChallengeInfo && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
-          onClick={() => setShowChallengeInfo(false)}
-        >
-          <div
-            className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-3"
-            style={{ background: '#1c1c1c', border: '1px solid rgba(150,100,200,0.2)' }}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('pointChallengeInfoLabel')}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-bold text-mj-bone">{t('pointChallenge')}</h3>
-            <p className="text-sm text-mj-bone/70 leading-relaxed">{t('pointChallengeInfo')}</p>
-            <button
-              onClick={() => setShowChallengeInfo(false)}
-              className="self-end px-4 py-2 rounded-xl text-xs font-bold"
-              style={{
-                background: 'rgba(150,100,200,0.15)',
-                border: '1px solid rgba(150,100,200,0.3)',
-                color: 'rgba(190,150,240,0.9)',
-              }}
-            >
-              {t('settingInfoClose')}
-            </button>
-          </div>
-        </div>
-      )}
     </ScreenShell>
-  );
-}
-
-// ── Internal helper ───────────────────────────────────────────────────────────
-
-function ChallengeSummaryRow({
-  challenge,
-  onClick,
-}: {
-  challenge: ChallengeSummary;
-  onClick: () => void;
-}) {
-  const { t } = useI18n();
-  const myStatusKey =
-    `challengeStatus${challenge.myStatus.charAt(0).toUpperCase()}${challenge.myStatus.slice(1)}` as never;
-  const statusColor: Record<ChallengeParticipantStatus, string> = {
-    pending: '#c9a961',
-    accepted: 'rgba(90,175,90,0.9)',
-    completed: 'rgba(var(--felt-ink-rgb),0.5)',
-    declined: 'rgba(192,57,43,0.8)',
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl text-left w-full"
-      style={{ background: 'rgba(150,100,200,0.07)', border: '1px solid rgba(150,100,200,0.2)' }}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-mj-bone truncate">
-          {t('challengeCreatedBy').replace('{{0}}', challenge.creatorHandle)}
-        </p>
-        <p className="text-xs text-mj-bone/50">
-          {t('challengeHandsLabel').replace('{{0}}', String(challenge.config.numRounds))} {BULLET}{' '}
-          {challenge.completedCount}/{challenge.participantCount}{' '}
-          {t('challengeStatusCompleted').toLowerCase()}
-        </p>
-      </div>
-      <span
-        className="text-xs font-bold flex-shrink-0"
-        style={{ color: statusColor[challenge.myStatus] }}
-      >
-        {t(myStatusKey)}
-      </span>
-    </button>
   );
 }

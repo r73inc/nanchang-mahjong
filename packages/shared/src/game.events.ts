@@ -248,6 +248,12 @@ export interface SettlementPreviewPayload {
   nextTileSeatCounts: [number, number, number, number];
   /** Preview score delta (zero-sum) for the 1pt indicator tile. */
   nextTileDelta: [number, number, number, number];
+  /**
+   * True when exactly one player holds any settlement tile (2pt or 1pt),
+   * triggering the monopoly doubling rule. The combined delta values already
+   * reflect the doubling; this flag is for UI display only.
+   */
+  isMonopoly?: boolean;
 }
 
 /**

@@ -46,6 +46,7 @@ function buildTransferLines(
   seat: number,
   settlementPreview: SettlementPreviewPayload,
   seatNames: string[],
+  multiplier: number,
 ): TransferLine[] {
   const lines: TransferLine[] = [];
   const otherCount = settlementPreview.seatCounts.length - 1;
@@ -55,14 +56,14 @@ function buildTransferLines(
     lines.push({
       tile: settlementPreview.settlementTile,
       direction: 'received',
-      amount: settlementPreview.seatCounts[seat] * 2 * otherCount,
+      amount: settlementPreview.seatCounts[seat] * 2 * otherCount * multiplier,
     });
   }
   if (settlementPreview.nextTileSeatCounts[seat] > 0) {
     lines.push({
       tile: settlementPreview.nextTile,
       direction: 'received',
-      amount: settlementPreview.nextTileSeatCounts[seat] * otherCount,
+      amount: settlementPreview.nextTileSeatCounts[seat] * otherCount * multiplier,
     });
   }
 
@@ -74,7 +75,7 @@ function buildTransferLines(
       lines.push({
         tile: settlementPreview.settlementTile,
         direction: 'paid',
-        amount: settlementPreview.seatCounts[j] * 2,
+        amount: settlementPreview.seatCounts[j] * 2 * multiplier,
         otherSeatName: jName,
       });
     }
@@ -82,7 +83,7 @@ function buildTransferLines(
       lines.push({
         tile: settlementPreview.nextTile,
         direction: 'paid',
-        amount: settlementPreview.nextTileSeatCounts[j],
+        amount: settlementPreview.nextTileSeatCounts[j] * multiplier,
         otherSeatName: jName,
       });
     }
@@ -124,11 +125,12 @@ export function SettlementPreview({
   };
 
   const seatNames = snapshot.seats.map((s) => s.seatName);
+  const multiplier = settlementPreview.isMonopoly ? 2 : 1;
 
   const seatDeltas = settlementPreview.delta.map((delta2pt, i) => ({
     seat: i,
-    totalDelta: delta2pt + settlementPreview.nextTileDelta[i],
-    transfers: buildTransferLines(i, settlementPreview, seatNames),
+    totalDelta: (delta2pt + settlementPreview.nextTileDelta[i]) * multiplier,
+    transfers: buildTransferLines(i, settlementPreview, seatNames, multiplier),
   }));
 
   return (
@@ -151,6 +153,13 @@ export function SettlementPreview({
               String(settlementPreview.dice[1]),
             )}
           </p>
+        )}
+        {settlementPreview.isMonopoly && (
+          <div className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full bg-mj-gold/[18%] border border-mj-gold/45">
+            <span className="text-xs font-bold text-mj-gold tracking-wide">
+              {t('settlementMonopoly')}
+            </span>
+          </div>
         )}
       </div>
 
@@ -191,15 +200,8 @@ export function SettlementPreview({
               {/* Main row */}
               <button
                 onClick={() => hasTransfers && toggleExpand(seat)}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${isExpanded ? 'rounded-b-none' : ''}`}
-                style={
-                  isViewer
-                    ? {
-                        background: 'rgba(201,169,97,0.15)',
-                        border: '1px solid rgba(201,169,97,0.3)',
-                      }
-                    : { background: 'rgba(var(--felt-ink-rgb),0.05)' }
-                }
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${isExpanded ? 'rounded-b-none' : ''} ${isViewer ? 'bg-mj-gold/15 border border-mj-gold/30' : ''}`}
+                style={!isViewer ? { background: 'rgba(var(--felt-ink-rgb),0.05)' } : undefined}
               >
                 <div className="flex items-center gap-2 flex-1 text-left min-w-0">
                   <span className="text-sm font-bold shrink-0" style={{ color: WIND_COLOR[wind] }}>
@@ -274,14 +276,14 @@ export function SettlementPreview({
               {/* Expanded per-player breakdown */}
               {isExpanded && hasTransfers && (
                 <div
-                  className="flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl"
+                  className={`flex flex-col gap-2 px-4 py-2.5 border-t rounded-b-xl ${isViewer ? 'bg-mj-gold/10 border-mj-gold/20' : ''}`}
                   style={
-                    isViewer
-                      ? { background: 'rgba(201,169,97,0.10)', borderColor: 'rgba(201,169,97,0.2)' }
-                      : {
+                    !isViewer
+                      ? {
                           background: 'rgba(var(--felt-ink-rgb),0.03)',
                           borderColor: 'rgba(var(--felt-ink-rgb),0.08)',
                         }
+                      : undefined
                   }
                 >
                   {transfers.map((line, li) => (

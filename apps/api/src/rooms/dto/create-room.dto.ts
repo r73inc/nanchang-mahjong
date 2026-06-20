@@ -7,8 +7,14 @@ export class BotConfigDto {
   @Max(3)
   count!: number;
 
+  @IsOptional()
   @IsIn(['easy', 'normal', 'hard', 'psychic'])
-  difficulty!: 'easy' | 'normal' | 'hard' | 'psychic';
+  difficulty?: 'easy' | 'normal' | 'hard' | 'psychic';
+
+  // Per-bot difficulties (index 0 = seat 3, 1 = seat 2, 2 = seat 1).
+  // When provided overrides `difficulty` for each individual bot.
+  @IsOptional()
+  difficulties?: ('easy' | 'normal' | 'hard' | 'psychic')[];
 }
 
 export class RoomSettingsDto {
@@ -51,6 +57,10 @@ export class RoomSettingsDto {
   @Min(0)
   @Max(60)
   claimWindowSecs?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isSolo?: boolean;
 }
 
 export class CreateRoomDto {

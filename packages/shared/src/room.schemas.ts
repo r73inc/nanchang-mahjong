@@ -65,6 +65,12 @@ export const RoomSettingsSchema = z.object({
    * 0 = unlimited (window only closes when all eligible seats respond).
    */
   claimWindowSecs: z.number().int().min(0).max(60).default(0),
+
+  /**
+   * Solo mode flag — set at room-creation time when the host creates a 1-vs-3-bots game.
+   * Immutable after creation. The room page uses this to hide bot-kick controls.
+   */
+  isSolo: z.boolean().default(false),
 });
 export type RoomSettings = z.infer<typeof RoomSettingsSchema>;
 
@@ -98,8 +104,10 @@ export interface RoomState {
 export const BotConfigSchema = z.object({
   /** Number of bot seats to fill (0–3). */
   count: z.number().int().min(0).max(3),
-  /** Difficulty applied to all bots in this room. */
-  difficulty: z.enum(['easy', 'normal', 'hard', 'psychic']),
+  /** Difficulty applied to all bots (fallback when `difficulties` is absent). */
+  difficulty: z.enum(['easy', 'normal', 'hard', 'psychic']).optional(),
+  /** Per-bot difficulties (index 0 = first bot slot). Overrides `difficulty`. */
+  difficulties: z.array(z.enum(['easy', 'normal', 'hard', 'psychic'])).optional(),
 });
 export type BotConfig = z.infer<typeof BotConfigSchema>;
 
@@ -109,7 +117,9 @@ export const CreateRoomSchema = z.object({
    *  with the requested number of bot seats at the chosen difficulty. */
   bots: BotConfigSchema.optional(),
 });
-export type CreateRoomInput = z.infer<typeof CreateRoomSchema>;
+// Use z.input so callers can omit fields that have schema-level defaults
+// (rounds, viewMode, isSolo, etc.) — Zod fills them in on parse.
+export type CreateRoomInput = z.input<typeof CreateRoomSchema>;
 
 export const JoinRoomSchema = z.object({
   code: z.string().min(1, 'Room code is required'),

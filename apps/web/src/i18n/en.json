@@ -152,6 +152,27 @@
   "adminSaving": "Saving…",
   "adminDisabledBadge": "Disabled",
 
+  "playNanchang": "Play Nanchang Mahjong",
+  "playNanchangSub": "Choose your game mode",
+  "playModeWithFriends": "Play with Friends",
+  "playModeWithFriendsSub": "Create or join a private room",
+  "playModeSolo": "Play Solo",
+  "playModeSoloSub": "1 vs 3 — you against three bots",
+  "playModeChallenges": "Challenges",
+  "playModeChallengesSub": "Compete across multiple sessions",
+
+  "playSoloTitle": "Play Solo",
+  "playSoloBotNote": "Set a difficulty for each bot opponent",
+  "playSoloStartBtn": "Create Solo Game",
+  "playSoloStarting": "Setting up…",
+
+  "playChallengesTitle": "Challenges",
+  "playChallengesPointChallengeTitle": "Point Challenge",
+  "playChallengesPointChallengeSub": "Challenge friends to accumulate points across multiple hands",
+  "playChallengesStart": "Start a Challenge",
+  "playChallengesViewAll": "View All",
+  "playChallengesMoreSoon": "More challenge modes coming soon",
+
   "playFriends": "Play with Friends",
   "playFriendsSub": "Create or join a private room",
   "joinRoom": "Join a Room",
@@ -190,7 +211,10 @@
 
   "botCountLabel": "Computer Players",
   "botCountNone": "None — friends only",
-  "botDifficultyLabel": "Bot Difficulty",
+  "botDifficultyLabel": "Bot Difficulties",
+  "botSlot1": "Bot 1",
+  "botSlot2": "Bot 2",
+  "botSlot3": "Bot 3",
   "botDifficultyEasy": "Easy",
   "botDifficultyNormal": "Normal",
   "botBadge": "BOT",
@@ -205,6 +229,7 @@
   "botDifficultyPsychic": "Psychic",
   "botDifficultyPsychicFull": "Psychic Bot",
   "roomAddBot": "Add Bot",
+  "botChangeDifficulty": "Change Difficulty",
 
   "settingStyleLabel": "Style",
   "settingStyle": "Nanchang (南昌)",
@@ -340,6 +365,8 @@
   "diceRollButton": "Roll Dice",
   "diceRollWaiting": "Waiting for {{0}} to roll…",
   "diceRollResult": "{{0}} + {{1}} = {{2}}",
+  "diceRollWallSource": "Tiles dealt from {{0}}'s wall",
+  "diceRollDistributeHand": "Distribute Hand",
 
   "handRevealTitle": "Hand Complete",
   "handRevealResultDraw": "Draw — No Winner",
@@ -359,6 +386,7 @@
   "settlementReceived": "Received {{0}}",
   "settlementPaid": "Paid {{0}}",
   "settlementEven": "—",
+  "settlementMonopoly": "Solo Hold ×2",
   "settlementReceivedFrom": "Received {{0}} from {{1}}",
   "settlementPaidTo": "Paid {{0}} to {{1}}",
   "handRevealBreakdownHandNetLabel": "This hand",
@@ -656,6 +684,10 @@
   "challengePlaceSecond": "2nd",
   "challengePlaceThird": "3rd",
   "challengePlaceFourth": "4th",
+
+  "homeChallengesSection": "Challenges",
+  "homeChallengeProgress": "{{0}} of {{1}} finished",
+  "homeChallengeViewAll": "See All Challenges",
 
   "savedGamesTitle": "Saved Games",
   "savedGamesAutoLabel": "Auto Save",

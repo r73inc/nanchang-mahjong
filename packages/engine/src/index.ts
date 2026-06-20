@@ -116,6 +116,7 @@ export {
   calculateSpiritSettlement,
   calculateEffectiveSpiritScores,
   calculateOpeningJingSettlement,
+  checkMonopoly,
 } from './scoring';
 
 // ── Engine ────────────────────────────────────────────────────────────────────

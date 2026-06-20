@@ -10,6 +10,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { AvatarImg } from '../../components/ui/avatar-img';
+import { InfoIconButton } from '../../components/ui/info-icon-button';
 import { useI18n } from '../../i18n';
 import type { StringKey } from '../../i18n/strings';
 import { useRoomStore } from '../../stores/room.store';
@@ -30,9 +31,6 @@ const botDifficultyTranslationMap: Record<BotDifficulty, StringKey> = {
   psychic: 'botDifficultyPsychicFull',
 };
 
-// Purely decorative info glyph — constant avoids i18n/no-literal-string lint
-const INFO_GLYPH = 'ⓘ' as const;
-
 // API values for the view-mode toggle — not i18n strings
 const VIEW_MODES = ['3D', '2D'] as const;
 type ViewMode = (typeof VIEW_MODES)[number];
@@ -52,34 +50,6 @@ const MAX_HANDS_OPTIONS = [1, 2, 3, 4] as const;
 const CLAIM_WINDOW_OPTIONS = [5, 8, 15, 30, 0] as const;
 type ClaimWindowOption = (typeof CLAIM_WINDOW_OPTIONS)[number];
 
-function InfoButton({ onClick }: { onClick: () => void }) {
-  const { t } = useI18n();
-  return (
-    <button
-      onClick={onClick}
-      aria-label={t('settingInfoOpen')}
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: '50%',
-        border: '1px solid rgba(var(--felt-ink-rgb),0.25)',
-        color: 'rgba(var(--felt-ink-rgb),0.35)',
-        fontSize: 9,
-        fontWeight: 700,
-        cursor: 'pointer',
-        background: 'none',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        lineHeight: 1,
-      }}
-    >
-      {INFO_GLYPH}
-    </button>
-  );
-}
-
 export function RoomPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -90,8 +60,16 @@ export function RoomPage() {
   const error = useRoomStore((s) => s.error);
   const { clearRoom } = useRoomStore();
 
-  const { getRoomByCode, leaveRoom, setReady, kickSeat, addBotToSeat, startGame, updateSettings } =
-    useRoomActions();
+  const {
+    getRoomByCode,
+    leaveRoom,
+    setReady,
+    kickSeat,
+    addBotToSeat,
+    updateBotDifficulty,
+    startGame,
+    updateSettings,
+  } = useRoomActions();
   const user = useAuthStore((s) => s.user);
 
   // Fetch room on mount (in case of hard-refresh or direct navigation).
@@ -156,6 +134,8 @@ export function RoomPage() {
 
   // Which empty seat is showing the bot difficulty picker (null = none open)
   const [addingBotToSeat, setAddingBotToSeat] = useState<number | null>(null);
+  // Which bot seat in a solo room is showing the difficulty-change picker
+  const [changingBotDifficulty, setChangingBotDifficulty] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   // Which setting's info modal is open (stores the info i18n key, null = closed)
   const [infoKey, setInfoKey] = useState<string | null>(null);
@@ -164,6 +144,12 @@ export function RoomPage() {
     if (!room) return;
     setAddingBotToSeat(null);
     await addBotToSeat(room.roomId, seatIdx, difficulty);
+  }
+
+  async function handleChangeBotDifficulty(seatIdx: number, difficulty: BotDifficulty) {
+    if (!room) return;
+    setChangingBotDifficulty(null);
+    await updateBotDifficulty(room.roomId, seatIdx, difficulty);
   }
 
   async function handleCopy() {
@@ -233,6 +219,8 @@ export function RoomPage() {
   // Host and bots are implicitly ready — host confirms by clicking Start.
   const allReady =
     filledSeats.length === 4 && filledSeats.every((s) => s.isHost || s.isBot || s.ready);
+  // Solo mode: immutable flag set at room creation — bots cannot be kicked.
+  const isSoloRoom = room.settings.isSolo ?? false;
 
   const botDisplayName = (handle: string) => {
     if (handle === 'MilkyBot') return t('botNameMilky');
@@ -362,14 +350,7 @@ export function RoomPage() {
                       </p>
                       {/* Bot chip */}
                       {seat.isBot && (
-                        <span
-                          className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider flex-shrink-0"
-                          style={{
-                            background: 'rgba(90,125,140,0.2)',
-                            border: '1px solid rgba(90,125,140,0.5)',
-                            color: '#7ab5cc',
-                          }}
-                        >
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider flex-shrink-0 bg-mj-bot-bg/20 border border-mj-bot-bg/50 text-mj-bot">
                           {t('botBadge')}
                         </span>
                       )}
@@ -384,6 +365,48 @@ export function RoomPage() {
                             : t('notReady')}
                     </p>
 
+                    {/* ── Bot difficulty changer — host only, bot seats in solo rooms ── */}
+                    {isHost && isSoloRoom && seat.isBot && room.status === 'waiting' && (
+                      <div className="mt-2">
+                        {changingBotDifficulty === seat.seatIdx ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {(['easy', 'normal', 'hard', 'psychic'] as BotDifficulty[]).map(
+                              (diff) => {
+                                const isPsychic = diff === 'psychic';
+                                const isActive = seat.botDifficulty === diff;
+                                return (
+                                  <button
+                                    key={diff}
+                                    onClick={() =>
+                                      !isActive &&
+                                      void handleChangeBotDifficulty(seat.seatIdx, diff)
+                                    }
+                                    disabled={isActive}
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${isActive ? 'cursor-default' : 'cursor-pointer'} ${isPsychic ? (isActive ? 'bg-mj-psychic-bg/35 border-mj-psychic-bg/70 text-mj-psychic' : 'bg-mj-psychic-bg/[12%] border-mj-psychic-bg/30 text-mj-psychic') : isActive ? 'bg-mj-bot-bg/35 border-mj-bot-bg/70 text-mj-bot' : 'bg-mj-bot-bg/[12%] border-mj-bot-bg/30 text-mj-bot'}`}
+                                  >
+                                    {t(botDifficultyTranslationMap[diff])}
+                                  </button>
+                                );
+                              },
+                            )}
+                            <button
+                              onClick={() => setChangingBotDifficulty(null)}
+                              className="text-[10px] text-mj-bone/40 px-1.5 py-1"
+                            >
+                              {t('cancel')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setChangingBotDifficulty(seat.seatIdx)}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-mj-bot-bg/[12%] border border-mj-bot-bg/30 text-mj-bot"
+                          >
+                            {t('botChangeDifficulty')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     {/* ── Bot picker — host only, empty seats only ──────── */}
                     {isHost && isEmpty && room.status === 'waiting' && (
                       <div className="mt-2">
@@ -396,16 +419,7 @@ export function RoomPage() {
                                   <button
                                     key={diff}
                                     onClick={() => void handleAddBot(seat.seatIdx, diff)}
-                                    className="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                                    style={{
-                                      background: isPsychic
-                                        ? 'rgba(130,80,180,0.2)'
-                                        : 'rgba(90,125,140,0.2)',
-                                      border: isPsychic
-                                        ? '1px solid rgba(130,80,180,0.5)'
-                                        : '1px solid rgba(90,125,140,0.5)',
-                                      color: isPsychic ? '#c090e8' : '#7ab5cc',
-                                    }}
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${isPsychic ? 'bg-mj-psychic-bg/20 border-mj-psychic-bg/50 text-mj-psychic' : 'bg-mj-bot-bg/20 border-mj-bot-bg/50 text-mj-bot'}`}
                                   >
                                     {t(botDifficultyTranslationMap[diff])}
                                   </button>
@@ -423,12 +437,7 @@ export function RoomPage() {
                         ) : (
                           <button
                             onClick={() => setAddingBotToSeat(seat.seatIdx)}
-                            className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                            style={{
-                              background: 'rgba(90,125,140,0.12)',
-                              border: '1px solid rgba(90,125,140,0.3)',
-                              color: '#7ab5cc',
-                            }}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-mj-bot-bg/[12%] border border-mj-bot-bg/30 text-mj-bot"
                           >
                             {t('roomAddBot')}
                           </button>
@@ -440,30 +449,27 @@ export function RoomPage() {
                   {/* Ready badge — host and bots are always shown as ready */}
                   {!isEmpty && (seat.isHost || seat.isBot || seat.ready) && (
                     <span
-                      className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider"
-                      style={{
-                        background: seat.isBot ? 'rgba(90,125,140,0.2)' : 'rgba(31,122,77,0.2)',
-                        border: seat.isBot
-                          ? '1px solid rgba(90,125,140,0.5)'
-                          : '1px solid rgba(31,122,77,0.5)',
-                        color: seat.isBot ? '#7ab5cc' : '#7fc299',
-                      }}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider border ${seat.isBot ? 'bg-mj-bot-bg/20 border-mj-bot-bg/50 text-mj-bot' : 'bg-mj-win-deep/20 border-mj-win-deep/50 text-mj-win'}`}
                     >
                       {t('ready').toUpperCase()}
                     </span>
                   )}
 
-                  {/* Host kick button — bots can be kicked like any seat */}
-                  {isHost && !isEmpty && !isMe && room.status === 'waiting' && (
-                    <button
-                      onClick={() => handleKick(seat.seatIdx)}
-                      className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
-                      style={{ background: 'rgba(192,57,43,0.12)' }}
-                      aria-label={`Kick ${seat.handle ?? ''}`}
-                    >
-                      {t('kickPlayerBtn')}
-                    </button>
-                  )}
+                  {/* Host kick button — hidden for bots in solo rooms */}
+                  {isHost &&
+                    !isEmpty &&
+                    !isMe &&
+                    room.status === 'waiting' &&
+                    !(isSoloRoom && seat.isBot) && (
+                      <button
+                        onClick={() => handleKick(seat.seatIdx)}
+                        className="text-[10px] text-mj-loss-light font-semibold px-2 py-0.5 rounded-lg"
+                        style={{ background: 'rgba(192,57,43,0.12)' }}
+                        aria-label={`Kick ${seat.handle ?? ''}`}
+                      >
+                        {t('kickPlayerBtn')}
+                      </button>
+                    )}
                 </div>
               );
             })}
@@ -507,7 +513,10 @@ export function RoomPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {label}
-                  <InfoButton onClick={() => setInfoKey(infoK)} />
+                  <InfoIconButton
+                    ariaLabel={t('settingInfoOpen')}
+                    onClick={() => setInfoKey(infoK)}
+                  />
                 </span>
                 <span className="text-mj-gold font-semibold">{value}</span>
               </div>
@@ -520,7 +529,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingViewModeLabel')}
-                <InfoButton onClick={() => setInfoKey('settingViewModeInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingViewModeInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div className="flex gap-1.5" role="group" aria-label={t('settingViewModeLabel')}>
@@ -563,7 +575,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTerminationLabel')}
-                <InfoButton onClick={() => setInfoKey('settingTerminationInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingTerminationInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div
@@ -628,7 +643,10 @@ export function RoomPage() {
               >
                 <span className="flex items-center gap-1 text-mj-bone/70">
                   {t('settingRoundsLabel')}
-                  <InfoButton onClick={() => setInfoKey('settingRoundsInfo')} />
+                  <InfoIconButton
+                    ariaLabel={t('settingInfoOpen')}
+                    onClick={() => setInfoKey('settingRoundsInfo')}
+                  />
                 </span>
                 {isHost && room.status === 'waiting' ? (
                   <div className="flex gap-1.5" role="group" aria-label={t('settingRoundsLabel')}>
@@ -716,7 +734,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingClaimWindowLabel')}
-                <InfoButton onClick={() => setInfoKey('settingClaimWindowInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingClaimWindowInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <div
@@ -783,7 +804,10 @@ export function RoomPage() {
             >
               <span className="flex items-center gap-1 text-mj-bone/70">
                 {t('settingTopBottomJingLabel')}
-                <InfoButton onClick={() => setInfoKey('settingTopBottomJingInfo')} />
+                <InfoIconButton
+                  ariaLabel={t('settingInfoOpen')}
+                  onClick={() => setInfoKey('settingTopBottomJingInfo')}
+                />
               </span>
               {isHost && room.status === 'waiting' ? (
                 <button

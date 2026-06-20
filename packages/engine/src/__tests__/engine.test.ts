@@ -501,7 +501,13 @@ describe('Event log', () => {
     const g = startedGame(42);
     const tile = g.state.seats[0].hand[0];
     const after = g.discard(tile).passClaims();
-    // deal + jing_indicator + discard + draw
+    const kinds = after.events.map((e) => e.kind);
+    // All four milestone event types must be present in this sequence
+    expect(kinds).toContain('deal');
+    expect(kinds).toContain('jing_indicator');
+    expect(kinds).toContain('discard');
+    expect(kinds).toContain('draw');
+    // At least 4 events (deal + jing_indicator + discard + draw plus any settlements)
     expect(after.events.length).toBeGreaterThanOrEqual(4);
   });
 

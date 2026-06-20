@@ -2736,7 +2736,7 @@ function GameHistoryPanel({
           background: 'rgba(14,14,14,0.92)',
           border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
           borderRight: 'none',
-          borderRadius: '6px 0 0 6px',
+          borderRadius: '8px 0 0 8px',
           color: 'rgba(var(--felt-ink-rgb),0.5)',
           fontSize: 14,
           transition: 'right 0.22s ease',
@@ -3858,9 +3858,7 @@ function GameTable({
                 backdropFilter: 'blur(8px)',
               }}
             >
-              <span className="text-sm font-semibold" style={{ color: '#7ecb7e' }}>
-                {t('addToKongPrompt')}
-              </span>
+              <span className="text-sm font-semibold text-mj-win">{t('addToKongPrompt')}</span>
               <button
                 onClick={() => onKongAdd(canAddToKong)}
                 className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
@@ -4027,10 +4025,13 @@ export function GamePage() {
     if (handReveal) playPointTransfer();
   }, [handReveal, playPointTransfer]);
 
-  // Play point-transfer sound for opening spirit settlement toast.
+  // Play point-transfer sound when the settlement SCREEN becomes active.
+  // The opening_jing_settlement event arrives while the jing-reveal dice
+  // animation is still playing; deferring to the phase transition ensures
+  // the dice sound finishes before the coin sound starts.
   useEffect(() => {
-    if (toast?.kind === 'opening_settlement') playPointTransfer();
-  }, [toast, playPointTransfer]);
+    if (snapshot?.preGamePhase === 'settlement' && !diceAnimation) playPointTransfer();
+  }, [snapshot?.preGamePhase, diceAnimation, playPointTransfer]);
 
   // ── Loading timeout ───────────────────────────────────────────────────────────
   // If we haven't received a game:snapshot within GAME_JOIN_TIMEOUT_MS, the
@@ -4082,6 +4083,12 @@ export function GamePage() {
   useEffect(() => {
     if (snapshot?.phase === 'finished') localStorage.removeItem(ACTIVE_GAME_KEY);
   }, [snapshot?.phase]);
+
+  // Also clear on any terminal/error state so a destroyed backend session
+  // doesn't leave a stale rejoin card in the lobby indefinitely.
+  useEffect(() => {
+    if (gameError || timedOut || ended) localStorage.removeItem(ACTIVE_GAME_KEY);
+  }, [gameError, timedOut, ended]);
 
   // ── Back-button / navigation intercept ─────────────────────────────────────
   // Block any navigation attempt while the game is actively in progress.

@@ -33,7 +33,12 @@ import {
   addToKongOptions,
   chowOptions,
 } from './calls';
-import { calculateWinPayout, instantKongPayment, calculateOpeningJingSettlement } from './scoring';
+import {
+  calculateWinPayout,
+  instantKongPayment,
+  calculateOpeningJingSettlement,
+  checkMonopoly,
+} from './scoring';
 import type {
   GameState,
   GameEvent,
@@ -474,12 +479,15 @@ export class GameEngine {
       const nextInSeq = stepAbove(settlementTile);
       const scoreDelta1 = calculateOpeningJingSettlement(nextInSeq, this.state.seats, 1);
       // Combined zero-sum delta (both settlements applied together)
-      const scoreDelta = scoreDelta0.map((d, i) => d + scoreDelta1[i]) as [
+      let scoreDelta = scoreDelta0.map((d, i) => d + scoreDelta1[i]) as [
         number,
         number,
         number,
         number,
       ];
+      if (checkMonopoly(this.state.seats, settlementTile, nextInSeq)) {
+        scoreDelta = scoreDelta.map((d) => d * 2) as [number, number, number, number];
+      }
 
       const seatsAfterSettlement = [...this.state.seats] as GameState['seats'];
       for (let i = 0; i < 4; i++) {

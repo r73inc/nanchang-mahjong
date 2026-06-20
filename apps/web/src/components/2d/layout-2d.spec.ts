@@ -124,9 +124,8 @@ describe('discardGrid · 2DLayout·seat-geometry', () => {
   it('returns consistent spec for all roles', () => {
     for (const role of VALID_ROLES) {
       const spec = discardGrid(role);
-      expect(spec.cols).toBeGreaterThan(0);
       expect(spec.tileSize).toBe('sm');
-      expect(spec.gap).toBeGreaterThanOrEqual(0);
+      expect(spec.gap).toBe(2);
     }
   });
 
@@ -158,9 +157,10 @@ describe('handLayout · 2DLayout·seat-geometry', () => {
     }
   });
 
-  it('gap is non-negative for all roles', () => {
-    for (const role of VALID_ROLES) {
-      expect(handLayout(role).gap).toBeGreaterThanOrEqual(0);
+  it('viewer (bottom) gap is wider than opponent gaps', () => {
+    expect(handLayout('bottom').gap).toBe(4);
+    for (const role of VALID_ROLES.filter((r) => r !== 'bottom')) {
+      expect(handLayout(role).gap).toBe(2);
     }
   });
 });

@@ -16,7 +16,7 @@ export function ChallengesListPage() {
   const { data: challenges, isLoading } = useChallenges();
 
   return (
-    <ScreenShell title={t('challengesListTitle')} onBack={() => navigate('/lobby')}>
+    <ScreenShell title={t('challengesListTitle')} onBack={() => navigate('/play/challenges')}>
       <div className="px-4 py-6 flex flex-col gap-3">
         {isLoading ? (
           <div className="text-sm text-mj-bone/50 text-center py-12">…</div>

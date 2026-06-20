@@ -415,11 +415,6 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
     expect(isWinningHand(hand, JINGS)).toBe(true);
   });
 
-  it('pure jing pair is NOT allowed in standard hand (pair must have ≥1 natural)', () => {
-    // placeholder — see comment in test for full analysis
-    expect(true).toBe(true);
-  });
-
   it('seven pairs with one jing pair (1 allowed)', () => {
     // 1m1m 2m2m 3m3m 4m4m 1p1p 2p2p + jing jing (pair 7 using 2 jings)
     const JING7: TileType = '9s';
@@ -541,6 +536,35 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
       JING9S, // jing wildcard completes the west pair
     ];
     expect(isWinningHand(hand, [JING9S])).toBe(true);
+  });
+
+  it('pure jing pair is NOT allowed in standard hand (pair must have ≥1 natural)', () => {
+    // 3 complete suit melds (9 naturals) + 3 isolated tiles that cannot form
+    // a 4th meld + 2 jings.
+    //
+    // The only structurally plausible pair is jing+jing (pure-wildcard pair),
+    // which Nanchang rules forbid. A half-jing pair (natural+jing) is also
+    // impossible: using 1 jing for the pair leaves [1s, 9s, east] + 1 jing for
+    // the 4th meld, but those three tiles span incompatible suits/types and
+    // cannot form any valid meld even with jing assistance.
+    const JING2: TileType = '9p';
+    const hand: TileType[] = [
+      '1m',
+      '2m',
+      '3m', // complete chow
+      '4m',
+      '5m',
+      '6m', // complete chow
+      '7m',
+      '8m',
+      '9m', // complete chow
+      '1s', // isolated — far from 9s; no adjacent suit tile
+      '9s', // isolated — far from 1s
+      'east', // isolated honor — no other wind tiles present
+      JING2,
+      JING2, // pure-jing pair candidate (forbidden by rules)
+    ];
+    expect(isWinningHand(hand, [JING2])).toBe(false);
   });
 });
 
