@@ -193,26 +193,11 @@ export function LobbyPage() {
                 type="text"
                 value={code}
                 onChange={(e) => {
-                  const newVal = e.target.value.toUpperCase();
-                  const rawNew = newVal.replace(/-/g, '').slice(0, 6);
-                  const rawPrev = code.replace(/-/g, '');
-
-                  if (rawNew.length < rawPrev.length) {
-                    // Deletion — trust what the browser produced, just cap length.
-                    setCode(newVal.slice(0, 7));
-                  } else if (
-                    rawNew.length === rawPrev.length &&
-                    code.includes('-') &&
-                    !newVal.includes('-')
-                  ) {
-                    // Only the dash was deleted — show two raw chars, no dash.
-                    setCode(rawNew);
-                  } else {
-                    // Addition (or dash manually typed) — apply XX-XXXX format.
-                    setCode(
-                      rawNew.length >= 2 ? `${rawNew.slice(0, 2)}-${rawNew.slice(2)}` : rawNew,
-                    );
-                  }
+                  const raw = e.target.value
+                    .replace(/[^A-Za-z0-9]/g, '')
+                    .toUpperCase()
+                    .slice(0, 6);
+                  setCode(raw.length > 2 ? `${raw.slice(0, 2)}-${raw.slice(2)}` : raw);
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                 placeholder={t('roomCodePlaceholder')}

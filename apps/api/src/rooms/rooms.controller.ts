@@ -129,6 +129,22 @@ export class RoomsController {
     return room;
   }
 
+  // ── Update bot difficulty ──────────────────────────────────────────────────
+
+  /** Host atomically changes the difficulty of an existing bot seat. */
+  @Patch(':roomId/seats/:seatIdx/bot')
+  @HttpCode(HttpStatus.OK)
+  async updateBotDifficulty(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('roomId') roomId: string,
+    @Param('seatIdx', ParseIntPipe) seatIdx: number,
+    @Body() dto: AddBotDto,
+  ) {
+    const room = await this.service.updateBotDifficulty(roomId, seatIdx, dto.difficulty, user.sub);
+    this.gateway.broadcastRoomUpdate(room.roomId, room);
+    return room;
+  }
+
   // ── Settings ───────────────────────────────────────────────────────────────
 
   /** Host updates mutable pre-game settings (viewMode, ruleTopBottomJing, rounds, terminationType, claimWindowSecs). Broadcasts new room state. */

@@ -197,7 +197,6 @@ export class RoomsService {
     const botSeatPuts = Array.from({ length: botCount }, (_, i) => {
       const seatIdx = 3 - i; // seats 3, 2, 1 for bots 1, 2, 3
       const profile = shuffledProfiles[i];
-      // Per-bot difficulty: use difficulties[i] if provided, else fall back to default
       const botDifficulty: BotDifficulty = dto?.bots?.difficulties?.[i] ?? defaultDifficulty;
       return {
         Put: {
@@ -486,6 +485,60 @@ export class RoomsService {
               botProfileId: profile.id,
             },
             ConditionExpression: 'attribute_not_exists(PK)',
+          },
+        },
+        {
+          Update: {
+            TableName: this.db.tableName,
+            Key: DK.room(roomId),
+            UpdateExpression: 'SET #ttl = :ttl, idleAt = :now',
+            ExpressionAttributeNames: { '#ttl': 'ttl' },
+            ExpressionAttributeValues: {
+              ':ttl': this.ttlFromNow(),
+              ':now': now,
+            },
+          },
+        },
+      ],
+    });
+
+    return (await this.queryRoom(roomId))!;
+  }
+
+  /**
+   * Host atomically changes the difficulty of an existing bot seat.
+   * Updates botDifficulty and the bot userId in a single DDB transaction.
+   */
+  async updateBotDifficulty(
+    roomId: string,
+    seatIdx: number,
+    difficulty: BotDifficulty,
+    requestingUserId: string,
+  ): Promise<RoomState> {
+    const room = await this.queryRoom(roomId);
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.hostUserId !== requestingUserId)
+      throw new ForbiddenException('Only the host can change bot difficulty');
+    if (room.status !== 'waiting')
+      throw new BadRequestException('Cannot change seats during a game');
+
+    const seat = room.seats[seatIdx];
+    if (!seat) throw new BadRequestException('Invalid seat index');
+    if (!seat.isBot) throw new BadRequestException('Seat is not a bot');
+
+    const now = new Date().toISOString();
+
+    await this.db.transactWrite({
+      TransactItems: [
+        {
+          Update: {
+            TableName: this.db.tableName,
+            Key: DK.roomSeat(roomId, seatIdx),
+            UpdateExpression: 'SET botDifficulty = :diff, userId = :uid',
+            ExpressionAttributeValues: {
+              ':diff': difficulty,
+              ':uid': `bot-${difficulty}-${seatIdx}`,
+            },
           },
         },
         {

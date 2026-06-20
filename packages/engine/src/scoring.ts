@@ -253,6 +253,17 @@ export function calculateOpeningJingSettlement(
   return counts.map((c) => rate * (4 * c - total)) as [number, number, number, number];
 }
 
+/**
+ * Returns true if exactly one player holds any of the given settlement tiles.
+ * Determines whether the monopoly doubling rule applies (×2 on the entire delta).
+ */
+export function checkMonopoly(
+  seats: readonly [SeatState, SeatState, SeatState, SeatState],
+  ...tiles: TileType[]
+): boolean {
+  return seats.filter((s) => s.hand.some((t) => tiles.includes(t))).length === 1;
+}
+
 // ── Instant Kong payout (§6.1) ────────────────────────────────────────────────
 
 /**

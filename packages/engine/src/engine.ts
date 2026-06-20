@@ -33,7 +33,12 @@ import {
   addToKongOptions,
   chowOptions,
 } from './calls';
-import { calculateWinPayout, instantKongPayment, calculateOpeningJingSettlement } from './scoring';
+import {
+  calculateWinPayout,
+  instantKongPayment,
+  calculateOpeningJingSettlement,
+  checkMonopoly,
+} from './scoring';
 import type {
   GameState,
   GameEvent,
@@ -480,13 +485,7 @@ export class GameEngine {
         number,
         number,
       ];
-      // Monopoly doubling: if exactly ONE player holds ANY settlement tile
-      // (either 2pt or 1pt type), their payout is doubled. Multiplying the
-      // entire zero-sum array by 2 preserves the zero-sum invariant.
-      const playersWithAny = this.state.seats.filter((s) =>
-        s.hand.some((t) => t === settlementTile || t === nextInSeq),
-      ).length;
-      if (playersWithAny === 1) {
+      if (checkMonopoly(this.state.seats, settlementTile, nextInSeq)) {
         scoreDelta = scoreDelta.map((d) => d * 2) as [number, number, number, number];
       }
 

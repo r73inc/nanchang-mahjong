@@ -157,6 +157,8 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
   // player can read the result and wall-source before the hand is dealt.
   const [awaitingDealConfirm, setAwaitingDealConfirm] = useState(false);
   const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onAnimationCompleteRef = useRef(onAnimationComplete);
+  onAnimationCompleteRef.current = onAnimationComplete;
 
   // Reset confirm state whenever diceAnimation changes (new roll or cleared).
   useEffect(() => {
@@ -182,7 +184,7 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
       autoAdvanceTimerRef.current = null;
     }
     setAwaitingDealConfirm(false);
-    onAnimationComplete();
+    onAnimationCompleteRef.current();
   };
 
   // Called by the motion.p onAnimationComplete for the dice-sum text.
