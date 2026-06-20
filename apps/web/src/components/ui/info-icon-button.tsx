@@ -24,17 +24,12 @@ export function InfoIconButton({
     <button
       onClick={onClick}
       aria-label={ariaLabel}
-      className="inline-flex items-center justify-center shrink-0 rounded-full"
+      className="inline-flex items-center justify-center shrink-0 rounded-full text-[9px] font-bold leading-none bg-transparent cursor-pointer"
       style={{
         width: size,
         height: size,
         border: `1px solid ${borderColor}`,
         color,
-        fontSize: 9,
-        fontWeight: 700,
-        lineHeight: 1,
-        background: 'none',
-        cursor: 'pointer',
       }}
     >
       {GLYPH}

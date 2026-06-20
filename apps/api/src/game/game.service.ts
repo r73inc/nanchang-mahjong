@@ -94,6 +94,8 @@ const SESSION_TEARDOWN_DELAY_MS = 60_000;
 export class GameService {
   private readonly logger = new Logger(GameService.name);
   private readonly sessions = new Map<string, GameSession>();
+  /** Reverse index: userSub → gameId for single-human bot sessions only. O(1) lookup for abandonBotSession. */
+  private readonly userBotSessionIndex = new Map<string, string>();
   private server?: Server;
 
   /** Maps restore code → { gameId, allowedPlayerSubs } for manual save restores. */
@@ -202,6 +204,7 @@ export class GameService {
     session.pendingRoll = { purpose: 'deal_1', roller: 0 as Seat4, seed };
 
     this.sessions.set(gameId, session);
+    this.indexBotSession(session, gameId);
 
     // Persist initial GAME#id/META
     await this.db
@@ -238,14 +241,8 @@ export class GameService {
    * socket disconnect cannot resurrect the save from the still-live session.
    */
   abandonBotSession(userSub: string): void {
-    for (const [gameId, session] of this.sessions) {
-      if (!session.hasBots) continue;
-      const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i));
-      if (humanSeats.length === 1 && session.seatMap[humanSeats[0]] === userSub) {
-        this.destroySession(gameId);
-        break;
-      }
-    }
+    const gameId = this.userBotSessionIndex.get(userSub);
+    if (gameId) this.destroySession(gameId);
   }
 
   /** Resolves after a random human-like delay (BOT_THINK_MIN_MS – BOT_THINK_MAX_MS). */
@@ -253,6 +250,13 @@ export class GameService {
     const ms =
       Math.floor(Math.random() * (BOT_THINK_MAX_MS - BOT_THINK_MIN_MS + 1)) + BOT_THINK_MIN_MS;
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private indexBotSession(session: GameSession, gameId: string): void {
+    if (!session.hasBots) return;
+    const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i));
+    if (humanSeats.length === 1)
+      this.userBotSessionIndex.set(session.seatMap[humanSeats[0]], gameId);
   }
 
   private destroySession(gameId: string): void {
@@ -270,6 +274,12 @@ export class GameService {
         this.restoreCodes.delete(code);
         break;
       }
+    }
+
+    // Clean up bot session index entry if present
+    if (session.hasBots) {
+      const humanSeats = ([0, 1, 2, 3] as Seat4[]).filter((i) => !session.isBotSeat(i));
+      if (humanSeats.length === 1) this.userBotSessionIndex.delete(session.seatMap[humanSeats[0]]);
     }
 
     this.sessions.delete(gameId);
@@ -337,6 +347,7 @@ export class GameService {
 
     session.isRestored = true;
     this.sessions.set(gameId, session);
+    this.indexBotSession(session, gameId);
 
     // Persist a minimal DDB record so the game can be tracked
     await this.db.put({
