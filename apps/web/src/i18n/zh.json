@@ -513,6 +513,7 @@
   "replayLoading": "加载中…",
   "replayNotFound": "回放不存在。",
   "replayFinalHand": "最终牌型",
+  "replayFinalScores": "分",
   "replayPlayback": "回放控制",
   "replayDiscards": "弃牌（当前进度）",
   "replayMoveLog": "出牌记录",

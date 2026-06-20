@@ -24,6 +24,7 @@ import { getChallengeSnapshot } from '../../lib/replay-engine';
 import { OmniscientBoard } from './components/OmniscientBoard';
 import {
   PlaybackControls,
+  TransportFooter,
   WIND_CHAR,
   WIND_COLOR,
   getSeatFromEvent,
@@ -284,7 +285,7 @@ export function ChallengeReplayPage() {
 
   return (
     <ScreenShell title={t('replayChallengeTitle')} onBack={() => navigate(-1)}>
-      <div className="px-4 pt-4 pb-10 space-y-4">
+      <div className="px-4 pt-4 pb-28 space-y-4">
         {/* Challenge summary */}
         {challenge && (
           <div
@@ -357,6 +358,16 @@ export function ChallengeReplayPage() {
           </div>
         )}
       </div>
+
+      <TransportFooter
+        steps={longestTimeline}
+        stepIdx={globalTurnIndex}
+        playing={playing}
+        speed={speed}
+        onScrub={handleScrub}
+        onPlayPause={handlePlayPause}
+        onSpeed={handleSpeed}
+      />
     </ScreenShell>
   );
 }

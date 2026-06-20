@@ -129,7 +129,6 @@ export interface OmniscientBoardProps {
 }
 
 export function OmniscientBoard({ step, displayNames, overlay }: OmniscientBoardProps) {
-  const { t } = useI18n();
   const { state, event, claimedDiscardIndices } = step;
 
   const activeSeat = event ? getSeatFromEvent(event) : null;
@@ -150,19 +149,6 @@ export function OmniscientBoard({ step, displayNames, overlay }: OmniscientBoard
       </div>
 
       <CombinedDiscardPool state={state} claimedDiscardIndices={claimedDiscardIndices} />
-
-      {/* Jing indicator strip */}
-      {state.jingPrimary && (
-        <div className="px-3 py-1.5 flex items-center gap-2 border-t border-mj-ink/[8%]">
-          <span className="text-[9px] font-bold tracking-widest uppercase text-mj-bone/30">
-            {t('replayJingIndicator')}
-          </span>
-          <MahjongTile2D tile={state.jingPrimary as TileType} size="xxs" isJing />
-          {state.jingSecondary && (
-            <MahjongTile2D tile={state.jingSecondary as TileType} size="xxs" isJing />
-          )}
-        </div>
-      )}
 
       {/* Overlay (e.g. "Match Concluded") */}
       {overlay && (

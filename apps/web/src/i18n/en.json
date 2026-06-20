@@ -512,6 +512,7 @@
   "replayLoading": "Loading replay…",
   "replayNotFound": "Replay not found.",
   "replayFinalHand": "Final Hand",
+  "replayFinalScores": "Pts",
   "replayPlayback": "Playback",
   "replayDiscards": "Discards at this point",
   "replayMoveLog": "Move log",

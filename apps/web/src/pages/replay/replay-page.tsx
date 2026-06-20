@@ -14,9 +14,11 @@ import { MahjongTile2D } from '../../components/2d/MahjongTile2D';
 import { useI18n } from '../../i18n';
 import { useReplay } from '../../hooks/use-replay';
 import { buildOmniscientTimeline } from '../../lib/replay-engine';
+import { useAuthStore } from '../../stores/auth.store';
 import { OmniscientBoard } from './components/OmniscientBoard';
 import {
   PlaybackControls,
+  TransportFooter,
   WIND_CHAR,
   WIND_COLOR,
   getSeatFromEvent,
@@ -53,15 +55,24 @@ function SectionLabel({ children }: { children: string }) {
  *
  * Bot IDs follow the pattern "bot-<difficulty>-<seatIdx>".
  * seatNames contains the bot persona name (MilkyBot, etc.) or the player handle.
+ * For old replays without seatNames, falls back to currentUser for the matching sub.
  */
-function buildDisplayName(seatId: string, seatName: string | undefined): string {
-  const name = seatName ?? seatId;
-  const botMatch = seatId.match(/^bot-(easy|normal|hard|psychic)-\d$/);
+function buildDisplayName(
+  seatId: string,
+  seatName: string | undefined,
+  currentUser: { sub: string; handle: string } | null,
+): string {
+  const botMatch = seatId.match(/^bot-(easy|normal|hard|psychic)-(\d)$/);
   if (botMatch) {
     const difficulty = botMatch[1];
-    return `${name} · ${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)}`;
+    const cap = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    // seatName = bot persona (MilkyBot, etc.) if seatNames present; otherwise generic
+    return seatName ? `${seatName} · ${cap}` : `Bot · ${cap}`;
   }
-  return name;
+  if (seatName) return seatName;
+  // Old replay without seatNames: identify current user by sub
+  if (currentUser && seatId === currentUser.sub) return currentUser.handle;
+  return 'Player';
 }
 
 // ── Share sheet ───────────────────────────────────────────────────────────────
@@ -140,6 +151,7 @@ export function ReplayPage() {
   const { id: gameId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useI18n();
+  const currentUser = useAuthStore((s) => s.user);
 
   const { data: payload, isLoading, isError } = useReplay(gameId ?? '');
 
@@ -220,9 +232,9 @@ export function ReplayPage() {
   const jingPrimary = lastStep.state.jingPrimary as TileType | undefined;
   const jingSecondary = lastStep.state.jingSecondary as TileType | undefined;
 
-  // Display names: bot IDs → "<BotName> · <Difficulty>"; human subs → handle
+  // Display names: bot IDs → "BotName · Difficulty"; human subs → handle or "Player"
   const displayNames = payload.seatMap.map((id, i) =>
-    buildDisplayName(id, payload.seatNames?.[i]),
+    buildDisplayName(id, payload.seatNames?.[i], currentUser),
   ) as [string, string, string, string];
 
   const resultColor = payload.result === 'win' ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.6)';
@@ -237,7 +249,7 @@ export function ReplayPage() {
 
   return (
     <ScreenShell title={t('replayTitle')} onBack={() => navigate(-1)}>
-      <div className="px-4 pt-4 pb-10 space-y-4">
+      <div className="px-4 pt-4 pb-28 space-y-4">
         {/* Summary header */}
         <div
           className="rounded-2xl p-4"
@@ -262,10 +274,15 @@ export function ReplayPage() {
               <p className="text-[11px] text-mj-bone/50 mt-0.5">
                 {new Date(payload.endedAt).toLocaleString(undefined, DATE_FORMAT_OPTS)}
               </p>
+              <p className="text-[10px] text-mj-bone/40 mt-1 font-mono">
+                <span className="font-bold tracking-widest uppercase mr-1.5">
+                  {t('replayFinalScores')}
+                </span>
+                <span style={{ color: resultColor }}>
+                  {payload.finalScores.map((s) => (s >= 0 ? `+${s}` : String(s))).join(' / ')}
+                </span>
+              </p>
             </div>
-            <p className="font-mono text-sm font-bold" style={{ color: resultColor }}>
-              {payload.finalScores.map((s) => (s >= 0 ? `+${s}` : String(s))).join(' / ')}
-            </p>
           </div>
 
           {/* Jing tiles */}
@@ -280,7 +297,7 @@ export function ReplayPage() {
           )}
         </div>
 
-        {/* Playback controls */}
+        {/* Playback controls — step callout + scrubber only; transport is in fixed footer */}
         <div>
           <SectionLabel>{t('replayPlayback')}</SectionLabel>
           <PlaybackControls
@@ -319,6 +336,16 @@ export function ReplayPage() {
       </div>
 
       {showShare && <ShareSheet gameId={gameId ?? ''} onClose={() => setShowShare(false)} />}
+
+      <TransportFooter
+        steps={timeline}
+        stepIdx={stepIdx}
+        playing={playing}
+        speed={speed}
+        onScrub={handleScrub}
+        onPlayPause={handlePlayPause}
+        onSpeed={handleSpeed}
+      />
     </ScreenShell>
   );
 }

@@ -206,14 +206,14 @@ export interface PlaybackControlsProps {
 export function PlaybackControls({
   steps,
   stepIdx,
-  playing,
-  speed,
+  playing: _playing,
+  speed: _speed,
   currentEvent,
   currentWindLabel,
   currentWindColor,
   onScrub,
-  onPlayPause,
-  onSpeed,
+  onPlayPause: _onPlayPause,
+  onSpeed: _onSpeed,
 }: PlaybackControlsProps) {
   const { t } = useI18n();
 
@@ -278,9 +278,44 @@ export function PlaybackControls({
         />
         <TickBar steps={steps} idx={stepIdx} onPick={onScrub} />
       </div>
+    </div>
+  );
+}
 
-      {/* Transport row */}
-      <div className="flex items-center gap-2">
+// ── Fixed transport footer ────────────────────────────────────────────────────
+
+export interface TransportFooterProps {
+  steps: { event: GameEvent | null }[];
+  stepIdx: number;
+  playing: boolean;
+  speed: number;
+  onScrub: (n: number) => void;
+  onPlayPause: () => void;
+  onSpeed: () => void;
+}
+
+export function TransportFooter({
+  steps,
+  stepIdx,
+  playing,
+  speed,
+  onScrub,
+  onPlayPause,
+  onSpeed,
+}: TransportFooterProps) {
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-safe-or-4"
+      style={{
+        background: 'var(--felt-header)',
+        borderTop: '1px solid rgba(var(--felt-ink-rgb),0.10)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)',
+        paddingTop: '0.5rem',
+      }}
+    >
+      <div className="flex items-center gap-2 max-w-lg mx-auto">
         <TransportBtn onClick={() => onScrub(0)} label="⏮" disabled={stepIdx === 0} />
         <TransportBtn
           onClick={() => onScrub(Math.max(0, stepIdx - 1))}
