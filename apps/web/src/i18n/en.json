@@ -685,6 +685,10 @@
   "challengePlaceThird": "3rd",
   "challengePlaceFourth": "4th",
 
+  "homeChallengesSection": "Challenges",
+  "homeChallengeProgress": "{{0}} of {{1}} finished",
+  "homeChallengeViewAll": "See All Challenges",
+
   "savedGamesTitle": "Saved Games",
   "savedGamesAutoLabel": "Auto Save",
   "savedGamesManualLabel": "Manual Save",
