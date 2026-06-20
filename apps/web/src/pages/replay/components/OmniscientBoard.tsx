@@ -16,9 +16,19 @@
 
 import { MahjongTile2D } from '../../../components/2d/MahjongTile2D';
 import { useI18n } from '../../../i18n';
-import type { GameState, SeatWind, TileType } from '@nanchang/shared';
+import type { GameEvent, GameState, SeatWind, TileType } from '@nanchang/shared';
 import type { OmniscientReplayStep } from '../../../lib/replay-engine';
-import { WIND_CHAR, WIND_COLOR, ACTION_COLOR, getSeatFromEvent } from './PlaybackControls';
+import {
+  WIND_CHAR,
+  WIND_BG_CLASS,
+  ACTION_BG_CLASS,
+  ACTION_BORDER_CLASS,
+  ACTION_TEXT_CLASS,
+  getSeatFromEvent,
+} from './PlaybackControls';
+
+// Events that carry a tile field — used to avoid `as object` casts
+type EventWithTile = Extract<GameEvent, { tile: TileType }>;
 
 // ── Wind badge ────────────────────────────────────────────────────────────────
 
@@ -26,8 +36,7 @@ function WindBadge({ wind, size = 'sm' }: { wind: SeatWind; size?: 'sm' | 'xs' }
   const dim = size === 'sm' ? 'w-7 h-7 text-sm' : 'w-5 h-5 text-[10px]';
   return (
     <div
-      className={`${dim} rounded-lg flex items-center justify-center font-serif font-bold text-white shrink-0`}
-      style={{ background: WIND_COLOR[wind] }}
+      className={`${dim} ${WIND_BG_CLASS[wind]} rounded-lg flex items-center justify-center font-serif font-bold text-white shrink-0`}
     >
       {WIND_CHAR[wind]}
     </div>
@@ -110,8 +119,7 @@ function HandStrip({
       <WindBadge wind={seatState.wind} size={tileSize === 'sm' ? 'sm' : 'xs'} />
       <div>
         <div
-          className="flex flex-wrap gap-px transition-all duration-150"
-          style={isActive ? { filter: 'drop-shadow(0 0 6px rgba(201,169,97,0.5))' } : undefined}
+          className={`flex flex-wrap gap-px transition-all duration-150${isActive ? ' drop-shadow-[0_0_6px_rgba(201,169,97,0.5)]' : ''}`}
         >
           {seatState.hand.map((tile, n) => (
             <MahjongTile2D key={n} tile={tile as TileType} size={tileSize} />
@@ -134,14 +142,7 @@ function CentralDiscardPool({
 }) {
   const { t } = useI18n();
   return (
-    <div
-      className="rounded-xl p-2 h-full flex flex-col gap-1"
-      style={{
-        background: 'rgba(var(--felt-ink-rgb),0.05)',
-        border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
-        minWidth: 120,
-      }}
-    >
+    <div className="rounded-xl p-2 h-full flex flex-col gap-1 min-w-[120px] border border-[rgba(var(--felt-ink-rgb),0.08)] bg-[rgba(var(--felt-ink-rgb),0.05)]">
       <p className="text-[8px] font-bold tracking-widest uppercase text-mj-bone/30 text-center">
         {t('replayDiscardPool')}
       </p>
@@ -185,6 +186,15 @@ function CentralDiscardPool({
   );
 }
 
+// ── Seat highlight helper ─────────────────────────────────────────────────────
+
+function seatHighlightClass(isActive: boolean, event: GameEvent | null): string {
+  if (!isActive || !event) return 'border border-transparent';
+  const bg = ACTION_BG_CLASS[event.kind] ?? 'bg-mj-gold/10';
+  const border = ACTION_BORDER_CLASS[event.kind] ?? 'border-mj-gold/20';
+  return `border ${bg} ${border}`;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export interface OmniscientBoardProps {
@@ -199,52 +209,33 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
   const { state, event, claimedDiscardIndices } = step;
 
   const activeSeat = event ? getSeatFromEvent(event) : null;
-  const actionColor = event ? (ACTION_COLOR[event.kind] ?? null) : null;
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden relative"
-      style={{
-        background: 'rgba(var(--felt-ink-rgb),0.03)',
-        border: '1px solid rgba(var(--felt-ink-rgb),0.10)',
-      }}
-    >
+    <div className="rounded-2xl overflow-hidden relative border border-[rgba(var(--felt-ink-rgb),0.10)] bg-[rgba(var(--felt-ink-rgb),0.03)]">
       {/* Active-action banner */}
-      {event && actionColor && (
+      {event && (
         <div
-          className="px-3 py-1.5 flex items-center gap-2"
-          style={{ background: `${actionColor}18`, borderBottom: `1px solid ${actionColor}30` }}
+          className={`px-3 py-1.5 flex items-center gap-2 border-b ${ACTION_BG_CLASS[event.kind] ?? 'bg-mj-gold/10'} ${ACTION_BORDER_CLASS[event.kind] ?? 'border-mj-gold/20'}`}
         >
           <div
-            className="w-5 h-5 rounded flex items-center justify-center font-serif text-[10px] font-bold text-white shrink-0"
-            style={{
-              background: activeSeat !== null ? WIND_COLOR[state.seats[activeSeat].wind] : '#888',
-            }}
+            className={`w-5 h-5 rounded flex items-center justify-center font-serif text-[10px] font-bold text-white shrink-0 ${
+              activeSeat !== null ? WIND_BG_CLASS[state.seats[activeSeat].wind] : 'bg-[#888]'
+            }`}
           >
             {activeSeat !== null ? WIND_CHAR[state.seats[activeSeat].wind] : '?'}
           </div>
-          <span className="text-[11px] font-bold" style={{ color: actionColor }}>
+          <span
+            className={`text-[11px] font-bold ${ACTION_TEXT_CLASS[event.kind] ?? 'text-mj-gold'}`}
+          >
             {activeSeat !== null ? seatMap[activeSeat] : ''}
           </span>
-          {'tile' in (event as object) && (event as { tile?: TileType }).tile && (
-            <MahjongTile2D tile={(event as { tile: TileType }).tile} size="xs" />
-          )}
+          {'tile' in event && <MahjongTile2D tile={(event as EventWithTile).tile} size="xs" />}
         </div>
       )}
 
       <div className="p-2 space-y-2">
         {/* ── Top seat (seat 2) ──────────────────────────────────────────── */}
-        <div
-          className="rounded-xl p-2"
-          style={
-            activeSeat === 2
-              ? {
-                  background: `${actionColor ?? '#c9a961'}12`,
-                  border: `1px solid ${actionColor ?? '#c9a961'}30`,
-                }
-              : { border: '1px solid transparent' }
-          }
-        >
+        <div className={`rounded-xl p-2 ${seatHighlightClass(activeSeat === 2, event)}`}>
           <p className="text-[8px] text-mj-bone/30 font-bold tracking-widest uppercase mb-1">
             {seatMap[2]}
           </p>
@@ -255,16 +246,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
         <div className="flex gap-2 items-stretch">
           {/* Seat 3 — left */}
           <div
-            className="rounded-xl p-2 flex flex-col justify-center shrink-0"
-            style={{
-              minWidth: 64,
-              ...(activeSeat === 3
-                ? {
-                    background: `${actionColor ?? '#c9a961'}12`,
-                    border: `1px solid ${actionColor ?? '#c9a961'}30`,
-                  }
-                : { border: '1px solid transparent' }),
-            }}
+            className={`rounded-xl p-2 flex flex-col justify-center shrink-0 min-w-16 ${seatHighlightClass(activeSeat === 3, event)}`}
           >
             <p className="text-[8px] text-mj-bone/30 font-bold tracking-widest uppercase mb-1 truncate max-w-[60px]">
               {seatMap[3]}
@@ -279,16 +261,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
 
           {/* Seat 1 — right */}
           <div
-            className="rounded-xl p-2 flex flex-col justify-center shrink-0"
-            style={{
-              minWidth: 64,
-              ...(activeSeat === 1
-                ? {
-                    background: `${actionColor ?? '#c9a961'}12`,
-                    border: `1px solid ${actionColor ?? '#c9a961'}30`,
-                  }
-                : { border: '1px solid transparent' }),
-            }}
+            className={`rounded-xl p-2 flex flex-col justify-center shrink-0 min-w-16 ${seatHighlightClass(activeSeat === 1, event)}`}
           >
             <p className="text-[8px] text-mj-bone/30 font-bold tracking-widest uppercase mb-1 truncate max-w-[60px]">
               {seatMap[1]}
@@ -298,17 +271,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
         </div>
 
         {/* ── Bottom seat (seat 0) ───────────────────────────────────────── */}
-        <div
-          className="rounded-xl p-2"
-          style={
-            activeSeat === 0
-              ? {
-                  background: `${actionColor ?? '#c9a961'}12`,
-                  border: `1px solid ${actionColor ?? '#c9a961'}30`,
-                }
-              : { border: '1px solid transparent' }
-          }
-        >
+        <div className={`rounded-xl p-2 ${seatHighlightClass(activeSeat === 0, event)}`}>
           <p className="text-[8px] text-mj-bone/30 font-bold tracking-widest uppercase mb-1">
             {seatMap[0]}
           </p>
@@ -318,10 +281,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
 
       {/* Jing indicator strip */}
       {state.jingPrimary && (
-        <div
-          className="px-3 py-1.5 flex items-center gap-2 border-t"
-          style={{ borderColor: 'rgba(var(--felt-ink-rgb),0.08)' }}
-        >
+        <div className="px-3 py-1.5 flex items-center gap-2 border-t border-[rgba(var(--felt-ink-rgb),0.08)]">
           <span className="text-[9px] font-bold tracking-widest uppercase text-mj-bone/30">
             {t('replayJingIndicator')}
           </span>
@@ -334,10 +294,7 @@ export function OmniscientBoard({ step, seatMap, overlay }: OmniscientBoardProps
 
       {/* Overlay (e.g. "Match Concluded") */}
       {overlay && (
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ background: 'rgba(var(--felt-ink-rgb),0.82)', backdropFilter: 'blur(4px)' }}
-        >
+        <div className="absolute inset-0 flex items-center justify-center bg-[rgba(var(--felt-ink-rgb),0.82)] backdrop-blur-sm">
           {overlay}
         </div>
       )}

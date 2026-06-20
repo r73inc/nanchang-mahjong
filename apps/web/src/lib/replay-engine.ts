@@ -124,6 +124,10 @@ export function buildTimeline(payload: ReplayGamePayload): ReplayStep[] {
   return steps;
 }
 
+// Shared frozen empty set — reused as the initial value for all seats with no
+// claimed discards. Never mutated; structural sharing replaces it on first claim.
+const EMPTY_CLAIMED_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
+
 // ── Omniscient builder ────────────────────────────────────────────────────────
 
 /**
@@ -140,6 +144,10 @@ export function buildTimeline(payload: ReplayGamePayload): ReplayStep[] {
  *   - A `pung`, `chow`, or `kong_open` event consumes that recorded index.
  *   - `kong_concealed` / `kong_added` come from the player's own hand — they
  *     do not touch any discard pool.
+ *
+ * Structural sharing: the `claimedDiscardIndices` tuple is only replaced (and
+ * only the modified seat's Set cloned) when a claim actually occurs. Non-claim
+ * steps push the same tuple reference — no heap allocation per step.
  */
 export function buildOmniscientTimeline(payload: ReplayGamePayload): OmniscientReplayStep[] {
   const steps: OmniscientReplayStep[] = [];
@@ -147,12 +155,11 @@ export function buildOmniscientTimeline(payload: ReplayGamePayload): OmniscientR
   for (let handIdx = 0; handIdx < payload.hands.length; handIdx++) {
     const { causes, states } = buildHandCauses(payload.hands[handIdx], payload.settings);
 
-    // Mutable tracking across this hand
-    const claimedSets: [Set<number>, Set<number>, Set<number>, Set<number>] = [
-      new Set(),
-      new Set(),
-      new Set(),
-      new Set(),
+    let currentClaimed: OmniscientReplayStep['claimedDiscardIndices'] = [
+      EMPTY_CLAIMED_SET,
+      EMPTY_CLAIMED_SET,
+      EMPTY_CLAIMED_SET,
+      EMPTY_CLAIMED_SET,
     ];
     let lastDiscardSeat: 0 | 1 | 2 | 3 | null = null;
     let lastDiscardIndex = -1;
@@ -169,7 +176,15 @@ export function buildOmniscientTimeline(payload: ReplayGamePayload): OmniscientR
         lastDiscardSeat !== null &&
         lastDiscardIndex >= 0
       ) {
-        claimedSets[lastDiscardSeat].add(lastDiscardIndex);
+        // Structural sharing: create a new tuple with only the claimed seat's Set replaced.
+        const updatedSet = new Set(currentClaimed[lastDiscardSeat]);
+        updatedSet.add(lastDiscardIndex);
+        currentClaimed = [
+          lastDiscardSeat === 0 ? updatedSet : currentClaimed[0],
+          lastDiscardSeat === 1 ? updatedSet : currentClaimed[1],
+          lastDiscardSeat === 2 ? updatedSet : currentClaimed[2],
+          lastDiscardSeat === 3 ? updatedSet : currentClaimed[3],
+        ];
         lastDiscardSeat = null;
         lastDiscardIndex = -1;
       } else if (event?.kind === 'draw') {
@@ -178,18 +193,8 @@ export function buildOmniscientTimeline(payload: ReplayGamePayload): OmniscientR
         lastDiscardIndex = -1;
       }
 
-      // Snapshot the claimed sets immutably for this step
-      steps.push({
-        state: states[j],
-        handIdx,
-        event,
-        claimedDiscardIndices: [
-          new Set(claimedSets[0]),
-          new Set(claimedSets[1]),
-          new Set(claimedSets[2]),
-          new Set(claimedSets[3]),
-        ],
-      });
+      // Push the shared reference — no allocation on non-claim steps
+      steps.push({ state: states[j], handIdx, event, claimedDiscardIndices: currentClaimed });
     }
   }
 

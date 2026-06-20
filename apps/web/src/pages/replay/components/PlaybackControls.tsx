@@ -44,6 +44,48 @@ export const ACTION_COLOR: Partial<Record<GameEvent['kind'], string>> = {
   concede: '#e88080',
 };
 
+// Tailwind class equivalents — all strings appear literally so JIT includes them.
+
+export const WIND_BG_CLASS: Record<SeatWind, string> = {
+  east: 'bg-mj-east',
+  south: 'bg-mj-south',
+  west: 'bg-mj-west',
+  north: 'bg-mj-north',
+};
+
+export const ACTION_BG_CLASS: Partial<Record<GameEvent['kind'], string>> = {
+  discard: 'bg-mj-gold/10',
+  pung: 'bg-mj-gold/10',
+  kong_open: 'bg-mj-south/10',
+  kong_concealed: 'bg-mj-south/10',
+  kong_added: 'bg-mj-south/10',
+  chow: 'bg-mj-west/10',
+  win: 'bg-mj-win/10',
+  concede: 'bg-mj-loss-light/10',
+};
+
+export const ACTION_BORDER_CLASS: Partial<Record<GameEvent['kind'], string>> = {
+  discard: 'border-mj-gold/20',
+  pung: 'border-mj-gold/20',
+  kong_open: 'border-mj-south/20',
+  kong_concealed: 'border-mj-south/20',
+  kong_added: 'border-mj-south/20',
+  chow: 'border-mj-west/20',
+  win: 'border-mj-win/20',
+  concede: 'border-mj-loss-light/20',
+};
+
+export const ACTION_TEXT_CLASS: Partial<Record<GameEvent['kind'], string>> = {
+  discard: 'text-mj-gold',
+  pung: 'text-mj-gold',
+  kong_open: 'text-mj-south',
+  kong_concealed: 'text-mj-south',
+  kong_added: 'text-mj-south',
+  chow: 'text-mj-west',
+  win: 'text-mj-win',
+  concede: 'text-mj-loss-light',
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function getSeatFromEvent(event: GameEvent): 0 | 1 | 2 | 3 {

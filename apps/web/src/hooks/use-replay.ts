@@ -58,9 +58,11 @@ export function useChallengeReplay(challengeId: string): UseChallengeReplayResul
 
   const completedParticipants = useMemo<ChallengeReplayParticipant[]>(
     () =>
-      (challenge?.participants ?? [])
-        .filter((p) => p.status === 'completed' && !!p.gameId)
-        .map((p) => ({ sub: p.sub, handle: p.handle, gameId: p.gameId! })),
+      (challenge?.participants ?? []).flatMap((p) =>
+        p.status === 'completed' && p.gameId != null
+          ? [{ sub: p.sub, handle: p.handle, gameId: p.gameId }]
+          : [],
+      ),
     [challenge],
   );
 
