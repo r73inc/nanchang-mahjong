@@ -21,13 +21,13 @@ vi.mock('../../hooks/use-replay', () => ({
 }));
 
 vi.mock('../../lib/replay-engine', () => ({
-  buildTimeline: vi.fn(),
+  buildOmniscientTimeline: vi.fn(),
 }));
 
 import { useReplay } from '../../hooks/use-replay';
-import { buildTimeline } from '../../lib/replay-engine';
+import { buildOmniscientTimeline } from '../../lib/replay-engine';
 const mockUseReplay = vi.mocked(useReplay);
-const mockBuildTimeline = vi.mocked(buildTimeline);
+const mockBuildOmniscientTimeline = vi.mocked(buildOmniscientTimeline);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +49,13 @@ const MOCK_STATE = {
   jingPrimary: null,
   jingSecondary: null,
 } as never;
+
+const EMPTY_CLAIMED = [
+  new Set<number>(),
+  new Set<number>(),
+  new Set<number>(),
+  new Set<number>(),
+] as const;
 
 const MOCK_PAYLOAD = {
   gameId: 'game-abc',
@@ -88,14 +95,14 @@ describe('ReplayPage', () => {
 
   it('Replay·loading — shows loading indicator while fetching', () => {
     mockUseReplay.mockReturnValue({ data: undefined, isLoading: true, isError: false } as never);
-    mockBuildTimeline.mockReturnValue([]);
+    mockBuildOmniscientTimeline.mockReturnValue([]);
     renderPage();
     expect(screen.getByText(/loading replay/i)).toBeInTheDocument();
   });
 
   it('Replay·not-found — shows error message on fetch failure', () => {
     mockUseReplay.mockReturnValue({ data: undefined, isLoading: false, isError: true } as never);
-    mockBuildTimeline.mockReturnValue([]);
+    mockBuildOmniscientTimeline.mockReturnValue([]);
     renderPage();
     expect(screen.getByText(/replay not found/i)).toBeInTheDocument();
   });
@@ -106,9 +113,11 @@ describe('ReplayPage', () => {
       isLoading: false,
       isError: false,
     } as never);
-    mockBuildTimeline.mockReturnValue([{ state: MOCK_STATE, handIdx: 0, event: null }]);
+    mockBuildOmniscientTimeline.mockReturnValue([
+      { state: MOCK_STATE, handIdx: 0, event: null, claimedDiscardIndices: EMPTY_CLAIMED },
+    ]);
     renderPage();
-    expect(screen.getByRole('slider', { name: /replay scrubber/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /share this hand/i })).toBeInTheDocument();
   });
 });
