@@ -21,6 +21,8 @@ export interface ReplayHandData {
 export interface ReplayGamePayload {
   gameId: string;
   seatMap: [string, string, string, string];
+  /** Human-readable display names — bot persona name for bot seats, handle for human seats. Optional for backwards compat with older replays. */
+  seatNames?: [string, string, string, string];
   settings: RoomSettings;
   hands: ReplayHandData[];
   startedAt: string;

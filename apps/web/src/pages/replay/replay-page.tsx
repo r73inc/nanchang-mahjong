@@ -21,7 +21,6 @@ import {
   WIND_COLOR,
   getSeatFromEvent,
 } from './components/PlaybackControls';
-import { ActionLog } from './components/ActionLog';
 import type { GameEvent, TileType } from '@nanchang/shared';
 
 // ── Glyphs & separators (module-level avoids i18next/no-literal-string) ───────
@@ -46,6 +45,23 @@ function SectionLabel({ children }: { children: string }) {
       {children}
     </p>
   );
+}
+
+/**
+ * Maps a raw seatMap entry (user sub or bot ID) + seatNames entry into a
+ * human-readable display label.
+ *
+ * Bot IDs follow the pattern "bot-<difficulty>-<seatIdx>".
+ * seatNames contains the bot persona name (MilkyBot, etc.) or the player handle.
+ */
+function buildDisplayName(seatId: string, seatName: string | undefined): string {
+  const name = seatName ?? seatId;
+  const botMatch = seatId.match(/^bot-(easy|normal|hard|psychic)-\d$/);
+  if (botMatch) {
+    const difficulty = botMatch[1];
+    return `${name} · ${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)}`;
+  }
+  return name;
 }
 
 // ── Share sheet ───────────────────────────────────────────────────────────────
@@ -198,18 +214,16 @@ export function ReplayPage() {
     .flatMap((h) => h.events)
     .find((e): e is Extract<GameEvent, { kind: 'win' }> => e.kind === 'win');
   const winnerSeat = winEvent?.seat;
-  const winnerWind = winnerSeat !== undefined ? state.seats[winnerSeat].wind : null;
+  const winnerWind = winnerSeat !== undefined ? lastStep.state.seats[winnerSeat].wind : null;
 
-  // Final winning hand (from last state)
-  const winningTile: TileType | null =
-    winEvent && 'tile' in winEvent ? ((winEvent as { tile: TileType }).tile ?? null) : null;
-  const finalHand: TileType[] = [];
-  if (winnerSeat !== undefined) {
-    const ws = lastStep.state.seats[winnerSeat];
-    finalHand.push(...ws.openMelds.flatMap((m) => m.tiles));
-    finalHand.push(...ws.hand);
-    if (winningTile && !finalHand.includes(winningTile)) finalHand.push(winningTile);
-  }
+  // Jing tiles from the final state
+  const jingPrimary = lastStep.state.jingPrimary as TileType | undefined;
+  const jingSecondary = lastStep.state.jingSecondary as TileType | undefined;
+
+  // Display names: bot IDs → "<BotName> · <Difficulty>"; human subs → handle
+  const displayNames = payload.seatMap.map((id, i) =>
+    buildDisplayName(id, payload.seatNames?.[i]),
+  ) as [string, string, string, string];
 
   const resultColor = payload.result === 'win' ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.6)';
 
@@ -243,7 +257,7 @@ export function ReplayPage() {
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-mj-bone truncate">
-                {payload.seatMap.join(DOT_SEP)}
+                {displayNames.join(DOT_SEP)}
               </p>
               <p className="text-[11px] text-mj-bone/50 mt-0.5">
                 {new Date(payload.endedAt).toLocaleString(undefined, DATE_FORMAT_OPTS)}
@@ -253,48 +267,18 @@ export function ReplayPage() {
               {payload.finalScores.map((s) => (s >= 0 ? `+${s}` : String(s))).join(' / ')}
             </p>
           </div>
-        </div>
 
-        {/* Final winning hand */}
-        {finalHand.length > 0 && (
-          <div>
-            <SectionLabel>{t('replayFinalHand')}</SectionLabel>
-            <div
-              className="rounded-xl p-3 overflow-x-auto"
-              style={{
-                background: 'rgba(var(--felt-ink-rgb),0.04)',
-                border: '1px solid rgba(var(--felt-ink-rgb),0.08)',
-              }}
-            >
-              <div className="flex gap-0.5 items-center min-w-fit">
-                {finalHand.map((tile, n) => {
-                  const isWin = tile === winningTile && n === finalHand.length - 1;
-                  return (
-                    <div
-                      key={n}
-                      className="relative"
-                      style={
-                        isWin
-                          ? {
-                              boxShadow: '0 0 0 2px #c9a961, 0 4px 10px rgba(201,169,97,0.4)',
-                              borderRadius: 6,
-                            }
-                          : undefined
-                      }
-                    >
-                      <MahjongTile2D tile={tile} size="sm" />
-                    </div>
-                  );
-                })}
-              </div>
-              {winningTile && (
-                <p className="text-[9px] font-bold tracking-widest text-mj-bone/40 uppercase mt-2 text-right font-mono">
-                  {t('replayWinTileLabel')}
-                </p>
-              )}
+          {/* Jing tiles */}
+          {jingPrimary && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-mj-gold/20">
+              <span className="text-[9px] font-bold tracking-widest uppercase text-mj-bone/40">
+                {t('replayJingIndicator')}
+              </span>
+              <MahjongTile2D tile={jingPrimary} size="xs" isJing />
+              {jingSecondary && <MahjongTile2D tile={jingSecondary} size="xs" isJing />}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Playback controls */}
         <div>
@@ -316,16 +300,7 @@ export function ReplayPage() {
         {/* Omniscient board */}
         <div>
           <SectionLabel>{t('replayOmniscientView')}</SectionLabel>
-          <OmniscientBoard
-            step={step}
-            seatMap={payload.seatMap as [string, string, string, string]}
-          />
-        </div>
-
-        {/* Action log */}
-        <div>
-          <SectionLabel>{t('replayActionLog')}</SectionLabel>
-          <ActionLog steps={timeline} currentIdx={stepIdx} onPick={handleScrub} />
+          <OmniscientBoard step={step} displayNames={displayNames} />
         </div>
 
         {/* Share */}

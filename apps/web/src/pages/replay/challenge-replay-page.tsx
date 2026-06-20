@@ -272,10 +272,10 @@ export function ChallengeReplayPage() {
 
   const activeParticipant = participants.find((p) => p.sub === activeSub);
 
-  // seatMap: use participant handle as seat 0, bots fill remaining slots
+  // displayNames: use participant handle as seat 0, bots fill remaining slots.
   // The seatMap from the replay payload has player userIds — we use the handle
   // from the challenge participant for the viewer's seat; others show as player N.
-  const boardSeatMap: [string, string, string, string] = [
+  const boardDisplayNames: [string, string, string, string] = [
     activeParticipant?.handle ?? '—',
     'P2',
     'P3',
@@ -340,7 +340,7 @@ export function ChallengeReplayPage() {
           <SectionLabel>{t('replayOmniscientView')}</SectionLabel>
           <OmniscientBoard
             step={step}
-            seatMap={boardSeatMap}
+            displayNames={boardDisplayNames}
             overlay={isExtendedWinningState ? <ConcludedOverlay /> : undefined}
           />
         </div>
