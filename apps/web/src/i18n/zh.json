@@ -686,6 +686,10 @@
   "challengePlaceThird": "第三名",
   "challengePlaceFourth": "第四名",
 
+  "homeChallengesSection": "挑战赛",
+  "homeChallengeProgress": "{{0}} / {{1}} 已完成",
+  "homeChallengeViewAll": "查看所有挑战",
+
   "savedGamesTitle": "保存的游戏",
   "savedGamesAutoLabel": "自动存档",
   "savedGamesManualLabel": "手动存档",
