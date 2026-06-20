@@ -35,21 +35,17 @@ function WindBadge({ wind }: { wind: SeatWind }) {
 function SeatCard({
   seat,
   state,
-  claimedIndices,
   event,
   isActive,
   displayName,
 }: {
   seat: 0 | 1 | 2 | 3;
   state: GameState;
-  claimedIndices: ReadonlySet<number>;
   event: GameEvent | null;
   isActive: boolean;
   displayName: string;
 }) {
-  const { t } = useI18n();
   const seatState = state.seats[seat];
-  const visibleDiscards = seatState.discards.filter((_, idx) => !claimedIndices.has(idx));
 
   const highlightClass =
     isActive && event
@@ -85,23 +81,39 @@ function SeatCard({
           ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Discards */}
-      {visibleDiscards.length > 0 && (
-        <div>
-          <p className="text-[8px] font-bold tracking-widest uppercase text-mj-bone/25 mb-0.5">
-            {t('replayDiscardPool')}
-            {claimedIndices.size > 0 && (
-              <span className="ml-1 font-mono">(-{claimedIndices.size})</span>
-            )}
-          </p>
-          <div className="flex flex-wrap gap-px">
-            {visibleDiscards.map((tile, n) => (
-              <MahjongTile2D key={n} tile={tile as TileType} size="xxs" />
-            ))}
-          </div>
-        </div>
-      )}
+// ── Combined discard pool ─────────────────────────────────────────────────────
+
+function CombinedDiscardPool({
+  state,
+  claimedDiscardIndices,
+}: {
+  state: GameState;
+  claimedDiscardIndices: OmniscientReplayStep['claimedDiscardIndices'];
+}) {
+  const { t } = useI18n();
+
+  const allDiscards = ([0, 1, 2, 3] as const).flatMap((seat) =>
+    state.seats[seat].discards
+      .filter((_, idx) => !claimedDiscardIndices[seat].has(idx))
+      .map((tile) => tile as TileType),
+  );
+
+  if (allDiscards.length === 0) return null;
+
+  return (
+    <div className="px-3 pb-3">
+      <p className="text-[8px] font-bold tracking-widest uppercase text-mj-bone/25 mb-1">
+        {t('replayDiscardPool')}
+      </p>
+      <div className="flex flex-wrap gap-px">
+        {allDiscards.map((tile, n) => (
+          <MahjongTile2D key={n} tile={tile} size="xxs" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -130,13 +142,14 @@ export function OmniscientBoard({ step, displayNames, overlay }: OmniscientBoard
             key={seat}
             seat={seat}
             state={state}
-            claimedIndices={claimedDiscardIndices[seat]}
             event={event}
             isActive={activeSeat === seat}
             displayName={displayNames[seat]}
           />
         ))}
       </div>
+
+      <CombinedDiscardPool state={state} claimedDiscardIndices={claimedDiscardIndices} />
 
       {/* Jing indicator strip */}
       {state.jingPrimary && (
