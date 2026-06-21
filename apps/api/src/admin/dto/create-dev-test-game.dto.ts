@@ -32,10 +32,11 @@ export class MeldDto {
 }
 
 export class CreateDevTestGameDto {
-  /** The admin's 13-tile waiting hand (tile type strings). */
+  /** The admin's closed waiting hand (tile type strings).
+   * Length = 13 − openMelds.length × 3 (each meld takes 3 slots, including kong). */
   @IsArray()
   @IsString({ each: true })
-  @ArrayMinSize(13)
+  @ArrayMinSize(1)
   @ArrayMaxSize(13)
   hand!: string[];
 
