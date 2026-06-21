@@ -195,7 +195,7 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
       setAwaitingDealConfirm(true);
       autoAdvanceTimerRef.current = setTimeout(confirmDeal, 5000);
     } else {
-      onAnimationComplete();
+      onAnimationCompleteRef.current();
     }
   };
 
@@ -278,10 +278,12 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
               className="text-mj-gold font-bold text-lg"
               onAnimationComplete={handleSumAnimationComplete}
             >
-              {t('diceRollResult')
-                .replace('{{0}}', String(diceAnimation.dice[0]))
-                .replace('{{1}}', String(diceAnimation.dice[1]))
-                .replace('{{2}}', String(diceAnimation.dice[0] + diceAnimation.dice[1]))}
+              {t(
+                'diceRollResult',
+                String(diceAnimation.dice[0]),
+                String(diceAnimation.dice[1]),
+                String(diceAnimation.dice[0] + diceAnimation.dice[1]),
+              )}
             </motion.p>
           )}
         </AnimatePresence>
@@ -297,7 +299,7 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
               transition={{ duration: 0.25 }}
               className="text-sm text-mj-bone/70 font-semibold"
             >
-              {t('diceRollWallSource').replace('{{0}}', rollerName)}
+              {t('diceRollWallSource', rollerName)}
             </motion.p>
           )}
         </AnimatePresence>
@@ -322,9 +324,7 @@ export function DiceRollOverlay({ snapshot, diceAnimation, onRoll, onAnimationCo
             ) : (
               <>
                 <WaitingDots />
-                <p className="text-sm text-mj-bone/50">
-                  {t('diceRollWaiting').replace('{{0}}', rollerName)}
-                </p>
+                <p className="text-sm text-mj-bone/50">{t('diceRollWaiting', rollerName)}</p>
               </>
             )}
           </div>

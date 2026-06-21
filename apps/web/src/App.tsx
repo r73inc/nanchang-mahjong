@@ -15,6 +15,7 @@ import { RoomPage } from './pages/room/room-page';
 import { GamePage } from './pages/game/game-page';
 import { HistoryPage } from './pages/history/history-page';
 import { ReplayPage } from './pages/replay/replay-page';
+import { ChallengeReplayPage } from './pages/replay/challenge-replay-page';
 import { LearnPage } from './pages/learn/learn-page';
 import { CustomizePage } from './pages/customize/customize-page';
 import { ChallengeCreatePage } from './pages/challenges/challenge-create-page';
@@ -77,6 +78,7 @@ export default function App() {
         <Route path="/challenges" element={<ChallengesListPage />} />
         <Route path="/challenges/create" element={<ChallengeCreatePage />} />
         <Route path="/challenges/:challengeId" element={<ChallengeDetailPage />} />
+        <Route path="/challenges/:challengeId/replay" element={<ChallengeReplayPage />} />
       </Route>
 
       {/* Admin-only routes — non-admins are redirected to /home */}

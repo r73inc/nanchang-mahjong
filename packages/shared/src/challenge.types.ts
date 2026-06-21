@@ -67,6 +67,8 @@ export interface Challenge {
   winners?: string[];
   createdAt: string;
   completedAt?: string;
+  /** Whether the requesting user has already viewed the final scoreboard. */
+  resultsViewed: boolean;
 }
 
 /** Lightweight summary for list views (no per-participant scores). */
@@ -80,6 +82,12 @@ export interface ChallengeSummary {
   /** The requesting user's own participant status. */
   myStatus: ChallengeParticipantStatus;
   createdAt: string;
+  /**
+   * Whether the requesting user has opened the final results screen for this
+   * challenge. Only meaningful when status = 'completed'. False means the
+   * player hasn't viewed the final scoreboard yet.
+   */
+  resultsViewed: boolean;
 }
 
 // ── REST DTO types (used by both API and web) ─────────────────────────────────

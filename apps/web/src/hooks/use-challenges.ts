@@ -62,6 +62,18 @@ export function useStartChallengeGame() {
   });
 }
 
+/** Mark that the current user has viewed the final results of a completed challenge. */
+export function useMarkChallengeResultsViewed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (challengeId: string) =>
+      api.post(`/challenges/${challengeId}/mark-viewed`).then(() => undefined),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
 /** Decline a challenge invite. */
 export function useDeclineChallenge() {
   const qc = useQueryClient();
