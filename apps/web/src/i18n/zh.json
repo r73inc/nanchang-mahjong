@@ -181,7 +181,7 @@
   "adminDevTestNoWinTile": "选择和牌",
   "adminDevTestValidationHand": "手牌必须恰好13张",
   "adminDevTestValidationWinTile": "此条件需要指定和牌",
-  "adminDevTestPickerHint": "左键点击添加 · 右键点击移除",
+  "adminDevTestPickerHint": "点击牌添加 · 点击数字角标移除",
   "adminDevTestNavDesc": "配置测试场景并与机器人对战",
   "adminDevTestSectionTitle": "测试与调试",
 

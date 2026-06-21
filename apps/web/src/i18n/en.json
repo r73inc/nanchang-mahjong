@@ -181,7 +181,7 @@
   "adminDevTestNoWinTile": "Select win tile",
   "adminDevTestValidationHand": "Hand must have exactly 13 tiles",
   "adminDevTestValidationWinTile": "Win tile is required for this condition",
-  "adminDevTestPickerHint": "Left-click to add · Right-click to remove",
+  "adminDevTestPickerHint": "Tap tile to add · Tap count badge to remove",
   "adminDevTestNavDesc": "Configure test scenarios and launch games against bots",
   "adminDevTestSectionTitle": "Test & Debug",
 

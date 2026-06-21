@@ -82,28 +82,30 @@ function TilePickerGrid({
             const count = hand[tile] ?? 0;
             const canAdd = count < 4 && total < maxTotal;
             return (
-              <button
-                key={tile}
-                type="button"
-                className={`relative flex flex-col items-center gap-0.5 rounded p-0.5 transition-all
-                  ${count > 0 ? 'ring-1 ring-mj-gold/40 bg-mj-gold/8' : 'bg-mj-bone/5 hover:bg-mj-bone/10'}
-                  ${canAdd ? 'cursor-pointer' : count === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-                onClick={() => {
-                  if (canAdd) onAdd(tile);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (count > 0) onRemove(tile);
-                }}
-                title={`${tile} (${count}/4) — left-click add, right-click remove`}
-              >
-                <MahjongTile2D tile={tile} size="xs" role="bottom" interactive={false} />
+              <div key={tile} className="relative">
+                <button
+                  type="button"
+                  className={`flex flex-col items-center gap-0.5 rounded p-0.5 transition-all touch-manipulation
+                    ${count > 0 ? 'ring-1 ring-mj-gold/40 bg-mj-gold/8' : 'bg-mj-bone/5 active:bg-mj-bone/10'}
+                    ${canAdd ? 'cursor-pointer' : count === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+                  onClick={() => {
+                    if (canAdd) onAdd(tile);
+                  }}
+                  aria-label={`${tile} ${count}/4`}
+                >
+                  <MahjongTile2D tile={tile} size="xs" role="bottom" interactive={false} />
+                </button>
                 {count > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-mj-gold text-[9px] font-bold text-black flex items-center justify-center leading-none">
+                  <button
+                    type="button"
+                    onClick={() => onRemove(tile)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-mj-gold text-[9px] font-bold text-black flex items-center justify-center leading-none active:opacity-60 touch-manipulation z-10"
+                    aria-label={`remove ${tile}`}
+                  >
                     {count}
-                  </span>
+                  </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
@@ -130,11 +132,12 @@ function WinTilePicker({
             <button
               key={tile}
               type="button"
-              className={`relative flex items-center justify-center rounded p-0.5 transition-all
-                ${selected === tile ? 'ring-2 ring-mj-gold bg-mj-gold/15' : 'bg-mj-bone/5 hover:bg-mj-bone/10'}
+              className={`relative flex items-center justify-center rounded p-0.5 transition-all touch-manipulation
+                ${selected === tile ? 'ring-2 ring-mj-gold bg-mj-gold/15' : 'bg-mj-bone/5 active:bg-mj-bone/10'}
                 cursor-pointer`}
               onClick={() => onSelect(tile)}
-              title={tile}
+              aria-label={tile}
+              aria-pressed={selected === tile}
             >
               <MahjongTile2D tile={tile} size="xs" role="bottom" interactive={false} />
             </button>
