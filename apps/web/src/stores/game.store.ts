@@ -143,6 +143,13 @@ interface GameStore {
   canAddToKong: import('@nanchang/shared').TileType | null;
 
   /**
+   * Set when the server emits game:can-concealed-kong for the viewer's seat.
+   * The tile types the player can declare a concealed kong with.
+   * Cleared on setSnapshot (turn changes) and when the player acts.
+   */
+  canConcealedKong: import('@nanchang/shared').TileType[] | null;
+
+  /**
    * The most recently discarded tile, identified by seat + tile type.
    * Set by game:event {kind:'discard'}, cleared by the next claim event
    * (pung/chow/kong_open/win) or replaced by the next discard.
@@ -185,6 +192,7 @@ interface GameStore {
   setYourTurnFlash: (v: boolean) => void;
   setCanTsumo: (v: boolean) => void;
   setCanAddToKong: (tile: import('@nanchang/shared').TileType | null) => void;
+  setCanConcealedKong: (tiles: import('@nanchang/shared').TileType[] | null) => void;
   setLastDiscard: (d: LastDiscard | null) => void;
   reset: () => void;
 }
@@ -206,6 +214,7 @@ const initialState = {
   yourTurnFlash: false,
   canTsumo: false,
   canAddToKong: null as import('@nanchang/shared').TileType | null,
+  canConcealedKong: null as import('@nanchang/shared').TileType[] | null,
   lastDiscard: null as LastDiscard | null,
   diceAnimation: null as {
     dice: [number, number];
@@ -226,9 +235,10 @@ export const useGameStore = create<GameStore>()(
         // Clear claim window and pending claim once snapshot arrives
         claimWindow: null,
         viewerClaimSubmitted: null,
-        // Clear tsumo/add-to-kong offers when a new snapshot arrives (turn moved on)
+        // Clear tsumo/add-to-kong/concealed-kong offers when a new snapshot arrives (turn moved on)
         canTsumo: false,
         canAddToKong: null,
+        canConcealedKong: null,
         // A non-null preGamePhase means a new hand has started — drop the
         // previous hand's reveal so HandRevealScreen can't block the pre-game
         // flow. (game:ended clears it for the session-end path; nothing else
@@ -273,6 +283,8 @@ export const useGameStore = create<GameStore>()(
     setCanTsumo: (canTsumo) => set({ canTsumo }),
 
     setCanAddToKong: (canAddToKong) => set({ canAddToKong }),
+
+    setCanConcealedKong: (canConcealedKong) => set({ canConcealedKong }),
 
     setLastDiscard: (lastDiscard) => set({ lastDiscard }),
 

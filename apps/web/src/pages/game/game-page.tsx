@@ -2997,7 +2997,8 @@ type KongActionOption =
   | { type: 'add'; pungTile: TileType };
 
 interface KongActionPending {
-  discardTile: TileType;
+  /** Null when triggered from the proactive "Declare Hidden Kong" button (no discard intent). */
+  discardTile: TileType | null;
   options: KongActionOption[];
 }
 
@@ -3025,17 +3026,20 @@ function KongActionSheet({
         aria-label={t(titleKey)}
       >
         <div className="flex items-center gap-4">
-          <MahjongTile2D tile={pending.discardTile} size="lg" interactive={false} />
+          {pending.discardTile && (
+            <MahjongTile2D tile={pending.discardTile} size="lg" interactive={false} />
+          )}
           <h2 className="font-bold text-lg text-mj-bone">{t(titleKey)}</h2>
         </div>
         <div className="flex gap-3 mt-2">
-          <button
-            onClick={onDiscard}
-            className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-            style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
-          >
-            {t('kongActionDiscard')}
-          </button>
+          {pending.discardTile && (
+            <button
+              onClick={onDiscard}
+              className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70 border border-mj-ink/15"
+            >
+              {t('kongActionDiscard')}
+            </button>
+          )}
           {pending.options.map((o, i) => (
             <button
               key={i}
@@ -3264,6 +3268,7 @@ function GameTable({
   claimWindow,
   canTsumo,
   canAddToKong,
+  canConcealedKong,
   toast,
   pendingMove,
   onSelect,
@@ -3282,6 +3287,7 @@ function GameTable({
   claimWindow: ClaimWindowState | null;
   canTsumo: boolean;
   canAddToKong: TileType | null;
+  canConcealedKong: TileType[] | null;
   toast: GameToast | null;
   pendingMove: boolean;
   onSelect: (idx: number | null) => void;
@@ -3437,7 +3443,7 @@ function GameTable({
   );
 
   const handleKongActionDiscard = useCallback(() => {
-    if (!kongActionPending) return;
+    if (!kongActionPending || !kongActionPending.discardTile) return;
     const tile = kongActionPending.discardTile;
     setKongActionPending(null);
     handleDiscardWithConfirm(tile);
@@ -3729,6 +3735,36 @@ function GameTable({
             />
           )}
 
+        {/* ── Declare Hidden Kong button ─────────────────────────────────────── */}
+        {/* Proactive upper-right button shown whenever the player holds 4-of-a-  */}
+        {/* kind in their concealed hand. Visible at any point on their turn so   */}
+        {/* they don't need to know to click a specific tile.                     */}
+        {canConcealedKong &&
+          canConcealedKong.length > 0 &&
+          isMyTurn &&
+          !showConcedeSheet &&
+          !jingDiscardPending &&
+          !kongActionPending && (
+            <button
+              onClick={() => {
+                if (canConcealedKong.length === 1) {
+                  onKongConcealed(canConcealedKong[0]);
+                } else {
+                  setKongActionPending({
+                    discardTile: null,
+                    options: canConcealedKong.map((tile) => ({
+                      type: 'concealed' as const,
+                      kongTile: tile,
+                    })),
+                  });
+                }
+              }}
+              className="absolute top-2 right-2 z-20 font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur shadow-[0_0_12px_rgba(201,169,97,0.35)]"
+            >
+              {t('declareHiddenKong')}
+            </button>
+          )}
+
         {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
         {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
         {/* HUD and lets them re-open the win prompt at any time before discarding.*/}
@@ -3990,6 +4026,7 @@ export function GamePage() {
     selectTile,
     canTsumo,
     canAddToKong,
+    canConcealedKong,
     discard,
     declareTsumo,
     kongConcealed,
@@ -4201,6 +4238,7 @@ export function GamePage() {
             claimWindow={claimWindow}
             canTsumo={canTsumo}
             canAddToKong={canAddToKong}
+            canConcealedKong={canConcealedKong}
             toast={toast}
             pendingMove={pendingMove}
             onSelect={selectTile}
