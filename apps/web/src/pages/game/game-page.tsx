@@ -3617,16 +3617,13 @@ function GameTable({
         {/* proactive buttons visible at any point on the player's turn. They     */}
         {/* stack vertically and never cover the hand or open melds.              */}
         {isMyTurn && !showConcedeSheet && !jingDiscardPending && (
-          <div
-            className="absolute right-2 z-20 flex flex-col items-end gap-2"
-            style={{ top: isMobile ? 'calc(var(--mj-safe-top, 0px) + 40px)' : '44px' }}
-          >
+          <div className="absolute top-[calc(var(--mj-safe-top,0px)+40px)] right-2 z-20 flex flex-col items-end gap-2">
             {canConcealedKong &&
               canConcealedKong.map((tile) => (
                 <button
                   key={tile}
                   onClick={() => onKongConcealed(tile)}
-                  className="font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur shadow-[0_0_12px_rgba(201,169,97,0.35)]"
+                  className="font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur drop-shadow-mj-gold"
                 >
                   {canConcealedKong.length > 1 ? (
                     <span className="flex items-center gap-2">
@@ -3641,7 +3638,7 @@ function GameTable({
             {canAddToKong && (
               <button
                 onClick={() => onKongAdd(canAddToKong)}
-                className="font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur shadow-[0_0_12px_rgba(201,169,97,0.35)]"
+                className="font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur drop-shadow-mj-gold"
               >
                 {t('addToKong')}
               </button>
