@@ -15,6 +15,9 @@ import {
   eventLabel,
 } from './PlaybackControls';
 
+// Fallback class for event kinds not covered by ACTION_TEXT_CLASS
+const ACTION_TEXT_DEFAULT = 'text-mj-bone/60';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ActionLogStep {
@@ -53,8 +56,7 @@ export function ActionLog({ steps, currentIdx, onPick }: ActionLogProps) {
         const isCurrent = n === currentIdx;
         const seat = getSeatFromEvent(s.event);
         const seatWind = s.state.seats[seat].wind;
-        const accentClass =
-          ACTION_TEXT_CLASS[s.event.kind] ?? 'text-[rgba(var(--felt-ink-rgb),0.7)]';
+        const accentClass = ACTION_TEXT_CLASS[s.event.kind] ?? ACTION_TEXT_DEFAULT;
 
         return (
           <button

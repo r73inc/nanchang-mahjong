@@ -1,5 +1,5 @@
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { api } from '../lib/api';
 import { useChallenge } from './use-challenges';
 import { useAuthStore } from '../stores/auth.store';
@@ -77,22 +77,35 @@ export function useChallengeReplay(challengeId: string): UseChallengeReplayResul
     })),
   });
 
-  const timelines = useMemo<Record<string, OmniscientReplayStep[]>>(() => {
-    const result: Record<string, OmniscientReplayStep[]> = {};
-    completedParticipants.forEach((p, i) => {
-      const data = replayQueries[i]?.data;
-      if (data) result[p.sub] = buildOmniscientTimeline(data);
-    });
-    return result;
-  }, [completedParticipants, replayQueries]);
+  // Per-participant cache: reuse the expensive buildOmniscientTimeline result as long as
+  // the payload reference hasn't changed. useQueries returns a new array on every render
+  // even when the underlying data is identical, so we check reference equality on data
+  // rather than depending on the array itself being stable.
+  const timelineCache = useRef(
+    new Map<string, { payload: ReplayGamePayload; steps: OmniscientReplayStep[] }>(),
+  );
 
-  const payloads = useMemo<Record<string, ReplayGamePayload>>(() => {
-    const result: Record<string, ReplayGamePayload> = {};
+  const { timelines, payloads } = useMemo<{
+    timelines: Record<string, OmniscientReplayStep[]>;
+    payloads: Record<string, ReplayGamePayload>;
+  }>(() => {
+    const cache = timelineCache.current;
+    const timelines: Record<string, OmniscientReplayStep[]> = {};
+    const payloads: Record<string, ReplayGamePayload> = {};
     completedParticipants.forEach((p, i) => {
       const data = replayQueries[i]?.data;
-      if (data) result[p.sub] = data;
+      if (!data) return;
+      const cached = cache.get(p.sub);
+      if (cached && cached.payload === data) {
+        timelines[p.sub] = cached.steps;
+      } else {
+        const steps = buildOmniscientTimeline(data);
+        cache.set(p.sub, { payload: data, steps });
+        timelines[p.sub] = steps;
+      }
+      payloads[p.sub] = data;
     });
-    return result;
+    return { timelines, payloads };
   }, [completedParticipants, replayQueries]);
 
   const maxTurns = useMemo(

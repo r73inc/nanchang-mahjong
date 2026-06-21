@@ -14,8 +14,8 @@ import type { GameEvent, SeatWind, TileType } from '@nanchang/shared';
 const PLAY_ICON = '▶';
 const PAUSE_ICON = '❚❚';
 const TIMES_SIGN = '×';
-const TICK_COLOR_WIN = '#7fc299';
-const TICK_COLOR_CLAIM = '#c9a961';
+const TICK_COLOR_WIN = 'var(--mj-win)';
+const TICK_COLOR_CLAIM = 'var(--mj-gold)';
 
 // ── Constants shared with parent views ────────────────────────────────────────
 
@@ -27,21 +27,10 @@ export const WIND_CHAR: Record<SeatWind, string> = {
 };
 
 export const WIND_COLOR: Record<SeatWind, string> = {
-  east: '#c9a961',
-  south: '#a36d3e',
-  west: '#5a7d8c',
-  north: '#7d4f4f',
-};
-
-export const ACTION_COLOR: Partial<Record<GameEvent['kind'], string>> = {
-  discard: '#c9a961',
-  pung: '#c9a961',
-  kong_open: '#a36d3e',
-  kong_concealed: '#a36d3e',
-  kong_added: '#a36d3e',
-  chow: '#5a7d8c',
-  win: '#7fc299',
-  concede: '#e88080',
+  east: 'var(--mj-gold)',
+  south: 'var(--mj-south)',
+  west: 'var(--mj-west)',
+  north: 'var(--mj-north)',
 };
 
 // Tailwind class equivalents — all strings appear literally so JIT includes them.
@@ -89,7 +78,7 @@ export const ACTION_TEXT_CLASS: Partial<Record<GameEvent['kind'], string>> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function getSeatFromEvent(event: GameEvent): 0 | 1 | 2 | 3 {
-  return 'seat' in event ? (event as { seat: 0 | 1 | 2 | 3 }).seat : 0;
+  return 'seat' in event ? event.seat : 0;
 }
 
 const EVENT_KEY_MAP: Partial<Record<GameEvent['kind'], StringKey>> = {
@@ -130,9 +119,9 @@ function TransportBtn({
       className="h-9 rounded-[10px] flex items-center justify-center font-bold text-sm disabled:opacity-40"
       style={{
         width: primary ? 48 : 40,
-        background: primary ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.06)',
-        border: `1px solid ${primary ? '#c9a961' : 'rgba(var(--felt-ink-rgb),0.12)'}`,
-        color: primary ? '#1f2937' : '#f5efdf',
+        background: primary ? 'var(--mj-gold)' : 'rgba(var(--felt-ink-rgb),0.06)',
+        border: `1px solid ${primary ? 'var(--mj-gold)' : 'rgba(var(--felt-ink-rgb),0.12)'}`,
+        color: primary ? 'var(--mj-slate)' : 'var(--mj-bone)',
       }}
     >
       {label}
@@ -178,7 +167,7 @@ function TickBar({
               height: isBig ? 10 : 5,
               borderRadius: isBig ? 2 : 1,
               background: color,
-              outline: isCurrent ? '2px solid #c9a961' : 'none',
+              outline: isCurrent ? '2px solid var(--mj-gold)' : 'none',
               outlineOffset: 1,
             }}
           />
@@ -222,11 +211,6 @@ export function PlaybackControls({
     [onScrub],
   );
 
-  const eventKind = currentEvent?.kind;
-  const accentColor = eventKind
-    ? (ACTION_COLOR[eventKind] ?? 'rgba(var(--felt-ink-rgb),0.7)')
-    : undefined;
-
   return (
     <div
       className="rounded-xl p-3 space-y-3"
@@ -238,11 +222,9 @@ export function PlaybackControls({
       {/* Step callout */}
       {currentEvent && (
         <div
-          className="rounded-xl px-3 py-2 flex items-center gap-3"
-          style={{
-            background: `${accentColor ?? 'rgba(var(--felt-ink-rgb),0.1)'}18`,
-            border: `1px solid ${accentColor ?? 'rgba(var(--felt-ink-rgb),0.15)'}55`,
-          }}
+          className={`rounded-xl px-3 py-2 flex items-center gap-3 border ${
+            ACTION_BG_CLASS[currentEvent.kind] ?? 'bg-mj-gold/10'
+          } ${ACTION_BORDER_CLASS[currentEvent.kind] ?? 'border-mj-gold/20'}`}
         >
           <span className="font-mono text-[10px] font-bold text-mj-bone/40 shrink-0">
             {String(stepIdx + 1).padStart(2, '0')}/{steps.length}
@@ -255,7 +237,11 @@ export function PlaybackControls({
               {currentWindLabel}
             </div>
           )}
-          <span className="text-xs font-bold flex-1" style={{ color: accentColor ?? '#f5efdf' }}>
+          <span
+            className={`text-xs font-bold flex-1 ${
+              ACTION_TEXT_CLASS[currentEvent.kind] ?? 'text-mj-bone'
+            }`}
+          >
             {eventLabel(currentEvent.kind, t)}
           </span>
           {'tile' in currentEvent && currentEvent.tile && (
@@ -273,7 +259,7 @@ export function PlaybackControls({
           value={stepIdx}
           onChange={handleScrub}
           className="w-full h-7"
-          style={{ accentColor: '#c9a961' }}
+          style={{ accentColor: 'var(--mj-gold)' }}
           aria-label={t('replayPlayback')}
         />
         <TickBar steps={steps} idx={stepIdx} onPick={onScrub} />

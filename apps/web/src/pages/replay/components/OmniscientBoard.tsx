@@ -62,7 +62,7 @@ function SeatCard({
 
       {/* Hand tiles */}
       <div
-        className={`flex flex-wrap gap-px transition-all duration-150${isActive ? ' drop-shadow-[0_0_6px_rgba(201,169,97,0.4)]' : ''}`}
+        className={`flex flex-wrap gap-px transition-all duration-150${isActive ? ' drop-shadow-mj-gold' : ''}`}
       >
         {seatState.hand.map((tile, n) => (
           <MahjongTile2D key={n} tile={tile as TileType} size="xs" />

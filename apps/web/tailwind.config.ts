@@ -78,6 +78,9 @@ const config: Config = {
         viewport:
           '0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(201, 169, 97, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
       },
+      dropShadow: {
+        'mj-gold': '0 0 6px rgba(201,169,97,0.4)',
+      },
 
       // ── Max widths ───────────────────────────────────────────
       maxWidth: {

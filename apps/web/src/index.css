@@ -5,6 +5,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design token CSS custom properties ──────────────────────────────────────── */
+/* These mirror the static hex values in tailwind.config.ts so JS inline styles  */
+/* can reference the same canonical values via var(--mj-*) instead of raw hex.   */
+:root {
+  --mj-gold: #c9a961;
+  --mj-gold-2: #a88a45;
+  --mj-win: #7fc299;
+  --mj-south: #a36d3e;
+  --mj-west: #5a7d8c;
+  --mj-north: #7d4f4f;
+  --mj-bone: #f5efdf;
+  --mj-slate: #1f2937;
+  --mj-loss-light: #e88080;
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
