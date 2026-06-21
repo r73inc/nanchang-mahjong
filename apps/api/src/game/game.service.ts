@@ -2110,6 +2110,7 @@ export class GameService {
     const replayPayload = {
       gameId: session.gameId,
       seatMap: session.seatMap,
+      seatNames: [...session.seatNames] as [string, string, string, string],
       settings: session.settings,
       hands: session.handLog.map((meta, i) => ({
         seed: meta.seed,
