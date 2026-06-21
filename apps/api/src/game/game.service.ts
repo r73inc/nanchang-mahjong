@@ -28,6 +28,7 @@ import {
   decomposeHand,
   decomposeConcealed,
   addToKongOptions,
+  concealedKongOptions,
   stepAbove,
   getBotDiscard,
   getBotClaim,
@@ -1062,6 +1063,16 @@ export class GameService {
             break;
           }
         }
+      }
+
+      // ── Concealed-kong opportunity detection ───────────────────────────────
+      // If the player holds 4 of a kind in their concealed hand, notify them
+      // so the UI can show a proactive "Declare Hidden Kong" button.
+      const cKongTiles = concealedKongOptions(seatState.hand, jingTypes);
+      if (cKongTiles.length > 0 && socketId && this.server) {
+        this.server
+          .to(socketId)
+          .emit('game:can-concealed-kong', { seat: activeSeat, tiles: cKongTiles });
       }
     }
 

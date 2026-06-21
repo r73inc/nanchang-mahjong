@@ -453,6 +453,7 @@
   "tsumoContinue": "Keep Playing",
   "addToKongPrompt": "You can promote a pung to a kong",
   "addToKong": "Add to Kong (加杠)",
+  "declareHiddenKong": "Declare Hidden Kong (暗杠)",
   "gameDrawRound": "Draw — No Winner",
   "gameConceded": "Player Conceded",
   "gameMobileEnterTitle": "Rotate to Play",
