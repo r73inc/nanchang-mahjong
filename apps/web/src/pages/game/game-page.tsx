@@ -3617,7 +3617,10 @@ function GameTable({
         {/* proactive buttons visible at any point on the player's turn. They     */}
         {/* stack vertically and never cover the hand or open melds.              */}
         {isMyTurn && !showConcedeSheet && !jingDiscardPending && (
-          <div className="absolute top-2 right-2 z-20 flex flex-col items-end gap-2">
+          <div
+            className="absolute right-2 z-20 flex flex-col items-end gap-2"
+            style={{ top: isMobile ? 'calc(var(--mj-safe-top, 0px) + 40px)' : '44px' }}
+          >
             {canConcealedKong &&
               canConcealedKong.map((tile) => (
                 <button
