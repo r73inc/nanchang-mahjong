@@ -4,6 +4,9 @@
 > single source of truth for the AI Replay Commentary feature. It is phased so each
 > phase maps to one focused, independently reviewable PR.
 >
+> **Decisions:** all questions (Q-1…Q-13) resolved (2026-06-21) and folded into the plan
+> below — see §7. Ready to implement from Phase 1.
+>
 > **Branching reminder:** every phase branches off `pre-prod` and is merged via PR
 > into `pre-prod`. One PR at a time. Never target `main`.
 
@@ -27,10 +30,18 @@ Two flavours of output:
      whole challenge. Focuses on **where each player's games diverged hand-by-hand**
      (same deals, different decisions), who took a risk that paid off, who chased a
      non-standard hand and made it, whose plan fell apart, who got unlucky — painting
-     the picture of _why the final scores ended up so far apart_. Length: as long as the
-     narrative needs.
+     the picture of _why the final scores ended up so far apart_. Length: open-ended but
+     bounded by a **configurable word cap (default 400 words)**.
    - **Per-player breakdown** — for each participant, an individual game overview
      identical in spirit to the normal match overview.
+
+**Languages:** every summary (normal overview, challenge overview, per-player breakdown)
+is generated and stored in **both English and Chinese**. The viewer renders whichever
+matches the user's current app language. See §4.3 (storage) and §4.4 (prompt).
+
+**Model:** a single Gemini model — **Flash** — is used for _all_ generation (overviews
+and challenge narrative alike). This may change later, but for now one model serves
+everything (§4.4).
 
 ### Where the output appears
 
@@ -39,8 +50,13 @@ Two flavours of output:
 | **Replay viewer** (`/replay/:id`)                      | Collapsible panel (collapsed by default) at the very top with the match overview. If no summary yet → a **"Request AI summary of this match"** button.      | All games            |
 | **Challenge replay viewer** (`/challenges/:id/replay`) | Same collapsible panel; the per-player breakdown **switches with the selected participant**.                                                                | Completed challenges |
 | **Challenge detail page** (`/challenges/:id`)          | The **challenge overview** is shown once the challenge is complete. For legacy/pre-existing challenges with no summary → a **"Request AI summary"** button. | Completed challenges |
-| **Admin: AI request queue** (new screen)               | Pending user requests; admins approve/reject.                                                                                                               | Admins               |
-| **Admin: AI failed jobs** (new screen)                 | Failed generation jobs with surfaced error reason/code/logs; retry.                                                                                         | Admins               |
+| **Admin: AI request queue** (new screen)               | Pending user requests; approve/reject.                                                                                                                      | `admin-ai-features`  |
+| **Admin: AI failed jobs** (new screen)                 | Failed generation jobs with surfaced error reason/code/logs; retry.                                                                                         | `admin-ai-features`  |
+
+> **Permission gate (see §4.5):** all AI-feature admin surfaces and the
+> auto-approve/retry powers require the new **`admin-ai-features`** permission — a
+> grant _separate_ from the `admin` role. An account can be an `admin` and still be
+> unable to touch any of this unless it also holds `admin-ai-features`.
 
 ### Generation triggers
 
@@ -48,14 +64,16 @@ Two flavours of output:
   generates the challenge overview **and** a per-player game overview for every attached
   game. No approval needed.
 - **Normal matches (on request):** never automatic. The replay viewer shows a request
-  button.
-  - **Requester is a normal user** → request goes into an **admin approval queue**.
-    - **Approved** → game is sent to Gemini, result stored, panel updates.
+  button to anyone allowed to view that replay.
+  - **Requester lacks `admin-ai-features`** (any normal user, _and_ a plain `admin`) →
+    request goes into the **approval queue**.
+    - **Approved** (by an `admin-ai-features` holder) → game is sent to Gemini, result
+      stored, panel updates.
     - **Rejected** → the request button is re-enabled in the replay viewer.
-  - **Requester is an admin** → treated as auto-approved; sent immediately.
+  - **Requester holds `admin-ai-features`** → treated as auto-approved; sent immediately.
 - **Re-requests / recovery:** the same request + approval mechanism covers
   re-generating after a failure, and backfilling games/challenges that predate this
-  feature.
+  feature. Retrying a **failed** job requires `admin-ai-features`.
 
 ---
 
@@ -137,6 +155,20 @@ Researched from the codebase so the plan slots into existing patterns.
 - Frontend: [`AdminPage`](apps/web/src/pages/admin/admin-page.tsx) is a single page with
   stacked sections + `AdminRoute` guard. New admin screens slot in as sections/tabs.
 
+### Roles & permissions (today)
+
+- Authorization is **role-only**: `UserRole = 'user' | 'admin'`
+  ([`authenticated-user.interface.ts`](apps/api/src/common/interfaces/authenticated-user.interface.ts:1)).
+- The role is **baked into the JWT** and re-derived client-side in
+  [`auth.store.ts`](apps/web/src/stores/auth.store.ts:29) (`parseUser`).
+- Server enforcement is `@Roles('admin')` + [`RolesGuard`](apps/api/src/common/guards/roles.guard.ts),
+  which simply checks `requiredRoles.includes(request.user.role)`.
+- [`JwtStrategy.validate`](apps/api/src/auth/strategies/jwt.strategy.ts:29) already does a
+  **fresh `users.findBySub`** on every request (for the `disabled` check) — so an
+  authoritative per-request permission lookup is cheap to add without re-issuing tokens.
+- There is **no granular-permission concept yet** — `admin-ai-features` introduces the
+  first one. See §4.5.
+
 ### Data layer
 
 - DynamoDB single-table; key helpers centralised in
@@ -205,10 +237,14 @@ Researched from the codebase so the plan slots into existing patterns.
 
 **Security layers:**
 
-1. `AWS_IAM` auth on the Function URL (primary gate — identity-based).
-2. Resource policy scoping invoke to the specific HK task-role ARN.
+1. `AWS_IAM` auth on the Function URL (**sole gate** — identity-based, per Q-7).
+2. Resource policy scoping invoke to the specific HK task-role ARN — every request that
+   is not SigV4-signed by that one principal is rejected.
 3. Request validation + strict size caps in the handler (defend against abuse/cost).
-4. Optional: a rotating shared secret header as defence-in-depth (decide in Q-7).
+
+> **Q-7 resolved:** IAM alone is the gate. No rotating shared-secret header — IAM blocks
+> all callers except the explicitly-allowed HK task role, which satisfies the
+> "easy to maintain but secure" bar.
 
 **Alternatives considered (and why not):**
 
@@ -232,9 +268,10 @@ Rationale:
 - One CI, one place to read, trivial code size.
 - Region isolation is achieved at the **stack/pipeline** level, not the repo level.
 
-Trade-off to confirm (Q-6): a separate repo gives a harder deploy boundary and smaller
-blast radius, at the cost of a synced contract. Given family scale, monorepo wins — but
-this is a decision for you.
+**Q-6 resolved:** monorepo is fine provided it stays a clean, maintainable pattern — a
+separate repo would give a harder deploy boundary and smaller blast radius at the cost of
+a synced contract, but at family scale the monorepo (with the relay's own us-east-1 stack
+and manual deploy) wins.
 
 ### 4.3 Data model (DynamoDB)
 
@@ -256,10 +293,10 @@ just resolve the request record and leave the game with no summary (button re-en
 
 ```
 status            'requested'|'approved'|'processing'|'done'|'failed'
-text              string            // the overview (game) — present when done
+text              { en: string; zh: string }   // both languages — present when done
 requestedBy/At    string            // who asked + when
-approvedBy/At     string            // admin or 'auto' (challenge) / 'self' (admin requester)
-model             string            // Gemini model id used
+approvedBy/At     string            // 'auto' (challenge) / actor sub (admin-ai-features holder)
+model             string            // Gemini model id used (Flash)
 promptVersion     string            // for reproducibility / A-B of prompts
 generatedAt       string
 attempts          number
@@ -267,8 +304,18 @@ errorCode         string            // '404'|'403'|'5xx'|'timeout'|'validation'|
 errorMessage      string            // surfaced (sanitised) reason
 ```
 
+**Both languages (Q-5).** `text` always carries `{ en, zh }`. The viewer picks the field
+matching the current app language; if one language is somehow missing it falls back to the
+other. Generation produces both in a single job (see §4.4 for whether that is one call or
+two) so a summary is never half-translated in the `done` state.
+
 The challenge summary item additionally references the per-participant game summary ids
 (or the per-player breakdowns are simply read from each participant's `GAME#<id>/AI_SUMMARY`).
+
+**Permission storage (`admin-ai-features`).** This is a property of the **user profile**,
+not a new summary/queue item. Add it to the `UserProfile`/user record (e.g.
+`permissions: string[]` or a boolean `aiFeatures` flag) so it can be granted/revoked from
+the admin user-management screen and checked authoritatively server-side. See §4.5.
 
 ### 4.4 Prompt & "facts digest" design
 
@@ -294,11 +341,68 @@ capability) and sends _that_ plus a versioned prompt template. This:
 - Persona: mahjong match reporter / commentator / breakdown reviewer; lively, a little
   personality, more engaging than a stat dump — but accurate to the facts digest.
 - Normal overview: **3–12 sentences**, scaled to game length.
-- Challenge overview: as long as the narrative needs; structured around hand-by-hand
-  divergence and risk/reward/heroes/failures.
+- Challenge overview: structured around hand-by-hand divergence and
+  risk/reward/heroes/failures, **bounded by a configurable word cap (default 400 words)**.
+  The cap lives in API config (not the relay) so it can be tuned without redeploying.
 - Per-player challenge breakdown: same as a normal overview.
 - **Nanchang Mahjong only** — the prompt must forbid any other-variant concepts (no
   minimum-fan talk, etc.), consistent with the project's Tier-0 rule.
+
+**Model (Q-1).** One model for everything: **Gemini Flash**. The relay takes a model id
+from the API request rather than hard-coding it, so swapping models later is an API-config
+change, not a relay redeploy.
+
+**Player identity (Q-9).** Send **full real player handles** in the facts digest — no
+anonymised seat labels. For this private family app there are no restricted fields; the
+digest may carry **all replay facts, including full-hand info** (which players already see
+in the omniscient replay). The whole replay payload is fair game.
+
+**Bilingual generation (Q-5).** Each job must yield `{ en, zh }`. Two viable shapes —
+decide at implementation time, default to (a):
+
+- **(a)** one prompt that asks Gemini to return a small JSON object with both `en` and `zh`
+  fields (one call, guaranteed paired, cheapest).
+- **(b)** two calls (one per language) — simpler prompts, double the cost/latency.
+
+The persona/length/Nanchang constraints apply identically to both languages.
+
+### 4.5 The `admin-ai-features` permission (Q-10)
+
+This feature introduces the project's **first granular permission**, gating _everything_
+privileged in the AI-commentary feature. It is **orthogonal to the `admin` role**: an
+account may be `admin` yet lack `admin-ai-features`, in which case it has no AI powers at
+all (its summary requests go through the normal approval queue like any user's).
+
+**What the permission gates:**
+
+- Auto-approval of one's own summary requests (instant generation, no queue).
+- Approving / rejecting other users' queued requests.
+- Retrying failed jobs (Q-11).
+- Visibility of the AI request-queue and failed-jobs admin screens.
+
+**What it does _not_ gate:** requesting a summary (any viewer of a replay/challenge may
+request — it just queues) and viewing finished summaries.
+
+**Design (recommended):**
+
+- **Storage:** a field on the user profile (`permissions: string[]`, holding e.g.
+  `'admin-ai-features'`, future-proofed for more permissions; or a simple boolean if we
+  never expect others). Granted/revoked from the admin user-management screen.
+- **Server enforcement (authoritative):** a new `@RequirePermission('admin-ai-features')`
+  decorator + guard that reads the **fresh user profile** (the same `users.findBySub`
+  lookup `JwtStrategy` already performs for the `disabled` check) rather than trusting a
+  JWT claim. This makes **revocation take effect immediately** — no waiting for token
+  refresh — which matters for an authorization gate on a paid external service.
+- **Frontend (UI-gating only, non-authoritative):** expose the permission to the client
+  (cleanest via the existing `/users/me` profile fetch; embedding it as a JWT claim is an
+  alternative but suffers revocation lag, so prefer the profile field) so `AdminPage` can
+  show/hide the AI sections and the replay panel can decide instant-vs-queued. The server
+  always re-checks.
+
+**Granting authority (Q-13 resolved):** **any `admin`** may grant/revoke
+`admin-ai-features` from the user-management screen, with grants written to the audit log
+like `SET_ROLE`. Crucially, **holding `admin-ai-features` does _not_ grant the right to
+hand it out** — only the `admin` role does — so the permission cannot self-propagate.
 
 ---
 
@@ -312,9 +416,12 @@ built and reviewed while their UI counterparts wait.
 **Scope:** types only, zero runtime behaviour change.
 
 - `packages/shared`: relay request/response contract (provider-agnostic), AI-summary
-  payload types (game + challenge), request/job status enums, facts-digest types.
+  payload types (game + challenge) with **bilingual `{ en, zh }` text**, request/job
+  status enums, facts-digest types.
 - `DK` key helpers for `GAME#<id>/AI_SUMMARY`, `CHALLENGE#<id>/AI_SUMMARY`, `AIREQ#<id>`,
   and the `AIREQ_STATUS#<status>` GSI tuple.
+- **Permission groundwork:** add the `admin-ai-features` permission to the shared
+  user/permission types and the `UserProfile` shape (e.g. `permissions: string[]`).
 - Doc the status machine in code comments.
   **Deliverables:** shared types compile; no API/web wiring.
   **Tests:** type-level only (typecheck). Tiny PR.
@@ -351,17 +458,26 @@ built and reviewed while their UI counterparts wait.
 
 ### Phase 4 — Request queue + admin approval (backend)
 
-**Scope:** the request/approval workflow.
+**Scope:** the request/approval workflow + the `admin-ai-features` permission infra.
 
+- **Permission infra:** `@RequirePermission('admin-ai-features')` decorator + guard doing
+  an authoritative fresh user-profile lookup (mirrors the `disabled` check in
+  `JwtStrategy`). Grant/revoke endpoint under `/admin/users/...` (audit-logged like
+  `SET_ROLE`); expose the permission on `/users/me`.
 - `POST /replays/:id/request-summary` and `POST /challenges/:id/request-summary`:
-  - admin requester → auto-approve → enqueue generation;
-  - normal user → create `AIREQ` pending record (idempotent; one open request per target).
-- Admin endpoints: `GET /admin/ai-requests?status=pending`,
-  `POST /admin/ai-requests/:id/approve` (→ generate), `POST /admin/ai-requests/:id/reject`
-  (→ resolve, leave target summary-less). Write audit-log entries.
-- Failed-jobs listing: `GET /admin/ai-jobs?status=failed` (+ retry endpoint).
+  - requester **holds `admin-ai-features`** → auto-approve → enqueue generation;
+  - everyone else (normal user _or_ plain admin) → create `AIREQ` pending record
+    (idempotent; one open request per target).
+- Queue-management endpoints (all `@RequirePermission('admin-ai-features')`):
+  `GET /admin/ai-requests?status=pending`, `POST /admin/ai-requests/:id/approve`
+  (→ generate), `POST /admin/ai-requests/:id/reject` (→ resolve, leave target
+  summary-less). Write audit-log entries.
+- Failed-jobs listing: `GET /admin/ai-jobs?status=failed` (+ retry endpoint), also gated
+  on `admin-ai-features` (Q-11).
 - Access control: requester must be allowed to view that replay/challenge.
-  **Tests:** approval/rejection transitions, role gating, idempotency, failed-job listing.
+  **Tests:** permission grant/revoke + guard gating (admin-without-permission is blocked),
+  approval/rejection transitions, auto-approve only for permission holders, idempotency,
+  failed-job listing + retry gating.
 
 ### Phase 5 — Auto-generation on challenge completion (backend)
 
@@ -370,21 +486,27 @@ built and reviewed while their UI counterparts wait.
 - Hook the challenge-completion transition in
   [`recordParticipantResult`](apps/api/src/challenges/challenges.service.ts:322) /
   [`declineChallenge`](apps/api/src/challenges/challenges.service.ts:523): on
-  `→ completed`, enqueue **auto-approved** jobs for (a) each completed participant's game
-  overview and (b) the challenge overview.
+  `→ completed`, enqueue **auto-approved** jobs for (a) each **completed** participant's
+  game overview and (b) the challenge overview. **Declined participants are skipped**
+  (Q-3).
+- **Only `completed` challenges generate** — a challenge that ends `cancelled` (all
+  challenged players declined) produces **no summary** (Q-12).
 - Generation runs async with status tracking; failures land in the failed-jobs screen and
   are retryable. Dedupe so re-completion/retries don't double-generate.
-- Decide push-notification-on-ready (Q-8).
-  **Tests:** completion fan-out enqueues the right jobs once; idempotency on repeat calls.
+- **No "ready" notification** — summaries surface **silently on the next page load**
+  (Q-8); no push, no badge.
+  **Tests:** completion fan-out enqueues the right jobs once (declined skipped); cancelled
+  challenge enqueues nothing; idempotency on repeat calls.
 
 ### Phase 6 — Frontend: replay viewers (panel + request button)
 
 **Scope:** the player-facing surfaces.
 
 - Collapsible panel (collapsed by default) at the top of `ReplayPage`: shows the overview
-  when present; otherwise the **"Request AI summary of this match"** button.
-  - admin → instant request; user → queued + "pending review" state; **re-enabled** if
-    rejected.
+  in the **current app language** (`{ en, zh }`, fall back to the other) when present;
+  otherwise the **"Request AI summary of this match"** button.
+  - `admin-ai-features` holder → instant request; everyone else → queued + "pending
+    review" state; **re-enabled** if rejected.
 - `ChallengeReplayPage`: same panel; the per-player breakdown **switches with the selected
   participant** (`viewedSub`).
 - `ChallengeDetailPage`: show the **challenge overview** when complete; **request button**
@@ -396,19 +518,25 @@ built and reviewed while their UI counterparts wait.
 
 ### Phase 7 — Frontend: admin screens
 
-**Scope:** admin tooling.
+**Scope:** admin tooling + permission management UI.
 
+- **Permission management:** in the existing user-management section, a grant/revoke
+  control for `admin-ai-features` (alongside the role/disable controls).
 - **AI request queue** screen/section: list pending, approve/reject, optimistic updates.
 - **AI failed jobs** screen/section: list failed jobs with surfaced error reason/code and
   any logs; retry action.
-- Slots into `AdminPage` (new sections or tabs) under `AdminRoute`. EN/ZH i18n.
-  **Tests:** RTL — list/approve/reject/retry; admin-only gating.
+- The AI sections render only for users holding `admin-ai-features` (the permission flag
+  from `/users/me`); they slot into `AdminPage` under `AdminRoute`, but a plain `admin`
+  without the permission does not see them. EN/ZH i18n.
+  **Tests:** RTL — list/approve/reject/retry; permission gating (admin-without-permission
+  sees no AI sections); grant/revoke control.
 
 ### Phase 8 — Polish, observability, backfill (optional)
 
 **Scope:** hardening.
 
-- Cost guards / rate limits on requests, dedupe windows, retry/backoff tuning.
+- Dedupe windows, retry/backoff tuning. (No per-user/per-day request caps or app-side
+  spend caps for now — Q-2, Q-10; the `admin-ai-features` gate is the throttle.)
 - Metrics + structured logging (relay + API) for the failed-jobs view.
 - Backfill tooling for pre-existing replays/challenges.
 - Prompt-version A/B notes.
@@ -417,14 +545,16 @@ built and reviewed while their UI counterparts wait.
 
 ## 6. Cross-Cutting Concerns
 
-- **Privacy / data egress:** replay facts (including full-hand info, which players already
-  see in the omniscient replay) are sent to Google via the relay. For a private family app
-  this is likely acceptable — confirm in Q-9. The digest should avoid PII beyond display
-  handles; consider sending seat labels instead of handles (Q-9).
+- **Privacy / data egress (Q-9 resolved):** sending replay facts to Google is **accepted**.
+  All replay facts — including full-hand info and the **whole replay payload** — plus
+  **full real player handles** may be sent. No restricted fields exist today; no
+  anonymisation.
 - **Nanchang-only correctness:** the prompt must explicitly constrain Gemini to Nanchang
   rules and forbid other-variant vocabulary (no min-fan, etc.).
-- **Idempotency & cost:** never regenerate a `done` summary unless an explicit retry/force
-  is issued; one open request per target.
+- **Idempotency:** never regenerate a `done` summary unless an explicit retry/force is
+  issued; one open request per target. **No spend cap or request cap** app-side (Q-2,
+  Q-10) — the user pre-funds the Gemini billing project and the `admin-ai-features` gate
+  bounds who can spend.
 - **Failure surfacing:** capture HTTP status (404/403/5xx), timeouts, and validation
   errors distinctly so the admin failed-jobs screen can show a real reason.
 - **No `main` deploy coupling:** the relay stack deploys to us-east-1 on a separate,
@@ -434,74 +564,28 @@ built and reviewed while their UI counterparts wait.
 
 ---
 
-## 7. Open Questions (please answer inline)
+## 7. Resolved Questions
 
-> Answer by editing under each question. My recommendation is marked **(rec)**.
+> All Q-1…Q-12 answered (2026-06-21) and folded into the plan above. **Q-13 is newly
+> raised** by the answer to Q-10 and is the only one still open.
 
-**Q-1. Gemini model.** Which model should the relay call?
+| #    | Decision                                                                                                                                                                                                         |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q-1  | **One model for everything: Gemini Flash.** Relay takes the model id from the request, so it can change later without a redeploy. (§4.4)                                                                         |
+| Q-2  | Key already in hand; billing project **pre-funded**. **No app-side spend cap.** (§6)                                                                                                                             |
+| Q-3  | **Confirmed:** on completion auto-generate the challenge overview **and** a per-player overview for each completed participant; **declined participants skipped.** (Phase 5)                                     |
+| Q-4  | Normal overview **3–12 sentences** confirmed. Challenge overview gets a **configurable word cap, default 400 words** (in API config). (§1, §4.4)                                                                 |
+| Q-5  | **Generate & store both EN and ZH** for every summary; viewer renders the current app language. (§4.3, §4.4)                                                                                                     |
+| Q-6  | **Same monorepo** (`services/gemini-relay`) — acceptable as long as it stays a clean, maintainable pattern (own us-east-1 stack + manual deploy). (§4.2)                                                         |
+| Q-7  | **IAM alone** is the gate — Function URL `AWS_IAM` + resource policy scoped to the HK task role. **No shared-secret header.** (§4.1)                                                                             |
+| Q-8  | **No notification** — summaries load **silently on next page load.** (Phase 5)                                                                                                                                   |
+| Q-9  | **Send everything:** all replay facts, the whole replay, and **full real player handles.** No restricted data today. (§4.4, §6)                                                                                  |
+| Q-10 | **No caps.** Instead gate the whole feature behind a **new `admin-ai-features` permission**, separate from the `admin` role. (§4.5)                                                                              |
+| Q-11 | **Anyone with `admin-ai-features`** can retry failed jobs. (Phase 4, §4.5)                                                                                                                                       |
+| Q-12 | **Cancelled challenges generate no summary.** (Phase 5)                                                                                                                                                          |
+| Q-13 | **Any `admin`** can grant/revoke `admin-ai-features` (user-management screen, audit-logged like `SET_ROLE`). Holding the permission does **not** confer the right to grant it — prevents self-escalation. (§4.5) |
 
-- (rec) `gemini-2.x Flash` for cost/latency on overviews; consider `Pro` for the longer
-  challenge overview. Or one model for everything?
-- **Answer:**
-
-**Q-2. Gemini access.** Do you already have a Google AI Studio / Gemini API key (and a
-billing project), or do we need to set that up? Any per-day spend cap you want enforced?
-
-- **Answer:**
-
-**Q-3. Auto-generation scope on challenge completion.** Confirm: on completion, generate
-**both** the challenge overview **and** a per-player game overview for **every** completed
-participant automatically. Declined participants → skipped. Correct?
-
-- **Answer:**
-
-**Q-4. Length controls.** Normal overview **3–12 sentences** (scaled to game length) —
-confirmed. For the challenge overview, any hard upper bound (e.g. ≤ ~400 words) or truly
-open-ended?
-
-- **Answer:**
-
-**Q-5. Language.** Should summaries be generated in the user's current app language
-(EN/ZH), always English, or both (store both)? This affects prompt + storage shape.
-
-- **Answer:**
-
-**Q-6. Relay repo placement.** (rec) Same monorepo (`services/gemini-relay`) with a
-separate us-east-1 CDK stack + manual deploy. OK, or do you want a dedicated repo?
-
-- **Answer:**
-
-**Q-7. Relay auth.** (rec) Lambda Function URL with `AWS_IAM` (SigV4) as the sole gate.
-Add a rotating shared-secret header as belt-and-braces, or is IAM alone sufficient?
-
-- **Answer:**
-
-**Q-8. "Summary ready" notification.** When an auto/approved summary finishes, should we
-fire a push notification (we already have web-push infra) and/or surface a badge, or just
-update silently on next page load?
-
-- **Answer:**
-
-**Q-9. Data sent to Google + handles.** Acceptable to send replay facts to Gemini? And
-should we send real player handles or anonymised seat labels (e.g. "East/South/...") in
-the digest?
-
-- **Answer:**
-
-**Q-10. Request limits.** Per-user cap on pending AI requests (e.g. N open at once / per
-day) to bound the admin queue and cost? Suggested default?
-
-- **Answer:**
-
-**Q-11. Retry ownership.** For failed jobs, who can retry — any admin only, or also the
-original requester? (rec) admins only, from the failed-jobs screen.
-
-- **Answer:**
-
-**Q-12. Cancelled challenges.** Challenges can end as `cancelled` (all challenged players
-declined). Generate any summary for those, or skip? (rec) skip.
-
-- **Answer:**
+All questions resolved. The plan is ready to implement starting at Phase 1.
 
 ---
 
