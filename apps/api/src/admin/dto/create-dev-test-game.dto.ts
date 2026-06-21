@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsBoolean,
+  ArrayMinSize,
   ArrayMaxSize,
   ValidateNested,
 } from 'class-validator';
@@ -34,6 +35,7 @@ export class CreateDevTestGameDto {
   /** The admin's 13-tile waiting hand (tile type strings). */
   @IsArray()
   @IsString({ each: true })
+  @ArrayMinSize(13)
   @ArrayMaxSize(13)
   hand!: string[];
 

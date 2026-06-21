@@ -160,7 +160,7 @@
   "adminDevTestRemoveMeld": "移除",
   "adminDevTestCondition": "和牌条件",
   "adminDevTestConditionImmediate": "立即自摸",
-  "adminDevTestConditionImmediateHint": "第14张牌即为和牌 — 可立即自摸",
+  "adminDevTestConditionImmediateHint": "在下方选择和牌 — 游戏开始后可立即自摸",
   "adminDevTestConditionSelfDraw": "自摸",
   "adminDevTestConditionSelfDrawHint": "从牌墙摸到和牌",
   "adminDevTestConditionLeft": "下家打出",

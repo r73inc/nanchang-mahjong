@@ -24,6 +24,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
 import { GameService } from '../game/game.service';
 import type { TestHandInjection } from '../game/game-session';
+import type { TileType, Meld } from '@nanchang/engine';
 
 @Controller('admin')
 @UseGuards(JwtGuard, RolesGuard)
@@ -113,10 +114,10 @@ export class AdminController {
     @Body() dto: CreateDevTestGameDto,
   ) {
     const injection: TestHandInjection = {
-      hand: dto.hand as TestHandInjection['hand'],
-      openMelds: (dto.openMelds ?? []) as TestHandInjection['openMelds'],
+      hand: dto.hand as TileType[],
+      openMelds: (dto.openMelds ?? []) as Meld[],
       condition: dto.condition,
-      winTile: dto.winTile as TestHandInjection['winTile'],
+      winTile: dto.winTile as TileType | undefined,
     };
 
     const result = await this.game.createTestGame(actor.sub, actor.handle, injection);

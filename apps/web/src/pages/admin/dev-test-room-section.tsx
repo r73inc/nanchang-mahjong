@@ -291,35 +291,25 @@ export function DevTestRoomSection() {
 
     const handArr = handToArray(hand);
 
-    // For 'immediate', hand must have 14 tiles (13 + win tile packed together)
-    // For others, hand must have 13 tiles
-    if (condition === 'immediate') {
-      if (handArr.length !== 14) {
-        setError('For immediate tsumo, hand must have exactly 14 tiles (your winning hand)');
-        return;
-      }
-    } else {
-      if (handArr.length !== 13) {
-        setError(t('adminDevTestValidationHand'));
-        return;
-      }
-      if (!winTile) {
-        setError(t('adminDevTestValidationWinTile'));
-        return;
-      }
+    if (handArr.length !== 13) {
+      setError(t('adminDevTestValidationHand'));
+      return;
+    }
+    if (!winTile) {
+      setError(t('adminDevTestValidationWinTile'));
+      return;
     }
 
     try {
-      const config = {
+      const { gameId } = await createGame({
         hand: handArr,
         openMelds: openMelds.length > 0 ? openMelds : undefined,
         condition,
-        winTile: condition !== 'immediate' ? winTile : undefined,
-      };
-      const { gameId } = await createGame(config);
+        winTile,
+      });
       navigate(`/game/${gameId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create test game');
+      setError(err instanceof Error ? err.message : t('error'));
     }
   };
 
@@ -446,27 +436,18 @@ export function DevTestRoomSection() {
           </div>
         </div>
 
-        {/* Win tile (hidden for immediate) */}
-        {condition !== 'immediate' && (
-          <div>
-            <h3 className="text-xs font-semibold text-mj-bone/70 mb-1">
-              {t('adminDevTestWinTile')}
-            </h3>
-            <p className="text-[10px] text-mj-bone/40 mb-2">{t('adminDevTestWinTileHint')}</p>
-            {winTile && (
-              <div className="mb-2 flex items-center gap-2">
-                <MahjongTile2D tile={winTile} size="sm" role="bottom" interactive={false} />
-                <span className="text-[10px] text-mj-bone/60">{winTile}</span>
-              </div>
-            )}
-            <WinTilePicker selected={winTile} onSelect={setWinTile} />
-          </div>
-        )}
-
-        {/* For immediate: hand count guidance */}
-        {condition === 'immediate' && (
-          <p className="text-[10px] text-mj-bone/40">{t('adminDevTestConditionImmediateHint')}</p>
-        )}
+        {/* Win tile (required for all conditions) */}
+        <div>
+          <h3 className="text-xs font-semibold text-mj-bone/70 mb-1">{t('adminDevTestWinTile')}</h3>
+          <p className="text-[10px] text-mj-bone/40 mb-2">{t('adminDevTestWinTileHint')}</p>
+          {winTile && (
+            <div className="mb-2 flex items-center gap-2">
+              <MahjongTile2D tile={winTile} size="sm" role="bottom" interactive={false} />
+              <span className="text-[10px] text-mj-bone/60">{winTile}</span>
+            </div>
+          )}
+          <WinTilePicker selected={winTile} onSelect={setWinTile} />
+        </div>
 
         {/* Error */}
         {error && (

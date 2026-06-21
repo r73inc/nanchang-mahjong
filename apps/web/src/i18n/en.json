@@ -160,7 +160,7 @@
   "adminDevTestRemoveMeld": "Remove",
   "adminDevTestCondition": "Win Condition",
   "adminDevTestConditionImmediate": "Immediate Tsumo",
-  "adminDevTestConditionImmediateHint": "Your 14th tile is the win tile — call tsumo right away",
+  "adminDevTestConditionImmediateHint": "Pick the win tile below — call tsumo right after launch",
   "adminDevTestConditionSelfDraw": "Self Draw",
   "adminDevTestConditionSelfDrawHint": "You draw the win tile from the wall",
   "adminDevTestConditionLeft": "Left Opponent Discards",
