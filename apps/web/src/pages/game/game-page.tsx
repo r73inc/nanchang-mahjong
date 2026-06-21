@@ -3035,8 +3035,7 @@ function KongActionSheet({
           {pending.discardTile && (
             <button
               onClick={onDiscard}
-              className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70"
-              style={{ border: '1px solid rgba(var(--felt-ink-rgb),0.15)' }}
+              className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70 border border-mj-ink/15"
             >
               {t('kongActionDiscard')}
             </button>
@@ -3760,15 +3759,7 @@ function GameTable({
                   });
                 }
               }}
-              className="absolute top-2 right-2 font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter"
-              style={{
-                zIndex: 20,
-                background: 'rgba(201,169,97,0.22)',
-                border: '1px solid rgba(201,169,97,0.65)',
-                color: '#c9a961',
-                backdropFilter: 'blur(8px)',
-                boxShadow: '0 0 12px rgba(201,169,97,0.35)',
-              }}
+              className="absolute top-2 right-2 z-20 font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur shadow-[0_0_12px_rgba(201,169,97,0.35)]"
             >
               {t('declareHiddenKong')}
             </button>
