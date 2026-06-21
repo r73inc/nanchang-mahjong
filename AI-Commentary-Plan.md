@@ -607,8 +607,8 @@ built and reviewed while their UI counterparts wait.
 
 ## 7. Resolved Questions
 
-> All Q-1…Q-12 answered (2026-06-21) and folded into the plan above. **Q-13 is newly
-> raised** by the answer to Q-10 and is the only one still open.
+> All questions Q-1…Q-13 fully resolved (2026-06-21) and integrated into the plan above.
+> No open questions remain.
 
 | #    | Decision                                                                                                                                                                                                         |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
