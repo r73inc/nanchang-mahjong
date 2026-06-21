@@ -25,7 +25,6 @@ import type {
   WinType,
   HandType,
   TileType,
-  Meld,
 } from '@nanchang/engine';
 import type {
   RoomSettings,
@@ -39,12 +38,12 @@ import type { IncomingClaim, Seat4 } from './claim-resolver';
 export type TestWinCondition = 'immediate' | 'self_draw' | 'left_discard' | 'right_discard';
 
 export interface TestHandInjection {
-  /** The admin's 13-tile waiting hand. */
-  hand: TileType[];
+  /** The admin's closed waiting hand as tile-type strings (validated by DTO). */
+  hand: string[];
   /** Pre-configured open melds for the admin seat. */
-  openMelds: Meld[];
-  /** The tile that completes the hand (required for all conditions except 'immediate'). */
-  winTile?: TileType;
+  openMelds: Array<{ kind: 'chow' | 'pung' | 'kong'; tiles: string[]; concealed: boolean }>;
+  /** The scenario tile (optional; undefined only for 'immediate' when already in hand). */
+  winTile?: string;
   condition: TestWinCondition;
 }
 
