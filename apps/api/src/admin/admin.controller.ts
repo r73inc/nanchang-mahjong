@@ -16,11 +16,13 @@ import { AdminService } from './admin.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { SetRoleDto } from './dto/set-role.dto';
 import { SetDisabledDto } from './dto/set-disabled.dto';
+import { CreateDevTestGameDto } from './dto/create-dev-test-game.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import { GameService } from '../game/game.service';
 
 @Controller('admin')
 @UseGuards(JwtGuard, RolesGuard)
@@ -28,7 +30,10 @@ import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.
 // Admin actions are low-volume; tighten to 30 req/min to be safe.
 @Throttle({ default: { ttl: 60_000, limit: 30 } })
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly game: GameService,
+  ) {}
 
   // ── Invites ──────────────────────────────────────────────────────────────────
 
@@ -91,5 +96,34 @@ export class AdminController {
   ) {
     await this.admin.setDisabled(actor.sub, targetSub, dto.disabled);
     return { ok: true };
+  }
+
+  // ── Dev test room ─────────────────────────────────────────────────────────────
+
+  /**
+   * POST /admin/dev-test-game — create a dev test room with 3 easy bots.
+   * Returns the gameId; admin navigates to /game/:gameId to join.
+   * ELO and stats are not affected (session has bots → hasBots guard skips stats).
+   * Conceding ends the hand normally but does not affect the admin's rating.
+   */
+  @Post('dev-test-game')
+  async createDevTestGame(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateDevTestGameDto,
+  ) {
+    const result = await this.game.createTestGame(actor.sub, actor.handle, {
+      hand: dto.hand,
+      openMelds: dto.openMelds ?? [],
+      condition: dto.condition,
+      winTile: dto.winTile,
+    });
+
+    await this.admin.writeAudit({
+      action: 'CREATE_DEV_TEST_GAME',
+      actorSub: actor.sub,
+      payload: { condition: dto.condition, gameId: result.gameId },
+    });
+
+    return result;
   }
 }

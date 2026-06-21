@@ -3,6 +3,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { GameService } from '../game/game.service';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
@@ -41,6 +42,11 @@ const mockAdmin = {
   listUsers: jest.fn(),
   setRole: jest.fn(),
   setDisabled: jest.fn(),
+  writeAudit: jest.fn(),
+};
+
+const mockGame = {
+  createTestGame: jest.fn(),
 };
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
@@ -53,7 +59,10 @@ describe('AdminController', () => {
 
     const module = await Test.createTestingModule({
       controllers: [AdminController],
-      providers: [{ provide: AdminService, useValue: mockAdmin }],
+      providers: [
+        { provide: AdminService, useValue: mockAdmin },
+        { provide: GameService, useValue: mockGame },
+      ],
     })
       .overrideGuard(ThrottlerGuard)
       .useValue({ canActivate: () => true })

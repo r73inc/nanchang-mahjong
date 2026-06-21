@@ -346,6 +346,31 @@ function UserRow({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// ── Dev Test Room nav card ────────────────────────────────────────────────────
+
+function DevTestNavCard() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  return (
+    <section className="mt-6">
+      <h2 className="text-[13px] font-bold text-mj-gold/80 uppercase tracking-wider mb-3">
+        {t('adminDevTestSectionTitle')}
+      </h2>
+      <button
+        type="button"
+        onClick={() => navigate('/admin/dev-test')}
+        className="w-full rounded-[14px] px-4 py-4 flex items-center justify-between text-left transition-colors hover:bg-mj-gold/5"
+        style={cardStyle}
+      >
+        <p className="text-sm text-mj-bone/70">{t('adminDevTestNavDesc')}</p>
+        <span className="text-mj-gold/60 text-xl leading-none ml-3">›</span>
+      </button>
+    </section>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export function AdminPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -355,6 +380,7 @@ export function AdminPage() {
       <div className="px-5 py-6">
         <InvitesSection />
         <UsersSection />
+        <DevTestNavCard />
       </div>
     </ScreenShell>
   );
