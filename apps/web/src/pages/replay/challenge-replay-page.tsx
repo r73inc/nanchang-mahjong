@@ -19,8 +19,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { useI18n } from '../../i18n';
+import { useAuthStore } from '../../stores/auth.store';
 import { useChallengeReplay } from '../../hooks/use-replay';
-import { getChallengeSnapshot } from '../../lib/replay-engine';
+import { getChallengeSnapshot, buildReplayDisplayName } from '../../lib/replay-engine';
 import { OmniscientBoard } from './components/OmniscientBoard';
 import {
   PlaybackControls,
@@ -29,7 +30,6 @@ import {
   WIND_COLOR,
   getSeatFromEvent,
 } from './components/PlaybackControls';
-import { ActionLog } from './components/ActionLog';
 
 // ── Glyphs & separators (module-level avoids i18next/no-literal-string) ───────
 
@@ -139,8 +139,19 @@ export function ChallengeReplayPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
 
-  const { challenge, participants, timelines, maxTurns, hasAccess, myStatus, isLoading, isError } =
-    useChallengeReplay(challengeId ?? '');
+  const currentUser = useAuthStore((s) => s.user);
+
+  const {
+    challenge,
+    participants,
+    timelines,
+    payloads,
+    maxTurns,
+    hasAccess,
+    myStatus,
+    isLoading,
+    isError,
+  } = useChallengeReplay(challengeId ?? '');
 
   const [globalTurnIndex, setGlobalTurnIndex] = useState(0);
   const [viewedSub, setViewedSub] = useState<string>('');
@@ -273,15 +284,13 @@ export function ChallengeReplayPage() {
 
   const activeParticipant = participants.find((p) => p.sub === activeSub);
 
-  // displayNames: use participant handle as seat 0, bots fill remaining slots.
-  // The seatMap from the replay payload has player userIds — we use the handle
-  // from the challenge participant for the viewer's seat; others show as player N.
-  const boardDisplayNames: [string, string, string, string] = [
-    activeParticipant?.handle ?? '—',
-    'P2',
-    'P3',
-    'P4',
-  ];
+  // displayNames: resolve bot/player names from the active participant's replay payload.
+  const activePayload = activeSub ? payloads[activeSub] : undefined;
+  const boardDisplayNames = activePayload
+    ? (activePayload.seatMap.map((id, i) =>
+        buildReplayDisplayName(id, activePayload.seatNames?.[i], currentUser),
+      ) as [string, string, string, string])
+    : ([activeParticipant?.handle ?? '—', 'Bot', 'Bot', 'Bot'] as [string, string, string, string]);
 
   return (
     <ScreenShell title={t('replayChallengeTitle')} onBack={() => navigate(-1)}>
@@ -345,18 +354,6 @@ export function ChallengeReplayPage() {
             overlay={isExtendedWinningState ? <ConcludedOverlay /> : undefined}
           />
         </div>
-
-        {/* Action log — scoped to active participant's timeline */}
-        {!isExtendedWinningState && activeTimeline.length > 0 && (
-          <div>
-            <SectionLabel>{t('replayActionLog')}</SectionLabel>
-            <ActionLog
-              steps={activeTimeline}
-              currentIdx={Math.min(globalTurnIndex, activeTimeline.length - 1)}
-              onPick={handleScrub}
-            />
-          </div>
-        )}
       </div>
 
       <TransportFooter

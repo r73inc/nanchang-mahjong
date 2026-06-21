@@ -200,3 +200,30 @@ export function buildOmniscientTimeline(payload: ReplayGamePayload): OmniscientR
 
   return steps;
 }
+
+// ── Display name helper ───────────────────────────────────────────────────────
+
+/**
+ * Maps a raw seatMap entry (user sub or bot ID) + optional seatNames entry
+ * into a human-readable display label.
+ *
+ * Bot IDs follow the pattern "bot-<difficulty>-<seatIdx>".
+ * seatNames contains the bot persona name (MilkyBot etc.) or the player handle.
+ * For old replays without seatNames, currentUser is used to identify the
+ * viewing player's own seat; all other unknown subs fall back to "Player".
+ */
+export function buildReplayDisplayName(
+  seatId: string,
+  seatName: string | undefined,
+  currentUser: { sub: string; handle: string } | null,
+): string {
+  const botMatch = seatId.match(/^bot-(easy|normal|hard|psychic)-(\d)$/);
+  if (botMatch) {
+    const difficulty = botMatch[1];
+    const cap = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+    return seatName ? `${seatName} · ${cap}` : `Bot · ${cap}`;
+  }
+  if (seatName) return seatName;
+  if (currentUser && seatId === currentUser.sub) return currentUser.handle;
+  return 'Player';
+}

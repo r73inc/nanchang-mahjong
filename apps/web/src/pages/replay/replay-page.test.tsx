@@ -22,6 +22,7 @@ vi.mock('../../hooks/use-replay', () => ({
 
 vi.mock('../../lib/replay-engine', () => ({
   buildOmniscientTimeline: vi.fn(),
+  buildReplayDisplayName: vi.fn((id: string) => id),
 }));
 
 import { useReplay } from '../../hooks/use-replay';

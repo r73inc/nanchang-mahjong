@@ -30,6 +30,8 @@ export interface UseChallengeReplayResult {
   challenge: ReturnType<typeof useChallenge>['data'];
   participants: ChallengeReplayParticipant[];
   timelines: Record<string, OmniscientReplayStep[]>;
+  /** Raw replay payload keyed by participant sub — use for seatNames/seatMap display. */
+  payloads: Record<string, ReplayGamePayload>;
   maxTurns: number;
   hasAccess: boolean;
   myStatus: string | null;
@@ -84,6 +86,15 @@ export function useChallengeReplay(challengeId: string): UseChallengeReplayResul
     return result;
   }, [completedParticipants, replayQueries]);
 
+  const payloads = useMemo<Record<string, ReplayGamePayload>>(() => {
+    const result: Record<string, ReplayGamePayload> = {};
+    completedParticipants.forEach((p, i) => {
+      const data = replayQueries[i]?.data;
+      if (data) result[p.sub] = data;
+    });
+    return result;
+  }, [completedParticipants, replayQueries]);
+
   const maxTurns = useMemo(
     () => Math.max(0, ...Object.values(timelines).map((t) => Math.max(0, t.length - 1))),
     [timelines],
@@ -97,6 +108,7 @@ export function useChallengeReplay(challengeId: string): UseChallengeReplayResul
     challenge,
     participants: completedParticipants,
     timelines,
+    payloads,
     maxTurns,
     hasAccess,
     myStatus: myParticipant?.status ?? null,

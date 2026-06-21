@@ -13,7 +13,7 @@ import { ScreenShell } from '../../components/ui/screen-shell';
 import { MahjongTile2D } from '../../components/2d/MahjongTile2D';
 import { useI18n } from '../../i18n';
 import { useReplay } from '../../hooks/use-replay';
-import { buildOmniscientTimeline } from '../../lib/replay-engine';
+import { buildOmniscientTimeline, buildReplayDisplayName } from '../../lib/replay-engine';
 import { useAuthStore } from '../../stores/auth.store';
 import { OmniscientBoard } from './components/OmniscientBoard';
 import {
@@ -47,32 +47,6 @@ function SectionLabel({ children }: { children: string }) {
       {children}
     </p>
   );
-}
-
-/**
- * Maps a raw seatMap entry (user sub or bot ID) + seatNames entry into a
- * human-readable display label.
- *
- * Bot IDs follow the pattern "bot-<difficulty>-<seatIdx>".
- * seatNames contains the bot persona name (MilkyBot, etc.) or the player handle.
- * For old replays without seatNames, falls back to currentUser for the matching sub.
- */
-function buildDisplayName(
-  seatId: string,
-  seatName: string | undefined,
-  currentUser: { sub: string; handle: string } | null,
-): string {
-  const botMatch = seatId.match(/^bot-(easy|normal|hard|psychic)-(\d)$/);
-  if (botMatch) {
-    const difficulty = botMatch[1];
-    const cap = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
-    // seatName = bot persona (MilkyBot, etc.) if seatNames present; otherwise generic
-    return seatName ? `${seatName} · ${cap}` : `Bot · ${cap}`;
-  }
-  if (seatName) return seatName;
-  // Old replay without seatNames: identify current user by sub
-  if (currentUser && seatId === currentUser.sub) return currentUser.handle;
-  return 'Player';
 }
 
 // ── Share sheet ───────────────────────────────────────────────────────────────
@@ -234,7 +208,7 @@ export function ReplayPage() {
 
   // Display names: bot IDs → "BotName · Difficulty"; human subs → handle or "Player"
   const displayNames = payload.seatMap.map((id, i) =>
-    buildDisplayName(id, payload.seatNames?.[i], currentUser),
+    buildReplayDisplayName(id, payload.seatNames?.[i], currentUser),
   ) as [string, string, string, string];
 
   const resultColor = payload.result === 'win' ? '#7fc299' : 'rgba(var(--felt-ink-rgb),0.6)';
