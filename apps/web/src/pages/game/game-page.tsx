@@ -29,8 +29,6 @@ import {
   tileAriaLabel,
   engineToDesignTile,
   decomposeConcealed,
-  concealedKongOptions,
-  addToKongOptions,
   sortTypes,
   WIND_CHOWS,
   DRAGON_CHOW,
@@ -2990,72 +2988,6 @@ function JingTileChip({ tile }: { tile: TileType }) {
   );
 }
 
-// ── Kong action sheet ─────────────────────────────────────────────────────────
-
-type KongActionOption =
-  | { type: 'concealed'; kongTile: TileType }
-  | { type: 'add'; pungTile: TileType };
-
-interface KongActionPending {
-  /** Null when triggered from the proactive "Declare Hidden Kong" button (no discard intent). */
-  discardTile: TileType | null;
-  options: KongActionOption[];
-}
-
-function KongActionSheet({
-  pending,
-  onKong,
-  onDiscard,
-}: {
-  pending: KongActionPending;
-  onKong: (opt: KongActionOption) => void;
-  onDiscard: () => void;
-}) {
-  const { t } = useI18n();
-  const opt = pending.options[0];
-  const titleKey = opt.type === 'concealed' ? 'kongActionConcealedTitle' : 'kongActionAddTitle';
-  return (
-    <div
-      className="absolute inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(12px)' }}
-    >
-      <div
-        className="w-full max-w-sm mx-4 rounded-xl p-6 flex flex-col gap-4"
-        style={{ background: '#1c1c1c', border: '1px solid rgba(var(--felt-ink-rgb),0.1)' }}
-        role="dialog"
-        aria-label={t(titleKey)}
-      >
-        <div className="flex items-center gap-4">
-          {pending.discardTile && (
-            <MahjongTile2D tile={pending.discardTile} size="lg" interactive={false} />
-          )}
-          <h2 className="font-bold text-lg text-mj-bone">{t(titleKey)}</h2>
-        </div>
-        <div className="flex gap-3 mt-2">
-          {pending.discardTile && (
-            <button
-              onClick={onDiscard}
-              className="flex-1 py-3 rounded-xl font-bold text-sm text-mj-bone/70 border border-mj-ink/15"
-            >
-              {t('kongActionDiscard')}
-            </button>
-          )}
-          {pending.options.map((o, i) => (
-            <button
-              key={i}
-              onClick={() => onKong(o)}
-              className="flex-1 py-3 rounded-xl font-bold text-sm"
-              style={{ background: '#c9a961', color: '#1a1a1a' }}
-            >
-              {t('kongActionKong')}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Compact bottom-bar tsumo prompt — does NOT cover the hand or 3D scene.
  * Positioned like SideRail: above the mobile hand strip, at bottom-0 on
@@ -3306,7 +3238,6 @@ function GameTable({
   const [showConcedeSheet, setShowConcedeSheet] = useState(false);
   const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [jingDiscardPending, setJingDiscardPending] = useState<TileType | null>(null);
-  const [kongActionPending, setKongActionPending] = useState<KongActionPending | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const nextHistoryId = useRef(0);
@@ -3393,61 +3324,11 @@ function GameTable({
     onSelect(null); // deselect the tile
   };
 
-  // ── Kong detection ───────────────────────────────────────────────────────────
-  // On the player's draw turn, check if the tile being discarded can instead
-  // be used to declare a concealed kong or extend an open pung to a kong.
+  // Kong buttons are proactive overlays — discarding always just discards.
   const handleDiscardOrKong = useCallback(
-    (tile: TileType) => {
-      if (!isMyTurn) {
-        handleDiscardWithConfirm(tile);
-        return;
-      }
-      const options: KongActionOption[] = [];
-      const jingTypesArr = Array.from(jingTypes) as TileType[];
-
-      // Concealed kong: all 4 of this tile type are in hand
-      const cKongTypes = concealedKongOptions(viewerHand, jingTypesArr);
-      if (cKongTypes.includes(tile)) {
-        options.push({ type: 'concealed', kongTile: tile });
-      }
-
-      // Add-to-kong: tile in hand matches what's needed to extend an open pung
-      const openPungs = snapshot.seats[viewerSeat].openMelds.filter((m) => m.kind === 'pung');
-      for (const pung of openPungs) {
-        const pungTile = pung.tiles[0] as TileType;
-        const removable = addToKongOptions(viewerHand, pungTile, jingTypesArr);
-        if (removable.includes(tile)) {
-          options.push({ type: 'add', pungTile });
-        }
-      }
-
-      if (options.length > 0) {
-        setKongActionPending({ discardTile: tile, options });
-      } else {
-        handleDiscardWithConfirm(tile);
-      }
-    },
-    [isMyTurn, viewerHand, jingTypes, snapshot.seats, viewerSeat, handleDiscardWithConfirm],
+    (tile: TileType) => handleDiscardWithConfirm(tile),
+    [handleDiscardWithConfirm],
   );
-
-  const handleKongAction = useCallback(
-    (opt: KongActionOption) => {
-      setKongActionPending(null);
-      if (opt.type === 'concealed') {
-        onKongConcealed(opt.kongTile);
-      } else {
-        onKongAdd(opt.pungTile);
-      }
-    },
-    [onKongConcealed, onKongAdd],
-  );
-
-  const handleKongActionDiscard = useCallback(() => {
-    if (!kongActionPending || !kongActionPending.discardTile) return;
-    const tile = kongActionPending.discardTile;
-    setKongActionPending(null);
-    handleDiscardWithConfirm(tile);
-  }, [kongActionPending, handleDiscardWithConfirm]);
 
   // ── History tracking ────────────────────────────────────────────────────────
 
@@ -3718,57 +3599,57 @@ function GameTable({
         {/* where it overlays the R3F canvas (which has no mobile handling).      */}
         {/* Kept visible when canTsumo is true so the hand remains visible while  */}
         {/* the non-blocking TsumoBar appears above it (IMP-020).                 */}
-        {!showConcedeSheet &&
-          !showSaveSheet &&
-          !kongActionPending &&
-          snapshot.viewMode !== '2D' &&
-          !isMobile && (
-            <ViewerHandHUD
-              hand={viewerHand}
-              selectedTileIdx={selectedTileIdx}
-              onSelect={onSelect}
-              onDiscard={handleDiscardOrKong}
-              isMyTurn={isMyTurn && (!canTsumo || tsumoSuppressed)}
-              jingTypes={jingTypes}
-              pendingMove={pendingMove}
-              onDisplayOrderChange={setHudDisplayOrder}
-            />
-          )}
+        {!showConcedeSheet && !showSaveSheet && snapshot.viewMode !== '2D' && !isMobile && (
+          <ViewerHandHUD
+            hand={viewerHand}
+            selectedTileIdx={selectedTileIdx}
+            onSelect={onSelect}
+            onDiscard={handleDiscardOrKong}
+            isMyTurn={isMyTurn && (!canTsumo || tsumoSuppressed)}
+            jingTypes={jingTypes}
+            pendingMove={pendingMove}
+            onDisplayOrderChange={setHudDisplayOrder}
+          />
+        )}
 
-        {/* ── Declare Hidden Kong button ─────────────────────────────────────── */}
-        {/* Proactive upper-right button shown whenever the player holds 4-of-a-  */}
-        {/* kind in their concealed hand. Visible at any point on their turn so   */}
-        {/* they don't need to know to click a specific tile.                     */}
-        {canConcealedKong &&
-          canConcealedKong.length > 0 &&
-          isMyTurn &&
-          !showConcedeSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && (
-            <button
-              onClick={() => {
-                if (canConcealedKong.length === 1) {
-                  onKongConcealed(canConcealedKong[0]);
-                } else {
-                  setKongActionPending({
-                    discardTile: null,
-                    options: canConcealedKong.map((tile) => ({
-                      type: 'concealed' as const,
-                      kongTile: tile,
-                    })),
-                  });
-                }
-              }}
-              className="absolute top-2 right-2 z-20 font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur shadow-[0_0_12px_rgba(201,169,97,0.35)]"
-            >
-              {t('declareHiddenKong')}
-            </button>
-          )}
+        {/* ── Kong action buttons (top-right, non-blocking) ─────────────────── */}
+        {/* Both "Declare Hidden Kong" and "Promote Pung to Kong" live here as    */}
+        {/* proactive buttons visible at any point on the player's turn. They     */}
+        {/* stack vertically and never cover the hand or open melds.              */}
+        {isMyTurn && !showConcedeSheet && !jingDiscardPending && (
+          <div className="absolute top-[calc(var(--mj-safe-top,0px)+40px)] right-2 z-20 flex flex-col items-end gap-2">
+            {canConcealedKong &&
+              canConcealedKong.map((tile) => (
+                <button
+                  key={tile}
+                  onClick={() => onKongConcealed(tile)}
+                  className="font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur drop-shadow-mj-gold"
+                >
+                  {canConcealedKong.length > 1 ? (
+                    <span className="flex items-center gap-2">
+                      <MahjongTile2D tile={tile} size="xxs" interactive={false} />
+                      {t('declareHiddenKong')}
+                    </span>
+                  ) : (
+                    t('declareHiddenKong')
+                  )}
+                </button>
+              ))}
+            {canAddToKong && (
+              <button
+                onClick={() => onKongAdd(canAddToKong)}
+                className="font-bold text-sm px-4 py-2 rounded-xl animate-call-prompt-enter bg-mj-gold/22 border border-mj-gold/65 text-mj-gold backdrop-blur drop-shadow-mj-gold"
+              >
+                {t('addToKong')}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── Persistent "Declare Win" button (IMP-020) ──────────────────────── */}
         {/* Shown after the player dismisses the TsumoBar. Floats above the hand  */}
         {/* HUD and lets them re-open the win prompt at any time before discarding.*/}
-        {canTsumo && tsumoSuppressed && isMyTurn && !showConcedeSheet && !kongActionPending && (
+        {canTsumo && tsumoSuppressed && isMyTurn && !showConcedeSheet && (
           <button
             onClick={() => setTsumoSuppressed(false)}
             className="absolute right-2 font-bold text-sm px-3 py-2 rounded-xl animate-call-prompt-enter"
@@ -3796,7 +3677,7 @@ function GameTable({
         />
 
         {/* ── Collapsible history panel ──────────────────────────────────────── */}
-        {!showConcedeSheet && !showSaveSheet && !jingDiscardPending && !kongActionPending && (
+        {!showConcedeSheet && !showSaveSheet && !jingDiscardPending && (
           <GameHistoryPanel
             entries={historyEntries}
             isOpen={historyOpen}
@@ -3807,42 +3688,34 @@ function GameTable({
         )}
 
         {/* ── Action toast ───────────────────────────────────────────────────── */}
-        {toast &&
-          !showConcedeSheet &&
-          !showSaveSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && <ActionToast toast={toast} snapshot={snapshot} />}
+        {toast && !showConcedeSheet && !showSaveSheet && !jingDiscardPending && (
+          <ActionToast toast={toast} snapshot={snapshot} />
+        )}
 
         {/* ── Your Turn flash banner ─────────────────────────────────────────── */}
         {yourTurnFlash &&
           !claimWindow &&
           !showConcedeSheet &&
           !showSaveSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && <YourTurnBanner />}
+          !jingDiscardPending && <YourTurnBanner />}
 
         {/* ── Waiting indicator — non-eligible viewer while claim window is open */}
         {snapshot.phase === 'awaiting_claims' &&
           !claimWindow &&
           !showConcedeSheet &&
           !showSaveSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && <WaitingForClaimIndicator isMobile={isMobile} />}
+          !jingDiscardPending && <WaitingForClaimIndicator isMobile={isMobile} />}
 
         {/* ── Claim window rail ──────────────────────────────────────────────── */}
-        {claimWindow &&
-          !showConcedeSheet &&
-          !showSaveSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && (
-            <SideRail
-              claimWindow={claimWindow}
-              pendingDiscard={snapshot.pendingDiscard}
-              onClaim={onClaim}
-              onPass={onPass}
-              isMobile={isMobile}
-            />
-          )}
+        {claimWindow && !showConcedeSheet && !showSaveSheet && !jingDiscardPending && (
+          <SideRail
+            claimWindow={claimWindow}
+            pendingDiscard={snapshot.pendingDiscard}
+            onClaim={onClaim}
+            onPass={onPass}
+            isMobile={isMobile}
+          />
+        )}
 
         {/* ── Concede sheet ──────────────────────────────────────────────────── */}
         {showConcedeSheet && !jingDiscardPending && (
@@ -3866,64 +3739,16 @@ function GameTable({
           />
         )}
 
-        {/* ── Kong action sheet ──────────────────────────────────────────────── */}
-        {kongActionPending && !jingDiscardPending && (
-          <KongActionSheet
-            pending={kongActionPending}
-            onKong={handleKongAction}
-            onDiscard={handleKongActionDiscard}
-          />
-        )}
-
-        {/* ── Add-to-kong bar (BUG-058) ─────────────────────────────────────── */}
-        {/* Proactive bar shown when player's drawn tile can extend an open pung. */}
-        {canAddToKong &&
-          isMyTurn &&
-          !showConcedeSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && (
-            <div
-              className="absolute left-0 right-0 flex items-center justify-between gap-2 px-4 py-2 animate-call-prompt-enter"
-              style={{
-                zIndex: 25,
-                bottom: canTsumo
-                  ? 'calc(var(--mj-hand-height, 80px) + 68px)'
-                  : 'calc(var(--mj-hand-height, 80px) + 8px)',
-                background: 'rgba(13,51,32,0.85)',
-                borderTop: '1px solid rgba(127,194,153,0.3)',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <span className="text-sm font-semibold text-mj-win">{t('addToKongPrompt')}</span>
-              <button
-                onClick={() => onKongAdd(canAddToKong)}
-                className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm"
-                style={{
-                  background: 'rgba(127,194,153,0.2)',
-                  border: '1px solid rgba(127,194,153,0.5)',
-                  color: '#7fc299',
-                }}
-              >
-                {t('addToKong')}
-              </button>
-            </div>
-          )}
-
         {/* ── Tsumo bar (IMP-020) ─────────────────────────────────────────────── */}
         {/* Non-blocking compact bar — does NOT cover the hand/canvas.            */}
         {/* Dismissed → shows persistent "Declare Win" button instead (above).    */}
-        {canTsumo &&
-          isMyTurn &&
-          !tsumoSuppressed &&
-          !showConcedeSheet &&
-          !jingDiscardPending &&
-          !kongActionPending && (
-            <TsumoBar
-              onDeclare={onDeclareTsumo}
-              onDismiss={() => setTsumoSuppressed(true)}
-              isMobile={isMobile}
-            />
-          )}
+        {canTsumo && isMyTurn && !tsumoSuppressed && !showConcedeSheet && !jingDiscardPending && (
+          <TsumoBar
+            onDeclare={onDeclareTsumo}
+            onDismiss={() => setTsumoSuppressed(true)}
+            isMobile={isMobile}
+          />
+        )}
 
         {/* ── A11y live region ───────────────────────────────────────────────── */}
         <div aria-live="polite" aria-atomic="true" className="sr-only" id="game-live-region">
