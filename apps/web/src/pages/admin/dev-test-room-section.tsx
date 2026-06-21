@@ -267,6 +267,10 @@ export function DevTestRoomSection() {
   const [error, setError] = useState<string | null>(null);
 
   const total = handTotal(hand);
+  const maxHandTiles = 13 - openMelds.length * 3;
+  const handOverLimit = total > maxHandTiles;
+  // Can add another meld if: not at 4-meld limit AND the hand would still fit
+  const canAddMeld = openMelds.length < 4 && total + (openMelds.length + 1) * 3 <= 13;
 
   const addTile = useCallback(
     (tile: TileType) => {
@@ -295,9 +299,10 @@ export function DevTestRoomSection() {
     setError(null);
 
     const handArr = handToArray(hand);
+    const expectedHandSize = 13 - openMelds.length * 3;
 
-    if (handArr.length !== 13) {
-      setError(t('adminDevTestValidationHand'));
+    if (handArr.length !== expectedHandSize) {
+      setError(t('adminDevTestValidationHand', String(expectedHandSize)));
       return;
     }
     if (!winTile) {
@@ -339,7 +344,12 @@ export function DevTestRoomSection() {
           <h3 className="text-xs font-semibold text-mj-bone/70 mb-1">{t('adminDevTestHand')}</h3>
           <p className="text-[10px] text-mj-bone/40 mb-2">{t('adminDevTestHandHint')}</p>
 
-          <TilePickerGrid hand={hand} onAdd={addTile} onRemove={removeTile} />
+          <TilePickerGrid
+            hand={hand}
+            onAdd={addTile}
+            onRemove={removeTile}
+            maxTotal={maxHandTiles}
+          />
 
           {/* Selected hand summary */}
           {total > 0 && (
@@ -353,8 +363,16 @@ export function DevTestRoomSection() {
                   interactive={false}
                 />
               ))}
-              <span className="text-[10px] text-mj-bone/50 self-end ml-1">{total}/13</span>
+              <span
+                className={`text-[10px] self-end ml-1 ${handOverLimit ? 'text-mj-loss-light font-semibold' : 'text-mj-bone/50'}`}
+              >
+                {t('adminDevTestHandCount', String(total), String(maxHandTiles))}
+              </span>
             </div>
+          )}
+
+          {handOverLimit && (
+            <p className="text-[10px] text-mj-loss-light mt-1">{t('adminDevTestHandOverLimit')}</p>
           )}
 
           {condition !== 'immediate' && (
@@ -392,9 +410,21 @@ export function DevTestRoomSection() {
               </div>
             ))}
             {!showMeldBuilder && openMelds.length < 4 && (
-              <button type="button" onClick={() => setShowMeldBuilder(true)} className={btnGold}>
-                {t('adminDevTestAddMeld')}
-              </button>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (canAddMeld) setShowMeldBuilder(true);
+                  }}
+                  disabled={!canAddMeld}
+                  className={btnGold}
+                >
+                  {t('adminDevTestAddMeld')}
+                </button>
+                {!canAddMeld && (
+                  <p className="text-[10px] text-amber-400/60">{t('adminDevTestMeldHandFull')}</p>
+                )}
+              </div>
             )}
             {showMeldBuilder && (
               <MeldBuilder onAdd={handleAddMeld} onCancel={() => setShowMeldBuilder(false)} />
