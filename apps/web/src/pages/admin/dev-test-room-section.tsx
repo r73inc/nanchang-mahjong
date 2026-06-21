@@ -88,7 +88,9 @@ function TilePickerGrid({
                 className={`relative flex flex-col items-center gap-0.5 rounded p-0.5 transition-all
                   ${count > 0 ? 'ring-1 ring-mj-gold/40 bg-mj-gold/8' : 'bg-mj-bone/5 hover:bg-mj-bone/10'}
                   ${canAdd ? 'cursor-pointer' : count === 0 ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-                onClick={() => (count > 0 && !canAdd ? onRemove(tile) : onAdd(tile))}
+                onClick={() => {
+                  if (canAdd) onAdd(tile);
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   if (count > 0) onRemove(tile);
@@ -328,11 +330,7 @@ export function DevTestRoomSection() {
   }
 
   return (
-    <section className="mt-8 space-y-4">
-      <h2 className="text-sm font-bold text-mj-gold/80 tracking-wider uppercase">
-        {t('adminDevTestSectionTitle')}
-      </h2>
-
+    <div className="px-5 py-6">
       <div className="rounded-[14px] p-4 space-y-5" style={cardStyle}>
         <div>
           <h3 className="text-xs font-semibold text-mj-bone/70 mb-1">{t('adminDevTestHand')}</h3>
@@ -466,6 +464,6 @@ export function DevTestRoomSection() {
           {isPending ? t('adminDevTestLaunching') : t('adminDevTestLaunch')}
         </button>
       </div>
-    </section>
+    </div>
   );
 }

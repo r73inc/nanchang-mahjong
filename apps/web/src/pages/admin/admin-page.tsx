@@ -15,7 +15,6 @@ import {
   type AdminUser,
 } from '../../hooks/use-admin';
 import { getApiErrorMessage } from '../../lib/api';
-import { DevTestRoomSection } from './dev-test-room-section';
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 
@@ -347,6 +346,34 @@ function UserRow({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// ── Dev Test Room nav card ────────────────────────────────────────────────────
+
+function DevTestNavCard() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  return (
+    <section className="mt-6">
+      <h2 className="text-[13px] font-bold text-mj-gold/80 uppercase tracking-wider mb-3">
+        {t('adminDevTestSectionTitle')}
+      </h2>
+      <button
+        type="button"
+        onClick={() => navigate('/admin/dev-test')}
+        className="w-full rounded-[14px] px-4 py-4 flex items-center justify-between text-left transition-colors hover:bg-mj-gold/5"
+        style={{
+          background: 'rgba(var(--felt-ink-rgb),0.05)',
+          border: '1px solid rgba(201,169,97,0.12)',
+        }}
+      >
+        <p className="text-sm text-mj-bone/70">{t('adminDevTestNavDesc')}</p>
+        <span className="text-mj-gold/60 text-xl leading-none ml-3">›</span>
+      </button>
+    </section>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export function AdminPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -356,7 +383,7 @@ export function AdminPage() {
       <div className="px-5 py-6">
         <InvitesSection />
         <UsersSection />
-        <DevTestRoomSection />
+        <DevTestNavCard />
       </div>
     </ScreenShell>
   );
