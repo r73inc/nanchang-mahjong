@@ -306,8 +306,9 @@ errorMessage      string            // surfaced (sanitised) reason
 
 **Both languages (Q-5).** `text` always carries `{ en, zh }`. The viewer picks the field
 matching the current app language; if one language is somehow missing it falls back to the
-other. Generation produces both in a single job (see §4.4 for whether that is one call or
-two) so a summary is never half-translated in the `done` state.
+other. Generation produces both in a **single-pass JSON call** (§4.4) so a summary is
+never half-translated in the `done` state — a job missing either language fails whole
+rather than writing a partial item.
 
 The challenge summary item additionally references the per-participant game summary ids
 (or the per-player breakdowns are simply read from each participant's `GAME#<id>/AI_SUMMARY`).
@@ -327,6 +328,19 @@ capability) and sends _that_ plus a versioned prompt template. This:
 - for challenges, **aligns participants' games by hand index** (same seeds) and computes
   per-hand divergence (who won/dealt-in/drew, score swing, special hands, jing, risky
   vs safe discards) — the raw material for the divergence narrative.
+
+**Payload boundary safeguard (mandatory).** Before dispatching to the us-east-1 relay, the
+NestJS API layer **MUST validate the total character size of the serialized facts-digest
+string** (the full JSON request body) and reject anything that would breach the
+**synchronous AWS Lambda request payload limit of 6 MB**. Enforce a conservative ceiling
+well under 6 MB (e.g. a configurable cap such as ~4 MB of UTF-8 bytes) to leave headroom
+for the prompt template, system instruction, and JSON envelope overhead. A digest that
+exceeds the cap is **never sent**: the job is marked `failed` with `errorCode: 'validation'`
+(payload too large) and surfaces in the failed-jobs screen rather than triggering an opaque
+relay/Lambda 413/500. The challenge digest — which aggregates every participant's
+per-hand divergence — is the most likely to approach the bound, so the size check runs on
+the **final assembled request**, after the digest is built, for both normal and challenge
+generations.
 
 **Prompt ownership split:**
 
@@ -357,14 +371,29 @@ anonymised seat labels. For this private family app there are no restricted fiel
 digest may carry **all replay facts, including full-hand info** (which players already see
 in the omniscient replay). The whole replay payload is fair game.
 
-**Bilingual generation (Q-5).** Each job must yield `{ en, zh }`. Two viable shapes —
-decide at implementation time, default to (a):
+**Bilingual generation (Q-5) — mandatory single-pass JSON.** Each job must yield
+`{ en, zh }` in **one** Gemini call. This is a **strict system constraint, not a choice**:
+the prompt MUST instruct Gemini to return a **single JSON object** with structured `en`
+and `zh` string properties — e.g.
 
-- **(a)** one prompt that asks Gemini to return a small JSON object with both `en` and `zh`
-  fields (one call, guaranteed paired, cheapest).
-- **(b)** two calls (one per language) — simpler prompts, double the cost/latency.
+```json
+{ "en": "...", "zh": "..." }
+```
 
-The persona/length/Nanchang constraints apply identically to both languages.
+and the relay request MUST pin the Gemini response to JSON (response MIME type
+`application/json` + a response schema declaring both properties as required strings).
+Per-language fan-out (two separate calls) is **explicitly disallowed** — it doubles token
+spend and latency and risks a half-translated `done` state. Single-pass JSON gives:
+
+- **Minimum token expenditure** — one prompt/context, not two.
+- **Atomic generation** — both languages land together or the job fails together; a
+  `done` summary is never half-translated.
+- **Deterministic parsing** — the API parses one object instead of stitching two
+  free-text responses.
+
+The persona/length/Nanchang constraints apply identically to both `en` and `zh`. If the
+returned object is missing either property or fails schema validation, the job is marked
+`failed` (not partially stored) and surfaces in the failed-jobs screen.
 
 ### 4.5 The `admin-ai-features` permission (Q-10)
 
@@ -493,10 +522,22 @@ built and reviewed while their UI counterparts wait.
   challenged players declined) produces **no summary** (Q-12).
 - Generation runs async with status tracking; failures land in the failed-jobs screen and
   are retryable. Dedupe so re-completion/retries don't double-generate.
+- **Staggered fan-out (DynamoDB write-throttle defence).** A challenge completion fans out
+  to _N_ participant jobs **plus** the challenge overview, each of which mutates a summary
+  item through its `processing → done/failed` lifecycle. Firing all of these at once would
+  produce a burst of near-simultaneous single-table writes. The async completion runner
+  **must therefore apply a lightweight staggered-dispatch / jittered-backoff pattern** —
+  e.g. spread the per-participant job kick-offs across a small randomised delay window
+  rather than dispatching them in a tight synchronous loop. This keeps the burst from
+  saturating the table's provisioned write throughput (and smooths the Gemini call rate as
+  a bonus), while staying simple — no queue infrastructure, just jittered scheduling of the
+  existing async jobs. Combined with idempotent dedupe, a retried completion re-spreads
+  rather than re-bursts.
 - **No "ready" notification** — summaries surface **silently on the next page load**
   (Q-8); no push, no badge.
   **Tests:** completion fan-out enqueues the right jobs once (declined skipped); cancelled
-  challenge enqueues nothing; idempotency on repeat calls.
+  challenge enqueues nothing; idempotency on repeat calls; jittered dispatch does not fire
+  all participant jobs in the same synchronous tick.
 
 ### Phase 6 — Frontend: replay viewers (panel + request button)
 
