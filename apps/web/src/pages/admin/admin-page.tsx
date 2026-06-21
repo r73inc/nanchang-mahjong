@@ -360,10 +360,7 @@ function DevTestNavCard() {
         type="button"
         onClick={() => navigate('/admin/dev-test')}
         className="w-full rounded-[14px] px-4 py-4 flex items-center justify-between text-left transition-colors hover:bg-mj-gold/5"
-        style={{
-          background: 'rgba(var(--felt-ink-rgb),0.05)',
-          border: '1px solid rgba(201,169,97,0.12)',
-        }}
+        style={cardStyle}
       >
         <p className="text-sm text-mj-bone/70">{t('adminDevTestNavDesc')}</p>
         <span className="text-mj-gold/60 text-xl leading-none ml-3">›</span>
