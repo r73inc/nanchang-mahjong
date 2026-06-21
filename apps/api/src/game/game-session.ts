@@ -18,7 +18,15 @@
  */
 
 import { GameEngine } from '@nanchang/engine';
-import type { GameEvent, SeatWind, WinPaymentResult, WinType, HandType } from '@nanchang/engine';
+import type {
+  GameEvent,
+  SeatWind,
+  WinPaymentResult,
+  WinType,
+  HandType,
+  TileType,
+  Meld,
+} from '@nanchang/engine';
 import type {
   RoomSettings,
   HandRevealPayload,
@@ -27,6 +35,18 @@ import type {
 } from '@nanchang/shared';
 import type { ClaimAction } from '@nanchang/shared';
 import type { IncomingClaim, Seat4 } from './claim-resolver';
+
+export type TestWinCondition = 'immediate' | 'self_draw' | 'left_discard' | 'right_discard';
+
+export interface TestHandInjection {
+  /** The admin's 13-tile waiting hand. */
+  hand: TileType[];
+  /** Pre-configured open melds for the admin seat. */
+  openMelds: Meld[];
+  /** The tile that completes the hand (required for all conditions except 'immediate'). */
+  winTile?: TileType;
+  condition: TestWinCondition;
+}
 
 export type { Seat4 };
 
@@ -146,6 +166,21 @@ export class GameSession {
 
   /** True when this session was restored from a save rather than started fresh. */
   isRestored = false;
+
+  /** True for admin dev-test-room sessions — skips ELO/stats and replay persistence. */
+  isTestGame = false;
+
+  /**
+   * Pending hand-injection applied immediately after deal() is called.
+   * Only set for test-game sessions; cleared once applied.
+   */
+  testHandInjection?: TestHandInjection;
+
+  /**
+   * Forced first discard per bot seat for test-game scenarios.
+   * Cleared per seat after the forced discard is executed.
+   */
+  readonly testForcedDiscards: Map<Seat4, TileType> = new Map();
 
   /**
    * True when a multi-player restore is waiting for all human players to connect

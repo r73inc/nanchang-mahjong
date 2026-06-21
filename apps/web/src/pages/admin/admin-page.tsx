@@ -15,6 +15,7 @@ import {
   type AdminUser,
 } from '../../hooks/use-admin';
 import { getApiErrorMessage } from '../../lib/api';
+import { DevTestRoomSection } from './dev-test-room-section';
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 
@@ -355,6 +356,7 @@ export function AdminPage() {
       <div className="px-5 py-6">
         <InvitesSection />
         <UsersSection />
+        <DevTestRoomSection />
       </div>
     </ScreenShell>
   );

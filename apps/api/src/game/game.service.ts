@@ -37,6 +37,7 @@ import {
   diceSum,
   DICE_SALT,
   GameRuleError,
+  typeOf,
 } from '@nanchang/engine';
 import type { BotClaimOption } from '@nanchang/engine';
 import type {
@@ -48,6 +49,7 @@ import type {
   SeatState,
   Meld,
   GameEvent,
+  GameState,
 } from '@nanchang/engine';
 import type {
   RoomSettings,
@@ -61,7 +63,7 @@ import type {
 import type { PublicGameEvent, ClaimAction } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { GameSession } from './game-session';
-import type { Seat4 } from './game-session';
+import type { Seat4, TestHandInjection } from './game-session';
 import { computeEligibleClaims, computeRobKongEligible, resolveClaims } from './claim-resolver';
 import type { IncomingClaim } from './claim-resolver';
 import { toClientSnapshot } from './snapshot';
@@ -244,6 +246,183 @@ export class GameService {
   abandonBotSession(userSub: string): void {
     const gameId = this.userBotSessionIndex.get(userSub);
     if (gameId) this.destroySession(gameId);
+  }
+
+  /**
+   * Create an admin dev-test-room session: admin at seat 0, three easy bots at seats 1–3.
+   * The session is flagged as a test game — ELO/stats are skipped (hasBots guard covers this).
+   * Returns the gameId so the admin can navigate directly to /game/:gameId.
+   */
+  async createTestGame(
+    adminSub: string,
+    adminHandle: string,
+    injection: TestHandInjection,
+  ): Promise<{ gameId: string }> {
+    const gameId = randomUUID();
+    const roomId = `test-${gameId}`;
+    const now = new Date().toISOString();
+    const seed = (Math.random() * 0x7fff_ffff) >>> 0;
+
+    const settings = {
+      rounds: 'east' as const,
+      terminationType: 'rounds' as const,
+      startingScore: 0,
+      maxHands: 4,
+      timerSecs: 0,
+      ruleTopBottomJing: false,
+      viewMode: '2D' as const,
+      claimWindowSecs: 0,
+      isSolo: true,
+    };
+
+    const engine = GameEngine.create(seed, {
+      startingScores: [0, 0, 0, 0],
+      dealerSeat: 0,
+      roundWind: 'east',
+      config: { ruleTopBottomJing: false },
+    });
+
+    const seatMap: [string, string, string, string] = [
+      adminSub,
+      'bot-easy-1',
+      'bot-easy-2',
+      'bot-easy-3',
+    ];
+    const seatNames: [string, string, string, string] = [
+      adminHandle,
+      'Bot East',
+      'Bot South',
+      'Bot West',
+    ];
+    const seatAvatarUrls: [string | null, string | null, string | null, string | null] = [
+      null,
+      null,
+      null,
+      null,
+    ];
+
+    const session = new GameSession({
+      engine,
+      gameId,
+      roomId,
+      settings,
+      seatMap,
+      seatNames,
+      seatAvatarUrls,
+      startedAt: now,
+    });
+
+    session.isTestGame = true;
+    session.testHandInjection = injection;
+
+    session.handLog.push({
+      seed,
+      startingScores: [0, 0, 0, 0],
+      dealerSeat: 0,
+      roundWind: 'east',
+      eventStartIdx: 0,
+    });
+
+    session.preGamePhase = 'dealing';
+    session.pendingRoll = { purpose: 'deal_1', roller: 0 as Seat4, seed };
+
+    this.sessions.set(gameId, session);
+    this.indexBotSession(session, gameId);
+
+    // Persist a minimal game record so history/replay won't choke if queried
+    await this.db
+      .put({
+        Item: {
+          ...DK.game(gameId),
+          gameId,
+          roomId,
+          seed,
+          seatMap: Array.from(seatMap),
+          settings,
+          status: 'active',
+          dealerSeat: 0,
+          roundWind: 'east' as SeatWind,
+          handsPlayed: 0,
+          startedAt: now,
+          isTestGame: true,
+        },
+      })
+      .catch((err) => this.logger.error(`Failed to persist test-game GAME#${gameId}: ${err}`));
+
+    // Dealer is admin (seat 0) — bots don't roll until the human does
+    this.logger.log(`Test game created: ${gameId} (admin: ${adminSub})`);
+
+    return { gameId };
+  }
+
+  /**
+   * Apply the admin's test-hand configuration to the engine state immediately after deal().
+   *
+   * For the dealer (admin = seat 0 = east) the engine gives 14 tiles. We replace those with:
+   *   • 'immediate': injection.hand (13 tiles) + injection.winTile → 14 winning tiles
+   *   • others:      injection.hand (13 tiles) + the original 14th dealt tile (junk to discard)
+   *
+   * For 'self_draw' the win tile is swapped into wall[drawPtr + 3] (admin draws after 3 bots).
+   * For 'left_discard' / 'right_discard' a forced-discard entry is added to testForcedDiscards.
+   */
+  private applyTestHandInjection(
+    engine: GameEngine,
+    injection: TestHandInjection,
+    session: GameSession,
+  ): GameEngine {
+    const state = engine.state;
+    const adminSeat = 0 as Seat4;
+    const originalHand = state.seats[adminSeat].hand; // 14 tiles (admin is dealer)
+
+    // Build the admin's new hand
+    let adminHand: TileType[];
+    if (injection.condition === 'immediate') {
+      // Hand already contains 14 tiles (13 configured + win tile packed by caller)
+      adminHand = [...injection.hand];
+    } else {
+      // Keep the original 14th tile from the deal as a junk "first discard" tile
+      const extraTile = originalHand[originalHand.length - 1] as TileType;
+      adminHand = [...(injection.hand as TileType[]), extraTile];
+    }
+
+    const seats = [...state.seats] as GameState['seats'];
+    seats[adminSeat] = {
+      ...state.seats[adminSeat],
+      hand: adminHand,
+      openMelds: injection.openMelds as Meld[],
+    };
+
+    let wall = state.wall!;
+
+    // For self_draw: place win tile at the draw position admin will hit (drawPtr + 3)
+    if (injection.winTile && injection.condition === 'self_draw') {
+      const winType = injection.winTile as TileType;
+      const targetIdx = wall.drawPtr + 3; // admin draws after 3 bot turns
+      const { drawOrder } = wall;
+      const swapFrom = drawOrder.findIndex(
+        (id, i) => i >= wall.drawPtr && i !== targetIdx && typeOf(id) === winType,
+      );
+      if (swapFrom !== -1) {
+        const newDrawOrder = [...drawOrder];
+        [newDrawOrder[targetIdx], newDrawOrder[swapFrom]] = [
+          newDrawOrder[swapFrom],
+          newDrawOrder[targetIdx],
+        ];
+        wall = { ...wall, drawOrder: newDrawOrder };
+      }
+    }
+
+    // For left_discard: seat 1 (next player after dealer) forced-discards the win tile
+    // For right_discard: seat 3 (player just before admin in next rotation) forced-discards it
+    if (
+      injection.winTile &&
+      (injection.condition === 'left_discard' || injection.condition === 'right_discard')
+    ) {
+      const targetSeat = injection.condition === 'left_discard' ? (1 as Seat4) : (3 as Seat4);
+      session.testForcedDiscards.set(targetSeat, injection.winTile as TileType);
+    }
+
+    return GameEngine.fromState({ ...state, seats, wall });
   }
 
   /** Resolves after a random human-like delay (BOT_THINK_MIN_MS – BOT_THINK_MAX_MS). */
@@ -827,6 +1006,16 @@ export class GameService {
       session.engine = session.engine.deal();
       session.moveLog.push(...getNewEvents(session));
 
+      // Apply test hand injection immediately after deal (test games only)
+      if (session.testHandInjection) {
+        session.engine = this.applyTestHandInjection(
+          session.engine,
+          session.testHandInjection,
+          session,
+        );
+        session.testHandInjection = undefined;
+      }
+
       session.pendingRoll = null;
       session.preGamePhase = 'hands';
       this.broadcastSnapshots(session);
@@ -1170,13 +1359,30 @@ export class GameService {
       }
     }
 
-    const tile = getBotDiscard(
-      state.seats[seat].hand,
-      jingTypes,
-      session.getBotDifficulty(seat),
-      state,
-      seat,
-    );
+    // Test-game forced discard: inject the target tile into the bot's hand (replacing the
+    // most-recently-drawn tile) and force it as the discard for the test scenario.
+    let tile: TileType;
+    const forcedTile = session.testForcedDiscards.get(seat);
+    if (forcedTile) {
+      session.testForcedDiscards.delete(seat);
+      const currentState = session.engine.state;
+      if (!currentState.seats[seat].hand.includes(forcedTile)) {
+        const newHand = [...currentState.seats[seat].hand];
+        newHand[newHand.length - 1] = forcedTile; // swap last (just-drawn) tile
+        const newSeats = [...currentState.seats] as GameState['seats'];
+        newSeats[seat] = { ...currentState.seats[seat], hand: newHand };
+        session.engine = GameEngine.fromState({ ...currentState, seats: newSeats });
+      }
+      tile = forcedTile;
+    } else {
+      tile = getBotDiscard(
+        session.engine.state.seats[seat].hand,
+        jingTypes,
+        session.getBotDifficulty(seat),
+        session.engine.state,
+        seat,
+      );
+    }
 
     try {
       session.engine = session.engine.discard(tile);

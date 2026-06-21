@@ -26,6 +26,7 @@ vi.mock('../../hooks/use-admin', () => ({
   useAdminUsers: vi.fn(),
   useSetRole: vi.fn(),
   useSetDisabled: vi.fn(),
+  useCreateDevTestGame: vi.fn(),
 }));
 
 import {
@@ -35,6 +36,7 @@ import {
   useAdminUsers,
   useSetRole,
   useSetDisabled,
+  useCreateDevTestGame,
 } from '../../hooks/use-admin';
 
 const mockUseAuthStore = vi.mocked(useAuthStore);
@@ -44,6 +46,7 @@ const mockUseRevokeInvite = vi.mocked(useRevokeInvite);
 const mockUseAdminUsers = vi.mocked(useAdminUsers);
 const mockUseSetRole = vi.mocked(useSetRole);
 const mockUseSetDisabled = vi.mocked(useSetDisabled);
+const mockUseCreateDevTestGame = vi.mocked(useCreateDevTestGame);
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +121,10 @@ function setupDefaultMocks() {
     mutate: mockSetDisabled,
     isPending: false,
     variables: undefined,
+  } as never);
+  mockUseCreateDevTestGame.mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
   } as never);
 }
 
