@@ -6,7 +6,10 @@ import { randomUUID } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InvitesService } from '../invites/invites.service';
 import type { AppConfig } from '../config/configuration';
-import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
+import type {
+  AuthenticatedUser,
+  UserPermission,
+} from '../common/interfaces/authenticated-user.interface';
 import type { SignupDto } from './dto/signup.dto';
 import type { SigninDto } from './dto/signin.dto';
 
@@ -57,6 +60,7 @@ export class AuthService {
       sub,
       handle: dto.handle.toLowerCase(),
       role: 'user',
+      permissions: [],
     };
 
     this.logger.log(`Signup: handle=${user.handle} sub=${sub}`);
@@ -82,6 +86,7 @@ export class AuthService {
       sub: profile.sub,
       handle: profile.handle,
       role: profile.role,
+      permissions: (profile.permissions ?? []) as UserPermission[],
     });
   }
 
@@ -105,22 +110,28 @@ export class AuthService {
     this.logger.log(`Account deleted: sub=${sub}`);
   }
 
-  refreshAccessToken(refreshToken: string): { accessToken: string } {
-    let payload: AuthenticatedUser & { type: string };
+  async refreshAccessToken(refreshToken: string): Promise<{ accessToken: string }> {
+    let payload: { sub: string; handle: string; role: string; type: string };
     try {
-      payload = this.jwt.verify<AuthenticatedUser & { type: string }>(refreshToken, {
-        secret: this.config.get('jwt.refreshSecret', { infer: true }),
-      });
+      payload = this.jwt.verify<{ sub: string; handle: string; role: string; type: string }>(
+        refreshToken,
+        { secret: this.config.get('jwt.refreshSecret', { infer: true }) },
+      );
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
     if (payload.type !== 'refresh') throw new UnauthorizedException('Invalid token type');
+
+    // Re-read profile from DB so the new access token carries up-to-date permissions.
+    const profile = await this.users.findBySub(payload.sub);
+    if (profile?.disabled) throw new UnauthorizedException('Account is disabled');
 
     const accessToken = this.jwt.sign(
       {
         sub: payload.sub,
         handle: payload.handle,
         role: payload.role,
+        permissions: (profile?.permissions ?? []) as UserPermission[],
         type: 'access',
       },
       {
@@ -136,6 +147,7 @@ export class AuthService {
       sub: user.sub,
       handle: user.handle,
       role: user.role,
+      permissions: user.permissions,
     };
     const jwtCfg = this.config.get('jwt', { infer: true });
 

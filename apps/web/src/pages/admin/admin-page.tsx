@@ -11,6 +11,7 @@ import {
   useAdminUsers,
   useSetRole,
   useSetDisabled,
+  useSetPermission,
   type InviteRecord,
   type AdminUser,
 } from '../../hooks/use-admin';
@@ -225,6 +226,7 @@ function UsersSection() {
   const { data: users, isLoading } = useAdminUsers(debouncedSearch || undefined);
   const setRoleMutation = useSetRole();
   const setDisabledMutation = useSetDisabled();
+  const setPermissionMutation = useSetPermission();
 
   return (
     <section>
@@ -259,9 +261,19 @@ function UsersSection() {
               isDisablePending={
                 setDisabledMutation.isPending && setDisabledMutation.variables?.sub === u.sub
               }
+              isPermissionPending={
+                setPermissionMutation.isPending && setPermissionMutation.variables?.sub === u.sub
+              }
               onSetRole={(role) => void setRoleMutation.mutate({ sub: u.sub, role })}
               onSetDisabled={(disabled) =>
                 void setDisabledMutation.mutate({ sub: u.sub, disabled })
+              }
+              onToggleDevTest={(grant) =>
+                void setPermissionMutation.mutate({
+                  sub: u.sub,
+                  permission: 'devTestRoom',
+                  grant,
+                })
               }
             />
           ))}
@@ -276,17 +288,22 @@ function UserRow({
   isSelf,
   isRolePending,
   isDisablePending,
+  isPermissionPending,
   onSetRole,
   onSetDisabled,
+  onToggleDevTest,
 }: {
   user: AdminUser;
   isSelf: boolean;
   isRolePending: boolean;
   isDisablePending: boolean;
+  isPermissionPending: boolean;
   onSetRole: (role: 'user' | 'admin') => void;
   onSetDisabled: (disabled: boolean) => void;
+  onToggleDevTest: (grant: boolean) => void;
 }) {
   const { t } = useI18n();
+  const hasDevTest = (user.permissions ?? []).includes('devTestRoom');
 
   return (
     <li className="rounded-[12px] px-3 py-3 space-y-1.5" style={rowStyle}>
@@ -304,6 +321,13 @@ function UserRow({
           {user.role === 'admin' ? t('adminBadge') : t('userBadge')}
         </span>
 
+        {/* Dev test permission badge */}
+        {hasDevTest && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-sky-500/10 text-sky-400 border-sky-500/20">
+            {t('devTestPermBadge')}
+          </span>
+        )}
+
         {/* Disabled badge */}
         {user.disabled && (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-mj-loss/15 text-mj-loss-light border-mj-loss/25">
@@ -312,60 +336,50 @@ function UserRow({
         )}
       </div>
 
-      {/* Action buttons — hidden for the acting admin's own row */}
-      {!isSelf && (
-        <div className="flex gap-1.5 flex-wrap pt-0.5">
-          <button
-            onClick={() => onSetRole(user.role === 'admin' ? 'user' : 'admin')}
-            disabled={isRolePending}
-            className={btnGold}
-          >
-            {isRolePending
-              ? t('adminSaving')
-              : user.role === 'admin'
-                ? t('adminMakeUser')
-                : t('adminMakeAdmin')}
-          </button>
+      <div className="flex gap-1.5 flex-wrap pt-0.5">
+        {/* Role + disable buttons hidden for the acting admin's own row */}
+        {!isSelf && (
+          <>
+            <button
+              onClick={() => onSetRole(user.role === 'admin' ? 'user' : 'admin')}
+              disabled={isRolePending}
+              className={btnGold}
+            >
+              {isRolePending
+                ? t('adminSaving')
+                : user.role === 'admin'
+                  ? t('adminMakeUser')
+                  : t('adminMakeAdmin')}
+            </button>
 
-          <button
-            onClick={() => onSetDisabled(!user.disabled)}
-            disabled={isDisablePending}
-            className={user.disabled ? btnMuted : btnDanger}
-          >
-            {isDisablePending
-              ? t('adminSaving')
-              : user.disabled
-                ? t('adminEnable')
-                : t('adminDisable')}
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => onSetDisabled(!user.disabled)}
+              disabled={isDisablePending}
+              className={user.disabled ? btnMuted : btnDanger}
+            >
+              {isDisablePending
+                ? t('adminSaving')
+                : user.disabled
+                  ? t('adminEnable')
+                  : t('adminDisable')}
+            </button>
+          </>
+        )}
+
+        {/* Dev test room permission — admins can toggle for anyone, including themselves */}
+        <button
+          onClick={() => onToggleDevTest(!hasDevTest)}
+          disabled={isPermissionPending}
+          className={hasDevTest ? btnDanger : btnMuted}
+        >
+          {isPermissionPending
+            ? t('adminSaving')
+            : hasDevTest
+              ? t('adminRevokeDevTest')
+              : t('adminGrantDevTest')}
+        </button>
+      </div>
     </li>
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
-
-// ── Dev Test Room nav card ────────────────────────────────────────────────────
-
-function DevTestNavCard() {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  return (
-    <section className="mt-6">
-      <h2 className="text-[13px] font-bold text-mj-gold/80 uppercase tracking-wider mb-3">
-        {t('adminDevTestSectionTitle')}
-      </h2>
-      <button
-        type="button"
-        onClick={() => navigate('/admin/dev-test')}
-        className="w-full rounded-[14px] px-4 py-4 flex items-center justify-between text-left transition-colors hover:bg-mj-gold/5"
-        style={cardStyle}
-      >
-        <p className="text-sm text-mj-bone/70">{t('adminDevTestNavDesc')}</p>
-        <span className="text-mj-gold/60 text-xl leading-none ml-3">›</span>
-      </button>
-    </section>
   );
 }
 
@@ -380,7 +394,6 @@ export function AdminPage() {
       <div className="px-5 py-6">
         <InvitesSection />
         <UsersSection />
-        <DevTestNavCard />
       </div>
     </ScreenShell>
   );

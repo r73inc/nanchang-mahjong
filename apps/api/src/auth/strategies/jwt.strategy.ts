@@ -4,7 +4,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../../users/users.service';
 import type { AppConfig } from '../../config/configuration';
-import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import type {
+  AuthenticatedUser,
+  UserPermission,
+} from '../../common/interfaces/authenticated-user.interface';
 
 interface JwtPayload {
   sub: string;
@@ -41,6 +44,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       sub: payload.sub,
       handle: payload.handle,
       role: payload.role,
+      permissions: (profile?.permissions ?? []) as UserPermission[],
     };
   }
 }

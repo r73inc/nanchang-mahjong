@@ -495,6 +495,25 @@ export function HomeStubPage() {
           </div>
         )}
 
+        {/* Dev test room — visible to anyone with the devTestRoom permission */}
+        {user?.permissions?.includes('devTestRoom') && (
+          <div className="mb-4">
+            <button
+              onClick={() => navigate('/dev-test-room')}
+              className="w-full flex items-center justify-between px-4 py-3.5 rounded-[14px] text-sm text-mj-bone/70"
+              style={{
+                background: 'rgba(var(--felt-ink-rgb),0.06)',
+                border: '1px solid rgba(var(--felt-ink-rgb),0.12)',
+              }}
+            >
+              <span>{t('devTestRoom')}</span>
+              <span className="text-mj-bone/40" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Settings actions */}
         <div className="space-y-2 mb-6">
           <SettingToggleRow

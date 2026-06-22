@@ -34,6 +34,7 @@ export interface AdminUser {
   sub: string;
   handle: string;
   role: 'user' | 'admin';
+  permissions: string[];
   disabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -96,11 +97,20 @@ export function useSetDisabled() {
   });
 }
 
+export function useSetPermission() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sub, permission, grant }: { sub: string; permission: string; grant: boolean }) =>
+      api.patch(`/admin/users/${sub}/permission`, { permission, grant }).then(() => undefined),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  });
+}
+
 // ── Dev test room ─────────────────────────────────────────────────────────────
 
 export function useCreateDevTestGame() {
   return useMutation({
     mutationFn: (config: DevTestGameConfig) =>
-      api.post<{ gameId: string }>('/admin/dev-test-game', config).then((r) => r.data),
+      api.post<{ gameId: string }>('/dev-test/game', config).then((r) => r.data),
   });
 }
