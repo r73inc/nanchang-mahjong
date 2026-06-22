@@ -1,5 +1,22 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
+
+// ── Dev test game types ───────────────────────────────────────────────────────
+
+export type TestWinCondition = 'immediate' | 'self_draw' | 'left_discard' | 'right_discard';
+
+export interface DevTestMeld {
+  kind: 'chow' | 'pung' | 'kong';
+  tiles: string[];
+  concealed: boolean;
+}
+
+export interface DevTestGameConfig {
+  hand: string[];
+  openMelds?: DevTestMeld[];
+  condition: TestWinCondition;
+  winTile?: string;
+}
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -76,5 +93,14 @@ export function useSetDisabled() {
     mutationFn: ({ sub, disabled }: { sub: string; disabled: boolean }) =>
       api.patch(`/admin/users/${sub}/disable`, { disabled }).then(() => undefined),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  });
+}
+
+// ── Dev test room ─────────────────────────────────────────────────────────────
+
+export function useCreateDevTestGame() {
+  return useMutation({
+    mutationFn: (config: DevTestGameConfig) =>
+      api.post<{ gameId: string }>('/admin/dev-test-game', config).then((r) => r.data),
   });
 }

@@ -494,3 +494,9 @@ export interface AfkWarningPayload {
 export interface CanTsumoPayload {
   seat: 0 | 1 | 2 | 3;
 }
+/** Sent privately to the active player's socket when their hand contains a concealed kong. */
+export interface CanConcealedKongPayload {
+  seat: 0 | 1 | 2 | 3;
+  /** All tile types the player can declare a concealed kong with. */
+  tiles: TileType[];
+}

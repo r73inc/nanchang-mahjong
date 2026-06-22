@@ -8,6 +8,7 @@ import { ChangePasswordPage } from './pages/settings/change-password-page';
 import { DeleteAccountPage } from './pages/settings/delete-account-page';
 import { AccountPage } from './pages/account/account-page';
 import { AdminPage } from './pages/admin/admin-page';
+import { DevTestRoomPage } from './pages/admin/dev-test-room-page';
 import { ProfilePage } from './pages/profile/profile-page';
 import { FriendsPage } from './pages/friends/friends-page';
 import { LobbyPage } from './pages/lobby/lobby-page';
@@ -84,6 +85,7 @@ export default function App() {
       {/* Admin-only routes — non-admins are redirected to /home */}
       <Route element={<AdminRoute />}>
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/dev-test" element={<DevTestRoomPage />} />
       </Route>
 
       {/* Fallback */}
