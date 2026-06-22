@@ -13,7 +13,7 @@
  *  - Multi-hand session management (nextDealer, cumulative scores, bust/rounds check).
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { randomUUID } from 'crypto';
 import type { Server, Socket } from 'socket.io';
@@ -258,6 +258,14 @@ export class GameService {
     adminHandle: string,
     injection: TestHandInjection,
   ): Promise<{ gameId: string }> {
+    const expectedTiles = injection.condition === 'immediate' ? 14 : 13;
+    const totalTiles = injection.hand.length + (injection.openMelds?.length ?? 0) * 3;
+    if (totalTiles !== expectedTiles) {
+      throw new BadRequestException(
+        `Hand invariant violation: expected ${expectedTiles} tiles (hand + open melds × 3), got ${totalTiles}`,
+      );
+    }
+
     const gameId = randomUUID();
     const roomId = `test-${gameId}`;
     const now = new Date().toISOString();
@@ -385,7 +393,9 @@ export class GameService {
     let adminHand: TileType[];
     if (injection.condition === 'immediate') {
       // 13 configured tiles + win tile = 14; admin can declare tsumo right away
-      adminHand = [...(injection.hand as TileType[]), injection.winTile as TileType];
+      adminHand = injection.winTile
+        ? [...(injection.hand as TileType[]), injection.winTile as TileType]
+        : [...(injection.hand as TileType[])];
     } else {
       // Keep the original 14th dealt tile as a junk first discard
       const extraTile = originalHand[originalHand.length - 1] as TileType;
