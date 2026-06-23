@@ -10,6 +10,10 @@ interface AuthTokens {
   refreshToken: string;
 }
 
+interface RefreshResponse {
+  accessToken: string;
+}
+
 // ── Sign Up ───────────────────────────────────────────────────────────────────
 
 export function useSignup() {
@@ -78,12 +82,19 @@ export function useDeleteAccount() {
 
 export function useSyncUserOnMount() {
   useEffect(() => {
-    const { refreshToken, setAccessToken } = useAuthStore.getState();
+    const { refreshToken } = useAuthStore.getState();
     if (!refreshToken) return;
+    let cancelled = false;
     void api
-      .post<{ accessToken: string }>('/auth/refresh', { refreshToken })
-      .then(({ data }) => setAccessToken(data.accessToken))
+      .post<RefreshResponse>('/auth/refresh', { refreshToken })
+      .then(({ data }) => {
+        if (cancelled) return;
+        useAuthStore.getState().setAccessToken(data.accessToken);
+      })
       .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 }
 
