@@ -20,6 +20,7 @@ const mockUser: AuthenticatedUser = {
   sub: 'sub-123',
   handle: 'alice',
   role: 'user',
+  permissions: [],
 };
 
 // ── Suite ─────────────────────────────────────────────────────────────────────

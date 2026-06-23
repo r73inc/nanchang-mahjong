@@ -4,11 +4,13 @@ import { decodeJwtPayload } from '../lib/decode-jwt';
 import { disconnectSocket } from '../lib/socket';
 
 export type UserRole = 'user' | 'admin';
+export type UserPermission = 'devTestRoom';
 
 export interface AuthUser {
   sub: string;
   handle: string;
   role: UserRole;
+  permissions: UserPermission[];
 }
 
 interface AuthState {
@@ -26,18 +28,20 @@ interface AuthState {
   clearAuth: () => void;
 }
 
-function parseUser(accessToken: string): AuthUser | null {
+export function parseUser(accessToken: string): AuthUser | null {
   try {
     const payload = decodeJwtPayload(accessToken) as {
       sub?: string;
       handle?: string;
       role?: UserRole;
+      permissions?: UserPermission[];
     };
     if (!payload.sub || !payload.handle) return null;
     return {
       sub: payload.sub,
       handle: payload.handle,
       role: payload.role ?? 'user',
+      permissions: payload.permissions ?? [],
     };
   } catch {
     return null;

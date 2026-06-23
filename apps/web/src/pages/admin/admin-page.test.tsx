@@ -18,6 +18,7 @@ const mockCreateInvites = vi.fn();
 const mockRevokeInvite = vi.fn();
 const mockSetRole = vi.fn();
 const mockSetDisabled = vi.fn();
+const mockSetPermission = vi.fn();
 
 vi.mock('../../hooks/use-admin', () => ({
   useAdminInvites: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('../../hooks/use-admin', () => ({
   useAdminUsers: vi.fn(),
   useSetRole: vi.fn(),
   useSetDisabled: vi.fn(),
+  useSetPermission: vi.fn(),
 }));
 
 import {
@@ -35,6 +37,7 @@ import {
   useAdminUsers,
   useSetRole,
   useSetDisabled,
+  useSetPermission,
 } from '../../hooks/use-admin';
 
 const mockUseAuthStore = vi.mocked(useAuthStore);
@@ -44,6 +47,7 @@ const mockUseRevokeInvite = vi.mocked(useRevokeInvite);
 const mockUseAdminUsers = vi.mocked(useAdminUsers);
 const mockUseSetRole = vi.mocked(useSetRole);
 const mockUseSetDisabled = vi.mocked(useSetDisabled);
+const mockUseSetPermission = vi.mocked(useSetPermission);
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -65,6 +69,7 @@ const sampleUser: AdminUser = {
   sub: 'user-sub',
   handle: 'alice',
   role: 'user',
+  permissions: [],
   disabled: false,
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -116,6 +121,11 @@ function setupDefaultMocks() {
   } as never);
   mockUseSetDisabled.mockReturnValue({
     mutate: mockSetDisabled,
+    isPending: false,
+    variables: undefined,
+  } as never);
+  mockUseSetPermission.mockReturnValue({
+    mutate: mockSetPermission,
     isPending: false,
     variables: undefined,
   } as never);

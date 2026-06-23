@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
-import type { UserRole } from '../common/interfaces/authenticated-user.interface';
+import type { UserRole, UserPermission } from '../common/interfaces/authenticated-user.interface';
 
 export interface UserProfile {
   sub: string;
   handle: string;
   role: UserRole;
+  permissions?: UserPermission[];
   createdAt: string;
   updatedAt: string;
   disabled: boolean;
@@ -118,6 +119,24 @@ export class UsersService {
       Key: DK.userProfile(sub),
       UpdateExpression: 'SET disabled = :disabled, updatedAt = :now',
       ExpressionAttributeValues: { ':disabled': disabled, ':now': now },
+      ConditionExpression: 'attribute_exists(PK)',
+    });
+  }
+
+  async setPermission(sub: string, permission: UserPermission, grant: boolean): Promise<void> {
+    const profile = await this.getOrThrow(sub);
+    const current = new Set(profile.permissions ?? []);
+    if (grant) {
+      current.add(permission);
+    } else {
+      current.delete(permission);
+    }
+    const now = new Date().toISOString();
+    await this.db.update({
+      Key: DK.userProfile(sub),
+      UpdateExpression: 'SET #perms = :perms, updatedAt = :now',
+      ExpressionAttributeNames: { '#perms': 'permissions' },
+      ExpressionAttributeValues: { ':perms': [...current], ':now': now },
       ConditionExpression: 'attribute_exists(PK)',
     });
   }

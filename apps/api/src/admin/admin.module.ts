@@ -3,11 +3,11 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { InvitesModule } from '../invites/invites.module';
 import { UsersModule } from '../users/users.module';
-import { GameModule } from '../game/game.module';
 
 @Module({
-  imports: [InvitesModule, UsersModule, GameModule],
+  imports: [InvitesModule, UsersModule],
   controllers: [AdminController],
   providers: [AdminService],
+  exports: [AdminService],
 })
 export class AdminModule {}
