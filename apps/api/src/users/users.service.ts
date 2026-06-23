@@ -134,7 +134,8 @@ export class UsersService {
     const now = new Date().toISOString();
     await this.db.update({
       Key: DK.userProfile(sub),
-      UpdateExpression: 'SET permissions = :perms, updatedAt = :now',
+      UpdateExpression: 'SET #perms = :perms, updatedAt = :now',
+      ExpressionAttributeNames: { '#perms': 'permissions' },
       ExpressionAttributeValues: { ':perms': [...current], ':now': now },
       ConditionExpression: 'attribute_exists(PK)',
     });
