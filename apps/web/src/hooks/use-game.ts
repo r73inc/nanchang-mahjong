@@ -535,6 +535,18 @@ export function useGame(gameId: string, spectate = false) {
     }
   }, [gameId]);
 
+  /** Host toggles the forced-final-hand flag for the upcoming hand. */
+  const setFinalHand = useCallback(
+    (active: boolean) => {
+      try {
+        getSocket().emit('game:set-final-hand', { gameId, active });
+      } catch {
+        /* ignore */
+      }
+    },
+    [gameId],
+  );
+
   const requestRematch = useCallback(() => {
     try {
       getSocket().emit('game:rematch', {});
@@ -653,6 +665,7 @@ export function useGame(gameId: string, spectate = false) {
     revealJing,
     advancePreGame,
     advanceHand,
+    setFinalHand,
     declareTsumo,
     kongConcealed,
     kongAdd,

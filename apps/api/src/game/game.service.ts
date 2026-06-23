@@ -292,9 +292,9 @@ export class GameService {
 
     const seatMap: [string, string, string, string] = [
       adminSub,
-      'bot-easy-1',
-      'bot-easy-2',
-      'bot-easy-3',
+      'bot-passive-1',
+      'bot-passive-2',
+      'bot-passive-3',
     ];
     const seatNames: [string, string, string, string] = [
       adminHandle,
@@ -947,23 +947,41 @@ export class GameService {
     const seat = session.getSeat(userId);
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
-    // Only the dealer (host of this hand) may advance.
-    // If the dealer seat is a bot, any connected human player may advance.
-    const dealerSeat = session.engine.state.dealerSeat;
-    const dealerUserId = session.seatMap[dealerSeat];
-    const dealerIsBot = session.isBotSeat(dealerSeat);
-    if (!dealerIsBot && userId !== dealerUserId) {
-      this.logger.warn(
-        `advance-pre-game rejected: userId=${userId} is not dealer (${dealerUserId})`,
-      );
-      return this.emitError(socket, 'NOT_HOST');
-    }
+    // Bots cannot emit this event — only humans can mark themselves ready.
+    if (session.isBotSeat(seat)) return;
 
-    if (session.preGamePhase === 'dealing') {
-      // Dice rolls are in progress — advance-pre-game cannot skip this phase.
-      this.logger.warn(`advance-pre-game ignored: preGamePhase=dealing for game ${gameId}`);
+    if (session.preGamePhase === 'dealing' || session.preGamePhase === null) {
+      // Dice rolls or live game — advance-pre-game is not applicable here.
+      this.logger.warn(
+        `advance-pre-game ignored: preGamePhase=${session.preGamePhase} for game ${gameId}`,
+      );
       return;
     }
+
+    // Mark this human seat as ready.
+    if (!session.preGameReadySeats) {
+      this.logger.warn(
+        `advance-pre-game: preGameReadySeats is null in phase ${session.preGamePhase} for game ${gameId}`,
+      );
+      return;
+    }
+    if (session.preGameReadySeats.has(seat)) {
+      // Already ready — idempotent, broadcast to resync the client.
+      this.broadcastSnapshots(session);
+      return;
+    }
+    session.preGameReadySeats.add(seat);
+
+    // Check whether all human seats are now ready.
+    const allHumansReady = this.allHumansReady(session, session.preGameReadySeats);
+    if (!allHumansReady) {
+      // Broadcast updated ready state so everyone sees who's still pending.
+      this.broadcastSnapshots(session);
+      return;
+    }
+
+    // All humans ready — advance the phase.
+    session.preGameReadySeats = null;
 
     if (session.preGamePhase === 'hands') {
       // Trigger the jing_reveal dice roll; settlement is computed and shown after the roll.
@@ -971,6 +989,7 @@ export class GameService {
     } else if (session.preGamePhase === 'settlement') {
       // Settlement acknowledged — advance to spirit tile reveal.
       session.preGamePhase = 'jing';
+      this.initPreGameReadyGate(session);
       this.broadcastSnapshots(session);
     } else if (session.preGamePhase === 'jing') {
       // Final step: start the game turn.
@@ -979,10 +998,28 @@ export class GameService {
       this.broadcastSnapshots(session);
       this.broadcastEvent(session, { kind: 'draw', seat: session.engine.state.currentSeat });
       this.startTurn(session);
-    } else {
-      // preGamePhase === null means game is already live — ignore stray clicks.
-      this.logger.warn(`advance-pre-game ignored: preGamePhase=null for game ${gameId}`);
     }
+  }
+
+  /**
+   * Initialize a pre-game ready gate for the current phase.
+   * Auto-adds all bot seats immediately; humans must add themselves.
+   */
+  private initPreGameReadyGate(session: GameSession): void {
+    session.preGameReadySeats = new Set<Seat4>();
+    for (const botSeat of session.botSeats) {
+      session.preGameReadySeats.add(botSeat);
+    }
+  }
+
+  /**
+   * Returns true when every human (non-bot) seat is present in readySet.
+   */
+  private allHumansReady(session: GameSession, readySet: Set<Seat4>): boolean {
+    for (let i = 0 as Seat4; i < 4; i++) {
+      if (!session.isBotSeat(i) && !readySet.has(i)) return false;
+    }
+    return true;
   }
 
   /**
@@ -1075,6 +1112,7 @@ export class GameService {
 
       session.pendingRoll = null;
       session.preGamePhase = 'hands';
+      this.initPreGameReadyGate(session);
       this.broadcastSnapshots(session);
     } else {
       // jing_reveal: call engine.revealJing() and broadcast the resulting dice event
@@ -1093,6 +1131,7 @@ export class GameService {
       session.pendingRoll = null;
       // With ruleTopBottomJing: show detailed settlement screen before spirit tiles.
       session.preGamePhase = session.settings.ruleTopBottomJing ? 'settlement' : 'jing';
+      this.initPreGameReadyGate(session);
 
       // Compute and store settlement preview (hand counts read from pre-reveal state).
       if (session.settings.ruleTopBottomJing) {
@@ -1209,22 +1248,35 @@ export class GameService {
     const seat = session.getSeat(userId);
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
-    // Only the dealer (host of the just-finished hand) may advance.
-    // If the dealer seat is a bot, any connected human player may advance.
-    const dealerSeat = session.engine.state.dealerSeat;
-    const dealerUserId = session.seatMap[dealerSeat];
-    const dealerIsBot = session.isBotSeat(dealerSeat);
-    if (!dealerIsBot && userId !== dealerUserId) return this.emitError(socket, 'NOT_HOST');
+    // Bots cannot emit this event.
+    if (session.isBotSeat(seat)) return;
 
     const pending = session.pendingHandEnd;
-    // pendingHandEnd is null when advance was already processed (e.g. auto-advance fired
-    // and the client resent due to a network delay, or two humans both clicked when
-    // the dealer was a bot seat).  The correct response is a silent no-op — the caller
-    // will shortly receive game:ended or the next hand's game:snapshot.
     if (!pending) return;
 
+    // handEndReadySeats should already be initialized by handleHandEnd.
+    if (!session.handEndReadySeats) {
+      this.logger.warn(`advance-hand: handEndReadySeats is null for game ${gameId}`);
+      return;
+    }
+
+    if (session.handEndReadySeats.has(seat)) {
+      // Already ready — idempotent.
+      this.broadcastSnapshots(session);
+      return;
+    }
+    session.handEndReadySeats.add(seat);
+
+    const allHumansReady = this.allHumansReady(session, session.handEndReadySeats);
+    if (!allHumansReady) {
+      this.broadcastSnapshots(session);
+      return;
+    }
+
+    // All humans ready — advance.
     session.pendingHandEnd = null;
     session.lastHandReveal = null;
+    session.handEndReadySeats = null;
 
     if (pending.isLastHand) {
       void this.endSession(
@@ -1237,6 +1289,32 @@ export class GameService {
     } else {
       this.startNextHand(session, pending.nextDealerInfo);
     }
+  }
+
+  handleSetFinalHand(socket: Socket, userId: string, gameId: string, active: boolean): void {
+    const session = this.sessions.get(gameId);
+    if (!session) return this.emitError(socket, 'GAME_NOT_FOUND');
+
+    const seat = session.getSeat(userId);
+    if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
+
+    // Must be in the hand-reveal screen (pendingHandEnd is set).
+    if (!session.pendingHandEnd) return this.emitError(socket, 'INVALID_PHASE');
+
+    // Cannot set force-final when this is already the last hand.
+    if (session.pendingHandEnd.isLastHand) return;
+
+    // Only the dealer (or first human when dealer is bot) may toggle.
+    const dealerSeat = session.engine.state.dealerSeat;
+    const dealerIsBot = session.isBotSeat(dealerSeat);
+    const firstHumanSeat = [0, 1, 2, 3].find((s) => !session.isBotSeat(s as Seat4)) as
+      | Seat4
+      | undefined;
+    const isAuthorized = dealerIsBot ? seat === firstHumanSeat : seat === dealerSeat;
+    if (!isAuthorized) return this.emitError(socket, 'NOT_HOST');
+
+    session.forcedFinalNextHand = active;
+    this.broadcastSnapshots(session);
   }
 
   // ── Turn loop ────────────────────────────────────────────────────────────────
@@ -1369,8 +1447,11 @@ export class GameService {
     if (state.jingPrimary) jingTypes.push(state.jingPrimary);
     if (state.jingSecondary) jingTypes.push(state.jingSecondary);
 
+    const isPassive = session.getBotDifficulty(seat) === 'passive';
+
     // Bots auto-declare tsumo when their hand is complete — no button needed.
-    if (jingTypes.length === 2) {
+    // Passive bots skip this: they only discard the drawn tile, no claims.
+    if (!isPassive && jingTypes.length === 2) {
       const seatState = state.seats[seat];
       const openMeldTiles = seatState.openMelds.flatMap((m) =>
         m.kind === 'kong'
@@ -1394,27 +1475,29 @@ export class GameService {
 
     // Add-to-kong: if the drawn tile matches an existing open pung, upgrade it
     // before discarding (bots always take the free kong payout).
+    // Passive bots skip this: they only discard the drawn tile.
     const seatState = state.seats[seat];
-    for (const meld of seatState.openMelds) {
-      if (meld.kind === 'pung') {
-        const pungTile = meld.tiles[0] as TileType;
-        if (addToKongOptions(seatState.hand, pungTile, jingTypes).length > 0) {
-          try {
-            session.engine = session.engine.addToKong(seat, pungTile);
-            session.touch(seat);
-            session.moveLog.push(...getNewEvents(session));
-          } catch (err) {
-            this.logger.error(
-              `Bot add-to-kong failed — seat ${seat}, game ${session.gameId}: ${err}`,
-            );
-            break;
+    if (!isPassive)
+      for (const meld of seatState.openMelds) {
+        if (meld.kind === 'pung') {
+          const pungTile = meld.tiles[0] as TileType;
+          if (addToKongOptions(seatState.hand, pungTile, jingTypes).length > 0) {
+            try {
+              session.engine = session.engine.addToKong(seat, pungTile);
+              session.touch(seat);
+              session.moveLog.push(...getNewEvents(session));
+            } catch (err) {
+              this.logger.error(
+                `Bot add-to-kong failed — seat ${seat}, game ${session.gameId}: ${err}`,
+              );
+              break;
+            }
+            this.broadcastEvent(session, { kind: 'kong_added', seat, tile: pungTile });
+            this.openRobKongWindow(session, seat, pungTile);
+            return;
           }
-          this.broadcastEvent(session, { kind: 'kong_added', seat, tile: pungTile });
-          this.openRobKongWindow(session, seat, pungTile);
-          return;
         }
       }
-    }
 
     // Test-game forced discard hint: the win tile was planted in the wall at injection time,
     // so the bot already has it in hand from a natural draw — no mutation needed.
@@ -2048,7 +2131,10 @@ export class GameService {
       winnerSeat,
     );
 
-    const isLastHand = result === 'concede' || this.isSessionOver(session, nextDealerInfo);
+    const isLastHand =
+      result === 'concede' ||
+      session.forcedFinalActive ||
+      this.isSessionOver(session, nextDealerInfo);
 
     // ── Per-player spirit counts for the reveal screen ─────────────────────────
     const spiritCounts = this.computeSpiritCounts(
@@ -2167,11 +2253,17 @@ export class GameService {
     };
     session.lastHandReveal = handReveal;
 
+    // Initialize hand-end ready gate: auto-add bots, humans must click.
+    session.handEndReadySeats = new Set<Seat4>();
+    for (const botSeat of session.botSeats) {
+      session.handEndReadySeats.add(botSeat);
+    }
+
     if (this.server) {
       this.server.to(`game:${session.gameId}`).emit('game:hand-reveal', handReveal);
     }
 
-    // The host must emit game:advance-hand to proceed.
+    // All players must emit game:advance-hand to proceed.
   }
 
   /**
@@ -2263,6 +2355,11 @@ export class GameService {
     });
 
     session.engine = newEngine;
+    // Lock in force-final flag if the host had requested it.
+    if (session.forcedFinalNextHand) {
+      session.forcedFinalActive = true;
+      session.forcedFinalNextHand = false;
+    }
     // Start dealing phase: dealer rolls first
     session.preGamePhase = 'dealing';
     session.pendingRoll = { purpose: 'deal_1', roller: dealerSeat, seed };
@@ -2462,6 +2559,8 @@ export class GameService {
     const clientPendingRoll = session.pendingRoll
       ? { purpose: session.pendingRoll.purpose, roller: session.pendingRoll.roller }
       : null;
+    const preGameReadySeats = session.preGameReadySeats ? [...session.preGameReadySeats] : null;
+    const handEndReadySeats = session.handEndReadySeats ? [...session.handEndReadySeats] : null;
     const snapshot = toClientSnapshot(
       session.engine.state,
       session.gameId,
@@ -2474,6 +2573,9 @@ export class GameService {
       session.seatNames,
       session.seatAvatarUrls,
       clientPendingRoll,
+      preGameReadySeats as (0 | 1 | 2 | 3)[] | null,
+      handEndReadySeats as (0 | 1 | 2 | 3)[] | null,
+      session.forcedFinalNextHand,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

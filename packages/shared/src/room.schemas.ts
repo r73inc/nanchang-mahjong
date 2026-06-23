@@ -5,7 +5,7 @@ import { z } from 'zod';
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 
 /** AI opponent difficulty level. */
-export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'psychic';
+export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'psychic' | 'passive';
 
 export const RoomSettingsSchema = z.object({
   /**
