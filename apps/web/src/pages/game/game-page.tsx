@@ -264,7 +264,7 @@ function PreGameFlow({
         {isHuman && !iAmReady && (
           <GoldButton onClick={onAdvance}>{t('preGameReadyBtn')}</GoldButton>
         )}
-        {isHuman && iAmReady && (
+        {(!isHuman || iAmReady) && (
           <div className="flex flex-col items-center gap-2">
             <WaitingDots />
             <p className="text-xs text-mj-bone/55">
@@ -282,14 +282,14 @@ function PreGameFlow({
     const footer =
       isHuman && !iAmReady ? (
         <GoldButton onClick={onAdvance}>{t('preGameReadyBtn')}</GoldButton>
-      ) : isHuman && iAmReady ? (
+      ) : (
         <>
           <WaitingDots />
           <p className="text-xs text-mj-bone/40">
             {pendingNames ? t('preGameWaitingFor', pendingNames) : t('preGameWaitingHost')}
           </p>
         </>
-      ) : null;
+      );
     return (
       <SettlementPreview
         settlementPreview={settlementPreview}
@@ -343,7 +343,7 @@ function PreGameFlow({
         {isHuman && !iAmReady && (
           <GoldButton onClick={onAdvance}>{t('preGameReadyBtn')}</GoldButton>
         )}
-        {isHuman && iAmReady && (
+        {(!isHuman || iAmReady) && (
           <div className="flex flex-col items-center gap-3">
             <WaitingDots />
             <p className="text-xs text-mj-bone/55">
@@ -1205,7 +1205,7 @@ function HandRevealScreen({
                     {t('handRevealContinue')} →
                   </button>
                 )
-              ) : isHuman && iAmReady ? (
+              ) : (
                 <>
                   <WaitingDots />
                   <p className="text-xs text-mj-bone/40">
@@ -1216,7 +1216,7 @@ function HandRevealScreen({
                         : t('handRevealWaitingHost')}
                   </p>
                 </>
-              ) : null}
+              )}
             </>
           )}
         </div>
