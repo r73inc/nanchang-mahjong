@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
-import { useSignout } from '../../hooks/use-auth';
+import { useSignout, useSyncUserOnMount } from '../../hooks/use-auth';
 import { useMyProfile } from '../../hooks/use-profile';
 import { ScreenShell } from '../../components/ui/screen-shell';
 import { AvatarImg } from '../../components/ui/avatar-img';
@@ -377,6 +377,7 @@ export function HomeStubPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const signout = useSignout();
+  useSyncUserOnMount();
   const { data: profile } = useMyProfile();
   const { isSupported, permission, isSubscribed, isLoading, subscribe, unsubscribe } =
     usePushNotifications();
@@ -426,8 +427,7 @@ export function HomeStubPage() {
         {/* Play Nanchang Mahjong — entry to all game modes */}
         <button
           onClick={() => navigate('/play')}
-          className="w-full mb-6 px-5 py-5 rounded-2xl font-bold text-lg text-mj-ink flex items-center justify-between btn-heirloom"
-          style={{ border: '1px solid rgba(255,255,255,0.3)' }}
+          className="w-full mb-6 px-5 py-5 rounded-2xl font-bold text-lg text-mj-ink flex items-center justify-between btn-heirloom border border-white/30"
         >
           <div className="text-left">
             <div>{t('playNanchang')}</div>

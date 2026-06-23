@@ -28,7 +28,7 @@ interface AuthState {
   clearAuth: () => void;
 }
 
-function parseUser(accessToken: string): AuthUser | null {
+export function parseUser(accessToken: string): AuthUser | null {
   try {
     const payload = decodeJwtPayload(accessToken) as {
       sub?: string;

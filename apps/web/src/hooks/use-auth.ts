@@ -1,12 +1,21 @@
+import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, getApiErrorMessage } from '../lib/api';
-import { useAuthStore } from '../stores/auth.store';
+import { useAuthStore, parseUser } from '../stores/auth.store';
 import type { SignupInput, SigninInput, ChangePasswordInput } from '@nanchang/shared';
 
 interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+}
+
+interface RefreshRequest {
+  refreshToken: string;
+}
+
+interface RefreshResponse {
+  accessToken: string;
 }
 
 // ── Sign Up ───────────────────────────────────────────────────────────────────
@@ -65,6 +74,35 @@ export function useDeleteAccount() {
       navigate('/auth', { replace: true });
     },
   });
+}
+
+// ── Sync user permissions on mount ────────────────────────────────────────────
+//
+// Permissions live in the JWT payload. After an admin grants or revokes a
+// permission the backend DB is updated immediately, but the stored token is
+// stale. Calling /auth/refresh re-reads the DB and returns a new access token
+// with current permissions, so any UI gated on user.permissions updates without
+// requiring a sign-out/sign-in cycle.
+
+export function useSyncUserOnMount() {
+  useEffect(() => {
+    const { refreshToken } = useAuthStore.getState();
+    if (!refreshToken) return;
+    let cancelled = false;
+    const body: RefreshRequest = { refreshToken };
+    void api
+      .post<RefreshResponse>('/auth/refresh', body)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const freshUser = parseUser(data.accessToken);
+        if (!freshUser) return;
+        useAuthStore.setState({ accessToken: data.accessToken, user: freshUser });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 }
 
 // ── Re-export helper ─────────────────────────────────────────────────────────
