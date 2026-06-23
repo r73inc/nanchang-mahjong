@@ -9,12 +9,12 @@ export class BotConfigDto {
 
   @IsOptional()
   @IsIn(['easy', 'normal', 'hard', 'psychic'])
-  difficulty?: 'easy' | 'normal' | 'hard' | 'psychic';
+  difficulty?: 'easy' | 'normal' | 'hard' | 'psychic' | 'passive';
 
   // Per-bot difficulties (index 0 = seat 3, 1 = seat 2, 2 = seat 1).
   // When provided overrides `difficulty` for each individual bot.
   @IsOptional()
-  difficulties?: ('easy' | 'normal' | 'hard' | 'psychic')[];
+  difficulties?: ('easy' | 'normal' | 'hard' | 'psychic' | 'passive')[];
 }
 
 export class RoomSettingsDto {

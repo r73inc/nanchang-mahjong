@@ -109,6 +109,10 @@ export type AdvancePreGamePayload = z.infer<typeof AdvancePreGamePayloadSchema>;
 export const AdvanceHandPayloadSchema = z.object({});
 export type AdvanceHandPayload = z.infer<typeof AdvanceHandPayloadSchema>;
 
+/** Host toggles whether the next hand should be the final one of the session. */
+export const SetFinalHandPayloadSchema = z.object({ active: z.boolean() });
+export type SetFinalHandPayload = z.infer<typeof SetFinalHandPayloadSchema>;
+
 // ── Server → Client data shapes ───────────────────────────────────────────────
 
 /** Per-seat view within a ClientGameState. */
@@ -205,6 +209,21 @@ export interface ClientGameState {
     purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
     roller: 0 | 1 | 2 | 3;
   } | null;
+  /**
+   * Seats that have clicked "Ready" in the current pre-game gate phase.
+   * null when not in a gate phase (e.g. 'dealing' or null).
+   */
+  preGameReadySeats?: (0 | 1 | 2 | 3)[] | null;
+  /**
+   * Seats that have clicked "Ready" to advance past the current hand-reveal screen.
+   * null when no hand is pending (pendingHandEnd is null).
+   */
+  handEndReadySeats?: (0 | 1 | 2 | 3)[] | null;
+  /**
+   * True when the host (dealer or first human) has requested the next hand be the
+   * final one of the session. Toggleable until the next hand starts.
+   */
+  forcedFinalNextHand?: boolean;
 }
 
 // ── Pre-game & hand-reveal payloads ──────────────────────────────────────────
