@@ -2,11 +2,15 @@ import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, getApiErrorMessage } from '../lib/api';
-import { useAuthStore } from '../stores/auth.store';
+import { useAuthStore, parseUser } from '../stores/auth.store';
 import type { SignupInput, SigninInput, ChangePasswordInput } from '@nanchang/shared';
 
 interface AuthTokens {
   accessToken: string;
+  refreshToken: string;
+}
+
+interface RefreshRequest {
   refreshToken: string;
 }
 
@@ -85,11 +89,14 @@ export function useSyncUserOnMount() {
     const { refreshToken } = useAuthStore.getState();
     if (!refreshToken) return;
     let cancelled = false;
+    const body: RefreshRequest = { refreshToken };
     void api
-      .post<RefreshResponse>('/auth/refresh', { refreshToken })
+      .post<RefreshResponse>('/auth/refresh', body)
       .then(({ data }) => {
         if (cancelled) return;
-        useAuthStore.getState().setAccessToken(data.accessToken);
+        const freshUser = parseUser(data.accessToken);
+        if (!freshUser) return;
+        useAuthStore.setState({ accessToken: data.accessToken, user: freshUser });
       })
       .catch(() => undefined);
     return () => {
