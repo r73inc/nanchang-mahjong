@@ -11,6 +11,7 @@ export function DevTestRoute() {
   const user = useAuthStore((s) => s.user);
 
   if (!user) return <Navigate to="/auth" replace />;
+  if (user.role === 'admin') return <Outlet />;
   if (!user.permissions.includes('devTestRoom')) return <Navigate to="/home" replace />;
 
   return <Outlet />;
