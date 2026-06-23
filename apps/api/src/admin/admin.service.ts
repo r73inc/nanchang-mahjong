@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { InvitesService, type InviteRecord } from '../invites/invites.service';
 import { UsersService, type UserProfile } from '../users/users.service';
-import type { UserRole } from '../common/interfaces/authenticated-user.interface';
+import type { UserRole, UserPermission } from '../common/interfaces/authenticated-user.interface';
 
 export interface AuditEntry {
   action: string;
@@ -91,6 +91,21 @@ export class AdminService {
       action: disabled ? 'DISABLE_USER' : 'ENABLE_USER',
       actorSub,
       targetSub,
+    });
+  }
+
+  async setPermission(
+    actorSub: string,
+    targetSub: string,
+    permission: UserPermission,
+    grant: boolean,
+  ): Promise<void> {
+    await this.users.setPermission(targetSub, permission, grant);
+    await this.writeAudit({
+      action: grant ? 'GRANT_PERMISSION' : 'REVOKE_PERMISSION',
+      actorSub,
+      targetSub,
+      payload: { permission },
     });
   }
 }

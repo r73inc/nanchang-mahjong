@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { InvitesModule } from './invites/invites.module';
 import { AdminModule } from './admin/admin.module';
+import { DevTestModule } from './dev-test/dev-test.module';
 import { FriendsModule } from './friends/friends.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { ReplayModule } from './replay/replay.module';
@@ -51,6 +52,7 @@ import { I18nModule } from './i18n/i18n.module';
     UsersModule,
     InvitesModule,
     AdminModule,
+    DevTestModule,
     FriendsModule,
     RoomsModule, // transitively imports GameModule
     ReplayModule,

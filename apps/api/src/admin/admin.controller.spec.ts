@@ -14,6 +14,7 @@ const adminUser: AuthenticatedUser = {
   sub: 'admin-sub',
   handle: 'admin',
   role: 'admin',
+  permissions: [],
 };
 
 const sampleInvite = {

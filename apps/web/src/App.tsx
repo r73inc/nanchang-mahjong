@@ -26,6 +26,7 @@ import { PlayPage } from './pages/play/play-page';
 import { PlayChallengesPage } from './pages/play/play-challenges-page';
 import { ProtectedRoute } from './components/layout/protected-route';
 import { AdminRoute } from './components/layout/admin-route';
+import { DevTestRoute } from './components/layout/dev-test-route';
 import { AppErrorBoundary } from './components/error-boundary';
 
 // Module-level constant avoids i18next/no-literal-string on the context prop.
@@ -85,7 +86,11 @@ export default function App() {
       {/* Admin-only routes — non-admins are redirected to /home */}
       <Route element={<AdminRoute />}>
         <Route path="/admin" element={<AdminPage />} />
-        <Route path="/admin/dev-test" element={<DevTestRoomPage />} />
+      </Route>
+
+      {/* Dev test room — requires devTestRoom permission */}
+      <Route element={<DevTestRoute />}>
+        <Route path="/dev-test-room" element={<DevTestRoomPage />} />
       </Route>
 
       {/* Fallback */}

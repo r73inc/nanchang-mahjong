@@ -151,6 +151,10 @@
   "adminEnable": "启用",
   "adminSaving": "保存中…",
   "adminDisabledBadge": "已停用",
+  "adminGrantDevTest": "授予测试权限",
+  "adminRevokeDevTest": "撤销测试权限",
+  "devTestPermBadge": "测试",
+  "devTestRoom": "开发测试房间",
 
   "adminDevTest": "开发测试房间",
   "adminDevTestHand": "配置手牌",

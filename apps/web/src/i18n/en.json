@@ -151,6 +151,10 @@
   "adminEnable": "Enable",
   "adminSaving": "Saving…",
   "adminDisabledBadge": "Disabled",
+  "adminGrantDevTest": "Grant Dev Test",
+  "adminRevokeDevTest": "Revoke Dev Test",
+  "devTestPermBadge": "Dev Test",
+  "devTestRoom": "Dev Test Room",
 
   "adminDevTest": "Dev Test Room",
   "adminDevTestHand": "Configure Hand",

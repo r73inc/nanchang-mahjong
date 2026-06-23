@@ -198,7 +198,7 @@ describe('AuthService', () => {
   // ── refreshAccessToken ─────────────────────────────────────────────────────
 
   describe('refreshAccessToken', () => {
-    it('returns a new accessToken for a valid refresh token', () => {
+    it('returns a new accessToken for a valid refresh token', async () => {
       mockJwt.verify.mockReturnValue({
         sub: 'sub-123',
         handle: 'alice',
@@ -206,24 +206,27 @@ describe('AuthService', () => {
         type: 'refresh',
       });
       mockJwt.sign.mockReturnValue('new-access-token');
+      mockUsers.findBySub.mockResolvedValue({ sub: 'sub-123', disabled: false, permissions: [] });
 
-      const result = service.refreshAccessToken('valid-refresh-token');
+      const result = await service.refreshAccessToken('valid-refresh-token');
       expect(result).toEqual({ accessToken: 'new-access-token' });
     });
 
-    it('throws UnauthorizedException for an invalid refresh token', () => {
+    it('throws UnauthorizedException for an invalid refresh token', async () => {
       mockJwt.verify.mockImplementation(() => {
         throw new Error('invalid');
       });
-      expect(() => service.refreshAccessToken('bad-token')).toThrow(UnauthorizedException);
+      await expect(service.refreshAccessToken('bad-token')).rejects.toThrow(UnauthorizedException);
     });
 
-    it('throws UnauthorizedException when token type is not refresh', () => {
+    it('throws UnauthorizedException when token type is not refresh', async () => {
       mockJwt.verify.mockReturnValue({
         sub: 'sub-123',
         type: 'access',
       });
-      expect(() => service.refreshAccessToken('access-token')).toThrow(UnauthorizedException);
+      await expect(service.refreshAccessToken('access-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 

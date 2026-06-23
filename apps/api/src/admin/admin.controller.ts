@@ -16,13 +16,12 @@ import { AdminService } from './admin.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { SetRoleDto } from './dto/set-role.dto';
 import { SetDisabledDto } from './dto/set-disabled.dto';
-import { CreateDevTestGameDto } from './dto/create-dev-test-game.dto';
+import { SetPermissionDto } from './dto/set-permission.dto';
 import { JwtGuard } from '../common/guards/jwt.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
-import { GameService } from '../game/game.service';
 
 @Controller('admin')
 @UseGuards(JwtGuard, RolesGuard)
@@ -30,10 +29,7 @@ import { GameService } from '../game/game.service';
 // Admin actions are low-volume; tighten to 30 req/min to be safe.
 @Throttle({ default: { ttl: 60_000, limit: 30 } })
 export class AdminController {
-  constructor(
-    private readonly admin: AdminService,
-    private readonly game: GameService,
-  ) {}
+  constructor(private readonly admin: AdminService) {}
 
   // ── Invites ──────────────────────────────────────────────────────────────────
 
@@ -68,7 +64,7 @@ export class AdminController {
 
   /**
    * GET /admin/users — list all users.
-   * Optional ?search=<term> filters by handle or email substring (case-insensitive).
+   * Optional ?search=<term> filters by handle substring (case-insensitive).
    */
   @Get('users')
   async listUsers(@Query('search') search?: string) {
@@ -98,32 +94,14 @@ export class AdminController {
     return { ok: true };
   }
 
-  // ── Dev test room ─────────────────────────────────────────────────────────────
-
-  /**
-   * POST /admin/dev-test-game — create a dev test room with 3 easy bots.
-   * Returns the gameId; admin navigates to /game/:gameId to join.
-   * ELO and stats are not affected (session has bots → hasBots guard skips stats).
-   * Conceding ends the hand normally but does not affect the admin's rating.
-   */
-  @Post('dev-test-game')
-  async createDevTestGame(
+  /** PATCH /admin/users/:sub/permission — grant or revoke a named permission. Admins may target themselves. */
+  @Patch('users/:sub/permission')
+  async setPermission(
     @CurrentUser() actor: AuthenticatedUser,
-    @Body() dto: CreateDevTestGameDto,
+    @Param('sub') targetSub: string,
+    @Body() dto: SetPermissionDto,
   ) {
-    const result = await this.game.createTestGame(actor.sub, actor.handle, {
-      hand: dto.hand,
-      openMelds: dto.openMelds ?? [],
-      condition: dto.condition,
-      winTile: dto.winTile,
-    });
-
-    await this.admin.writeAudit({
-      action: 'CREATE_DEV_TEST_GAME',
-      actorSub: actor.sub,
-      payload: { condition: dto.condition, gameId: result.gameId },
-    });
-
-    return result;
+    await this.admin.setPermission(actor.sub, targetSub, dto.permission, dto.grant);
+    return { ok: true };
   }
 }

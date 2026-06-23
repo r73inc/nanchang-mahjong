@@ -8,7 +8,7 @@ export function DevTestRoomPage() {
   const navigate = useNavigate();
 
   return (
-    <ScreenShell title={t('adminDevTestSectionTitle')} onBack={() => navigate('/admin')}>
+    <ScreenShell title={t('adminDevTest')} onBack={() => navigate('/home')}>
       <DevTestRoomSection />
     </ScreenShell>
   );
