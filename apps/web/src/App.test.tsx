@@ -18,6 +18,7 @@ vi.mock('./hooks/use-auth', () => ({
   useChangePassword: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useSignout: () => vi.fn(),
+  useSyncUserOnMount: vi.fn(),
   getApiErrorMessage: vi.fn((_err: unknown, fallback: string) => fallback),
 }));
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api, getApiErrorMessage } from '../lib/api';
@@ -65,6 +66,25 @@ export function useDeleteAccount() {
       navigate('/auth', { replace: true });
     },
   });
+}
+
+// ── Sync user permissions on mount ────────────────────────────────────────────
+//
+// Permissions live in the JWT payload. After an admin grants or revokes a
+// permission the backend DB is updated immediately, but the stored token is
+// stale. Calling /auth/refresh re-reads the DB and returns a new access token
+// with current permissions, so any UI gated on user.permissions updates without
+// requiring a sign-out/sign-in cycle.
+
+export function useSyncUserOnMount() {
+  useEffect(() => {
+    const { refreshToken, setAccessToken } = useAuthStore.getState();
+    if (!refreshToken) return;
+    void api
+      .post<{ accessToken: string }>('/auth/refresh', { refreshToken })
+      .then(({ data }) => setAccessToken(data.accessToken))
+      .catch(() => undefined);
+  }, []);
 }
 
 // ── Re-export helper ─────────────────────────────────────────────────────────
