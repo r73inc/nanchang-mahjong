@@ -6,10 +6,7 @@ import { randomUUID } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InvitesService } from '../invites/invites.service';
 import type { AppConfig } from '../config/configuration';
-import type {
-  AuthenticatedUser,
-  UserPermission,
-} from '../common/interfaces/authenticated-user.interface';
+import type { AuthenticatedUser } from '../common/interfaces/authenticated-user.interface';
 import type { SignupDto } from './dto/signup.dto';
 import type { SigninDto } from './dto/signin.dto';
 
@@ -86,7 +83,7 @@ export class AuthService {
       sub: profile.sub,
       handle: profile.handle,
       role: profile.role,
-      permissions: (profile.permissions ?? []) as UserPermission[],
+      permissions: profile.permissions ?? [],
     });
   }
 
@@ -124,14 +121,15 @@ export class AuthService {
 
     // Re-read profile from DB so the new access token carries up-to-date permissions.
     const profile = await this.users.findBySub(payload.sub);
-    if (profile?.disabled) throw new UnauthorizedException('Account is disabled');
+    if (!profile || profile.disabled)
+      throw new UnauthorizedException('Account is disabled or deleted');
 
     const accessToken = this.jwt.sign(
       {
         sub: payload.sub,
         handle: payload.handle,
         role: payload.role,
-        permissions: (profile?.permissions ?? []) as UserPermission[],
+        permissions: profile?.permissions ?? [],
         type: 'access',
       },
       {

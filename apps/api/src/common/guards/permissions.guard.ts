@@ -15,6 +15,7 @@ export class PermissionsGuard implements CanActivate {
     if (!required || required.length === 0) return true;
 
     const request = context.switchToHttp().getRequest<{ user: AuthenticatedUser }>();
+    if (request.user?.role === 'admin') return true;
     const permissions = request.user?.permissions ?? [];
     return required.every((p) => permissions.includes(p));
   }

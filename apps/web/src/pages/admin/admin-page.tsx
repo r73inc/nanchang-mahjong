@@ -323,7 +323,7 @@ function UserRow({
 
         {/* Dev test permission badge */}
         {hasDevTest && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-sky-500/10 text-sky-400 border-sky-500/20">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-mj-gold/10 text-mj-gold border-mj-gold/20">
             {t('devTestPermBadge')}
           </span>
         )}
