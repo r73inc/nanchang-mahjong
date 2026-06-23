@@ -277,6 +277,36 @@ export class GameSession {
   lastHandReveal: HandRevealPayload | null = null;
 
   /**
+   * Tracks which seats have marked themselves "ready" during the current pre-game
+   * gate phase ('hands', 'settlement', 'jing'). Null when not in a gate phase.
+   * Bots are auto-added when the gate opens. Humans add themselves via
+   * game:advance-pre-game. The phase advances when all human seats are in this set.
+   */
+  preGameReadySeats: Set<Seat4> | null = null;
+
+  /**
+   * Tracks which seats have marked themselves "ready" to advance past the
+   * current hand-reveal screen. Null when no hand is pending.
+   * Bots are auto-added when pendingHandEnd is set. Humans add themselves via
+   * game:advance-hand. The session advances when all human seats are in this set.
+   */
+  handEndReadySeats: Set<Seat4> | null = null;
+
+  /**
+   * Set by the host (dealer/first human) at the hand-reveal screen to request
+   * that the upcoming next hand be the final one of the game. Can be toggled
+   * until the next hand actually starts, at which point it is locked in.
+   */
+  forcedFinalNextHand = false;
+
+  /**
+   * Set at the start of a hand when the host had forcedFinalNextHand = true.
+   * Causes handleHandEnd to treat that hand as the last regardless of normal
+   * session-over logic.
+   */
+  forcedFinalActive = false;
+
+  /**
    * The most recent settlement-preview payload — re-sent to reconnecting players
    * while the session is in the 'settlement' pre-game phase.
    */
@@ -349,12 +379,13 @@ export class GameSession {
     return this.botSeats.has(seat);
   }
 
-  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal', 'bot-hard-N' → 'hard', 'bot-psychic-N' → 'psychic'. */
+  /** Parse difficulty from userId string: 'bot-easy-N' → 'easy', 'bot-normal-N' → 'normal', 'bot-hard-N' → 'hard', 'bot-psychic-N' → 'psychic', 'bot-passive-N' → 'passive'. */
   getBotDifficulty(seat: Seat4): BotDifficulty {
     const userId = this.seatMap[seat];
     if (userId.startsWith('bot-normal')) return 'normal';
     if (userId.startsWith('bot-hard')) return 'hard';
     if (userId.startsWith('bot-psychic')) return 'psychic';
+    if (userId.startsWith('bot-passive')) return 'passive';
     return 'easy';
   }
 

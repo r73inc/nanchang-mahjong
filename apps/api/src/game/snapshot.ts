@@ -64,6 +64,9 @@ export function toClientSnapshot(
     purpose: 'deal_1' | 'deal_2' | 'jing_reveal';
     roller: 0 | 1 | 2 | 3;
   } | null = null,
+  preGameReadySeats: readonly (0 | 1 | 2 | 3)[] | null = null,
+  handEndReadySeats: readonly (0 | 1 | 2 | 3)[] | null = null,
+  forcedFinalNextHand = false,
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
@@ -102,5 +105,8 @@ export function toClientSnapshot(
     ruleTopBottomJing,
     preGamePhase,
     pendingRoll,
+    preGameReadySeats: preGameReadySeats ? [...preGameReadySeats] : null,
+    handEndReadySeats: handEndReadySeats ? [...handEndReadySeats] : null,
+    forcedFinalNextHand,
   };
 }

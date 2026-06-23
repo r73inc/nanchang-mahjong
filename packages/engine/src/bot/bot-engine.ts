@@ -25,7 +25,7 @@ import { isOpponentThreatening, safestDiscard } from './defense';
 import { buildCheatContext } from './cheat-api';
 import type { CheatContext } from './cheat-api';
 
-export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'psychic';
+export type BotDifficulty = 'easy' | 'normal' | 'hard' | 'psychic' | 'passive';
 
 /**
  * Available call options offered to the bot during a claim window.
@@ -219,6 +219,11 @@ export function getBotDiscard(
 
   if (naturals.length === 0) return hand[0]; // forced: entire hand is wildcards
 
+  // Passive bots discard only the tile they drew (always the last tile in hand).
+  if (difficulty === 'passive') {
+    return hand[hand.length - 1];
+  }
+
   if (difficulty === 'easy') {
     return naturals[Math.floor(Math.random() * naturals.length)];
   }
@@ -267,6 +272,9 @@ export function getBotClaim(
   botSeat?: 0 | 1 | 2 | 3,
 ): BotClaimDecision | null {
   if (available.length === 0) return null;
+
+  // Passive bots never claim anything — they only discard the tile they drew.
+  if (difficulty === 'passive') return null;
 
   // All difficulties always claim a winning hand — never pass up a win.
   const win = available.find((a) => a.kind === 'win');

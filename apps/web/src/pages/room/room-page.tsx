@@ -29,6 +29,7 @@ const botDifficultyTranslationMap: Record<BotDifficulty, StringKey> = {
   normal: 'botDifficultyNormalFull',
   hard: 'botDifficultyHardFull',
   psychic: 'botDifficultyPsychicFull',
+  passive: 'botDifficultyEasyFull',
 };
 
 // API values for the view-mode toggle — not i18n strings

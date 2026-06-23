@@ -192,18 +192,25 @@ function WaitingDots() {
 function PreGameFlow({
   snapshot,
   settlementPreview,
-  isHost,
+  isHuman,
   onAdvance,
 }: {
   snapshot: ClientGameState;
   settlementPreview: SettlementPreviewPayload | null;
-  isHost: boolean;
+  isHuman: boolean;
   onAdvance: () => void;
 }) {
   const { t, lang } = useI18n();
   const phase = snapshot.preGamePhase;
   const viewerSeat = snapshot.viewerSeat;
   const myHand: TileType[] = viewerSeat !== null ? (snapshot.seats[viewerSeat].hand ?? []) : [];
+
+  const readySeats: readonly (0 | 1 | 2 | 3)[] = snapshot.preGameReadySeats ?? [];
+  const iAmReady = viewerSeat !== null && readySeats.includes(viewerSeat);
+  const pendingNames = ([0, 1, 2, 3] as const)
+    .filter((s) => !snapshot.seats[s]?.isBot && !readySeats.includes(s))
+    .map((s) => snapshot.seats[s].seatName)
+    .join(', ');
 
   // ── Step 0: Dealing — DiceRollOverlay covers this; just show a loading screen
   if (phase === 'dealing') {
@@ -225,9 +232,6 @@ function PreGameFlow({
 
   // ── Step 1: Hands ─────────────────────────────────────────────────────────
   if (phase === 'hands') {
-    const buttonLabel = snapshot.ruleTopBottomJing
-      ? t('preGameRevealSettlement')
-      : t('preGameRevealSpirit');
     return (
       <div
         className="flex flex-col items-center justify-center gap-8 min-h-dvh px-6 text-center bg-mj-bg-page"
@@ -257,12 +261,15 @@ function PreGameFlow({
 
         {viewerSeat === null && <p className="text-sm text-mj-bone/50">{t('preGameSpectating')}</p>}
 
-        {isHost ? (
-          <GoldButton onClick={onAdvance}>{buttonLabel} →</GoldButton>
-        ) : (
-          <div className="flex flex-col items-center gap-3">
+        {isHuman && !iAmReady && (
+          <GoldButton onClick={onAdvance}>{t('preGameReadyBtn')}</GoldButton>
+        )}
+        {(!isHuman || iAmReady) && (
+          <div className="flex flex-col items-center gap-2">
             <WaitingDots />
-            <p className="text-xs text-mj-bone/55">{t('preGameWaitingHost')}</p>
+            <p className="text-xs text-mj-bone/55">
+              {pendingNames ? t('preGameWaitingFor', pendingNames) : t('preGameWaitingHost')}
+            </p>
           </div>
         )}
       </div>
@@ -272,14 +279,17 @@ function PreGameFlow({
   // ── Step 1.5: Settlement — bonus tile payout (ruleTopBottomJing only) ──────
   if (phase === 'settlement') {
     if (!settlementPreview) return <LoadingScreen />;
-    const footer = isHost ? (
-      <GoldButton onClick={onAdvance}>{t('preGameRevealSpirit')} →</GoldButton>
-    ) : (
-      <>
-        <WaitingDots />
-        <p className="text-xs text-mj-bone/40">{t('preGameWaitingHost')}</p>
-      </>
-    );
+    const footer =
+      isHuman && !iAmReady ? (
+        <GoldButton onClick={onAdvance}>{t('preGameReadyBtn')}</GoldButton>
+      ) : (
+        <>
+          <WaitingDots />
+          <p className="text-xs text-mj-bone/40">
+            {pendingNames ? t('preGameWaitingFor', pendingNames) : t('preGameWaitingHost')}
+          </p>
+        </>
+      );
     return (
       <SettlementPreview
         settlementPreview={settlementPreview}
@@ -330,12 +340,15 @@ function PreGameFlow({
           )}
         </div>
 
-        {isHost ? (
-          <GoldButton onClick={onAdvance}>{t('preGameStartGame')} →</GoldButton>
-        ) : (
+        {isHuman && !iAmReady && (
+          <GoldButton onClick={onAdvance}>{t('preGameReadyBtn')}</GoldButton>
+        )}
+        {(!isHuman || iAmReady) && (
           <div className="flex flex-col items-center gap-3">
             <WaitingDots />
-            <p className="text-xs text-mj-bone/55">{t('preGameWaitingHost')}</p>
+            <p className="text-xs text-mj-bone/55">
+              {pendingNames ? t('preGameWaitingFor', pendingNames) : t('preGameWaitingHost')}
+            </p>
           </div>
         )}
       </div>
@@ -480,20 +493,31 @@ function reconstructMeldTiles(
 function HandRevealScreen({
   handReveal,
   snapshot,
-  isHost,
+  isHuman,
+  isActualHost,
   onAdvance,
+  onSetFinalHand,
   mode = 'pause',
   onBack,
 }: {
   handReveal: HandRevealPayload;
   snapshot: ClientGameState;
-  isHost: boolean;
+  isHuman: boolean;
+  isActualHost: boolean;
   onAdvance?: () => void;
+  onSetFinalHand?: (active: boolean) => void;
   mode?: 'pause' | 'review';
   onBack?: () => void;
 }) {
   const { t, lang } = useI18n();
   const viewerSeat = snapshot.viewerSeat;
+
+  const readySeats: readonly (0 | 1 | 2 | 3)[] = snapshot.handEndReadySeats ?? [];
+  const iAmReady = viewerSeat !== null && readySeats.includes(viewerSeat);
+  const pendingNames = ([0, 1, 2, 3] as const)
+    .filter((s) => !snapshot.seats[s]?.isBot && !readySeats.includes(s))
+    .map((s) => snapshot.seats[s].seatName)
+    .join(', ');
 
   const [expandedSeat, setExpandedSeat] = useState<number | null>(null);
 
@@ -1124,38 +1148,75 @@ function HandRevealScreen({
             <GoldButton onClick={onBack ?? (() => undefined)}>
               {t('endGameBackToResults')}
             </GoldButton>
-          ) : isHost ? (
-            handReveal.isLastHand ? (
-              <button
-                onClick={onAdvance ?? (() => undefined)}
-                className="w-full py-4 rounded-full font-bold text-base"
-                style={{
-                  background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
-                  boxShadow: '0 6px 18px rgba(201,169,97,0.45)',
-                  color: '#1a1a1a',
-                }}
-              >
-                {t('handRevealEndSession')} →
-              </button>
-            ) : (
-              <button
-                onClick={onAdvance ?? (() => undefined)}
-                className="w-full py-3 rounded-full font-bold text-sm"
-                style={{
-                  background: 'rgba(var(--felt-ink-rgb),0.08)',
-                  border: '1px solid rgba(var(--felt-ink-rgb),0.2)',
-                  color: 'var(--felt-ink,#f5efdf)',
-                }}
-              >
-                {t('handRevealContinue')} →
-              </button>
-            )
           ) : (
             <>
-              <WaitingDots />
-              <p className="text-xs text-mj-bone/40">
-                {handReveal.isLastHand ? t('handRevealWaitingHostEnd') : t('handRevealWaitingHost')}
-              </p>
+              {/* Force-final toggle — actual host only, not on the last hand */}
+              {isActualHost && !handReveal.isLastHand && (
+                <button
+                  onClick={() => onSetFinalHand?.(!snapshot.forcedFinalNextHand)}
+                  className="w-full py-2.5 rounded-full font-semibold text-xs"
+                  style={{
+                    background: snapshot.forcedFinalNextHand
+                      ? 'rgba(201,169,97,0.15)'
+                      : 'rgba(var(--felt-ink-rgb),0.06)',
+                    border: snapshot.forcedFinalNextHand
+                      ? '1px solid rgba(201,169,97,0.40)'
+                      : '1px solid rgba(var(--felt-ink-rgb),0.15)',
+                    color: snapshot.forcedFinalNextHand ? '#c9a961' : 'var(--felt-ink,#f5efdf)',
+                  }}
+                >
+                  {snapshot.forcedFinalNextHand
+                    ? t('handRevealForceFinalActive')
+                    : t('handRevealForceFinal')}
+                </button>
+              )}
+
+              {/* Badge shown to all players when host has queued a forced final */}
+              {!isActualHost && snapshot.forcedFinalNextHand && !handReveal.isLastHand && (
+                <p className="text-[11px] font-semibold text-mj-gold/80 tracking-wide">
+                  {t('handRevealForceFinalBadge')}
+                </p>
+              )}
+
+              {/* Ready / waiting */}
+              {isHuman && !iAmReady ? (
+                handReveal.isLastHand ? (
+                  <button
+                    onClick={onAdvance ?? (() => undefined)}
+                    className="w-full py-4 rounded-full font-bold text-base"
+                    style={{
+                      background: 'linear-gradient(180deg,#c9a961 0%,#a88a45 100%)',
+                      boxShadow: '0 6px 18px rgba(201,169,97,0.45)',
+                      color: '#1a1a1a',
+                    }}
+                  >
+                    {t('handRevealEndSession')} →
+                  </button>
+                ) : (
+                  <button
+                    onClick={onAdvance ?? (() => undefined)}
+                    className="w-full py-3 rounded-full font-bold text-sm"
+                    style={{
+                      background: 'rgba(var(--felt-ink-rgb),0.08)',
+                      border: '1px solid rgba(var(--felt-ink-rgb),0.2)',
+                      color: 'var(--felt-ink,#f5efdf)',
+                    }}
+                  >
+                    {t('handRevealContinue')} →
+                  </button>
+                )
+              ) : (
+                <>
+                  <WaitingDots />
+                  <p className="text-xs text-mj-bone/40">
+                    {pendingNames
+                      ? t('handRevealWaitingFor', pendingNames)
+                      : handReveal.isLastHand
+                        ? t('handRevealWaitingHostEnd')
+                        : t('handRevealWaitingHost')}
+                  </p>
+                </>
+              )}
             </>
           )}
         </div>
@@ -3862,6 +3923,7 @@ export function GamePage() {
     saveAndQuit,
     advancePreGame,
     advanceHand,
+    setFinalHand,
     rollDice,
     onDiceAnimationComplete,
     diceAnimation,
@@ -4002,6 +4064,7 @@ export function GamePage() {
   const firstHumanSeat = snapshot.seats.findIndex((s) => !s.isBot) as 0 | 1 | 2 | 3 | -1;
   const canAdvanceHand =
     isDealer || (dealerIsBot && viewerSeat !== null && viewerSeat === firstHumanSeat);
+  const isHuman = viewerSeat !== null && !snapshot.seats[viewerSeat]?.isBot;
   const announcement = announcingReveal
     ? buildHandAnnouncement(announcingReveal, snapshot, t)
     : null;
@@ -4025,8 +4088,10 @@ export function GamePage() {
         <HandRevealScreen
           handReveal={handReveal}
           snapshot={snapshot}
-          isHost={canAdvanceHand}
+          isHuman={isHuman}
+          isActualHost={canAdvanceHand}
           onAdvance={advanceHand}
+          onSetFinalHand={setFinalHand}
         />
       )}
 
@@ -4037,7 +4102,7 @@ export function GamePage() {
         <PreGameFlow
           snapshot={snapshot}
           settlementPreview={settlementPreview}
-          isHost={canAdvanceHand}
+          isHuman={isHuman}
           onAdvance={advancePreGame}
         />
       )}
@@ -4088,7 +4153,8 @@ export function GamePage() {
           <HandRevealScreen
             handReveal={finalHandReveal}
             snapshot={snapshot}
-            isHost={false}
+            isHuman={false}
+            isActualHost={false}
             mode="review"
             onBack={() => setShowEndDetails(false)}
           />
