@@ -17,7 +17,13 @@ import { DynamoDBService } from '../database/dynamodb.service';
 import { StorageService } from '../storage/storage.service';
 import { GeminiRelayClient } from './gemini-relay.client';
 import type { AppConfig } from '../config/configuration';
-import type { ReplayGamePayload, GameEvent, TileType, SeatWind } from '@nanchang/shared';
+import type {
+  ReplayGamePayload,
+  ReplayHandData,
+  GameEvent,
+  TileType,
+  SeatWind,
+} from '@nanchang/shared';
 import type {
   GameFactsDigest,
   GameHandDigest,
@@ -106,6 +112,55 @@ function countJings(
   }
 
   return Math.max(0, count);
+}
+
+/**
+ * Derive per-hand score deltas from authoritative event sources first.
+ *
+ * Priority order:
+ *   1. Sum of all score-bearing events in the hand:
+ *        win.paymentResult.scoreDelta  — hand-payment (includes kong payouts embedded in WinPaymentResult)
+ *        opening_jing_settlement.scoreDelta — spirit-flip opening bonus
+ *        sacking_dealer.scoreDelta           — four-winds-alignment early draw penalty
+ *   2. Fallback: (endScores − startingScores) when no scoring events exist
+ *        (draw, concede, or any hand that ended without a scoreDelta event).
+ *
+ * NOTE: intra-hand spirit settlement paid at session layer is NOT emitted as a
+ * GameEvent, so event-based sums may undercount for win hands.  The caller
+ * logs a reconciliation warning when the aggregate deviates from the terminal
+ * game differential so regressions are visible without silently swallowing data.
+ */
+function extractHandScoreDeltas(
+  hand: ReplayHandData,
+  endScores: [number, number, number, number],
+): [number, number, number, number] {
+  const delta: [number, number, number, number] = [0, 0, 0, 0];
+
+  for (const ev of hand.events) {
+    let ds: readonly [number, number, number, number] | undefined;
+    if (ev.kind === 'win') ds = ev.paymentResult.scoreDelta;
+    else if (ev.kind === 'opening_jing_settlement') ds = ev.scoreDelta;
+    else if (ev.kind === 'sacking_dealer') ds = ev.scoreDelta;
+    if (ds) {
+      delta[0] += ds[0];
+      delta[1] += ds[1];
+      delta[2] += ds[2];
+      delta[3] += ds[3];
+    }
+  }
+
+  // No scoring events present — draw/concede/abnormal termination.
+  // Fall back to the score-book diff which captures spirit settlement too.
+  if (delta[0] === 0 && delta[1] === 0 && delta[2] === 0 && delta[3] === 0) {
+    return [
+      endScores[0] - hand.startingScores[0],
+      endScores[1] - hand.startingScores[1],
+      endScores[2] - hand.startingScores[2],
+      endScores[3] - hand.startingScores[3],
+    ];
+  }
+
+  return delta;
 }
 
 function extractHandDigest(
@@ -257,12 +312,7 @@ export class AiSummaryService {
       const endScores: [number, number, number, number] =
         i + 1 < payload.hands.length ? payload.hands[i + 1].startingScores : payload.finalScores;
 
-      const scoreDeltas: [number, number, number, number] = [
-        endScores[0] - hand.startingScores[0],
-        endScores[1] - hand.startingScores[1],
-        endScores[2] - hand.startingScores[2],
-        endScores[3] - hand.startingScores[3],
-      ];
+      const scoreDeltas = extractHandScoreDeltas(hand, endScores);
 
       return extractHandDigest(
         hand.events,
@@ -273,6 +323,33 @@ export class AiSummaryService {
         players,
       );
     });
+
+    // Reconciliation guard: warn if per-hand delta sum diverges from terminal game differential.
+    // A gap here means spirit settlement (not emitted as a GameEvent) was not captured.
+    if (payload.hands.length > 0) {
+      const netDelta = hands.reduce<[number, number, number, number]>(
+        (acc, h) => [
+          acc[0] + h.scoreDeltas[0],
+          acc[1] + h.scoreDeltas[1],
+          acc[2] + h.scoreDeltas[2],
+          acc[3] + h.scoreDeltas[3],
+        ],
+        [0, 0, 0, 0],
+      );
+      const terminalDelta: [number, number, number, number] = [
+        payload.finalScores[0] - payload.hands[0].startingScores[0],
+        payload.finalScores[1] - payload.hands[0].startingScores[1],
+        payload.finalScores[2] - payload.hands[0].startingScores[2],
+        payload.finalScores[3] - payload.hands[0].startingScores[3],
+      ];
+      if (netDelta.some((v, i) => v !== terminalDelta[i])) {
+        this.logger.warn(
+          `Score delta mismatch for game ${payload.gameId}: ` +
+            `event sum [${netDelta}] ≠ terminal diff [${terminalDelta}]. ` +
+            `Spirit settlement points are likely missing from event log.`,
+        );
+      }
+    }
 
     return {
       gameId: payload.gameId,
@@ -381,6 +458,10 @@ export class AiSummaryService {
     attempts: number,
   ): Promise<void> {
     const now = new Date().toISOString();
+    // Idempotency guard: refuse to overwrite an in-flight item.
+    // attribute_not_exists(PK) covers first-ever write;
+    // #status <> :processing covers retries on done/failed items.
+    // A concurrent caller hitting an in-flight item gets ConditionalCheckFailedException.
     await this.db.put({
       Item: {
         PK: pk,
@@ -394,6 +475,9 @@ export class AiSummaryService {
         promptVersion: PROMPT_VERSION_GAME,
         attempts,
       },
+      ConditionExpression: 'attribute_not_exists(PK) OR #status <> :processing',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':processing': 'processing' },
     });
   }
 
@@ -449,7 +533,15 @@ export class AiSummaryService {
     const existing = await this.getSummary(pk);
     const attempts = (existing?.attempts ?? 0) + 1;
 
-    await this.writeSummaryProcessing(pk, requestedBy, model, attempts);
+    try {
+      await this.writeSummaryProcessing(pk, requestedBy, model, attempts);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+        this.logger.warn(`AI summary for ${pk} is already processing — concurrent run skipped`);
+        return (await this.getSummary(pk))!;
+      }
+      throw err;
+    }
 
     if (!this.relay.isEnabled) {
       await this.writeSummaryFailed(pk, '5xx', 'Gemini relay not configured');

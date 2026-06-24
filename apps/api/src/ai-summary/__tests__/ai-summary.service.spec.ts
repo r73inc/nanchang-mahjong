@@ -167,11 +167,11 @@ describe('AiSummaryService', () => {
       expect(digest.players[0].isBot).toBe(false);
     });
 
-    it('computes score deltas from consecutive startingScores', () => {
+    it('uses paymentResult.scoreDelta for win hands and startingScores diff for draw/concede', () => {
       const digest = service.extractGameDigest(makeReplay());
-      // Hand 0: [0,0,0,0] → [-2,-2,4,0] ⇒ deltas [-2,-2,+4,0]
+      // Hand 0 (win): paymentResult.scoreDelta = [-2,-2,4,0]
       expect(digest.hands[0].scoreDeltas).toEqual([-2, -2, 4, 0]);
-      // Hand 1: [-2,-2,4,0] → [-2,-2,4,0] (draw, no change — same as hand 2 start)
+      // Hand 1 (draw): no scoring events → startingScores diff = [0,0,0,0]
       expect(digest.hands[1].scoreDeltas).toEqual([0, 0, 0, 0]);
     });
 
@@ -349,6 +349,33 @@ describe('AiSummaryService', () => {
           ExpressionAttributeValues: expect.objectContaining({ ':failed': 'failed' }),
         }),
       );
+    });
+
+    it('short-circuits and returns existing item when processing write is rejected as duplicate', async () => {
+      const condError = Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      const inFlightItem = {
+        PK: 'GAME#game-001',
+        SK: 'AI_SUMMARY',
+        status: 'processing',
+        requestedBy: 'user-concurrent',
+        requestedAt: new Date().toISOString(),
+        attempts: 1,
+      };
+      // First getSummary (for attempts count) → no existing item
+      // db.put → ConditionalCheckFailedException (concurrent run already in flight)
+      // Second getSummary (return value) → in-flight item
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: inFlightItem });
+      mockDb.put.mockRejectedValueOnce(condError);
+
+      const result = await service.generateGameSummary('game-001', 'user-X');
+
+      expect(mockDb.put).toHaveBeenCalledTimes(1);
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(result.status).toBe('processing');
     });
   });
 });
