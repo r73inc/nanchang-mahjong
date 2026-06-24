@@ -2,13 +2,14 @@
  * AiSummaryService — HK-side orchestrator for AI-generated replay commentary.
  *
  * Responsibilities:
- *   1. Extract a compact GameFactsDigest from a ReplayGamePayload (no raw events to Gemini).
+ *   1. Extract a compact GameFactsDigest / ChallengeFactsDigest (no raw events to Gemini).
  *   2. Build versioned, bilingual prompts and dispatch to the us-east-1 relay.
  *   3. Manage the AiSummaryItem lifecycle in DynamoDB (none → processing → done/failed).
- *   4. Load replay payloads from S3 on behalf of callers.
+ *   4. Load replay payloads from S3 and challenge records from DDB on behalf of callers.
  *
- * Phase 3 scope: internal only. Exposed via an admin-only debug endpoint.
- * Phase 4 adds the request queue; Phase 5 hooks challenge auto-generation here.
+ * Phase 3: per-game digests + admin debug endpoint.
+ * Phase 4: request queue + admin approval flow.
+ * Phase 5: challenge digest extraction + auto-generation on challenge completion.
  */
 
 import {
@@ -42,11 +43,41 @@ import type {
   AiSummaryErrorCode,
   AiRequestItem,
   RelayGenerateRequest,
+  ChallengeFactsDigest,
+  ChallengeHandDivergence,
+  ChallengeDigestParticipant,
 } from '@nanchang/shared';
 
 // ── Prompt versioning ─────────────────────────────────────────────────────────
 
 const PROMPT_VERSION_GAME = 'v1-game';
+const PROMPT_VERSION_CHALLENGE = 'v1-challenge';
+
+// ── Internal DDB projection type for challenge records ────────────────────────
+
+/** Minimal projection of CHALLENGE#<id>/META that AiSummaryService needs. */
+interface ChallengeRecord {
+  challengeId: string;
+  config: {
+    numRounds: number;
+    startingScore: number;
+    ruleTopBottomJing: boolean;
+  };
+  participants: Record<
+    string,
+    {
+      sub: string;
+      handle: string;
+      role: string;
+      status: string;
+      gameId?: string;
+      finalScore?: number;
+    }
+  >;
+  winners?: string[];
+  createdAt: string;
+  completedAt?: string;
+}
 
 const RESPONSE_SCHEMA = {
   type: 'object',
@@ -240,6 +271,55 @@ function extractHandDigest(
   };
 }
 
+// ── Challenge hand helpers ────────────────────────────────────────────────────
+
+/**
+ * Extract outcome, score swing (seat 0 = human in solo challenge games), special
+ * hands, and jing count for a single challenge hand from the human player's perspective.
+ * Seat 0 is always the human in a challenge solo room (1 human + 3 bots).
+ */
+function extractChallengeHandMeta(
+  hand: ReplayHandData,
+  endScores: [number, number, number, number],
+): {
+  outcome: HandOutcome;
+  scoreSwing: number;
+  specialHands: string[];
+  jingCount: number;
+} {
+  const delta = extractHandScoreDeltas(hand, endScores);
+  const winIdx = hand.events.findIndex((e) => e.kind === 'win');
+  const concedeIdx = hand.events.findIndex((e) => e.kind === 'concede');
+
+  let outcome: HandOutcome = 'draw';
+  if (winIdx >= 0) outcome = 'win';
+  else if (concedeIdx >= 0) outcome = 'concede';
+
+  const specialHands: string[] = [];
+  let jingCount = 0;
+
+  if (winIdx >= 0) {
+    const winEv = hand.events[winIdx];
+    if (winEv.kind === 'win') {
+      if (winEv.handType === 'seven_pairs') specialHands.push('Seven Pairs');
+      else if (winEv.handType === 'all_triplets') specialHands.push('Seven Pairs (All Triplets)');
+      else if (winEv.handType === 'thirteen_misfits') specialHands.push('Thirteen Misfits');
+      else if (winEv.handType === 'seven_star_thirteen')
+        specialHands.push('Seven Star Thirteen Misfits');
+
+      // Count jings only when the human player (seat 0) won the hand.
+      if (winEv.seat === 0) {
+        const jingEv = hand.events.find((e) => e.kind === 'jing_indicator');
+        const primary = jingEv?.kind === 'jing_indicator' ? jingEv.jingPrimary : null;
+        const secondary = jingEv?.kind === 'jing_indicator' ? jingEv.jingSecondary : null;
+        jingCount = countJings(hand.events, 0, primary, secondary);
+      }
+    }
+  }
+
+  return { outcome, scoreSwing: delta[0], specialHands, jingCount };
+}
+
 // ── Prompt building ───────────────────────────────────────────────────────────
 
 function formatPlacement(rank: 1 | 2 | 3 | 4): string {
@@ -378,6 +458,93 @@ export class AiSummaryService {
     };
   }
 
+  /**
+   * Build a ChallengeFactsDigest from a completed challenge record.
+   * Async: loads each completed participant's replay from S3 to extract
+   * hand-by-hand divergence (same deal, different decisions).
+   */
+  async extractChallengeDigest(
+    challengeId: string,
+    record: ChallengeRecord,
+  ): Promise<ChallengeFactsDigest> {
+    const completed = Object.values(record.participants).filter(
+      (p) => p.status === 'completed' && typeof p.finalScore === 'number' && p.gameId,
+    );
+
+    // Rank participants by final score desc; tied scores share the same rank.
+    const sorted = [...completed].sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+    const placementMap = new Map<string, number>();
+    let rank = 1;
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i].finalScore !== sorted[i - 1].finalScore) rank = i + 1;
+      placementMap.set(sorted[i].sub, rank);
+    }
+
+    const participants: ChallengeDigestParticipant[] = completed.map((p) => ({
+      sub: p.sub,
+      handle: p.handle,
+      gameId: p.gameId!,
+      finalScore: p.finalScore!,
+      placement: Math.min(placementMap.get(p.sub) ?? 1, 4) as 1 | 2 | 3 | 4,
+    }));
+
+    // Load every completed participant's replay concurrently.
+    const replayResults = await Promise.allSettled(
+      participants.map((p) => this.storage.getReplay(p.gameId)),
+    );
+
+    const available: Array<{
+      participant: ChallengeDigestParticipant;
+      replay: ReplayGamePayload;
+    }> = [];
+    for (let i = 0; i < replayResults.length; i++) {
+      const r = replayResults[i];
+      if (r.status === 'fulfilled') {
+        available.push({ participant: participants[i], replay: r.value });
+      } else {
+        this.logger.warn(
+          `Challenge ${challengeId}: replay load failed for ${participants[i].gameId}: ${r.reason}`,
+        );
+      }
+    }
+
+    const numHands = available.reduce((max, { replay }) => Math.max(max, replay.hands.length), 0);
+
+    // Build hand-by-hand divergence across participants.
+    const divergence: ChallengeHandDivergence[] = [];
+    for (let h = 0; h < numHands; h++) {
+      const participantOutcomes: ChallengeHandDivergence['participantOutcomes'] = [];
+
+      for (const { participant, replay } of available) {
+        if (h >= replay.hands.length) continue;
+        const hand = replay.hands[h];
+        const endScores: [number, number, number, number] =
+          h + 1 < replay.hands.length ? replay.hands[h + 1].startingScores : replay.finalScores;
+
+        const { outcome, scoreSwing, specialHands, jingCount } = extractChallengeHandMeta(
+          hand,
+          endScores,
+        );
+
+        participantOutcomes.push({
+          sub: participant.sub,
+          handle: participant.handle,
+          outcome,
+          isWinner: record.winners?.includes(participant.sub) ?? false,
+          scoreSwing,
+          specialHands,
+          jingCount,
+        });
+      }
+
+      if (participantOutcomes.length > 0) {
+        divergence.push({ handIndex: h, participantOutcomes });
+      }
+    }
+
+    return { challengeId, participants, numHands, divergence };
+  }
+
   buildGameRequest(digest: GameFactsDigest): RelayGenerateRequest {
     const model = this.config.get('geminiRelay.model', { infer: true });
 
@@ -453,6 +620,68 @@ export class AiSummaryService {
     };
   }
 
+  buildChallengeRequest(digest: ChallengeFactsDigest, wordCap: number): RelayGenerateRequest {
+    const model = this.config.get('geminiRelay.model', { infer: true });
+
+    const standings = [...digest.participants]
+      .sort((a, b) => a.placement - b.placement)
+      .map((p) => `  ${formatPlacement(p.placement)}: ${p.handle} — ${p.finalScore} pts`)
+      .join('\n');
+
+    const handLines = digest.divergence
+      .map((hand) => {
+        const header = `Hand ${hand.handIndex + 1}`;
+        const outcomes = hand.participantOutcomes
+          .map((o) => {
+            const swing = `${o.scoreSwing >= 0 ? '+' : ''}${o.scoreSwing} pts`;
+            let line =
+              o.outcome === 'win'
+                ? `  ${o.handle}: Win ${swing}`
+                : o.outcome === 'concede'
+                  ? `  ${o.handle}: Concede ${swing}`
+                  : `  ${o.handle}: Draw ${swing}`;
+            if (o.specialHands.length > 0) line += ` [${o.specialHands.join(', ')}]`;
+            if (o.jingCount > 0)
+              line += ` • ${o.jingCount} spirit tile${o.jingCount > 1 ? 's' : ''}`;
+            if (o.isWinner) line += ' ★';
+            return line;
+          })
+          .join('\n');
+        return `${header}\n${outcomes}`;
+      })
+      .join('\n\n');
+
+    const systemInstruction = [
+      'You are a lively Nanchang Mahjong Point Challenge commentator.',
+      'A Point Challenge gives all participants the same pre-determined deal; your job is to compare how they navigated it.',
+      'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
+      '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
+      '(3) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields.',
+      `Each language: 3–8 sentences (target ≤ ${wordCap} words). Focus on divergence moments and drama, not a stat dump.`,
+    ].join(' ');
+
+    const userPrompt = [
+      '=== NANCHANG MAHJONG POINT CHALLENGE ===',
+      `Challenge ID: ${digest.challengeId}`,
+      `Participants: ${digest.participants.length} | Hands played: ${digest.numHands}`,
+      '',
+      'Final standings:',
+      standings,
+      '',
+      '=== HAND-BY-HAND COMPARISON ===',
+      handLines,
+    ].join('\n');
+
+    return {
+      model,
+      promptVersion: PROMPT_VERSION_CHALLENGE,
+      systemInstruction,
+      userPrompt,
+      responseSchema: RESPONSE_SCHEMA,
+      wordCap,
+    };
+  }
+
   // ── DynamoDB summary item lifecycle ─────────────────────────────────────────
 
   async getSummary(pk: string): Promise<AiSummaryItem | null> {
@@ -465,6 +694,7 @@ export class AiSummaryService {
     requestedBy: string,
     model: string,
     attempts: number,
+    promptVersion = PROMPT_VERSION_GAME,
   ): Promise<void> {
     const now = new Date().toISOString();
     // Idempotency guard: refuse to overwrite an in-flight item.
@@ -483,7 +713,7 @@ export class AiSummaryService {
         approvedBy: 'auto',
         approvedAt: now,
         model,
-        promptVersion: PROMPT_VERSION_GAME,
+        promptVersion,
         attempts,
       },
       ConditionExpression: 'attribute_not_exists(PK) OR #status <> :processing',
@@ -603,6 +833,82 @@ export class AiSummaryService {
       await this.writeSummaryFailed(pk, result.errorCode, result.message);
       this.logger.warn(
         `AI summary failed for game ${gameId}: [${result.errorCode}] ${result.message}`,
+      );
+    }
+
+    return (await this.getSummary(pk))!;
+  }
+
+  // ── Challenge generation (Phase 5) ──────────────────────────────────────────
+
+  private async fetchChallengeRecord(challengeId: string): Promise<ChallengeRecord | null> {
+    const result = await this.db.get({ Key: { PK: `CHALLENGE#${challengeId}`, SK: 'META' } });
+    return (result.Item as ChallengeRecord | undefined) ?? null;
+  }
+
+  /**
+   * Generate and store an AI summary for a completed Point Challenge.
+   *
+   * Full lifecycle: write processing → load replays → call relay → write done/failed.
+   * Called automatically when a challenge completes ('auto' requestedBy) and when
+   * an admin approves a queued challenge request.
+   */
+  async generateChallengeSummary(challengeId: string, requestedBy: string): Promise<AiSummaryItem> {
+    const pk = `CHALLENGE#${challengeId}`;
+    const model = this.config.get('geminiRelay.model', { infer: true });
+    const { challengeWordCap } = this.config.get('geminiRelay', { infer: true });
+
+    const existing = await this.getSummary(pk);
+    const attempts = (existing?.attempts ?? 0) + 1;
+
+    try {
+      await this.writeSummaryProcessing(pk, requestedBy, model, attempts, PROMPT_VERSION_CHALLENGE);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+        this.logger.warn(
+          `AI challenge summary for ${pk} is already processing — concurrent run skipped`,
+        );
+        return (await this.getSummary(pk))!;
+      }
+      throw err;
+    }
+
+    if (!this.relay.isEnabled) {
+      await this.writeSummaryFailed(pk, '5xx', 'Gemini relay not configured');
+      return (await this.getSummary(pk))!;
+    }
+
+    const record = await this.fetchChallengeRecord(challengeId);
+    if (!record) {
+      await this.writeSummaryFailed(pk, '5xx', `Challenge ${challengeId} not found in DDB`);
+      return (await this.getSummary(pk))!;
+    }
+
+    let digest: ChallengeFactsDigest;
+    try {
+      digest = await this.extractChallengeDigest(challengeId, record);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Challenge ${challengeId}: digest extraction failed: ${msg}`);
+      await this.writeSummaryFailed(pk, '5xx', `Digest extraction failed: ${msg}`);
+      return (await this.getSummary(pk))!;
+    }
+
+    if (digest.participants.length === 0) {
+      await this.writeSummaryFailed(pk, '5xx', 'No completed participants in challenge');
+      return (await this.getSummary(pk))!;
+    }
+
+    const request = this.buildChallengeRequest(digest, challengeWordCap);
+    const result = await this.relay.generate(request);
+
+    if (result.ok) {
+      await this.writeSummaryDone(pk, result.data.text, result.data.model);
+      this.logger.log(`AI challenge summary generated for ${challengeId} (${result.data.model})`);
+    } else {
+      await this.writeSummaryFailed(pk, result.errorCode, result.message);
+      this.logger.warn(
+        `AI challenge summary failed for ${challengeId}: [${result.errorCode}] ${result.message}`,
       );
     }
 
@@ -765,21 +1071,8 @@ export class AiSummaryService {
       return this.generateGameSummary(req.targetId, req.requestedBy);
     }
 
-    // Challenge generation deferred to Phase 5 — mark summary as approved for now.
-    const pk = `CHALLENGE#${req.targetId}`;
-    await this.db.update({
-      Key: { PK: pk, SK: 'AI_SUMMARY' },
-      UpdateExpression:
-        'SET #status = :approved, approvedBy = :by, approvedAt = :now, gsi1pk = :gsi',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: {
-        ':approved': 'approved',
-        ':by': approvedBy,
-        ':now': now,
-        ':gsi': 'AISUMMARY_STATUS#approved',
-      },
-    });
-    return (await this.getSummary(pk))!;
+    // Challenge: trigger generation (Phase 5).
+    return this.generateChallengeSummary(req.targetId, req.requestedBy);
   }
 
   /** Reject a pending request. Leaves the summary item at 'requested'. */
@@ -838,8 +1131,6 @@ export class AiSummaryService {
     if (targetType === 'game') {
       return this.generateGameSummary(targetId, retriedBy);
     }
-    throw new BadRequestException(
-      'Challenge summary retry is not yet implemented — coming in Phase 5',
-    );
+    return this.generateChallengeSummary(targetId, retriedBy);
   }
 }

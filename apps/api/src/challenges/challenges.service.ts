@@ -30,6 +30,7 @@ import type {
 } from '@nanchang/shared';
 import { DynamoDBService, DK } from '../database/dynamodb.service';
 import { PushService } from '../push/push.service';
+import { AiSummaryService } from '../ai-summary/ai-summary.service';
 import type { CreateChallengeDto } from './dto/create-challenge.dto';
 
 // Maximum number of hand seeds to pre-generate (4 rounds × 4 hands per round + generous buffer).
@@ -89,6 +90,7 @@ export class ChallengesService {
   constructor(
     private readonly db: DynamoDBService,
     private readonly push: PushService,
+    private readonly aiSummary: AiSummaryService,
   ) {}
 
   // ── Challenge creation ────────────────────────────────────────────────────
@@ -313,6 +315,15 @@ export class ChallengesService {
     }
 
     this.logger.log(`Challenge ${challengeId}: creator result recorded, status → ${newStatus}`);
+
+    // Edge case: no challenged players — challenge completes immediately on creator finish.
+    if (newStatus === 'completed') {
+      void this.aiSummary
+        .generateChallengeSummary(challengeId, 'auto')
+        .catch((err: unknown) =>
+          this.logger.warn(`Challenge ${challengeId}: auto-summary failed: ${err}`),
+        );
+    }
   }
 
   /**
@@ -388,6 +399,14 @@ export class ChallengesService {
       .catch((err) => this.logger.warn(`Index update failed for ${playerSub}: ${err}`));
 
     this.logger.log(`Challenge ${challengeId}: participant ${playerSub} result recorded`);
+
+    if (allDone && newStatus === 'completed') {
+      void this.aiSummary
+        .generateChallengeSummary(challengeId, 'auto')
+        .catch((err: unknown) =>
+          this.logger.warn(`Challenge ${challengeId}: auto-summary failed: ${err}`),
+        );
+    }
   }
 
   /**
@@ -583,6 +602,15 @@ export class ChallengesService {
         },
       })
       .catch((err) => this.logger.warn(`Index update for declined ${playerSub}: ${err}`));
+
+    // Fire-and-forget auto-summary when the last decline completes the challenge.
+    if (allDone && newStatus === 'completed') {
+      void this.aiSummary
+        .generateChallengeSummary(challengeId, 'auto')
+        .catch((err: unknown) =>
+          this.logger.warn(`Challenge ${challengeId}: auto-summary failed: ${err}`),
+        );
+    }
   }
 
   // ── Queries ───────────────────────────────────────────────────────────────
