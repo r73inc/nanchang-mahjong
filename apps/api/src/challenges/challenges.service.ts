@@ -318,11 +318,19 @@ export class ChallengesService {
 
     // Edge case: no challenged players — challenge completes immediately on creator finish.
     if (newStatus === 'completed') {
-      void this.aiSummary
-        .generateChallengeSummary(challengeId, 'auto')
-        .catch((err: unknown) =>
-          this.logger.warn(`Challenge ${challengeId}: auto-summary failed: ${err}`),
-        );
+      const completedParticipants = Object.values(item.participants).filter(
+        (p) => p.status === 'completed' && p.gameId,
+      );
+      this.fireWithJitter([
+        {
+          fn: () => this.aiSummary.generateChallengeSummary(challengeId, 'auto'),
+          label: `Challenge ${challengeId} overview`,
+        },
+        ...completedParticipants.map((p) => ({
+          fn: () => this.aiSummary.generateGameSummary(p.gameId!, 'auto'),
+          label: `Challenge ${challengeId} game ${p.gameId!} (${p.sub})`,
+        })),
+      ]);
     }
   }
 
@@ -401,11 +409,19 @@ export class ChallengesService {
     this.logger.log(`Challenge ${challengeId}: participant ${playerSub} result recorded`);
 
     if (allDone && newStatus === 'completed') {
-      void this.aiSummary
-        .generateChallengeSummary(challengeId, 'auto')
-        .catch((err: unknown) =>
-          this.logger.warn(`Challenge ${challengeId}: auto-summary failed: ${err}`),
-        );
+      const completedParticipants = Object.values(item.participants).filter(
+        (p) => p.status === 'completed' && p.gameId,
+      );
+      this.fireWithJitter([
+        {
+          fn: () => this.aiSummary.generateChallengeSummary(challengeId, 'auto'),
+          label: `Challenge ${challengeId} overview`,
+        },
+        ...completedParticipants.map((p) => ({
+          fn: () => this.aiSummary.generateGameSummary(p.gameId!, 'auto'),
+          label: `Challenge ${challengeId} game ${p.gameId!} (${p.sub})`,
+        })),
+      ]);
     }
   }
 
@@ -603,13 +619,40 @@ export class ChallengesService {
       })
       .catch((err) => this.logger.warn(`Index update for declined ${playerSub}: ${err}`));
 
-    // Fire-and-forget auto-summary when the last decline completes the challenge.
+    // Staggered fan-out when the last decline completes the challenge.
     if (allDone && newStatus === 'completed') {
-      void this.aiSummary
-        .generateChallengeSummary(challengeId, 'auto')
-        .catch((err: unknown) =>
-          this.logger.warn(`Challenge ${challengeId}: auto-summary failed: ${err}`),
-        );
+      const completedParticipants = Object.values(item.participants).filter(
+        (p) => p.status === 'completed' && p.gameId,
+      );
+      this.fireWithJitter([
+        {
+          fn: () => this.aiSummary.generateChallengeSummary(challengeId, 'auto'),
+          label: `Challenge ${challengeId} overview`,
+        },
+        ...completedParticipants.map((p) => ({
+          fn: () => this.aiSummary.generateGameSummary(p.gameId!, 'auto'),
+          label: `Challenge ${challengeId} game ${p.gameId!} (${p.sub})`,
+        })),
+      ]);
+    }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Fire N async jobs as true fire-and-forget, each after a randomised delay
+   * in [0, maxDelayMs]. Spreading kick-offs protects DynamoDB from a burst of
+   * near-simultaneous writes when a challenge completes with multiple participants.
+   */
+  private fireWithJitter(
+    jobs: Array<{ fn: () => Promise<unknown>; label: string }>,
+    maxDelayMs = 1500,
+  ): void {
+    for (const { fn, label } of jobs) {
+      const delay = Math.floor(Math.random() * (maxDelayMs + 1));
+      void new Promise<void>((resolve) => setTimeout(resolve, delay))
+        .then(fn)
+        .catch((err: unknown) => this.logger.warn(`${label}: auto-summary failed: ${err}`));
     }
   }
 

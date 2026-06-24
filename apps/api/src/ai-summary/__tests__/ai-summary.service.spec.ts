@@ -697,19 +697,24 @@ describe('AiSummaryService', () => {
       );
     });
 
-    it('continues with available replays when one participant replay fails to load', async () => {
+    it('writes failed when fewer than 2 participant replays load (divergence impossible)', async () => {
       mockDb.get
-        .mockResolvedValueOnce({ Item: undefined })
-        .mockResolvedValueOnce({ Item: makeChallengeRecord() })
-        .mockResolvedValueOnce({ Item: doneChallengeItem });
+        .mockResolvedValueOnce({ Item: undefined }) // getSummary (attempts)
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() }) // fetchChallengeRecord
+        .mockResolvedValueOnce({ Item: doneChallengeItem }); // final getSummary
       mockStorage.getReplay
         .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' })) // Alice OK
-        .mockRejectedValueOnce(new Error('S3 error')); // Bob fails
+        .mockRejectedValueOnce(new Error('S3 error')); // Bob fails → only 1 available
 
-      // Should still call relay (Alice's data is usable)
       await service.generateChallengeSummary('chal-001', 'auto');
 
-      expect(mockRelay.generate).toHaveBeenCalledTimes(1);
+      // Relay must NOT be called — extraction failure gates the job
+      expect(mockRelay.generate).not.toHaveBeenCalled();
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ExpressionAttributeValues: expect.objectContaining({ ':failed': 'failed' }),
+        }),
+      );
     });
 
     it('short-circuits when already processing (ConditionalCheckFailedException)', async () => {

@@ -508,6 +508,15 @@ export class AiSummaryService {
       }
     }
 
+    // Need at least 2 participants' replays to build a meaningful divergence narrative.
+    if (available.length < 2) {
+      throw new Error(
+        `Insufficient replay data for challenge ${challengeId}: ` +
+          `${available.length}/${participants.length} replays loaded — ` +
+          `need at least 2 for divergence narrative`,
+      );
+    }
+
     const numHands = available.reduce((max, { replay }) => Math.max(max, replay.hands.length), 0);
 
     // Build hand-by-hand divergence across participants.
