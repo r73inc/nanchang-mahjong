@@ -775,5 +775,15 @@
   "restoreWaitingConnected": "Connected",
   "restoreWaitingWaiting": "Waiting…",
   "restoreWaitingStart": "Start Game",
-  "restoreWaitingWaitingForHost": "Waiting for host to start the game…"
+  "restoreWaitingWaitingForHost": "Waiting for host to start the game…",
+
+  "aiSummaryTitle": "AI Commentary",
+  "aiSummaryRequest": "Request AI summary",
+  "aiSummaryLoading": "Loading…",
+  "aiSummaryPending": "In the queue…",
+  "aiSummaryProcessing": "Generating…",
+  "aiSummaryFailed": "Generation failed",
+  "aiSummaryExpand": "Expand AI commentary",
+  "aiSummaryCollapse": "Collapse AI commentary",
+  "aiSummaryPlayerBreakdown": "Player breakdown"
 }

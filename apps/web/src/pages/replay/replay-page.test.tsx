@@ -18,6 +18,8 @@ import { ReplayPage } from './replay-page';
 
 vi.mock('../../hooks/use-replay', () => ({
   useReplay: vi.fn(),
+  useGameSummary: vi.fn().mockReturnValue({ data: null, isLoading: false }),
+  useRequestGameSummary: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('../../lib/replay-engine', () => ({

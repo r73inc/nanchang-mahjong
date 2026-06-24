@@ -6,6 +6,7 @@ import type {
   CreateChallengeInput,
   CreateChallengeResult,
   StartChallengeGameResult,
+  AiSummaryPublic,
 } from '@nanchang/shared';
 
 // ── Query keys ────────────────────────────────────────────────────────────────
@@ -70,6 +71,29 @@ export function useMarkChallengeResultsViewed() {
       api.post(`/challenges/${challengeId}/mark-viewed`).then(() => undefined),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: KEYS.list });
+    },
+  });
+}
+
+/** Fetch the current AI summary state for a challenge (null if none yet). */
+export function useChallengeSummary(challengeId: string) {
+  return useQuery({
+    queryKey: ['challenge-summary', challengeId],
+    queryFn: () =>
+      api.get<AiSummaryPublic | null>(`/challenges/${challengeId}/summary`).then((r) => r.data),
+    enabled: !!challengeId,
+    retry: false,
+  });
+}
+
+/** Request an AI overview summary for a challenge. */
+export function useRequestChallengeSummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (challengeId: string) =>
+      api.post<AiSummaryPublic>(`/challenges/${challengeId}/request-summary`).then((r) => r.data),
+    onSuccess: (_, challengeId) => {
+      void qc.invalidateQueries({ queryKey: ['challenge-summary', challengeId] });
     },
   });
 }

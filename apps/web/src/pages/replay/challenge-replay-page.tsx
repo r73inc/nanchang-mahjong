@@ -30,6 +30,9 @@ import {
   WIND_COLOR,
   getSeatFromEvent,
 } from './components/PlaybackControls';
+import { AiSummaryPanel } from '../../components/AiSummaryPanel';
+import { useChallengeSummary, useRequestChallengeSummary } from '../../hooks/use-challenges';
+import { useGameSummary, useRequestGameSummary } from '../../hooks/use-replay';
 
 // ── Glyphs & separators (module-level avoids i18next/no-literal-string) ───────
 
@@ -157,6 +160,14 @@ export function ChallengeReplayPage() {
   const [viewedSub, setViewedSub] = useState<string>('');
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+
+  // AI summary hooks
+  const challengeSummary = useChallengeSummary(challengeId ?? '');
+  const requestChallengeSummary = useRequestChallengeSummary();
+  const activeGameId =
+    participants.find((p) => p.sub === (viewedSub || participants[0]?.sub))?.gameId ?? '';
+  const gameSummary = useGameSummary(activeGameId);
+  const requestGameSummary = useRequestGameSummary();
 
   // Default to first participant once loaded
   useEffect(() => {
@@ -313,6 +324,14 @@ export function ChallengeReplayPage() {
           </div>
         )}
 
+        {/* Challenge overview AI commentary */}
+        <AiSummaryPanel
+          summary={challengeSummary.data}
+          isLoading={challengeSummary.isLoading}
+          isRequesting={requestChallengeSummary.isPending}
+          onRequest={() => void requestChallengeSummary.mutate(challengeId ?? '')}
+        />
+
         {/* Participant switcher */}
         <div>
           <SectionLabel>{t('replayChallengeParticipants')}</SectionLabel>
@@ -327,6 +346,17 @@ export function ChallengeReplayPage() {
             }}
           />
         </div>
+
+        {/* Per-player AI breakdown (switches with active participant) */}
+        {activeGameId && (
+          <AiSummaryPanel
+            summary={gameSummary.data}
+            isLoading={gameSummary.isLoading}
+            isRequesting={requestGameSummary.isPending}
+            onRequest={() => void requestGameSummary.mutate(activeGameId)}
+            label={t('aiSummaryPlayerBreakdown')}
+          />
+        )}
 
         {/* Playback controls — driven by globalTurnIndex across all timelines */}
         <div>

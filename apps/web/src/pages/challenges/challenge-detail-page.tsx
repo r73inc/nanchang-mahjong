@@ -7,7 +7,10 @@ import {
   useStartChallengeGame,
   useDeclineChallenge,
   useMarkChallengeResultsViewed,
+  useChallengeSummary,
+  useRequestChallengeSummary,
 } from '../../hooks/use-challenges';
+import { AiSummaryPanel } from '../../components/AiSummaryPanel';
 import { useAuthStore } from '../../stores/auth.store';
 import type {
   ChallengeParticipant,
@@ -26,6 +29,8 @@ export function ChallengeDetailPage() {
   const startGame = useStartChallengeGame();
   const declineChallenge = useDeclineChallenge();
   const markViewed = useMarkChallengeResultsViewed();
+  const { data: aiSummary, isLoading: aiSummaryLoading } = useChallengeSummary(challengeId!);
+  const requestAiSummary = useRequestChallengeSummary();
 
   const [confirmDecline, setConfirmDecline] = useState(false);
 
@@ -143,6 +148,16 @@ export function ChallengeDetailPage() {
             ))}
           </div>
         </Section>
+
+        {/* ── AI overview (completed challenges only) ──────────────────────── */}
+        {challengeStatus === 'completed' && (
+          <AiSummaryPanel
+            summary={aiSummary}
+            isLoading={aiSummaryLoading}
+            isRequesting={requestAiSummary.isPending}
+            onRequest={() => void requestAiSummary.mutate(challengeId!)}
+          />
+        )}
 
         {/* ── My score callout (after completing) ─────────────────────────── */}
         {myStatus === 'completed' && myParticipant?.finalScore !== undefined && (

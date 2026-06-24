@@ -217,6 +217,23 @@ export class ChallengesController {
   }
 
   /**
+   * GET /challenges/:id/summary
+   *
+   * Return the current AI summary state for this challenge (public fields only).
+   * Returns null when no summary has been requested yet.
+   */
+  @Get(':id/summary')
+  async getChallengeSummary(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') challengeId: string,
+  ) {
+    await this.challenges.getChallenge(challengeId, actor.sub);
+    const item = await this.aiSummary.getSummary(`CHALLENGE#${challengeId}`);
+    if (!item) return null;
+    return { status: item.status, text: item.text, errorCode: item.errorCode };
+  }
+
+  /**
    * Request an AI-generated overview summary for this challenge.
    *
    * Callers with admin-ai-features (or admin role) receive an immediately-approved

@@ -776,5 +776,15 @@
   "restoreWaitingConnected": "已连接",
   "restoreWaitingWaiting": "等待中…",
   "restoreWaitingStart": "开始游戏",
-  "restoreWaitingWaitingForHost": "等待房主开始游戏…"
+  "restoreWaitingWaitingForHost": "等待房主开始游戏…",
+
+  "aiSummaryTitle": "AI 点评",
+  "aiSummaryRequest": "申请 AI 总结",
+  "aiSummaryLoading": "加载中…",
+  "aiSummaryPending": "排队等待中…",
+  "aiSummaryProcessing": "生成中…",
+  "aiSummaryFailed": "生成失败",
+  "aiSummaryExpand": "展开 AI 点评",
+  "aiSummaryCollapse": "收起 AI 点评",
+  "aiSummaryPlayerBreakdown": "玩家详情"
 }
