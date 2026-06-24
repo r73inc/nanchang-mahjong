@@ -6,6 +6,7 @@ export * from './replay.types';
 export * from './tile-map';
 export * from './challenge.types';
 export * from './game-save.types';
+export * from './ai-commentary.types';
 
 // Re-export engine helpers useful in frontend without adding engine as a direct web dep
 export {

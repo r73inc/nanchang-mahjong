@@ -124,4 +124,15 @@ export const DK = {
     PK: `USER#${sub}`,
     SK: `SAVE#${slot.toUpperCase()}`,
   }),
+  // ── AI Commentary keys ───────────────────────────────────────────────────────
+  /** AI summary item for a single game replay. */
+  gameSummary: (id: string) => ({ PK: `GAME#${id}`, SK: 'AI_SUMMARY' }),
+  /** AI summary item for a Point Challenge overview. */
+  challengeSummary: (id: string) => ({ PK: `CHALLENGE#${id}`, SK: 'AI_SUMMARY' }),
+  /** Primary record for a user-initiated AI summary request. */
+  aiRequest: (reqId: string) => ({ PK: `AIREQ#${reqId}`, SK: 'META' }),
+  /** GSI-1 lookup to list AI requests by status (mirrors invite status-GSI pattern). */
+  aiRequestsByStatus: (status: string) => ({
+    gsi1pk: `AIREQ_STATUS#${status}`,
+  }),
 } as const;
