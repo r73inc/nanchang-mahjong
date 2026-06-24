@@ -196,6 +196,19 @@ export class NanchangStack extends cdk.Stack {
     replayBucket.grantReadWrite(taskRole);
     avatarBucket.grantReadWrite(taskRole);
 
+    // Grant the ECS task role permission to invoke the Gemini relay Function URL (us-east-1).
+    // Supply the relay Lambda ARN after Phase 2 deployment:
+    //   cdk deploy --context geminiRelayArn=arn:aws:lambda:us-east-1:<acct>:function:gemini-relay
+    const geminiRelayArn = this.node.tryGetContext('geminiRelayArn') as string | undefined;
+    if (geminiRelayArn) {
+      taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          actions: ['lambda:InvokeFunctionUrl'],
+          resources: [geminiRelayArn],
+        }),
+      );
+    }
+
     // ── CloudFront Function: strip /api prefix ─────────────────────────────────
     // The NestJS API routes live at /auth/..., /users/..., etc. — no /api prefix.
     // The React app calls /api/... which CloudFront routes to the Fargate ALB.
@@ -262,6 +275,10 @@ export class NanchangStack extends cdk.Stack {
           JWT_EXPIRES_IN: '1h',
           JWT_REFRESH_EXPIRES_IN: '30d',
           VAPID_SUBJECT: 'mailto:r73inc@gmail.com',
+          // Gemini relay — set GEMINI_RELAY_URL after the us-east-1 relay is deployed
+          GEMINI_RELAY_URL: (this.node.tryGetContext('geminiRelayUrl') as string | undefined) ?? '',
+          GEMINI_RELAY_REGION: 'us-east-1',
+          GEMINI_RELAY_MODEL: 'gemini-1.5-flash',
         },
         secrets: {
           JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
