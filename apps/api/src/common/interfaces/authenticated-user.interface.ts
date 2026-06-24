@@ -1,5 +1,5 @@
 export type UserRole = 'user' | 'admin';
-export type UserPermission = 'devTestRoom';
+export type UserPermission = 'devTestRoom' | 'admin-ai-features';
 
 export interface AuthenticatedUser {
   sub: string;
