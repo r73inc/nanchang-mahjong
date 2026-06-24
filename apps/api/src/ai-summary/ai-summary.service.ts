@@ -903,8 +903,12 @@ export class AiSummaryService {
       return (await this.getSummary(pk))!;
     }
 
-    if (digest.participants.length === 0) {
-      await this.writeSummaryFailed(pk, '5xx', 'No completed participants in challenge');
+    if (digest.participants.length < 2) {
+      await this.writeSummaryFailed(
+        pk,
+        '5xx',
+        `Insufficient participants for comparison (${digest.participants.length} completed — need at least 2)`,
+      );
       return (await this.getSummary(pk))!;
     }
 
