@@ -35,6 +35,17 @@ export const configuration = () => ({
   },
 
   /**
+   * Gemini Relay — us-east-1 Lambda Function URL.
+   * Leave url empty to disable AI summary generation (graceful no-op, mirrors VAPID pattern).
+   */
+  geminiRelay: {
+    url: process.env.GEMINI_RELAY_URL ?? '',
+    region: process.env.GEMINI_RELAY_REGION ?? 'us-east-1',
+    model: process.env.GEMINI_RELAY_MODEL ?? 'gemini-1.5-flash',
+    challengeWordCap: parseInt(process.env.GEMINI_CHALLENGE_WORD_CAP ?? '400', 10),
+  },
+
+  /**
    * Web Push (VAPID) configuration.
    * Generate a key pair with: npx web-push generate-vapid-keys
    * Leave publicKey/privateKey empty to disable push in dev (graceful no-op).
