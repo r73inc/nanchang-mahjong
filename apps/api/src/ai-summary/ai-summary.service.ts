@@ -19,7 +19,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
 import { DynamoDBService } from '../database/dynamodb.service';
 import { StorageService } from '../storage/storage.service';
 import { GeminiRelayClient } from './gemini-relay.client';
@@ -30,6 +29,7 @@ import type {
   GameEvent,
   TileType,
   SeatWind,
+  ChallengeStatus,
 } from '@nanchang/shared';
 import type {
   GameFactsDigest,
@@ -639,13 +639,25 @@ export class AiSummaryService {
       return { queued: false, summary };
     }
 
-    await this.writeSummaryRequested(pk, requestedBy);
+    try {
+      await this.writeSummaryRequested(pk, requestedBy);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+        throw new ConflictException(
+          'A concurrent AI summary request is already in progress for this game',
+        );
+      }
+      throw err;
+    }
     const reqId = await this.createAiRequestItem('game', gameId, requestedBy);
     return { queued: true, reqId };
   }
 
   /**
    * User-facing entry point to request a challenge AI summary.
+   *
+   * Rejects immediately if the challenge is not yet completed — summaries are only
+   * meaningful once all participants have finished their games.
    *
    * Challenge generation (Phase 5) is not yet implemented, so all requests —
    * including from auto-approve holders — enter the pending queue. Phase 5 will
@@ -654,7 +666,14 @@ export class AiSummaryService {
   async requestChallengeSummary(
     challengeId: string,
     requestedBy: string,
+    challengeStatus: ChallengeStatus,
   ): Promise<{ queued: boolean; reqId: string }> {
+    if (challengeStatus !== 'completed') {
+      throw new BadRequestException(
+        `AI summary can only be requested for completed challenges (status: ${challengeStatus})`,
+      );
+    }
+
     const pk = `CHALLENGE#${challengeId}`;
     const existing = await this.getSummary(pk);
     const blockingStatuses: AiSummaryStatus[] = ['requested', 'approved', 'processing', 'done'];
@@ -664,7 +683,16 @@ export class AiSummaryService {
       );
     }
 
-    await this.writeSummaryRequested(pk, requestedBy);
+    try {
+      await this.writeSummaryRequested(pk, requestedBy);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+        throw new ConflictException(
+          'A concurrent AI summary request is already in progress for this challenge',
+        );
+      }
+      throw err;
+    }
     const reqId = await this.createAiRequestItem('challenge', challengeId, requestedBy);
     return { queued: true, reqId };
   }
@@ -674,7 +702,10 @@ export class AiSummaryService {
     targetId: string,
     requestedBy: string,
   ): Promise<string> {
-    const reqId = randomUUID();
+    // Deterministic key — one AIREQ row per target forever.
+    // ConditionExpression blocks overwriting a live pending/approved item;
+    // only allows re-creation after a rejection (completing the re-request flow).
+    const reqId = `${targetType}:${targetId}`;
     const now = new Date().toISOString();
     await this.db.put({
       Item: {
@@ -688,6 +719,9 @@ export class AiSummaryService {
         requestedBy,
         requestedAt: now,
       },
+      ConditionExpression: 'attribute_not_exists(PK) OR #status = :rejected',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':rejected': 'rejected' },
     });
     return reqId;
   }
@@ -727,7 +761,8 @@ export class AiSummaryService {
     });
 
     if (req.targetType === 'game') {
-      return this.generateGameSummary(req.targetId, approvedBy);
+      // Pass the original requester — approvedBy is already tracked in resolvedBy on the AIREQ item.
+      return this.generateGameSummary(req.targetId, req.requestedBy);
     }
 
     // Challenge generation deferred to Phase 5 — mark summary as approved for now.

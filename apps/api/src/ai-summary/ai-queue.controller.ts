@@ -10,7 +10,16 @@
  * POST /admin/ai-jobs/:type/:id/retry    — retry a failed game summary
  */
 
-import { Controller, Get, Post, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AiSummaryService } from './ai-summary.service';
 import { JwtGuard } from '../common/guards/jwt.guard';
@@ -65,9 +74,7 @@ export class AiQueueController {
     @CurrentUser() actor: AuthenticatedUser,
   ) {
     if (targetType !== 'game' && targetType !== 'challenge') {
-      throw new (await import('@nestjs/common')).BadRequestException(
-        'targetType must be "game" or "challenge"',
-      );
+      throw new BadRequestException('targetType must be "game" or "challenge"');
     }
     const summary = await this.aiSummary.retryFailedSummary(
       targetType as 'game' | 'challenge',

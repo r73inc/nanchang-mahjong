@@ -420,23 +420,29 @@ describe('AiSummaryService', () => {
       );
     });
 
-    it('queue path: writes requested status and creates AiRequestItem', async () => {
+    it('queue path: writes requested status and creates AiRequestItem with deterministic key', async () => {
       mockDb.get.mockResolvedValueOnce({ Item: undefined }); // conflict check
 
       const result = await service.requestGameSummary('game-001', 'user-X', false);
 
       expect(result.queued).toBe(true);
-      expect(typeof result.reqId).toBe('string');
+      expect(result.reqId).toBe('game:game-001');
       // writeSummaryRequested
       expect(mockDb.put).toHaveBeenCalledWith(
         expect.objectContaining({
           Item: expect.objectContaining({ status: 'requested', SK: 'AI_SUMMARY' }),
         }),
       );
-      // createAiRequestItem
+      // createAiRequestItem — deterministic key + ConditionExpression guard
       expect(mockDb.put).toHaveBeenCalledWith(
         expect.objectContaining({
-          Item: expect.objectContaining({ status: 'pending', SK: 'META', targetType: 'game' }),
+          Item: expect.objectContaining({
+            PK: 'AIREQ#game:game-001',
+            status: 'pending',
+            SK: 'META',
+            targetType: 'game',
+          }),
+          ConditionExpression: expect.stringContaining('attribute_not_exists'),
         }),
       );
     });
@@ -465,13 +471,100 @@ describe('AiSummaryService', () => {
       const result = await service.requestGameSummary('game-001', 'user-X', true);
       expect(result.queued).toBe(false);
     });
+
+    it('throws ConflictException (409) when concurrent writeSummaryRequested wins the race', async () => {
+      const condError = Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      mockDb.get.mockResolvedValueOnce({ Item: undefined }); // getSummary → no item
+      mockDb.put.mockRejectedValueOnce(condError); // writeSummaryRequested
+
+      await expect(service.requestGameSummary('game-001', 'user-X', false)).rejects.toMatchObject({
+        status: 409,
+      });
+      // createAiRequestItem must NOT have been called
+      expect(mockDb.put).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── requestChallengeSummary ────────────────────────────────────────────────
+
+  describe('requestChallengeSummary', () => {
+    it('throws BadRequestException (400) when challenge status is not completed', async () => {
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'open'),
+      ).rejects.toMatchObject({ status: 400 });
+      // No DB calls should be made before the guard
+      expect(mockDb.get).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException (400) for awaiting_creator status', async () => {
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'awaiting_creator'),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('throws BadRequestException (400) for cancelled status', async () => {
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'cancelled'),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('creates queue item with deterministic key when challenge is completed', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: undefined }); // getSummary → no existing
+
+      const result = await service.requestChallengeSummary('chal-001', 'user-X', 'completed');
+
+      expect(result.queued).toBe(true);
+      expect(result.reqId).toBe('challenge:chal-001');
+      // writeSummaryRequested
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({ status: 'requested', PK: 'CHALLENGE#chal-001' }),
+        }),
+      );
+      // createAiRequestItem — deterministic key + ConditionExpression guard
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({
+            PK: 'AIREQ#challenge:chal-001',
+            targetType: 'challenge',
+            targetId: 'chal-001',
+          }),
+          ConditionExpression: expect.stringContaining('attribute_not_exists'),
+        }),
+      );
+    });
+
+    it('throws ConflictException (409) when concurrent writeSummaryRequested wins the race', async () => {
+      const condError = Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      mockDb.get.mockResolvedValueOnce({ Item: undefined });
+      mockDb.put.mockRejectedValueOnce(condError); // writeSummaryRequested
+
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'completed'),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(mockDb.put).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws ConflictException (409) when summary is already in progress', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: { status: 'processing', attempts: 1 } });
+
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'completed'),
+      ).rejects.toMatchObject({ status: 409 });
+    });
   });
 
   // ── approveAiRequest ───────────────────────────────────────────────────────
 
   describe('approveAiRequest', () => {
+    // reqId is now deterministic: targetType:targetId
+    const reqId = 'game:game-001';
     const pendingReq = {
-      PK: 'AIREQ#req-001',
+      PK: `AIREQ#${reqId}`,
       SK: 'META',
       status: 'pending',
       targetType: 'game',
@@ -500,27 +593,43 @@ describe('AiSummaryService', () => {
         .mockResolvedValueOnce({ Item: undefined })
         .mockResolvedValueOnce({ Item: doneItem });
 
-      const result = await service.approveAiRequest('req-001', 'admin-sub');
+      const result = await service.approveAiRequest(reqId, 'admin-sub');
 
       expect(mockDb.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          Key: { PK: 'AIREQ#req-001', SK: 'META' },
+          Key: { PK: `AIREQ#${reqId}`, SK: 'META' },
           ExpressionAttributeValues: expect.objectContaining({ ':approved': 'approved' }),
         }),
       );
       expect(result.status).toBe('done');
     });
 
+    it('generates summary with original requester sub, not approver sub', async () => {
+      mockDb.get
+        .mockResolvedValueOnce({ Item: pendingReq }) // getAiRequest
+        .mockResolvedValueOnce({ Item: undefined }) // generateGameSummary: attempts
+        .mockResolvedValueOnce({ Item: doneItem }); // generateGameSummary: return value
+
+      await service.approveAiRequest(reqId, 'admin-sub');
+
+      // writeSummaryProcessing must carry the original requester ('user-X'), not the approver
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({ requestedBy: 'user-X', status: 'processing' }),
+        }),
+      );
+    });
+
     it('throws ConflictException when request is already approved', async () => {
       mockDb.get.mockResolvedValueOnce({ Item: { ...pendingReq, status: 'approved' } });
-      await expect(service.approveAiRequest('req-001', 'admin-sub')).rejects.toMatchObject({
+      await expect(service.approveAiRequest(reqId, 'admin-sub')).rejects.toMatchObject({
         status: 409,
       });
     });
 
     it('throws NotFoundException when request does not exist', async () => {
       mockDb.get.mockResolvedValueOnce({ Item: undefined });
-      await expect(service.approveAiRequest('req-001', 'admin-sub')).rejects.toMatchObject({
+      await expect(service.approveAiRequest(reqId, 'admin-sub')).rejects.toMatchObject({
         status: 404,
       });
     });
@@ -530,9 +639,10 @@ describe('AiSummaryService', () => {
 
   describe('rejectAiRequest', () => {
     it('updates request status to rejected', async () => {
+      const reqId = 'game:game-001';
       mockDb.get.mockResolvedValueOnce({
         Item: {
-          PK: 'AIREQ#req-001',
+          PK: `AIREQ#${reqId}`,
           SK: 'META',
           status: 'pending',
           targetType: 'game',
@@ -542,11 +652,11 @@ describe('AiSummaryService', () => {
         },
       });
 
-      await service.rejectAiRequest('req-001', 'admin-sub');
+      await service.rejectAiRequest(reqId, 'admin-sub');
 
       expect(mockDb.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          Key: { PK: 'AIREQ#req-001', SK: 'META' },
+          Key: { PK: `AIREQ#${reqId}`, SK: 'META' },
           ExpressionAttributeValues: expect.objectContaining({ ':rejected': 'rejected' }),
         }),
       );

@@ -228,8 +228,8 @@ export class ChallengesController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async requestSummary(@CurrentUser() actor: AuthenticatedUser, @Param('id') challengeId: string) {
     // Access check: getChallenge throws 403/404 if caller is not a participant.
-    await this.challenges.getChallenge(challengeId, actor.sub);
-    return this.aiSummary.requestChallengeSummary(challengeId, actor.sub);
+    const challenge = await this.challenges.getChallenge(challengeId, actor.sub);
+    return this.aiSummary.requestChallengeSummary(challengeId, actor.sub, challenge.status);
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────
