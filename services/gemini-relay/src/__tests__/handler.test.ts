@@ -160,6 +160,17 @@ describe('Relay·handler', () => {
     expect(body.errorCode).toBe('403');
   });
 
+  it('returns 429 5xx when Gemini returns HTTP 429 rate limit', async () => {
+    const err = Object.assign(new Error('Too Many Requests'), { status: 429 });
+    vi.mocked(callGemini).mockRejectedValueOnce(err);
+
+    const result = await handler(makeEvent(VALID_REQUEST));
+
+    expect(statusOf(result)).toBe(429);
+    const body = parseBody<RelayErrorResponse>(result);
+    expect(body.errorCode).toBe('5xx');
+  });
+
   it('returns 502 5xx when Gemini returns an HTTP 500 error', async () => {
     const err = Object.assign(new Error('Internal Server Error'), { status: 500 });
     vi.mocked(callGemini).mockRejectedValueOnce(err);

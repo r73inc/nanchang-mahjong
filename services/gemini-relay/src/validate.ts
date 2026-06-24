@@ -54,5 +54,17 @@ export function parseAndValidate(raw: string | undefined): RelayGenerateRequest 
   )
     throw new ValidationError('responseSchema is required and must be a plain object');
 
+  const schema = req.responseSchema as Record<string, unknown>;
+  const hasType = typeof schema.type === 'string' && schema.type.length > 0;
+  const hasProperties =
+    schema.properties !== undefined &&
+    typeof schema.properties === 'object' &&
+    !Array.isArray(schema.properties);
+  if (!hasType && !hasProperties) {
+    throw new ValidationError(
+      'responseSchema must contain at least a "type" string or a "properties" object — bare empty objects are not valid Gemini schemas',
+    );
+  }
+
   return req as unknown as RelayGenerateRequest;
 }

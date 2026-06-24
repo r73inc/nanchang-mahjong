@@ -53,6 +53,8 @@ function mapGeminiError(err: unknown): APIGatewayProxyResultV2 {
   const status = extractHttpStatus(err);
   if (status === 403) return errorJson(403, '403', 'Gemini API key is invalid or access denied');
   if (status === 404) return errorJson(404, '404', 'Gemini model not found');
+  if (status === 429)
+    return errorJson(429, '5xx', 'Gemini rate limit or quota exceeded — retryable');
   if (status >= 400 && status < 500) {
     return errorJson(400, 'validation', `Gemini rejected the request (HTTP ${status})`);
   }
