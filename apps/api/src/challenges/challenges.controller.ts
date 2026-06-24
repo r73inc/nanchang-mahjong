@@ -27,6 +27,7 @@ import { RoomsService } from '../rooms/rooms.service';
 import { GameService } from '../game/game.service';
 import { FriendsService } from '../friends/friends.service';
 import { DynamoDBService } from '../database/dynamodb.service';
+import { AiSummaryService } from '../ai-summary/ai-summary.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 import type { BotDifficulty } from '@nanchang/shared';
 
@@ -39,6 +40,7 @@ export class ChallengesController {
     private readonly gameService: GameService,
     private readonly friends: FriendsService,
     private readonly db: DynamoDBService,
+    private readonly aiSummary: AiSummaryService,
   ) {}
 
   /**
@@ -212,6 +214,22 @@ export class ChallengesController {
     @Param('id') challengeId: string,
   ) {
     await this.challenges.markResultsViewed(challengeId, user.sub);
+  }
+
+  /**
+   * Request an AI-generated overview summary for this challenge.
+   *
+   * Callers with admin-ai-features (or admin role) receive an immediately-approved
+   * summary request; all others create a pending queue item for admin approval.
+   * Challenge generation itself lands in Phase 5 — the queue item is created now.
+   */
+  @Post(':id/request-summary')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async requestSummary(@CurrentUser() actor: AuthenticatedUser, @Param('id') challengeId: string) {
+    // Access check: getChallenge throws 403/404 if caller is not a participant.
+    await this.challenges.getChallenge(challengeId, actor.sub);
+    return this.aiSummary.requestChallengeSummary(challengeId, actor.sub);
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────

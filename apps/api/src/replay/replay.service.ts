@@ -13,30 +13,29 @@ export class ReplayService {
   ) {}
 
   /**
-   * Fetch a replay for the given viewer.
+   * Verify the viewer is allowed to access the given game's replay.
    *
    * Access rules:
-   *  - Viewer must be one of the 4 players in the game, OR
+   *  - Viewer must be one of the 4 players, OR
    *  - Viewer must have an accepted friendship with at least one player.
    *
    * Throws NotFoundException if the game record doesn't exist.
    * Throws ForbiddenException if the viewer doesn't meet the access criteria.
    */
-  async getReplayForViewer(gameId: string, viewerSub: string): Promise<ReplayGamePayload> {
-    // Fetch game META from DDB to get seatMap for access control
+  async checkReplayAccess(gameId: string, viewerSub: string): Promise<void> {
     const gameMeta = await this.db.get({ Key: DK.game(gameId) });
     if (!gameMeta.Item) throw new NotFoundException('Game not found');
 
     const seatMap = gameMeta.Item.seatMap as [string, string, string, string];
-
-    // Access control: player in the game?
-    const isPlayer = seatMap.includes(viewerSub);
-    if (!isPlayer) {
-      // Not a player — must be an accepted friend of at least one player
+    if (!seatMap.includes(viewerSub)) {
       const friendOfPlayer = await this.friends.areFriends(viewerSub, seatMap);
       if (!friendOfPlayer) throw new ForbiddenException('Access denied');
     }
+  }
 
+  /** Fetch the full replay payload for a viewer who has passed access control. */
+  async getReplayForViewer(gameId: string, viewerSub: string): Promise<ReplayGamePayload> {
+    await this.checkReplayAccess(gameId, viewerSub);
     return this.storage.getReplay(gameId);
   }
 }
