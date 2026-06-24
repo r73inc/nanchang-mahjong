@@ -135,4 +135,8 @@ export const DK = {
   aiRequestsByStatus: (status: string) => ({
     gsi1pk: `AIREQ_STATUS#${status}`,
   }),
+  /** GSI-1 lookup to list AI summary items by status (used for failed-jobs listing). */
+  aiSummaryByStatus: (status: string) => ({
+    gsi1pk: `AISUMMARY_STATUS#${status}`,
+  }),
 } as const;

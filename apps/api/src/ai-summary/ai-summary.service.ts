@@ -11,7 +11,13 @@
  * Phase 4 adds the request queue; Phase 5 hooks challenge auto-generation here.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ConflictException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DynamoDBService } from '../database/dynamodb.service';
 import { StorageService } from '../storage/storage.service';
@@ -23,6 +29,7 @@ import type {
   GameEvent,
   TileType,
   SeatWind,
+  ChallengeStatus,
 } from '@nanchang/shared';
 import type {
   GameFactsDigest,
@@ -31,7 +38,9 @@ import type {
   HandOutcome,
   WinMethod,
   AiSummaryItem,
+  AiSummaryStatus,
   AiSummaryErrorCode,
+  AiRequestItem,
   RelayGenerateRequest,
 } from '@nanchang/shared';
 
@@ -466,6 +475,8 @@ export class AiSummaryService {
       Item: {
         PK: pk,
         SK: 'AI_SUMMARY',
+        gsi1pk: 'AISUMMARY_STATUS#processing',
+        gsi1sk: pk,
         status: 'processing',
         requestedBy,
         requestedAt: now,
@@ -488,13 +499,15 @@ export class AiSummaryService {
   ): Promise<void> {
     await this.db.update({
       Key: { PK: pk, SK: 'AI_SUMMARY' },
-      UpdateExpression: 'SET #status = :done, #text = :text, generatedAt = :now, model = :model',
+      UpdateExpression:
+        'SET #status = :done, #text = :text, generatedAt = :now, model = :model, gsi1pk = :gsi',
       ExpressionAttributeNames: { '#status': 'status', '#text': 'text' },
       ExpressionAttributeValues: {
         ':done': 'done',
         ':text': text,
         ':now': new Date().toISOString(),
         ':model': model,
+        ':gsi': 'AISUMMARY_STATUS#done',
       },
     });
   }
@@ -507,14 +520,34 @@ export class AiSummaryService {
     await this.db.update({
       Key: { PK: pk, SK: 'AI_SUMMARY' },
       UpdateExpression:
-        'SET #status = :failed, errorCode = :code, errorMessage = :msg, attempts = attempts + :one',
+        'SET #status = :failed, errorCode = :code, errorMessage = :msg, attempts = attempts + :one, gsi1pk = :gsi',
       ExpressionAttributeNames: { '#status': 'status' },
       ExpressionAttributeValues: {
         ':failed': 'failed',
         ':code': errorCode,
         ':msg': errorMessage,
         ':one': 1,
+        ':gsi': 'AISUMMARY_STATUS#failed',
       },
+    });
+  }
+
+  private async writeSummaryRequested(pk: string, requestedBy: string): Promise<void> {
+    const now = new Date().toISOString();
+    await this.db.put({
+      Item: {
+        PK: pk,
+        SK: 'AI_SUMMARY',
+        gsi1pk: 'AISUMMARY_STATUS#requested',
+        gsi1sk: pk,
+        status: 'requested',
+        requestedBy,
+        requestedAt: now,
+        attempts: 0,
+      },
+      ConditionExpression: 'attribute_not_exists(PK) OR #status = :failed',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':failed': 'failed' },
     });
   }
 
@@ -574,5 +607,239 @@ export class AiSummaryService {
     }
 
     return (await this.getSummary(pk))!;
+  }
+
+  // ── Request queue (Phase 4) ──────────────────────────────────────────────────
+
+  /**
+   * User-facing entry point to request a game AI summary.
+   *
+   * hasAutoApprove callers (admin / admin-ai-features holders) bypass the queue and
+   * trigger generation immediately.  All others create a pending request item so an
+   * admin-ai-features holder can approve it later.
+   *
+   * Throws ConflictException if a non-failed summary is already in flight or done.
+   */
+  async requestGameSummary(
+    gameId: string,
+    requestedBy: string,
+    hasAutoApprove: boolean,
+  ): Promise<{ queued: boolean; reqId?: string; summary?: AiSummaryItem }> {
+    const pk = `GAME#${gameId}`;
+    const existing = await this.getSummary(pk);
+    const blockingStatuses: AiSummaryStatus[] = ['requested', 'approved', 'processing', 'done'];
+    if (existing && blockingStatuses.includes(existing.status)) {
+      throw new ConflictException(
+        `AI summary already in progress or completed (status: ${existing.status})`,
+      );
+    }
+
+    if (hasAutoApprove) {
+      const summary = await this.generateGameSummary(gameId, requestedBy);
+      return { queued: false, summary };
+    }
+
+    try {
+      await this.writeSummaryRequested(pk, requestedBy);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+        throw new ConflictException(
+          'A concurrent AI summary request is already in progress for this game',
+        );
+      }
+      throw err;
+    }
+    const reqId = await this.createAiRequestItem('game', gameId, requestedBy);
+    return { queued: true, reqId };
+  }
+
+  /**
+   * User-facing entry point to request a challenge AI summary.
+   *
+   * Rejects immediately if the challenge is not yet completed — summaries are only
+   * meaningful once all participants have finished their games.
+   *
+   * Challenge generation (Phase 5) is not yet implemented, so all requests —
+   * including from auto-approve holders — enter the pending queue. Phase 5 will
+   * hook into `approveAiRequest` to trigger challenge generation automatically.
+   */
+  async requestChallengeSummary(
+    challengeId: string,
+    requestedBy: string,
+    challengeStatus: ChallengeStatus,
+  ): Promise<{ queued: boolean; reqId: string }> {
+    if (challengeStatus !== 'completed') {
+      throw new BadRequestException(
+        `AI summary can only be requested for completed challenges (status: ${challengeStatus})`,
+      );
+    }
+
+    const pk = `CHALLENGE#${challengeId}`;
+    const existing = await this.getSummary(pk);
+    const blockingStatuses: AiSummaryStatus[] = ['requested', 'approved', 'processing', 'done'];
+    if (existing && blockingStatuses.includes(existing.status)) {
+      throw new ConflictException(
+        `AI summary already in progress or completed (status: ${existing.status})`,
+      );
+    }
+
+    try {
+      await this.writeSummaryRequested(pk, requestedBy);
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'ConditionalCheckFailedException') {
+        throw new ConflictException(
+          'A concurrent AI summary request is already in progress for this challenge',
+        );
+      }
+      throw err;
+    }
+    const reqId = await this.createAiRequestItem('challenge', challengeId, requestedBy);
+    return { queued: true, reqId };
+  }
+
+  private async createAiRequestItem(
+    targetType: 'game' | 'challenge',
+    targetId: string,
+    requestedBy: string,
+  ): Promise<string> {
+    // Deterministic key — one AIREQ row per target forever.
+    // ConditionExpression blocks overwriting a live pending/approved item;
+    // only allows re-creation after a rejection (completing the re-request flow).
+    const reqId = `${targetType}:${targetId}`;
+    const now = new Date().toISOString();
+    await this.db.put({
+      Item: {
+        PK: `AIREQ#${reqId}`,
+        SK: 'META',
+        gsi1pk: 'AIREQ_STATUS#pending',
+        gsi1sk: reqId,
+        status: 'pending',
+        targetType,
+        targetId,
+        requestedBy,
+        requestedAt: now,
+      },
+      ConditionExpression: 'attribute_not_exists(PK) OR #status = :rejected',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':rejected': 'rejected' },
+    });
+    return reqId;
+  }
+
+  async getAiRequest(reqId: string): Promise<AiRequestItem | null> {
+    const result = await this.db.get({ Key: { PK: `AIREQ#${reqId}`, SK: 'META' } });
+    return (result.Item as AiRequestItem | undefined) ?? null;
+  }
+
+  /**
+   * Approve a pending request and trigger generation immediately.
+   *
+   * For game requests: runs generateGameSummary and returns the resulting item.
+   * For challenge requests: marks summary as 'approved' — Phase 5 will add generation.
+   */
+  async approveAiRequest(reqId: string, approvedBy: string): Promise<AiSummaryItem> {
+    const req = await this.getAiRequest(reqId);
+    if (!req) throw new NotFoundException(`AI request ${reqId} not found`);
+    if (req.status !== 'pending') {
+      throw new ConflictException(
+        `Cannot approve request with status '${req.status}' — only pending requests can be approved`,
+      );
+    }
+
+    const now = new Date().toISOString();
+    await this.db.update({
+      Key: { PK: `AIREQ#${reqId}`, SK: 'META' },
+      UpdateExpression:
+        'SET #status = :approved, resolvedBy = :by, resolvedAt = :now, gsi1pk = :gsi',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':approved': 'approved',
+        ':by': approvedBy,
+        ':now': now,
+        ':gsi': 'AIREQ_STATUS#approved',
+      },
+    });
+
+    if (req.targetType === 'game') {
+      // Pass the original requester — approvedBy is already tracked in resolvedBy on the AIREQ item.
+      return this.generateGameSummary(req.targetId, req.requestedBy);
+    }
+
+    // Challenge generation deferred to Phase 5 — mark summary as approved for now.
+    const pk = `CHALLENGE#${req.targetId}`;
+    await this.db.update({
+      Key: { PK: pk, SK: 'AI_SUMMARY' },
+      UpdateExpression:
+        'SET #status = :approved, approvedBy = :by, approvedAt = :now, gsi1pk = :gsi',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':approved': 'approved',
+        ':by': approvedBy,
+        ':now': now,
+        ':gsi': 'AISUMMARY_STATUS#approved',
+      },
+    });
+    return (await this.getSummary(pk))!;
+  }
+
+  /** Reject a pending request. Leaves the summary item at 'requested'. */
+  async rejectAiRequest(reqId: string, resolvedBy: string): Promise<void> {
+    const req = await this.getAiRequest(reqId);
+    if (!req) throw new NotFoundException(`AI request ${reqId} not found`);
+    if (req.status !== 'pending') {
+      throw new BadRequestException(
+        `Cannot reject request with status '${req.status}' — only pending requests can be rejected`,
+      );
+    }
+
+    await this.db.update({
+      Key: { PK: `AIREQ#${reqId}`, SK: 'META' },
+      UpdateExpression:
+        'SET #status = :rejected, resolvedBy = :by, resolvedAt = :now, gsi1pk = :gsi',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':rejected': 'rejected',
+        ':by': resolvedBy,
+        ':now': new Date().toISOString(),
+        ':gsi': 'AIREQ_STATUS#rejected',
+      },
+    });
+  }
+
+  /** List all pending AI summary requests (admin queue view). */
+  async listPendingRequests(): Promise<AiRequestItem[]> {
+    const result = await this.db.query({
+      IndexName: 'gsi1',
+      KeyConditionExpression: 'gsi1pk = :pk',
+      ExpressionAttributeValues: { ':pk': 'AIREQ_STATUS#pending' },
+    });
+    return (result.Items ?? []) as AiRequestItem[];
+  }
+
+  /** List all failed AI summary jobs (for the admin failed-jobs screen). */
+  async listFailedJobs(): Promise<AiSummaryItem[]> {
+    const result = await this.db.query({
+      IndexName: 'gsi1',
+      KeyConditionExpression: 'gsi1pk = :pk',
+      ExpressionAttributeValues: { ':pk': 'AISUMMARY_STATUS#failed' },
+    });
+    return (result.Items ?? []) as AiSummaryItem[];
+  }
+
+  /**
+   * Admin retry of a failed summary.
+   * Delegates to generateGameSummary for games; challenge retry is Phase 5.
+   */
+  async retryFailedSummary(
+    targetType: 'game' | 'challenge',
+    targetId: string,
+    retriedBy: string,
+  ): Promise<AiSummaryItem> {
+    if (targetType === 'game') {
+      return this.generateGameSummary(targetId, retriedBy);
+    }
+    throw new BadRequestException(
+      'Challenge summary retry is not yet implemented — coming in Phase 5',
+    );
   }
 }

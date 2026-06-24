@@ -4,6 +4,7 @@ import { PushModule } from '../push/push.module';
 import { FriendsModule } from '../friends/friends.module';
 import { RoomsModule } from '../rooms/rooms.module';
 import { GameModule } from '../game/game.module';
+import { AiSummaryModule } from '../ai-summary/ai-summary.module';
 import { ChallengesService } from './challenges.service';
 import { ChallengesController } from './challenges.controller';
 
@@ -16,6 +17,7 @@ import { ChallengesController } from './challenges.controller';
     // GameModule is imported directly so ChallengesController can inject GameService.
     // (RoomsModule also imports GameModule but does not re-export it.)
     GameModule,
+    AiSummaryModule,
   ],
   providers: [ChallengesService],
   controllers: [ChallengesController],

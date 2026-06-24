@@ -103,6 +103,7 @@ const mockDb = {
   get: jest.fn(),
   put: jest.fn(),
   update: jest.fn(),
+  query: jest.fn(),
 };
 
 const mockStorage = {
@@ -376,6 +377,321 @@ describe('AiSummaryService', () => {
       expect(mockDb.put).toHaveBeenCalledTimes(1);
       expect(mockDb.update).not.toHaveBeenCalled();
       expect(result.status).toBe('processing');
+    });
+  });
+
+  // ── requestGameSummary ─────────────────────────────────────────────────────
+
+  describe('requestGameSummary', () => {
+    const doneItem = {
+      PK: 'GAME#game-001',
+      SK: 'AI_SUMMARY',
+      status: 'done',
+      text: { en: 'Great game!', zh: '好游戏！' },
+      attempts: 1,
+    };
+
+    beforeEach(() => {
+      mockStorage.getReplay.mockResolvedValue(makeReplay());
+      mockRelay.generate.mockResolvedValue({
+        ok: true,
+        data: {
+          text: { en: 'Great game!', zh: '好游戏！' },
+          model: 'gemini-1.5-flash',
+          promptVersion: 'v1-game',
+        },
+      });
+    });
+
+    it('auto-approve: triggers generateGameSummary and returns summary', async () => {
+      // conflict check → no item; attempts fetch → no item; final getSummary → done item
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: doneItem });
+
+      const result = await service.requestGameSummary('game-001', 'user-X', true);
+
+      expect(result.queued).toBe(false);
+      expect(result.summary?.status).toBe('done');
+      // writeSummaryProcessing (db.put) must have been called
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({ Item: expect.objectContaining({ status: 'processing' }) }),
+      );
+    });
+
+    it('queue path: writes requested status and creates AiRequestItem with deterministic key', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: undefined }); // conflict check
+
+      const result = await service.requestGameSummary('game-001', 'user-X', false);
+
+      expect(result.queued).toBe(true);
+      expect(result.reqId).toBe('game:game-001');
+      // writeSummaryRequested
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({ status: 'requested', SK: 'AI_SUMMARY' }),
+        }),
+      );
+      // createAiRequestItem — deterministic key + ConditionExpression guard
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({
+            PK: 'AIREQ#game:game-001',
+            status: 'pending',
+            SK: 'META',
+            targetType: 'game',
+          }),
+          ConditionExpression: expect.stringContaining('attribute_not_exists'),
+        }),
+      );
+    });
+
+    it('throws ConflictException when summary is already processing', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: { status: 'processing', attempts: 1 } });
+      await expect(service.requestGameSummary('game-001', 'user-X', false)).rejects.toMatchObject({
+        status: 409,
+      });
+    });
+
+    it('throws ConflictException when summary is already done', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: { status: 'done', attempts: 1 } });
+      await expect(service.requestGameSummary('game-001', 'user-X', false)).rejects.toMatchObject({
+        status: 409,
+      });
+    });
+
+    it('allows re-request when previous summary failed', async () => {
+      // conflict check → failed item (not blocked); then auto-approve path
+      mockDb.get
+        .mockResolvedValueOnce({ Item: { status: 'failed', attempts: 1 } })
+        .mockResolvedValueOnce({ Item: { status: 'failed', attempts: 1 } }) // attempts in generateGameSummary
+        .mockResolvedValueOnce({ Item: doneItem });
+
+      const result = await service.requestGameSummary('game-001', 'user-X', true);
+      expect(result.queued).toBe(false);
+    });
+
+    it('throws ConflictException (409) when concurrent writeSummaryRequested wins the race', async () => {
+      const condError = Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      mockDb.get.mockResolvedValueOnce({ Item: undefined }); // getSummary → no item
+      mockDb.put.mockRejectedValueOnce(condError); // writeSummaryRequested
+
+      await expect(service.requestGameSummary('game-001', 'user-X', false)).rejects.toMatchObject({
+        status: 409,
+      });
+      // createAiRequestItem must NOT have been called
+      expect(mockDb.put).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── requestChallengeSummary ────────────────────────────────────────────────
+
+  describe('requestChallengeSummary', () => {
+    it('throws BadRequestException (400) when challenge status is not completed', async () => {
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'open'),
+      ).rejects.toMatchObject({ status: 400 });
+      // No DB calls should be made before the guard
+      expect(mockDb.get).not.toHaveBeenCalled();
+    });
+
+    it('throws BadRequestException (400) for awaiting_creator status', async () => {
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'awaiting_creator'),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('throws BadRequestException (400) for cancelled status', async () => {
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'cancelled'),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('creates queue item with deterministic key when challenge is completed', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: undefined }); // getSummary → no existing
+
+      const result = await service.requestChallengeSummary('chal-001', 'user-X', 'completed');
+
+      expect(result.queued).toBe(true);
+      expect(result.reqId).toBe('challenge:chal-001');
+      // writeSummaryRequested
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({ status: 'requested', PK: 'CHALLENGE#chal-001' }),
+        }),
+      );
+      // createAiRequestItem — deterministic key + ConditionExpression guard
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({
+            PK: 'AIREQ#challenge:chal-001',
+            targetType: 'challenge',
+            targetId: 'chal-001',
+          }),
+          ConditionExpression: expect.stringContaining('attribute_not_exists'),
+        }),
+      );
+    });
+
+    it('throws ConflictException (409) when concurrent writeSummaryRequested wins the race', async () => {
+      const condError = Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      mockDb.get.mockResolvedValueOnce({ Item: undefined });
+      mockDb.put.mockRejectedValueOnce(condError); // writeSummaryRequested
+
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'completed'),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(mockDb.put).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws ConflictException (409) when summary is already in progress', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: { status: 'processing', attempts: 1 } });
+
+      await expect(
+        service.requestChallengeSummary('chal-001', 'user-X', 'completed'),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+  });
+
+  // ── approveAiRequest ───────────────────────────────────────────────────────
+
+  describe('approveAiRequest', () => {
+    // reqId is now deterministic: targetType:targetId
+    const reqId = 'game:game-001';
+    const pendingReq = {
+      PK: `AIREQ#${reqId}`,
+      SK: 'META',
+      status: 'pending',
+      targetType: 'game',
+      targetId: 'game-001',
+      requestedBy: 'user-X',
+      requestedAt: new Date().toISOString(),
+    };
+    const doneItem = { PK: 'GAME#game-001', SK: 'AI_SUMMARY', status: 'done', attempts: 1 };
+
+    beforeEach(() => {
+      mockStorage.getReplay.mockResolvedValue(makeReplay());
+      mockRelay.generate.mockResolvedValue({
+        ok: true,
+        data: {
+          text: { en: 'Great!', zh: '好！' },
+          model: 'gemini-1.5-flash',
+          promptVersion: 'v1-game',
+        },
+      });
+    });
+
+    it('updates request to approved and triggers game generation', async () => {
+      // getAiRequest → pending; generateGameSummary: attempts fetch → no item; final getSummary → done
+      mockDb.get
+        .mockResolvedValueOnce({ Item: pendingReq })
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: doneItem });
+
+      const result = await service.approveAiRequest(reqId, 'admin-sub');
+
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Key: { PK: `AIREQ#${reqId}`, SK: 'META' },
+          ExpressionAttributeValues: expect.objectContaining({ ':approved': 'approved' }),
+        }),
+      );
+      expect(result.status).toBe('done');
+    });
+
+    it('generates summary with original requester sub, not approver sub', async () => {
+      mockDb.get
+        .mockResolvedValueOnce({ Item: pendingReq }) // getAiRequest
+        .mockResolvedValueOnce({ Item: undefined }) // generateGameSummary: attempts
+        .mockResolvedValueOnce({ Item: doneItem }); // generateGameSummary: return value
+
+      await service.approveAiRequest(reqId, 'admin-sub');
+
+      // writeSummaryProcessing must carry the original requester ('user-X'), not the approver
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({ requestedBy: 'user-X', status: 'processing' }),
+        }),
+      );
+    });
+
+    it('throws ConflictException when request is already approved', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: { ...pendingReq, status: 'approved' } });
+      await expect(service.approveAiRequest(reqId, 'admin-sub')).rejects.toMatchObject({
+        status: 409,
+      });
+    });
+
+    it('throws NotFoundException when request does not exist', async () => {
+      mockDb.get.mockResolvedValueOnce({ Item: undefined });
+      await expect(service.approveAiRequest(reqId, 'admin-sub')).rejects.toMatchObject({
+        status: 404,
+      });
+    });
+  });
+
+  // ── rejectAiRequest ────────────────────────────────────────────────────────
+
+  describe('rejectAiRequest', () => {
+    it('updates request status to rejected', async () => {
+      const reqId = 'game:game-001';
+      mockDb.get.mockResolvedValueOnce({
+        Item: {
+          PK: `AIREQ#${reqId}`,
+          SK: 'META',
+          status: 'pending',
+          targetType: 'game',
+          targetId: 'game-001',
+          requestedBy: 'user-X',
+          requestedAt: '',
+        },
+      });
+
+      await service.rejectAiRequest(reqId, 'admin-sub');
+
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Key: { PK: `AIREQ#${reqId}`, SK: 'META' },
+          ExpressionAttributeValues: expect.objectContaining({ ':rejected': 'rejected' }),
+        }),
+      );
+    });
+  });
+
+  // ── listPendingRequests / listFailedJobs ───────────────────────────────────
+
+  describe('listPendingRequests', () => {
+    it('queries GSI-1 for pending requests', async () => {
+      const items = [{ PK: 'AIREQ#req-001', SK: 'META', status: 'pending' }];
+      mockDb.query = jest.fn().mockResolvedValueOnce({ Items: items });
+
+      const result = await service.listPendingRequests();
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.objectContaining({ ExpressionAttributeValues: { ':pk': 'AIREQ_STATUS#pending' } }),
+      );
+      expect(result).toEqual(items);
+    });
+  });
+
+  describe('listFailedJobs', () => {
+    it('queries GSI-1 for failed summary items', async () => {
+      const items = [{ PK: 'GAME#game-001', SK: 'AI_SUMMARY', status: 'failed' }];
+      mockDb.query = jest.fn().mockResolvedValueOnce({ Items: items });
+
+      const result = await service.listFailedJobs();
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ExpressionAttributeValues: { ':pk': 'AISUMMARY_STATUS#failed' },
+        }),
+      );
+      expect(result).toEqual(items);
     });
   });
 });
