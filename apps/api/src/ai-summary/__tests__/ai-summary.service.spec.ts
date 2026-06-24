@@ -97,6 +97,42 @@ function makeReplay(overrides: Partial<ReplayGamePayload> = {}): ReplayGamePaylo
   };
 }
 
+function makeChallengeRecord() {
+  return {
+    PK: 'CHALLENGE#chal-001',
+    SK: 'META',
+    challengeId: 'chal-001',
+    config: { numRounds: 1, startingScore: 0, ruleTopBottomJing: true },
+    participants: {
+      'user-A': {
+        sub: 'user-A',
+        handle: 'Alice',
+        role: 'creator',
+        status: 'completed',
+        gameId: 'game-A',
+        finalScore: 12,
+      },
+      'user-B': {
+        sub: 'user-B',
+        handle: 'Bob',
+        role: 'challenged',
+        status: 'completed',
+        gameId: 'game-B',
+        finalScore: -4,
+      },
+      'user-C': {
+        sub: 'user-C',
+        handle: 'Charlie',
+        role: 'challenged',
+        status: 'declined',
+      },
+    },
+    winners: ['user-A'],
+    createdAt: '2026-06-20T10:00:00Z',
+    completedAt: '2026-06-20T11:30:00Z',
+  };
+}
+
 // ── Mock setup ────────────────────────────────────────────────────────────────
 
 const mockDb = {
@@ -558,6 +594,175 @@ describe('AiSummaryService', () => {
     });
   });
 
+  // ── generateChallengeSummary ───────────────────────────────────────────────
+
+  describe('generateChallengeSummary', () => {
+    const doneChallengeItem = {
+      PK: 'CHALLENGE#chal-001',
+      SK: 'AI_SUMMARY',
+      status: 'done',
+      attempts: 1,
+    };
+
+    beforeEach(() => {
+      // Default relay response for challenge tests
+      mockRelay.generate.mockResolvedValue({
+        ok: true,
+        data: {
+          text: { en: 'Epic challenge!', zh: '精彩挑战！' },
+          model: 'gemini-1.5-flash',
+          promptVersion: 'v1-challenge',
+        },
+      });
+    });
+
+    it('writes processing with v1-challenge promptVersion then done on relay success', async () => {
+      // getSummary (attempts) → no existing; fetchChallengeRecord → record; getReplay ×2; final getSummary → done
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() })
+        .mockResolvedValueOnce({ Item: doneChallengeItem });
+      mockStorage.getReplay
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' }))
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-B' }));
+
+      const result = await service.generateChallengeSummary('chal-001', 'auto');
+
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({
+            PK: 'CHALLENGE#chal-001',
+            status: 'processing',
+            promptVersion: 'v1-challenge',
+          }),
+        }),
+      );
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Key: { PK: 'CHALLENGE#chal-001', SK: 'AI_SUMMARY' },
+          UpdateExpression: expect.stringContaining('done'),
+        }),
+      );
+      expect(result.status).toBe('done');
+    });
+
+    it('skips declined participants: only completed entries appear in digest', async () => {
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() })
+        .mockResolvedValueOnce({ Item: doneChallengeItem });
+      mockStorage.getReplay
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' }))
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-B' }));
+
+      await service.generateChallengeSummary('chal-001', 'auto');
+
+      // storage.getReplay must be called exactly twice (Alice + Bob), not three times (Charlie declined)
+      expect(mockStorage.getReplay).toHaveBeenCalledTimes(2);
+      expect(mockStorage.getReplay).toHaveBeenCalledWith('game-A');
+      expect(mockStorage.getReplay).toHaveBeenCalledWith('game-B');
+    });
+
+    it('marks failed when relay is disabled', async () => {
+      mockRelay.isEnabled = false;
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: doneChallengeItem });
+
+      await service.generateChallengeSummary('chal-001', 'auto');
+
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ExpressionAttributeValues: expect.objectContaining({
+            ':failed': 'failed',
+            ':code': '5xx',
+          }),
+        }),
+      );
+      mockRelay.isEnabled = true; // restore
+    });
+
+    it('marks failed when challenge record is not found in DDB', async () => {
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined }) // getSummary
+        .mockResolvedValueOnce({ Item: undefined }) // fetchChallengeRecord → not found
+        .mockResolvedValueOnce({ Item: doneChallengeItem });
+
+      await service.generateChallengeSummary('chal-001', 'auto');
+
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ExpressionAttributeValues: expect.objectContaining({ ':failed': 'failed' }),
+        }),
+      );
+    });
+
+    it('writes failed when fewer than 2 participant replays load (divergence impossible)', async () => {
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined }) // getSummary (attempts)
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() }) // fetchChallengeRecord
+        .mockResolvedValueOnce({ Item: doneChallengeItem }); // final getSummary
+      mockStorage.getReplay
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' })) // Alice OK
+        .mockRejectedValueOnce(new Error('S3 error')); // Bob fails → only 1 available
+
+      await service.generateChallengeSummary('chal-001', 'auto');
+
+      // Relay must NOT be called — extraction failure gates the job
+      expect(mockRelay.generate).not.toHaveBeenCalled();
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ExpressionAttributeValues: expect.objectContaining({ ':failed': 'failed' }),
+        }),
+      );
+    });
+
+    it('short-circuits when already processing (ConditionalCheckFailedException)', async () => {
+      const condError = Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      const inFlightItem = {
+        PK: 'CHALLENGE#chal-001',
+        SK: 'AI_SUMMARY',
+        status: 'processing',
+        attempts: 1,
+      };
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined }) // getSummary (attempts)
+        .mockResolvedValueOnce({ Item: inFlightItem }); // getSummary (return value)
+      mockDb.put.mockRejectedValueOnce(condError);
+
+      const result = await service.generateChallengeSummary('chal-001', 'auto');
+
+      expect(mockDb.put).toHaveBeenCalledTimes(1);
+      expect(mockRelay.generate).not.toHaveBeenCalled();
+      expect(result.status).toBe('processing');
+    });
+
+    it('marks failed when relay returns error', async () => {
+      mockRelay.generate.mockResolvedValue({
+        ok: false,
+        errorCode: 'timeout',
+        message: 'timed out',
+      });
+      mockDb.get
+        .mockResolvedValueOnce({ Item: undefined })
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() })
+        .mockResolvedValueOnce({ Item: doneChallengeItem });
+      mockStorage.getReplay
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' }))
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-B' }));
+
+      await service.generateChallengeSummary('chal-001', 'auto');
+
+      expect(mockDb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          UpdateExpression: expect.stringContaining('failed'),
+        }),
+      );
+    });
+  });
+
   // ── approveAiRequest ───────────────────────────────────────────────────────
 
   describe('approveAiRequest', () => {
@@ -633,6 +838,55 @@ describe('AiSummaryService', () => {
         status: 404,
       });
     });
+
+    it('triggers generateChallengeSummary when targetType is challenge', async () => {
+      const chalReqId = 'challenge:chal-001';
+      const chalPendingReq = {
+        PK: `AIREQ#${chalReqId}`,
+        SK: 'META',
+        status: 'pending',
+        targetType: 'challenge',
+        targetId: 'chal-001',
+        requestedBy: 'user-X',
+        requestedAt: new Date().toISOString(),
+      };
+      const chalDoneItem = {
+        PK: 'CHALLENGE#chal-001',
+        SK: 'AI_SUMMARY',
+        status: 'done',
+        attempts: 1,
+      };
+
+      mockRelay.generate.mockResolvedValue({
+        ok: true,
+        data: {
+          text: { en: 'Epic!', zh: '精彩！' },
+          model: 'gemini-1.5-flash',
+          promptVersion: 'v1-challenge',
+        },
+      });
+      mockDb.get
+        .mockResolvedValueOnce({ Item: chalPendingReq }) // getAiRequest
+        .mockResolvedValueOnce({ Item: undefined }) // generateChallengeSummary: getSummary (attempts)
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() }) // fetchChallengeRecord
+        .mockResolvedValueOnce({ Item: chalDoneItem }); // final getSummary
+      mockStorage.getReplay
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' }))
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-B' }));
+
+      const result = await service.approveAiRequest(chalReqId, 'admin-sub');
+
+      expect(mockDb.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          Item: expect.objectContaining({
+            PK: 'CHALLENGE#chal-001',
+            promptVersion: 'v1-challenge',
+            requestedBy: 'user-X', // original requester, not 'admin-sub'
+          }),
+        }),
+      );
+      expect(result.status).toBe('done');
+    });
   });
 
   // ── rejectAiRequest ────────────────────────────────────────────────────────
@@ -660,6 +914,78 @@ describe('AiSummaryService', () => {
           ExpressionAttributeValues: expect.objectContaining({ ':rejected': 'rejected' }),
         }),
       );
+    });
+  });
+
+  // ── retryFailedSummary ────────────────────────────────────────────────────
+
+  describe('retryFailedSummary', () => {
+    it('delegates to generateGameSummary for game targetType', async () => {
+      const failedItem = { PK: 'GAME#game-001', SK: 'AI_SUMMARY', status: 'failed', attempts: 1 };
+      const doneItem = { ...failedItem, status: 'done', attempts: 2 };
+      mockStorage.getReplay.mockResolvedValue(makeReplay());
+      mockRelay.generate.mockResolvedValue({
+        ok: true,
+        data: {
+          text: { en: 'Retry!', zh: '重试！' },
+          model: 'gemini-1.5-flash',
+          promptVersion: 'v1-game',
+        },
+      });
+      mockDb.get
+        .mockResolvedValueOnce({ Item: failedItem }) // getSummary (attempts)
+        .mockResolvedValueOnce({ Item: doneItem }); // final return
+
+      const result = await service.retryFailedSummary('game', 'game-001', 'admin-sub');
+      expect(result.status).toBe('done');
+    });
+
+    it('short-circuits when game summary is already processing', async () => {
+      const inFlightItem = {
+        PK: 'GAME#game-001',
+        SK: 'AI_SUMMARY',
+        status: 'processing',
+        attempts: 1,
+      };
+      const condError = Object.assign(new Error('conditional check failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+      mockDb.get
+        .mockResolvedValueOnce({ Item: inFlightItem }) // getSummary (attempts)
+        .mockResolvedValueOnce({ Item: inFlightItem }); // return after short-circuit
+      mockDb.put.mockRejectedValueOnce(condError);
+
+      const result = await service.retryFailedSummary('game', 'game-001', 'admin-sub');
+      expect(mockRelay.generate).not.toHaveBeenCalled();
+      expect(result.status).toBe('processing');
+    });
+
+    it('delegates to generateChallengeSummary for challenge targetType', async () => {
+      const failedItem = {
+        PK: 'CHALLENGE#chal-001',
+        SK: 'AI_SUMMARY',
+        status: 'failed',
+        attempts: 1,
+      };
+      const doneItem = { ...failedItem, status: 'done', attempts: 2 };
+      mockRelay.generate.mockResolvedValue({
+        ok: true,
+        data: {
+          text: { en: 'Retry!', zh: '重试！' },
+          model: 'gemini-1.5-flash',
+          promptVersion: 'v1-challenge',
+        },
+      });
+      mockDb.get
+        .mockResolvedValueOnce({ Item: failedItem }) // getSummary (attempts)
+        .mockResolvedValueOnce({ Item: makeChallengeRecord() }) // fetchChallengeRecord
+        .mockResolvedValueOnce({ Item: doneItem }); // final getSummary
+      mockStorage.getReplay
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-A' }))
+        .mockResolvedValueOnce(makeReplay({ gameId: 'game-B' }));
+
+      const result = await service.retryFailedSummary('challenge', 'chal-001', 'admin-sub');
+      expect(result.status).toBe('done');
     });
   });
 
