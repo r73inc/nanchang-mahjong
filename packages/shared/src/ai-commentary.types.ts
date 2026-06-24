@@ -16,7 +16,16 @@ import type { SeatWind } from './game.events';
 
 // ── Bilingual text ─────────────────────────────────────────────────────────────
 
-/** Every generated text payload carries both languages atomically. */
+/**
+ * Both language fields are always populated atomically in a single Gemini call.
+ *
+ * IMPLEMENTER CONSTRAINT (Phase 3): the `responseSchema` sent to the relay
+ * MUST declare both `en` and `zh` as strictly required string properties (no
+ * optionals, no nullables). This enforces single-pass generation — two separate
+ * per-language calls are explicitly disallowed (doubles token spend, risks a
+ * half-translated `done` state). If either field is absent or fails schema
+ * validation, the job MUST be marked `failed`, not partially stored.
+ */
 export interface BilingualText {
   en: string;
   zh: string;
@@ -30,8 +39,21 @@ export interface BilingualText {
  */
 export type AiSummaryStatus = 'requested' | 'approved' | 'processing' | 'done' | 'failed';
 
-/** Error codes surfaced in the failed-jobs admin screen. */
-export type AiSummaryErrorCode = '403' | '404' | '5xx' | 'timeout' | 'validation' | 'parse';
+/**
+ * Error codes surfaced in the failed-jobs admin screen.
+ *
+ * `payload_too_large` — the serialized facts-digest exceeded the pre-flight
+ * size ceiling enforced by the NestJS API before dispatch. The job is marked
+ * failed at source; the relay is never called.
+ */
+export type AiSummaryErrorCode =
+  | '403'
+  | '404'
+  | '5xx'
+  | 'timeout'
+  | 'validation'
+  | 'parse'
+  | 'payload_too_large';
 
 /** Shape of a GAME#<id>/AI_SUMMARY or CHALLENGE#<id>/AI_SUMMARY DynamoDB item. */
 export interface AiSummaryItem {
@@ -138,6 +160,7 @@ export interface GameFactsDigest {
   startedAt: string;
   endedAt: string;
   finalScores: [number, number, number, number];
+  /** 1-indexed finishing ranks ordered by seat index (placement[0] = seat 0's rank, etc.). */
   placement: [1 | 2 | 3 | 4, 1 | 2 | 3 | 4, 1 | 2 | 3 | 4, 1 | 2 | 3 | 4];
   result: 'win' | 'draw' | 'concede' | 'bust';
   hands: GameHandDigest[];
@@ -189,6 +212,16 @@ export interface ChallengeFactsDigest {
 /**
  * Request sent from the HK API to the us-east-1 Gemini relay Lambda.
  * The relay maps this to the Gemini generateContent request body.
+ *
+ * PAYLOAD BOUNDARY SAFEGUARD (mandatory — Phase 3 implementer):
+ * Before dispatching this request, the NestJS API layer MUST serialize the
+ * full request body to a UTF-8 string and validate that its byte length falls
+ * below a conservative ceiling (e.g. 4 MB) that leaves headroom under the
+ * synchronous AWS Lambda request payload hard limit of 6 MB. The challenge
+ * digest — which aggregates every participant's per-hand divergence — is the
+ * most likely to approach this bound. If the ceiling is breached the job MUST
+ * be marked `failed` with `errorCode: 'payload_too_large'` without calling the
+ * relay. Never send an oversized payload and rely on the Lambda returning 413.
  */
 export interface RelayGenerateRequest {
   /** Gemini model id to invoke (e.g. 'gemini-1.5-flash'). */
@@ -200,9 +233,13 @@ export interface RelayGenerateRequest {
   /** User-turn prompt containing the facts digest. */
   userPrompt: string;
   /**
-   * JSON Schema object describing the expected response.
-   * Must declare 'en' and 'zh' as required string properties so Gemini
-   * returns a single-pass bilingual JSON object.
+   * JSON Schema object describing the expected Gemini response.
+   *
+   * MUST declare both `en` and `zh` as required, non-nullable string
+   * properties to enforce single-pass bilingual generation (see BilingualText).
+   * The relay pins the Gemini response MIME type to `application/json` and
+   * passes this schema as the response schema — Gemini will reject responses
+   * that do not conform.
    */
   responseSchema: object;
   /** Word cap for challenge overviews (absent for per-game overviews). */
