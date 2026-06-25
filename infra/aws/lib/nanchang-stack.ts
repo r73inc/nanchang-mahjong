@@ -19,13 +19,13 @@ import { Construct } from 'constructs';
  *
  * REQUIREMENT: This app MUST be deployed in ap-east-1 (Hong Kong). No other region.
  *
- * Deploy in two phases to avoid the ECR chicken-and-egg problem:
+ * Standard deploy:
+ *   cdk deploy NanchangProd
  *
- *   Phase 1 — infrastructure only (ECS Fargate service not yet created):
- *     cdk deploy
- *
- *   Phase 2 — after pushing the first Docker image to ECR:
- *     cdk deploy --context deployApi=true
+ * On first deploy there is no Docker image in ECR yet — ECS tasks will fail to
+ * start and keep retrying. This is fine: as soon as GitHub Actions pushes the
+ * first image on merge to main, ECS picks it up automatically. There is no
+ * two-phase deploy process and no flags to remember.
  *
  * See docs/DEPLOYMENT.md for the full step-by-step guide.
  *
@@ -36,7 +36,7 @@ import { Construct } from 'constructs';
  *   - S3 web bucket (private, served via CloudFront OAC)
  *   - ECR repository for the NestJS API Docker image
  *   - Secrets Manager (JWT secrets auto-generated; VAPID keys require manual update)
- *   - ECS Fargate service behind an HTTP ALB (only when deployApi=true)
+ *   - ECS Fargate service behind an HTTP ALB
  *   - CloudFront distribution:
  *       /* → S3 web bucket (SPA, serves index.html on 403/404)
  *       /api/* → ECS Fargate ALB (CloudFront Function strips /api prefix)
@@ -46,11 +46,6 @@ import { Construct } from 'constructs';
 export class NanchangStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
-
-    // Whether to create the ECS Fargate service + API CloudFront behaviors.
-    // Set to false on first deploy (ECR image doesn't exist yet).
-    // Set to true after pushing the first Docker image: cdk deploy --context deployApi=true
-    const deployApi = this.node.tryGetContext('deployApi') === 'true';
 
     // ── DynamoDB (single-table design) ────────────────────────────────────────
     // PK / SK primary key. GSI1 covers:
@@ -233,73 +228,72 @@ export class NanchangStack extends cdk.Stack {
     });
 
     // ── CloudFront Distribution ────────────────────────────────────────────────
-    // Default behavior: S3 (static SPA). Additional behaviors for API traffic
-    // are added only when deployApi=true (ALB endpoint becomes available).
+    // Default behavior: S3 (static SPA). API behaviors always present.
 
     const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {};
 
-    let fargateService: ecsPatterns.ApplicationLoadBalancedFargateService | undefined;
+    // Look up the default VPC — all subnets are public (routes to IGW).
+    // CDK caches the lookup result in cdk.context.json; commit that file.
+    const vpc = ec2.Vpc.fromLookup(this, 'DefaultVpc', { isDefault: true });
 
-    if (deployApi) {
-      // Look up the default VPC — all subnets are public (routes to IGW).
-      // CDK caches the lookup result in cdk.context.json; commit that file.
-      const vpc = ec2.Vpc.fromLookup(this, 'DefaultVpc', { isDefault: true });
+    const cluster = new ecs.Cluster(this, 'NanchangCluster', {
+      vpc,
+      clusterName: 'nanchang',
+    });
 
-      const cluster = new ecs.Cluster(this, 'NanchangCluster', {
-        vpc,
-        clusterName: 'nanchang',
-      });
+    const logGroup = new logs.LogGroup(this, 'ApiLogGroup', {
+      logGroupName: '/ecs/nanchang-api',
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
-      const logGroup = new logs.LogGroup(this, 'ApiLogGroup', {
-        logGroupName: '/ecs/nanchang-api',
-        retention: logs.RetentionDays.ONE_MONTH,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-      });
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'ApiTaskDef', {
+      cpu: 512,
+      memoryLimitMiB: 1024,
+      executionRole,
+      taskRole,
+    });
 
-      const taskDefinition = new ecs.FargateTaskDefinition(this, 'ApiTaskDef', {
-        cpu: 512,
-        memoryLimitMiB: 1024,
-        executionRole,
-        taskRole,
-      });
+    taskDefinition.addContainer('api', {
+      image: ecs.ContainerImage.fromEcrRepository(ecrRepo, 'latest'),
+      portMappings: [{ containerPort: 3001 }],
+      environment: {
+        NODE_ENV: 'production',
+        PORT: '3001',
+        AWS_REGION: this.region,
+        DYNAMODB_TABLE_NAME: table.tableName,
+        S3_REPLAY_BUCKET: replayBucket.bucketName,
+        S3_AVATAR_BUCKET: avatarBucket.bucketName,
+        JWT_EXPIRES_IN: '1h',
+        JWT_REFRESH_EXPIRES_IN: '30d',
+        VAPID_SUBJECT: 'mailto:r73inc@gmail.com',
+        // Gemini relay — set GEMINI_RELAY_URL after the us-east-1 relay is deployed
+        GEMINI_RELAY_URL: (this.node.tryGetContext('geminiRelayUrl') as string | undefined) ?? '',
+        GEMINI_RELAY_REGION: 'us-east-1',
+        GEMINI_RELAY_MODEL: 'gemini-1.5-flash',
+      },
+      secrets: {
+        JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
+        JWT_REFRESH_SECRET: ecs.Secret.fromSecretsManager(jwtRefreshSecret),
+        VAPID_PUBLIC_KEY: ecs.Secret.fromSecretsManager(vapidKeys, 'publicKey'),
+        VAPID_PRIVATE_KEY: ecs.Secret.fromSecretsManager(vapidKeys, 'privateKey'),
+      },
+      logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'api', logGroup }),
+      healthCheck: {
+        command: ['CMD-SHELL', 'wget -qO- http://localhost:3001/health || exit 1'],
+        interval: cdk.Duration.seconds(10),
+        timeout: cdk.Duration.seconds(5),
+        retries: 3,
+        startPeriod: cdk.Duration.seconds(30),
+      },
+    });
 
-      taskDefinition.addContainer('api', {
-        image: ecs.ContainerImage.fromEcrRepository(ecrRepo, 'latest'),
-        portMappings: [{ containerPort: 3001 }],
-        environment: {
-          NODE_ENV: 'production',
-          PORT: '3001',
-          AWS_REGION: this.region,
-          DYNAMODB_TABLE_NAME: table.tableName,
-          S3_REPLAY_BUCKET: replayBucket.bucketName,
-          S3_AVATAR_BUCKET: avatarBucket.bucketName,
-          JWT_EXPIRES_IN: '1h',
-          JWT_REFRESH_EXPIRES_IN: '30d',
-          VAPID_SUBJECT: 'mailto:r73inc@gmail.com',
-          // Gemini relay — set GEMINI_RELAY_URL after the us-east-1 relay is deployed
-          GEMINI_RELAY_URL: (this.node.tryGetContext('geminiRelayUrl') as string | undefined) ?? '',
-          GEMINI_RELAY_REGION: 'us-east-1',
-          GEMINI_RELAY_MODEL: 'gemini-1.5-flash',
-        },
-        secrets: {
-          JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
-          JWT_REFRESH_SECRET: ecs.Secret.fromSecretsManager(jwtRefreshSecret),
-          VAPID_PUBLIC_KEY: ecs.Secret.fromSecretsManager(vapidKeys, 'publicKey'),
-          VAPID_PRIVATE_KEY: ecs.Secret.fromSecretsManager(vapidKeys, 'privateKey'),
-        },
-        logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'api', logGroup }),
-        healthCheck: {
-          command: ['CMD-SHELL', 'wget -qO- http://localhost:3001/health || exit 1'],
-          interval: cdk.Duration.seconds(10),
-          timeout: cdk.Duration.seconds(5),
-          retries: 3,
-          startPeriod: cdk.Duration.seconds(30),
-        },
-      });
-
-      // HTTP ALB + Fargate in public subnets with public IPs (no NAT gateway cost).
-      // CloudFront sits in front and handles HTTPS termination.
-      fargateService = new ecsPatterns.ApplicationLoadBalancedFargateService(this, 'ApiService', {
+    // HTTP ALB + Fargate in public subnets with public IPs (no NAT gateway cost).
+    // CloudFront sits in front and handles HTTPS termination.
+    const fargateService = new ecsPatterns.ApplicationLoadBalancedFargateService(
+      this,
+      'ApiService',
+      {
         cluster,
         taskDefinition,
         serviceName: 'nanchang-api',
@@ -313,52 +307,52 @@ export class NanchangStack extends cdk.Stack {
         healthCheckGracePeriod: cdk.Duration.seconds(60),
         minHealthyPercent: 100,
         maxHealthyPercent: 200,
-      });
+      },
+    );
 
-      fargateService.targetGroup.configureHealthCheck({
-        path: '/health',
-        protocol: elb2.Protocol.HTTP,
-        port: '3001',
-        healthyThresholdCount: 2,
-        unhealthyThresholdCount: 3,
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(10),
-      });
+    fargateService.targetGroup.configureHealthCheck({
+      path: '/health',
+      protocol: elb2.Protocol.HTTP,
+      port: '3001',
+      healthyThresholdCount: 2,
+      unhealthyThresholdCount: 3,
+      interval: cdk.Duration.seconds(30),
+      timeout: cdk.Duration.seconds(10),
+    });
 
-      // CloudFront → ALB via HTTP (CloudFront handles the HTTPS leg to clients).
-      const apiOrigin = new origins.HttpOrigin(fargateService.loadBalancer.loadBalancerDnsName, {
-        protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-        httpPort: 80,
-      });
+    // CloudFront → ALB via HTTP (CloudFront handles the HTTPS leg to clients).
+    const apiOrigin = new origins.HttpOrigin(fargateService.loadBalancer.loadBalancerDnsName, {
+      protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      httpPort: 80,
+    });
 
-      const apiCachePolicy = cloudfront.CachePolicy.CACHING_DISABLED;
-      // ALL_VIEWER_EXCEPT_HOST_HEADER forwards all viewer headers (including the
-      // Upgrade/Connection headers needed for WebSocket handshakes) while replacing
-      // Host with the origin hostname so the ALB doesn't reject the request.
-      const apiRequestPolicy = cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER;
+    const apiCachePolicy = cloudfront.CachePolicy.CACHING_DISABLED;
+    // ALL_VIEWER_EXCEPT_HOST_HEADER forwards all viewer headers (including the
+    // Upgrade/Connection headers needed for WebSocket handshakes) while replacing
+    // Host with the origin hostname so the ALB doesn't reject the request.
+    const apiRequestPolicy = cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER;
 
-      additionalBehaviors['/api/*'] = {
-        origin: apiOrigin,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        cachePolicy: apiCachePolicy,
-        originRequestPolicy: apiRequestPolicy,
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        functionAssociations: [
-          {
-            function: stripApiPrefixFn,
-            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-          },
-        ],
-      };
+    additionalBehaviors['/api/*'] = {
+      origin: apiOrigin,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: apiCachePolicy,
+      originRequestPolicy: apiRequestPolicy,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      functionAssociations: [
+        {
+          function: stripApiPrefixFn,
+          eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+        },
+      ],
+    };
 
-      additionalBehaviors['/socket.io*'] = {
-        origin: apiOrigin,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        cachePolicy: apiCachePolicy,
-        originRequestPolicy: apiRequestPolicy,
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      };
-    }
+    additionalBehaviors['/socket.io*'] = {
+      origin: apiOrigin,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: apiCachePolicy,
+      originRequestPolicy: apiRequestPolicy,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+    };
 
     // Use OAC (preferred over legacy OAI) for S3 origin.
     // CDK automatically creates the OAC and grants the bucket policy.
@@ -436,17 +430,15 @@ export class NanchangStack extends cdk.Stack {
       description: 'Update this secret with real VAPID keys before enabling push',
     });
 
-    if (fargateService) {
-      new cdk.CfnOutput(this, 'EcsFargateServiceArn', {
-        value: fargateService.service.serviceArn,
-        description:
-          'ECS Fargate service ARN — use cluster=nanchang service=nanchang-api for updates',
-      });
+    new cdk.CfnOutput(this, 'EcsFargateServiceArn', {
+      value: fargateService.service.serviceArn,
+      description:
+        'ECS Fargate service ARN — use cluster=nanchang service=nanchang-api for updates',
+    });
 
-      new cdk.CfnOutput(this, 'AlbEndpoint', {
-        value: fargateService.loadBalancer.loadBalancerDnsName,
-        description: 'ALB DNS name — traffic goes through CloudFront, not here directly',
-      });
-    }
+    new cdk.CfnOutput(this, 'AlbEndpoint', {
+      value: fargateService.loadBalancer.loadBalancerDnsName,
+      description: 'ALB DNS name — traffic goes through CloudFront, not here directly',
+    });
   }
 }
