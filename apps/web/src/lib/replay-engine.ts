@@ -95,7 +95,8 @@ function buildHandCauses(
     if (
       event.kind === 'deal' ||
       event.kind === 'dice_roll' ||
-      event.kind === 'opening_jing_settlement'
+      event.kind === 'opening_jing_settlement' ||
+      event.kind === 'sacking_dealer'
     ) {
       i += 1;
       continue;
