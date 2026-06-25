@@ -23,6 +23,7 @@ import type { AiSummaryPublic } from '@nanchang/shared';
 function renderPanel(props: {
   summary?: AiSummaryPublic | null;
   isLoading?: boolean;
+  isError?: boolean;
   isRequesting?: boolean;
   onRequest?: () => void;
   label?: string;
@@ -32,6 +33,7 @@ function renderPanel(props: {
       <AiSummaryPanel
         summary={props.summary ?? null}
         isLoading={props.isLoading ?? false}
+        isError={props.isError ?? false}
         isRequesting={props.isRequesting ?? false}
         onRequest={props.onRequest ?? vi.fn()}
         label={props.label}
@@ -94,6 +96,12 @@ describe('AiSummaryPanel', () => {
     renderPanel({ summary: { status: 'failed' } });
     expandPanel();
     expect(screen.getByText(/generation failed/i)).toBeInTheDocument();
+  });
+
+  it('AiSummary·error-hides-button — request button is hidden when the fetch errored', () => {
+    renderPanel({ summary: null, isError: true });
+    expandPanel();
+    expect(screen.queryByRole('button', { name: /request ai summary/i })).not.toBeInTheDocument();
   });
 
   it('AiSummary·lang-fallback — falls back to zh when en text is missing', () => {

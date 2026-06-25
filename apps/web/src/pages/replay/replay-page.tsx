@@ -130,7 +130,11 @@ export function ReplayPage() {
   const currentUser = useAuthStore((s) => s.user);
 
   const { data: payload, isLoading, isError } = useReplay(gameId ?? '');
-  const { data: summary, isLoading: summaryLoading } = useGameSummary(gameId ?? '');
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isError: summaryError,
+  } = useGameSummary(gameId ?? '');
   const requestSummary = useRequestGameSummary();
 
   const timeline = useMemo(() => (payload ? buildOmniscientTimeline(payload) : []), [payload]);
@@ -279,6 +283,7 @@ export function ReplayPage() {
         <AiSummaryPanel
           summary={summary}
           isLoading={summaryLoading}
+          isError={summaryError}
           isRequesting={requestSummary.isPending}
           onRequest={() => void requestSummary.mutate(gameId ?? '')}
         />

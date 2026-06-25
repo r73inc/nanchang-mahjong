@@ -19,13 +19,22 @@ const CHEVRON_DOWN = '▾';
 interface Props {
   summary: AiSummaryPublic | null | undefined;
   isLoading: boolean;
+  /** When the fetch itself failed (auth/network error) — hides the request button. */
+  isError?: boolean;
   isRequesting?: boolean;
   onRequest: () => void;
   /** Optional label that appears above the panel, e.g. participant handle. */
   label?: string;
 }
 
-export function AiSummaryPanel({ summary, isLoading, isRequesting, onRequest, label }: Props) {
+export function AiSummaryPanel({
+  summary,
+  isLoading,
+  isError,
+  isRequesting,
+  onRequest,
+  label,
+}: Props) {
   const { t, lang } = useI18n();
   const [expanded, setExpanded] = useState(false);
 
@@ -70,7 +79,7 @@ export function AiSummaryPanel({ summary, isLoading, isRequesting, onRequest, la
         <div className="px-4 pb-4">
           {isLoading && <p className="text-xs text-mj-bone/40 italic">{t('aiSummaryLoading')}</p>}
 
-          {!isLoading && !summary && (
+          {!isLoading && !isError && !summary && (
             <button
               onClick={onRequest}
               disabled={isRequesting}

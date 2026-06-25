@@ -328,6 +328,7 @@ export function ChallengeReplayPage() {
         <AiSummaryPanel
           summary={challengeSummary.data}
           isLoading={challengeSummary.isLoading}
+          isError={challengeSummary.isError}
           isRequesting={requestChallengeSummary.isPending}
           onRequest={() => void requestChallengeSummary.mutate(challengeId ?? '')}
         />
@@ -350,8 +351,10 @@ export function ChallengeReplayPage() {
         {/* Per-player AI breakdown (switches with active participant) */}
         {activeGameId && (
           <AiSummaryPanel
+            key={activeGameId}
             summary={gameSummary.data}
             isLoading={gameSummary.isLoading}
+            isError={gameSummary.isError}
             isRequesting={requestGameSummary.isPending}
             onRequest={() => void requestGameSummary.mutate(activeGameId)}
             label={t('aiSummaryPlayerBreakdown')}

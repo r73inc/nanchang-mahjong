@@ -29,7 +29,11 @@ export function ChallengeDetailPage() {
   const startGame = useStartChallengeGame();
   const declineChallenge = useDeclineChallenge();
   const markViewed = useMarkChallengeResultsViewed();
-  const { data: aiSummary, isLoading: aiSummaryLoading } = useChallengeSummary(challengeId!);
+  const {
+    data: aiSummary,
+    isLoading: aiSummaryLoading,
+    isError: aiSummaryError,
+  } = useChallengeSummary(challengeId!);
   const requestAiSummary = useRequestChallengeSummary();
 
   const [confirmDecline, setConfirmDecline] = useState(false);
@@ -154,6 +158,7 @@ export function ChallengeDetailPage() {
           <AiSummaryPanel
             summary={aiSummary}
             isLoading={aiSummaryLoading}
+            isError={aiSummaryError}
             isRequesting={requestAiSummary.isPending}
             onRequest={() => void requestAiSummary.mutate(challengeId!)}
           />
