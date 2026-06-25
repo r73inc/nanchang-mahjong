@@ -69,8 +69,12 @@ export function replayHand(config: ReplayHandConfig, events: GameEvent[]): GameS
         // A stand-alone 'draw' always means passClaims() was called.
         // Dead-wall draws after kong claims are consumed internally by the
         // kong methods below (advance = 2 skips the following draw event).
-        engine = engine.passClaims();
-        states.push(engine.state);
+        // Guard matches draw_game: skip silently if phase is wrong rather than
+        // throwing, so an unexpected draw in the log doesn't crash the replay.
+        if (engine.state.phase === 'awaiting_claims') {
+          engine = engine.passClaims();
+          states.push(engine.state);
+        }
         break;
 
       case 'pung':
