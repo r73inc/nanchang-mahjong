@@ -12,8 +12,15 @@ import {
   useSetRole,
   useSetDisabled,
   useSetPermission,
+  useAiPendingRequests,
+  useApproveAiRequest,
+  useRejectAiRequest,
+  useAiFailedJobs,
+  useRetryAiJob,
   type InviteRecord,
   type AdminUser,
+  type AiPendingRequest,
+  type AiFailedJob,
 } from '../../hooks/use-admin';
 import { getApiErrorMessage } from '../../lib/api';
 
@@ -275,6 +282,13 @@ function UsersSection() {
                   grant,
                 })
               }
+              onToggleAiFeatures={(grant) =>
+                void setPermissionMutation.mutate({
+                  sub: u.sub,
+                  permission: 'admin-ai-features',
+                  grant,
+                })
+              }
             />
           ))}
         </ul>
@@ -292,6 +306,7 @@ function UserRow({
   onSetRole,
   onSetDisabled,
   onToggleDevTest,
+  onToggleAiFeatures,
 }: {
   user: AdminUser;
   isSelf: boolean;
@@ -301,9 +316,11 @@ function UserRow({
   onSetRole: (role: 'user' | 'admin') => void;
   onSetDisabled: (disabled: boolean) => void;
   onToggleDevTest: (grant: boolean) => void;
+  onToggleAiFeatures: (grant: boolean) => void;
 }) {
   const { t } = useI18n();
   const hasDevTest = (user.permissions ?? []).includes('devTestRoom');
+  const hasAiFeatures = (user.permissions ?? []).includes('admin-ai-features');
 
   return (
     <li className="rounded-[12px] px-3 py-3 space-y-1.5" style={rowStyle}>
@@ -325,6 +342,13 @@ function UserRow({
         {hasDevTest && (
           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-mj-gold/10 text-mj-gold border-mj-gold/20">
             {t('devTestPermBadge')}
+          </span>
+        )}
+
+        {/* AI admin permission badge */}
+        {hasAiFeatures && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-mj-gold/10 text-mj-gold border-mj-gold/20">
+            {t('adminAiFeaturesBadge')}
           </span>
         )}
 
@@ -378,8 +402,194 @@ function UserRow({
               ? t('adminRevokeDevTest')
               : t('adminGrantDevTest')}
         </button>
+
+        {/* AI admin permission — admins can toggle for anyone, including themselves */}
+        <button
+          onClick={() => onToggleAiFeatures(!hasAiFeatures)}
+          disabled={isPermissionPending}
+          className={hasAiFeatures ? btnDanger : btnMuted}
+        >
+          {isPermissionPending
+            ? t('adminSaving')
+            : hasAiFeatures
+              ? t('adminRevokeAiFeatures')
+              : t('adminGrantAiFeatures')}
+        </button>
       </div>
     </li>
+  );
+}
+
+// ── AI request queue section ──────────────────────────────────────────────────
+
+function AiRequestRow({
+  request,
+  isBusy,
+  pendingAction,
+  onApprove,
+  onReject,
+}: {
+  request: AiPendingRequest;
+  isBusy: boolean;
+  pendingAction: 'approve' | 'reject' | null;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <li className="rounded-[12px] px-3 py-2.5 space-y-1.5" style={rowStyle}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-bold border"
+          style={{
+            background: 'rgba(var(--felt-ink-rgb),0.06)',
+            borderColor: 'rgba(var(--felt-ink-rgb),0.12)',
+            color: 'rgba(var(--felt-ink-rgb),0.55)',
+          }}
+        >
+          {request.targetType === 'game' ? t('adminAiTargetGame') : t('adminAiTargetChallenge')}
+        </span>
+        <span className="font-mono text-xs text-mj-bone/70 flex-1 truncate">
+          {request.targetId}
+        </span>
+        <span className="text-[10px] text-mj-bone/35">
+          {new Date(request.requestedAt).toLocaleDateString()}
+        </span>
+      </div>
+      <div className="flex gap-1.5">
+        <button onClick={onApprove} disabled={isBusy} className={btnGold}>
+          {pendingAction === 'approve' ? t('adminSaving') : t('adminAiApprove')}
+        </button>
+        <button onClick={onReject} disabled={isBusy} className={btnDanger}>
+          {pendingAction === 'reject' ? t('adminSaving') : t('adminAiReject')}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function AiQueueSection() {
+  const { t } = useI18n();
+  const { data: requests, isLoading } = useAiPendingRequests();
+  const approveMutation = useApproveAiRequest();
+  const rejectMutation = useRejectAiRequest();
+
+  const pendingReqId = approveMutation.isPending
+    ? approveMutation.variables
+    : rejectMutation.isPending
+      ? rejectMutation.variables
+      : null;
+  const pendingAction: 'approve' | 'reject' | null = approveMutation.isPending
+    ? 'approve'
+    : rejectMutation.isPending
+      ? 'reject'
+      : null;
+
+  return (
+    <section className="mb-6">
+      <h2 className="text-[13px] font-bold text-mj-gold/80 uppercase tracking-wider mb-3">
+        {t('adminAiQueueTitle')}
+      </h2>
+      {isLoading ? (
+        <div className="flex justify-center py-6">
+          <Spinner />
+        </div>
+      ) : !requests?.length ? (
+        <p className="text-center text-sm text-mj-bone/40 py-4">{t('adminAiQueueEmpty')}</p>
+      ) : (
+        <ul className="space-y-2">
+          {requests.map((req) => (
+            <AiRequestRow
+              key={req.reqId}
+              request={req}
+              isBusy={pendingReqId === req.reqId}
+              pendingAction={pendingReqId === req.reqId ? pendingAction : null}
+              onApprove={() => void approveMutation.mutate(req.reqId)}
+              onReject={() => void rejectMutation.mutate(req.reqId)}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ── AI failed jobs section ────────────────────────────────────────────────────
+
+function AiFailedJobRow({
+  job,
+  isBusy,
+  onRetry,
+}: {
+  job: AiFailedJob;
+  isBusy: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <li className="rounded-[12px] px-3 py-2.5 space-y-1.5" style={rowStyle}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-bold border"
+          style={{
+            background: 'rgba(var(--felt-ink-rgb),0.06)',
+            borderColor: 'rgba(var(--felt-ink-rgb),0.12)',
+            color: 'rgba(var(--felt-ink-rgb),0.55)',
+          }}
+        >
+          {job.targetType === 'game' ? t('adminAiTargetGame') : t('adminAiTargetChallenge')}
+        </span>
+        <span className="font-mono text-xs text-mj-bone/70 flex-1 truncate">{job.targetId}</span>
+        <span className="text-[10px] text-mj-bone/35">
+          {t('adminAiAttempts', String(job.attempts))}
+        </span>
+      </div>
+      {job.errorCode && <p className="text-[11px] font-mono text-mj-loss-light">{job.errorCode}</p>}
+      <div className="flex gap-1.5">
+        <button onClick={onRetry} disabled={isBusy} className={btnGold}>
+          {isBusy ? t('adminSaving') : t('adminAiRetry')}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function AiFailedJobsSection() {
+  const { t } = useI18n();
+  const { data: jobs, isLoading } = useAiFailedJobs();
+  const retryMutation = useRetryAiJob();
+
+  const pendingKey =
+    retryMutation.isPending && retryMutation.variables
+      ? `${retryMutation.variables.targetType}-${retryMutation.variables.targetId}`
+      : null;
+
+  return (
+    <section className="mb-6">
+      <h2 className="text-[13px] font-bold text-mj-gold/80 uppercase tracking-wider mb-3">
+        {t('adminAiFailedTitle')}
+      </h2>
+      {isLoading ? (
+        <div className="flex justify-center py-6">
+          <Spinner />
+        </div>
+      ) : !jobs?.length ? (
+        <p className="text-center text-sm text-mj-bone/40 py-4">{t('adminAiFailedEmpty')}</p>
+      ) : (
+        <ul className="space-y-2">
+          {jobs.map((job) => (
+            <AiFailedJobRow
+              key={`${job.targetType}-${job.targetId}`}
+              job={job}
+              isBusy={pendingKey === `${job.targetType}-${job.targetId}`}
+              onRetry={() =>
+                void retryMutation.mutate({ targetType: job.targetType, targetId: job.targetId })
+              }
+            />
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -388,12 +598,16 @@ function UserRow({
 export function AdminPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const currentUser = useAuthStore((s) => s.user);
+  const hasAiFeatures = (currentUser?.permissions ?? []).includes('admin-ai-features');
 
   return (
     <ScreenShell title={t('adminPanel')} onBack={() => navigate('/home')}>
       <div className="px-5 py-6">
         <InvitesSection />
         <UsersSection />
+        {hasAiFeatures && <AiQueueSection />}
+        {hasAiFeatures && <AiFailedJobsSection />}
       </div>
     </ScreenShell>
   );

@@ -785,5 +785,19 @@
   "aiSummaryFailed": "Generation failed",
   "aiSummaryExpand": "Expand AI commentary",
   "aiSummaryCollapse": "Collapse AI commentary",
-  "aiSummaryPlayerBreakdown": "Player breakdown"
+  "aiSummaryPlayerBreakdown": "Player breakdown",
+
+  "adminAiQueueTitle": "AI Request Queue",
+  "adminAiQueueEmpty": "No pending requests.",
+  "adminAiApprove": "Approve",
+  "adminAiReject": "Reject",
+  "adminAiFailedTitle": "Failed AI Jobs",
+  "adminAiFailedEmpty": "No failed jobs.",
+  "adminAiRetry": "Retry",
+  "adminGrantAiFeatures": "Grant AI Admin",
+  "adminRevokeAiFeatures": "Revoke AI Admin",
+  "adminAiFeaturesBadge": "AI Admin",
+  "adminAiTargetGame": "Game",
+  "adminAiTargetChallenge": "Challenge",
+  "adminAiAttempts": "Attempt {{0}}"
 }

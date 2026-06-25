@@ -786,5 +786,19 @@
   "aiSummaryFailed": "生成失败",
   "aiSummaryExpand": "展开 AI 点评",
   "aiSummaryCollapse": "收起 AI 点评",
-  "aiSummaryPlayerBreakdown": "玩家详情"
+  "aiSummaryPlayerBreakdown": "玩家详情",
+
+  "adminAiQueueTitle": "AI 申请队列",
+  "adminAiQueueEmpty": "暂无待处理申请。",
+  "adminAiApprove": "批准",
+  "adminAiReject": "拒绝",
+  "adminAiFailedTitle": "失败的 AI 任务",
+  "adminAiFailedEmpty": "暂无失败任务。",
+  "adminAiRetry": "重试",
+  "adminGrantAiFeatures": "授予 AI 管理权限",
+  "adminRevokeAiFeatures": "撤销 AI 管理权限",
+  "adminAiFeaturesBadge": "AI 管理",
+  "adminAiTargetGame": "游戏",
+  "adminAiTargetChallenge": "挑战",
+  "adminAiAttempts": "第 {{0}} 次"
 }
