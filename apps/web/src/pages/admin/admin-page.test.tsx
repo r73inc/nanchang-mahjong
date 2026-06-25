@@ -22,6 +22,7 @@ const mockSetPermission = vi.fn();
 const mockApproveAiRequest = vi.fn();
 const mockRejectAiRequest = vi.fn();
 const mockRetryAiJob = vi.fn();
+const mockBackfillSummaries = vi.fn();
 
 vi.mock('../../hooks/use-admin', () => ({
   useAdminInvites: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock('../../hooks/use-admin', () => ({
   useRejectAiRequest: vi.fn(),
   useAiFailedJobs: vi.fn(),
   useRetryAiJob: vi.fn(),
+  useBackfillSummaries: vi.fn(),
 }));
 
 import {
@@ -51,6 +53,7 @@ import {
   useRejectAiRequest,
   useAiFailedJobs,
   useRetryAiJob,
+  useBackfillSummaries,
 } from '../../hooks/use-admin';
 
 const mockUseAuthStore = vi.mocked(useAuthStore);
@@ -66,6 +69,7 @@ const mockUseApproveAiRequest = vi.mocked(useApproveAiRequest);
 const mockUseRejectAiRequest = vi.mocked(useRejectAiRequest);
 const mockUseAiFailedJobs = vi.mocked(useAiFailedJobs);
 const mockUseRetryAiJob = vi.mocked(useRetryAiJob);
+const mockUseBackfillSummaries = vi.mocked(useBackfillSummaries);
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -163,6 +167,11 @@ function setupDefaultMocks() {
     mutate: mockRetryAiJob,
     isPending: false,
     variables: undefined,
+  } as never);
+  mockUseBackfillSummaries.mockReturnValue({
+    mutate: mockBackfillSummaries,
+    isPending: false,
+    data: undefined,
   } as never);
 }
 
@@ -415,6 +424,22 @@ describe('AdminPage — AI queue', () => {
     renderAdminPage();
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     expect(mockRetryAiJob).toHaveBeenCalledWith({ targetType: 'game', targetId: 'game-xyz' });
+  });
+
+  it('AdminAi·backfill-button — calls backfill mutation when button clicked', () => {
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /backfill summaries/i }));
+    expect(mockBackfillSummaries).toHaveBeenCalledTimes(1);
+  });
+
+  it('AdminAi·backfill-result — shows queued/skipped counts after backfill succeeds', () => {
+    mockUseBackfillSummaries.mockReturnValue({
+      mutate: mockBackfillSummaries,
+      isPending: false,
+      data: { game: { queued: 3, skipped: 1 }, challenge: { queued: 2, skipped: 0 } },
+    } as never);
+    renderAdminPage();
+    expect(screen.getByText(/queued 3 games/i)).toBeInTheDocument();
   });
 });
 
