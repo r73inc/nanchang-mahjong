@@ -424,19 +424,18 @@ function UserRow({
 
 function AiRequestRow({
   request,
-  isApprovePending,
-  isRejectPending,
+  isBusy,
+  pendingAction,
   onApprove,
   onReject,
 }: {
   request: AiPendingRequest;
-  isApprovePending: boolean;
-  isRejectPending: boolean;
+  isBusy: boolean;
+  pendingAction: 'approve' | 'reject' | null;
   onApprove: () => void;
   onReject: () => void;
 }) {
   const { t } = useI18n();
-  const isBusy = isApprovePending || isRejectPending;
   return (
     <li className="rounded-[12px] px-3 py-2.5 space-y-1.5" style={rowStyle}>
       <div className="flex items-center gap-2 flex-wrap">
@@ -459,10 +458,10 @@ function AiRequestRow({
       </div>
       <div className="flex gap-1.5">
         <button onClick={onApprove} disabled={isBusy} className={btnGold}>
-          {isApprovePending ? t('adminSaving') : t('adminAiApprove')}
+          {pendingAction === 'approve' ? t('adminSaving') : t('adminAiApprove')}
         </button>
         <button onClick={onReject} disabled={isBusy} className={btnDanger}>
-          {isRejectPending ? t('adminSaving') : t('adminAiReject')}
+          {pendingAction === 'reject' ? t('adminSaving') : t('adminAiReject')}
         </button>
       </div>
     </li>
@@ -474,6 +473,17 @@ function AiQueueSection() {
   const { data: requests, isLoading } = useAiPendingRequests();
   const approveMutation = useApproveAiRequest();
   const rejectMutation = useRejectAiRequest();
+
+  const pendingReqId = approveMutation.isPending
+    ? approveMutation.variables
+    : rejectMutation.isPending
+      ? rejectMutation.variables
+      : null;
+  const pendingAction: 'approve' | 'reject' | null = approveMutation.isPending
+    ? 'approve'
+    : rejectMutation.isPending
+      ? 'reject'
+      : null;
 
   return (
     <section className="mb-6">
@@ -492,10 +502,8 @@ function AiQueueSection() {
             <AiRequestRow
               key={req.reqId}
               request={req}
-              isApprovePending={
-                approveMutation.isPending && approveMutation.variables === req.reqId
-              }
-              isRejectPending={rejectMutation.isPending && rejectMutation.variables === req.reqId}
+              isBusy={pendingReqId === req.reqId}
+              pendingAction={pendingReqId === req.reqId ? pendingAction : null}
               onApprove={() => void approveMutation.mutate(req.reqId)}
               onReject={() => void rejectMutation.mutate(req.reqId)}
             />
@@ -510,11 +518,11 @@ function AiQueueSection() {
 
 function AiFailedJobRow({
   job,
-  isRetrying,
+  isBusy,
   onRetry,
 }: {
   job: AiFailedJob;
-  isRetrying: boolean;
+  isBusy: boolean;
   onRetry: () => void;
 }) {
   const { t } = useI18n();
@@ -538,8 +546,8 @@ function AiFailedJobRow({
       </div>
       {job.errorCode && <p className="text-[11px] font-mono text-mj-loss-light">{job.errorCode}</p>}
       <div className="flex gap-1.5">
-        <button onClick={onRetry} disabled={isRetrying} className={btnGold}>
-          {isRetrying ? t('adminSaving') : t('adminAiRetry')}
+        <button onClick={onRetry} disabled={isBusy} className={btnGold}>
+          {isBusy ? t('adminSaving') : t('adminAiRetry')}
         </button>
       </div>
     </li>
@@ -550,6 +558,11 @@ function AiFailedJobsSection() {
   const { t } = useI18n();
   const { data: jobs, isLoading } = useAiFailedJobs();
   const retryMutation = useRetryAiJob();
+
+  const pendingKey =
+    retryMutation.isPending && retryMutation.variables
+      ? `${retryMutation.variables.targetType}-${retryMutation.variables.targetId}`
+      : null;
 
   return (
     <section className="mb-6">
@@ -568,11 +581,7 @@ function AiFailedJobsSection() {
             <AiFailedJobRow
               key={`${job.targetType}-${job.targetId}`}
               job={job}
-              isRetrying={
-                retryMutation.isPending &&
-                retryMutation.variables?.targetType === job.targetType &&
-                retryMutation.variables?.targetId === job.targetId
-              }
+              isBusy={pendingKey === `${job.targetType}-${job.targetId}`}
               onRetry={() =>
                 void retryMutation.mutate({ targetType: job.targetType, targetId: job.targetId })
               }
