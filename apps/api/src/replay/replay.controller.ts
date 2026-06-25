@@ -22,6 +22,20 @@ export class ReplayController {
   }
 
   /**
+   * GET /replays/:id/summary
+   *
+   * Return the current AI summary state for this game (public fields only).
+   * Returns null when no summary has been requested yet.
+   */
+  @Get(':id/summary')
+  async getGameSummary(@Param('id') gameId: string, @CurrentUser() actor: AuthenticatedUser) {
+    await this.replay.checkReplayAccess(gameId, actor.sub);
+    const item = await this.aiSummary.getSummary(`GAME#${gameId}`);
+    if (!item) return null;
+    return { status: item.status, text: item.text, errorCode: item.errorCode };
+  }
+
+  /**
    * POST /replays/:id/request-summary
    *
    * Request an AI-generated commentary summary for this game.
