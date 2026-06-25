@@ -10,6 +10,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
@@ -363,8 +364,18 @@ export class NanchangStack extends cdk.Stack {
     // CDK automatically creates the OAC and grants the bucket policy.
     const webOrigin = origins.S3BucketOrigin.withOriginAccessControl(webBucket);
 
+    // ACM certificate for the custom domain (must be in us-east-1 for CloudFront).
+    // Certificate covers wuchatea.com + www.wuchatea.com and is already ISSUED.
+    const siteCert = acm.Certificate.fromCertificateArn(
+      this,
+      'SiteCert',
+      'arn:aws:acm:us-east-1:948211576126:certificate/c7c72c10-9ea9-4bfc-b701-f6fbff12777b',
+    );
+
     const distribution = new cloudfront.Distribution(this, 'WebDistribution', {
       comment: 'Nanchang Mahjong — SPA + API proxy',
+      domainNames: ['wuchatea.com', 'www.wuchatea.com'],
+      certificate: siteCert,
       defaultBehavior: {
         origin: webOrigin,
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

@@ -118,7 +118,7 @@ function UnviewedChallengesBanner() {
   const navigate = useNavigate();
   const { data: challenges } = useChallenges();
 
-  const unviewedCount = (challenges ?? []).filter(
+  const unviewedCount = (Array.isArray(challenges) ? challenges : []).filter(
     (c) => c.status === 'completed' && !c.resultsViewed,
   ).length;
 
@@ -148,7 +148,7 @@ function OpenChallengesSection() {
   const mySub = useAuthStore((s) => s.user?.sub ?? '');
   const { data: challenges } = useChallenges();
 
-  const actionable = (challenges ?? [])
+  const actionable = (Array.isArray(challenges) ? challenges : [])
     .filter(
       (c) =>
         (c.myStatus === 'pending' || c.myStatus === 'accepted') &&
@@ -264,7 +264,7 @@ function SavedGamesSection() {
   const loadManual = useLoadManualSave();
   const deleteSave = useDeleteSave();
 
-  if (!saves || saves.length === 0) return null;
+  if (!Array.isArray(saves) || saves.length === 0) return null;
 
   const autoSave = saves.find((s) => s.slot === 'auto');
   const manualSave = saves.find((s) => s.slot === 'manual');
