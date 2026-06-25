@@ -799,5 +799,9 @@
   "adminAiFeaturesBadge": "AI Admin",
   "adminAiTargetGame": "Game",
   "adminAiTargetChallenge": "Challenge",
-  "adminAiAttempts": "Attempt {{0}}"
+  "adminAiAttempts": "Attempt {{0}}",
+  "adminAiBackfill": "Backfill Summaries",
+  "adminAiBackfillDesc": "Queue AI summaries for all games and completed challenges that don't have one yet.",
+  "adminAiBackfillRunning": "Queuing…",
+  "adminAiBackfillResult": "Queued {{0}} games, {{1}} challenges. Skipped {{2}} already covered."
 }

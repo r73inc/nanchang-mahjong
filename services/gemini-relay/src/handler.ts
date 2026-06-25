@@ -4,34 +4,56 @@ import type {
   RelayErrorResponse,
   AiSummaryErrorCode,
 } from '@nanchang/shared';
+
+function log(fields: Record<string, unknown>): void {
+  console.log(JSON.stringify(fields));
+}
 import { SizeError, ParseError } from './errors';
 import { getRawBody, parseAndValidate } from './validate';
 import { getGeminiKey } from './secrets';
 import { callGemini } from './gemini-client';
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+  const startMs = Date.now();
+
   // ── 1. Parse + validate request ────────────────────────────────────────────
   let request;
   try {
     request = parseAndValidate(getRawBody(event));
   } catch (err) {
-    if (err instanceof SizeError) {
-      return errorJson(413, 'payload_too_large', err.message);
-    }
-    return errorJson(400, 'validation', err instanceof Error ? err.message : 'Invalid request');
+    const code = err instanceof SizeError ? 'payload_too_large' : 'validation';
+    const message = err instanceof Error ? err.message : 'Invalid request';
+    log({ event: 'relay_error', errorCode: code, message, durationMs: Date.now() - startMs });
+    return errorJson(err instanceof SizeError ? 413 : 400, code as AiSummaryErrorCode, message);
   }
+
+  log({ event: 'relay_request', model: request.model, promptVersion: request.promptVersion });
 
   // ── 2. Retrieve Gemini API key from Secrets Manager ────────────────────────
   let apiKey: string;
   try {
     apiKey = await getGeminiKey();
   } catch {
-    return errorJson(500, '5xx', 'Failed to retrieve Gemini API key from Secrets Manager');
+    const message = 'Failed to retrieve Gemini API key from Secrets Manager';
+    log({
+      event: 'relay_error',
+      model: request.model,
+      errorCode: '5xx',
+      message,
+      durationMs: Date.now() - startMs,
+    });
+    return errorJson(500, '5xx', message);
   }
 
   // ── 3. Call Gemini and map response / errors ───────────────────────────────
   try {
     const text = await callGemini(apiKey, request);
+    log({
+      event: 'relay_success',
+      model: request.model,
+      promptVersion: request.promptVersion,
+      durationMs: Date.now() - startMs,
+    });
     const response: RelayGenerateResponse = {
       text,
       model: request.model,
@@ -39,7 +61,17 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     };
     return json(200, response);
   } catch (err) {
-    return mapGeminiError(err);
+    const result = mapGeminiError(err);
+    const body = JSON.parse((result as { body: string }).body) as RelayErrorResponse;
+    log({
+      event: 'relay_error',
+      model: request.model,
+      promptVersion: request.promptVersion,
+      errorCode: body.errorCode,
+      message: body.message,
+      durationMs: Date.now() - startMs,
+    });
+    return result;
   }
 };
 

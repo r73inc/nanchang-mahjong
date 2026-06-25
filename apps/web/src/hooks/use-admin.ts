@@ -222,3 +222,19 @@ export function useRetryAiJob() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'ai-jobs-failed'] }),
   });
 }
+
+export interface BackfillResult {
+  game: { queued: number; skipped: number };
+  challenge: { queued: number; skipped: number };
+}
+
+export function useBackfillSummaries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<BackfillResult>('/admin/ai/backfill').then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'ai-requests'] });
+      void qc.invalidateQueries({ queryKey: ['admin', 'ai-jobs-failed'] });
+    },
+  });
+}

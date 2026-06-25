@@ -17,6 +17,8 @@ import {
   useRejectAiRequest,
   useAiFailedJobs,
   useRetryAiJob,
+  useBackfillSummaries,
+  type BackfillResult,
   type InviteRecord,
   type AdminUser,
   type AiPendingRequest,
@@ -473,6 +475,7 @@ function AiQueueSection() {
   const { data: requests, isLoading } = useAiPendingRequests();
   const approveMutation = useApproveAiRequest();
   const rejectMutation = useRejectAiRequest();
+  const backfillMutation = useBackfillSummaries();
 
   const pendingReqId = approveMutation.isPending
     ? approveMutation.variables
@@ -484,6 +487,8 @@ function AiQueueSection() {
     : rejectMutation.isPending
       ? 'reject'
       : null;
+
+  const backfillData = backfillMutation.data as BackfillResult | undefined;
 
   return (
     <section className="mb-6">
@@ -510,6 +515,28 @@ function AiQueueSection() {
           ))}
         </ul>
       )}
+
+      {/* Backfill */}
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <p className="text-xs text-mj-bone/50 mb-2">{t('adminAiBackfillDesc')}</p>
+        <button
+          onClick={() => void backfillMutation.mutate()}
+          disabled={backfillMutation.isPending}
+          className="text-xs px-3 py-1.5 rounded bg-mj-gold/20 hover:bg-mj-gold/30 text-mj-gold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {backfillMutation.isPending ? t('adminAiBackfillRunning') : t('adminAiBackfill')}
+        </button>
+        {backfillData && (
+          <p className="mt-2 text-xs text-mj-bone/60">
+            {t(
+              'adminAiBackfillResult',
+              String(backfillData.game.queued),
+              String(backfillData.challenge.queued),
+              String(backfillData.game.skipped + backfillData.challenge.skipped),
+            )}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

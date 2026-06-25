@@ -63,6 +63,17 @@ export class AiQueueController {
   }
 
   /**
+   * Backfill — queues AI summary requests for all games and completed
+   * challenges that do not already have a summary in progress or done.
+   * Returns { game: { queued, skipped }, challenge: { queued, skipped } }.
+   */
+  @Post('backfill')
+  @HttpCode(HttpStatus.OK)
+  async backfill(@CurrentUser() actor: AuthenticatedUser) {
+    return this.aiSummary.backfillSummaries(actor.sub);
+  }
+
+  /**
    * Retry a failed summary.
    * targetType: 'game' | 'challenge'   (challenge retry is Phase 5)
    */

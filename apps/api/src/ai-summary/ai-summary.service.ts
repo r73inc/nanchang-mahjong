@@ -1146,4 +1146,77 @@ export class AiSummaryService {
     }
     return this.generateChallengeSummary(targetId, retriedBy);
   }
+
+  /**
+   * Admin backfill — queues AI summary requests for all games and completed
+   * challenges that do not already have a done/in-progress summary.
+   *
+   * Returns counts of newly-queued and skipped (already covered) items per type.
+   * Skips items that have a summary in any blocking status (requested, approved,
+   * processing, done) or whose ConditionalExpression blocks a duplicate AIREQ.
+   */
+  async backfillSummaries(
+    requestedBy: string,
+  ): Promise<{
+    game: { queued: number; skipped: number };
+    challenge: { queued: number; skipped: number };
+  }> {
+    const result = { game: { queued: 0, skipped: 0 }, challenge: { queued: 0, skipped: 0 } };
+    const blockingStatuses: AiSummaryStatus[] = ['requested', 'approved', 'processing', 'done'];
+
+    // Scan for all game and challenge META rows in one pass.
+    const items: Array<{ PK: string; status?: string }> = [];
+    let lastKey: Record<string, unknown> | undefined;
+    do {
+      const page = await this.db.scan({
+        FilterExpression: 'SK = :meta AND (begins_with(PK, :gp) OR begins_with(PK, :cp))',
+        ExpressionAttributeValues: { ':meta': 'META', ':gp': 'GAME#', ':cp': 'CHALLENGE#' },
+        ProjectionExpression: 'PK, #s',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExclusiveStartKey: lastKey,
+      });
+      items.push(...((page.Items ?? []) as Array<{ PK: string; status?: string }>));
+      lastKey = page.LastEvaluatedKey as Record<string, unknown> | undefined;
+    } while (lastKey);
+
+    for (const { PK, status: entityStatus } of items) {
+      if (PK.startsWith('GAME#')) {
+        const gameId = PK.slice('GAME#'.length);
+        const existing = await this.getSummary(PK);
+        if (existing && blockingStatuses.includes(existing.status)) {
+          result.game.skipped++;
+          continue;
+        }
+        try {
+          await this.requestGameSummary(gameId, requestedBy, false);
+          result.game.queued++;
+        } catch {
+          result.game.skipped++;
+        }
+      } else if (PK.startsWith('CHALLENGE#')) {
+        if (entityStatus !== 'completed') {
+          result.challenge.skipped++;
+          continue;
+        }
+        const challengeId = PK.slice('CHALLENGE#'.length);
+        const existing = await this.getSummary(PK);
+        if (existing && blockingStatuses.includes(existing.status)) {
+          result.challenge.skipped++;
+          continue;
+        }
+        try {
+          await this.requestChallengeSummary(
+            challengeId,
+            requestedBy,
+            'completed' as ChallengeStatus,
+          );
+          result.challenge.queued++;
+        } catch {
+          result.challenge.skipped++;
+        }
+      }
+    }
+
+    return result;
+  }
 }

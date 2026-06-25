@@ -800,5 +800,9 @@
   "adminAiFeaturesBadge": "AI 管理",
   "adminAiTargetGame": "游戏",
   "adminAiTargetChallenge": "挑战",
-  "adminAiAttempts": "第 {{0}} 次"
+  "adminAiAttempts": "第 {{0}} 次",
+  "adminAiBackfill": "批量补充摘要",
+  "adminAiBackfillDesc": "为所有尚无摘要的游戏和已完成挑战排队生成 AI 摘要。",
+  "adminAiBackfillRunning": "排队中…",
+  "adminAiBackfillResult": "已排队 {{0}} 场游戏、{{1}} 个挑战，跳过 {{2}} 个已有摘要。"
 }
