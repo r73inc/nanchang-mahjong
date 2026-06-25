@@ -16,6 +16,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { ReplayModule } from './replay/replay.module';
 import { PushModule } from './push/push.module';
 import { ChallengesModule } from './challenges/challenges.module';
+import { AiSummaryModule } from './ai-summary/ai-summary.module';
 import { HealthController } from './health/health.controller';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { I18nModule } from './i18n/i18n.module';
@@ -58,6 +59,7 @@ import { I18nModule } from './i18n/i18n.module';
     ReplayModule,
     PushModule,
     ChallengesModule,
+    AiSummaryModule,
   ],
   controllers: [HealthController],
   providers: [

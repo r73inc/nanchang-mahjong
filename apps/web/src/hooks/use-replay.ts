@@ -1,10 +1,10 @@
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
 import { api } from '../lib/api';
 import { useChallenge } from './use-challenges';
 import { useAuthStore } from '../stores/auth.store';
 import { buildOmniscientTimeline } from '../lib/replay-engine';
-import type { ReplayGamePayload } from '@nanchang/shared';
+import type { ReplayGamePayload, AiSummaryPublic } from '@nanchang/shared';
 import type { OmniscientReplayStep } from '../lib/replay-engine';
 
 // ── General replay ─────────────────────────────────────────────────────────────
@@ -15,6 +15,27 @@ export function useReplay(gameId: string) {
     queryFn: () => api.get<ReplayGamePayload>(`/replays/${gameId}`).then((r) => r.data),
     enabled: !!gameId,
     retry: false,
+  });
+}
+
+export function useGameSummary(gameId: string) {
+  return useQuery({
+    queryKey: ['replay-summary', gameId],
+    queryFn: () =>
+      api.get<AiSummaryPublic | null>(`/replays/${gameId}/summary`).then((r) => r.data),
+    enabled: !!gameId,
+    retry: false,
+  });
+}
+
+export function useRequestGameSummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (gameId: string) =>
+      api.post<AiSummaryPublic>(`/replays/${gameId}/request-summary`).then((r) => r.data),
+    onSuccess: (_, gameId) => {
+      void qc.invalidateQueries({ queryKey: ['replay-summary', gameId] });
+    },
   });
 }
 

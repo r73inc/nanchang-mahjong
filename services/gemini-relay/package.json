@@ -1,0 +1,21 @@
+{
+  "name": "@nanchang/gemini-relay",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.777.0",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "devDependencies": {
+    "@nanchang/shared": "workspace:*",
+    "@types/aws-lambda": "^8.10.149",
+    "@types/node": "^22.10.7",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

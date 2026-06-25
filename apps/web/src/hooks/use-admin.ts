@@ -114,3 +114,127 @@ export function useCreateDevTestGame() {
       api.post<{ gameId: string }>('/dev-test/game', config).then((r) => r.data),
   });
 }
+
+// ── AI admin types ────────────────────────────────────────────────────────────
+
+export interface AiPendingRequest {
+  reqId: string;
+  targetType: 'game' | 'challenge';
+  targetId: string;
+  requestedBy: string;
+  requestedAt: string;
+}
+
+export interface AiFailedJob {
+  targetType: 'game' | 'challenge';
+  targetId: string;
+  attempts: number;
+  errorCode?: string;
+  requestedAt: string;
+}
+
+// ── AI admin hooks ────────────────────────────────────────────────────────────
+
+export function useAiPendingRequests() {
+  return useQuery({
+    queryKey: ['admin', 'ai-requests'],
+    queryFn: () =>
+      api
+        .get<{
+          requests: Array<{
+            PK: string;
+            targetType: 'game' | 'challenge';
+            targetId: string;
+            requestedBy: string;
+            requestedAt: string;
+          }>;
+        }>('/admin/ai/requests')
+        .then((r) =>
+          r.data.requests.map(
+            (item): AiPendingRequest => ({
+              reqId: item.PK.replace('AIREQ#', ''),
+              targetType: item.targetType,
+              targetId: item.targetId,
+              requestedBy: item.requestedBy,
+              requestedAt: item.requestedAt,
+            }),
+          ),
+        ),
+  });
+}
+
+export function useApproveAiRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reqId: string) =>
+      api.post(`/admin/ai/requests/${reqId}/approve`).then(() => undefined),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'ai-requests'] }),
+  });
+}
+
+export function useRejectAiRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (reqId: string) =>
+      api.post(`/admin/ai/requests/${reqId}/reject`).then(() => undefined),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'ai-requests'] }),
+  });
+}
+
+export function useAiFailedJobs() {
+  return useQuery({
+    queryKey: ['admin', 'ai-jobs-failed'],
+    queryFn: () =>
+      api
+        .get<{
+          jobs: Array<{
+            PK: string;
+            attempts: number;
+            errorCode?: string;
+            requestedAt: string;
+          }>;
+        }>('/admin/ai/jobs/failed')
+        .then((r) =>
+          r.data.jobs.map((item): AiFailedJob => {
+            const hashIdx = item.PK.indexOf('#');
+            return {
+              targetType: item.PK.slice(0, hashIdx) === 'GAME' ? 'game' : 'challenge',
+              targetId: item.PK.slice(hashIdx + 1),
+              attempts: item.attempts,
+              errorCode: item.errorCode,
+              requestedAt: item.requestedAt,
+            };
+          }),
+        ),
+  });
+}
+
+export function useRetryAiJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      targetType,
+      targetId,
+    }: {
+      targetType: 'game' | 'challenge';
+      targetId: string;
+    }) => api.post(`/admin/ai/jobs/${targetType}/${targetId}/retry`).then(() => undefined),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'ai-jobs-failed'] }),
+  });
+}
+
+export interface BackfillResult {
+  game: { queued: number; skipped: number };
+  challenge: { queued: number; skipped: number };
+}
+
+export function useBackfillSummaries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<BackfillResult>('/admin/ai/backfill').then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'ai-requests'] });
+      void qc.invalidateQueries({ queryKey: ['admin', 'ai-jobs-failed'] });
+    },
+  });
+}

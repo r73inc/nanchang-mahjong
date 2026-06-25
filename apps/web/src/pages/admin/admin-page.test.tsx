@@ -19,6 +19,10 @@ const mockRevokeInvite = vi.fn();
 const mockSetRole = vi.fn();
 const mockSetDisabled = vi.fn();
 const mockSetPermission = vi.fn();
+const mockApproveAiRequest = vi.fn();
+const mockRejectAiRequest = vi.fn();
+const mockRetryAiJob = vi.fn();
+const mockBackfillSummaries = vi.fn();
 
 vi.mock('../../hooks/use-admin', () => ({
   useAdminInvites: vi.fn(),
@@ -28,6 +32,12 @@ vi.mock('../../hooks/use-admin', () => ({
   useSetRole: vi.fn(),
   useSetDisabled: vi.fn(),
   useSetPermission: vi.fn(),
+  useAiPendingRequests: vi.fn(),
+  useApproveAiRequest: vi.fn(),
+  useRejectAiRequest: vi.fn(),
+  useAiFailedJobs: vi.fn(),
+  useRetryAiJob: vi.fn(),
+  useBackfillSummaries: vi.fn(),
 }));
 
 import {
@@ -38,6 +48,12 @@ import {
   useSetRole,
   useSetDisabled,
   useSetPermission,
+  useAiPendingRequests,
+  useApproveAiRequest,
+  useRejectAiRequest,
+  useAiFailedJobs,
+  useRetryAiJob,
+  useBackfillSummaries,
 } from '../../hooks/use-admin';
 
 const mockUseAuthStore = vi.mocked(useAuthStore);
@@ -48,6 +64,12 @@ const mockUseAdminUsers = vi.mocked(useAdminUsers);
 const mockUseSetRole = vi.mocked(useSetRole);
 const mockUseSetDisabled = vi.mocked(useSetDisabled);
 const mockUseSetPermission = vi.mocked(useSetPermission);
+const mockUseAiPendingRequests = vi.mocked(useAiPendingRequests);
+const mockUseApproveAiRequest = vi.mocked(useApproveAiRequest);
+const mockUseRejectAiRequest = vi.mocked(useRejectAiRequest);
+const mockUseAiFailedJobs = vi.mocked(useAiFailedJobs);
+const mockUseRetryAiJob = vi.mocked(useRetryAiJob);
+const mockUseBackfillSummaries = vi.mocked(useBackfillSummaries);
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -128,6 +150,28 @@ function setupDefaultMocks() {
     mutate: mockSetPermission,
     isPending: false,
     variables: undefined,
+  } as never);
+  mockUseAiPendingRequests.mockReturnValue({ data: [], isLoading: false } as never);
+  mockUseApproveAiRequest.mockReturnValue({
+    mutate: mockApproveAiRequest,
+    isPending: false,
+    variables: undefined,
+  } as never);
+  mockUseRejectAiRequest.mockReturnValue({
+    mutate: mockRejectAiRequest,
+    isPending: false,
+    variables: undefined,
+  } as never);
+  mockUseAiFailedJobs.mockReturnValue({ data: [], isLoading: false } as never);
+  mockUseRetryAiJob.mockReturnValue({
+    mutate: mockRetryAiJob,
+    isPending: false,
+    variables: undefined,
+  } as never);
+  mockUseBackfillSummaries.mockReturnValue({
+    mutate: mockBackfillSummaries,
+    isPending: false,
+    data: undefined,
   } as never);
 }
 
@@ -274,5 +318,168 @@ describe('AdminPage — Users', () => {
     expect(
       screen.queryByRole('button', { name: /make user|make admin|disable|enable/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminPage — AI queue', () => {
+  const aiAdmin = { ...adminUser, permissions: ['admin-ai-features'] };
+
+  const sampleRequest = {
+    reqId: 'req-1',
+    targetType: 'game' as const,
+    targetId: 'game-abc',
+    requestedBy: 'user-sub',
+    requestedAt: '2025-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupDefaultMocks();
+    mockUseAuthStore.mockReturnValue(aiAdmin as never);
+  });
+
+  it('AdminAi·hidden — AI sections absent when acting admin lacks ai-features permission', () => {
+    mockUseAuthStore.mockReturnValue(adminUser as never);
+    renderAdminPage();
+    expect(screen.queryByText('AI Request Queue')).not.toBeInTheDocument();
+    expect(screen.queryByText('Failed AI Jobs')).not.toBeInTheDocument();
+  });
+
+  it('AdminAi·visible — AI sections present for admin with ai-features permission', () => {
+    renderAdminPage();
+    expect(screen.getByText('AI Request Queue')).toBeInTheDocument();
+    expect(screen.getByText('Failed AI Jobs')).toBeInTheDocument();
+  });
+
+  it('AdminAi·queue-empty — shows empty state when no pending requests', () => {
+    renderAdminPage();
+    expect(screen.getByText('No pending requests.')).toBeInTheDocument();
+  });
+
+  it('AdminAi·queue-row — shows request row with approve and reject buttons', () => {
+    mockUseAiPendingRequests.mockReturnValue({
+      data: [sampleRequest],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    expect(screen.getByText('game-abc')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^reject$/i })).toBeInTheDocument();
+  });
+
+  it('AdminAi·approve — calls approve mutation with reqId', () => {
+    mockUseAiPendingRequests.mockReturnValue({
+      data: [sampleRequest],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    expect(mockApproveAiRequest).toHaveBeenCalledWith('req-1');
+  });
+
+  it('AdminAi·reject — calls reject mutation with reqId', () => {
+    mockUseAiPendingRequests.mockReturnValue({
+      data: [sampleRequest],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /^reject$/i }));
+    expect(mockRejectAiRequest).toHaveBeenCalledWith('req-1');
+  });
+
+  it('AdminAi·failed-empty — shows empty state when no failed jobs', () => {
+    renderAdminPage();
+    expect(screen.getByText('No failed jobs.')).toBeInTheDocument();
+  });
+
+  it('AdminAi·failed-row — shows failed job row with retry button', () => {
+    mockUseAiFailedJobs.mockReturnValue({
+      data: [
+        {
+          targetType: 'game' as const,
+          targetId: 'game-xyz',
+          attempts: 2,
+          requestedAt: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    expect(screen.getByText('game-xyz')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it('AdminAi·retry — calls retry mutation with targetType and targetId', () => {
+    mockUseAiFailedJobs.mockReturnValue({
+      data: [
+        {
+          targetType: 'game' as const,
+          targetId: 'game-xyz',
+          attempts: 2,
+          requestedAt: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(mockRetryAiJob).toHaveBeenCalledWith({ targetType: 'game', targetId: 'game-xyz' });
+  });
+
+  it('AdminAi·backfill-button — calls backfill mutation when button clicked', () => {
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /backfill summaries/i }));
+    expect(mockBackfillSummaries).toHaveBeenCalledTimes(1);
+  });
+
+  it('AdminAi·backfill-result — shows queued/skipped counts after backfill succeeds', () => {
+    mockUseBackfillSummaries.mockReturnValue({
+      mutate: mockBackfillSummaries,
+      isPending: false,
+      data: { game: { queued: 3, skipped: 1 }, challenge: { queued: 2, skipped: 0 } },
+    } as never);
+    renderAdminPage();
+    expect(screen.getByText(/queued 3 games/i)).toBeInTheDocument();
+  });
+});
+
+describe('AdminPage — AI features permission toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupDefaultMocks();
+    mockUseAuthStore.mockReturnValue(adminUser as never);
+  });
+
+  it('AdminAi·badge — shows AI Admin badge for user holding ai-features permission', () => {
+    mockUseAdminUsers.mockReturnValue({
+      data: [{ ...sampleUser, permissions: ['admin-ai-features'] }],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    expect(screen.getByText('AI Admin')).toBeInTheDocument();
+  });
+
+  it('AdminAi·grant — calls setPermission grant for admin-ai-features', () => {
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /grant ai admin/i }));
+    expect(mockSetPermission).toHaveBeenCalledWith({
+      sub: 'user-sub',
+      permission: 'admin-ai-features',
+      grant: true,
+    });
+  });
+
+  it('AdminAi·revoke — calls setPermission revoke for admin-ai-features', () => {
+    mockUseAdminUsers.mockReturnValue({
+      data: [{ ...sampleUser, permissions: ['admin-ai-features'] }],
+      isLoading: false,
+    } as never);
+    renderAdminPage();
+    fireEvent.click(screen.getByRole('button', { name: /revoke ai admin/i }));
+    expect(mockSetPermission).toHaveBeenCalledWith({
+      sub: 'user-sub',
+      permission: 'admin-ai-features',
+      grant: false,
+    });
   });
 });

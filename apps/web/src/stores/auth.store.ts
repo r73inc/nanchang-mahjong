@@ -4,7 +4,7 @@ import { decodeJwtPayload } from '../lib/decode-jwt';
 import { disconnectSocket } from '../lib/socket';
 
 export type UserRole = 'user' | 'admin';
-export type UserPermission = 'devTestRoom';
+export type UserPermission = 'devTestRoom' | 'admin-ai-features';
 
 export interface AuthUser {
   sub: string;

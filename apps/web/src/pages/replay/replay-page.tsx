@@ -23,6 +23,8 @@ import {
   WIND_COLOR,
   getSeatFromEvent,
 } from './components/PlaybackControls';
+import { AiSummaryPanel } from '../../components/AiSummaryPanel';
+import { useGameSummary, useRequestGameSummary } from '../../hooks/use-replay';
 import type { GameEvent, TileType } from '@nanchang/shared';
 
 // ── Glyphs & separators (module-level avoids i18next/no-literal-string) ───────
@@ -128,6 +130,12 @@ export function ReplayPage() {
   const currentUser = useAuthStore((s) => s.user);
 
   const { data: payload, isLoading, isError } = useReplay(gameId ?? '');
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isError: summaryError,
+  } = useGameSummary(gameId ?? '');
+  const requestSummary = useRequestGameSummary();
 
   const timeline = useMemo(() => (payload ? buildOmniscientTimeline(payload) : []), [payload]);
 
@@ -270,6 +278,15 @@ export function ReplayPage() {
             </div>
           )}
         </div>
+
+        {/* AI commentary */}
+        <AiSummaryPanel
+          summary={summary}
+          isLoading={summaryLoading}
+          isError={summaryError}
+          isRequesting={requestSummary.isPending}
+          onRequest={() => void requestSummary.mutate(gameId ?? '')}
+        />
 
         {/* Playback controls — step callout + scrubber only; transport is in fixed footer */}
         <div>
