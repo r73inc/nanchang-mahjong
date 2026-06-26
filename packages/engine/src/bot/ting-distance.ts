@@ -9,8 +9,7 @@
  *
  * All functions are pure — no I/O, no mutation.
  * Jing (精) wildcards are handled per Nanchang rules:
- *   - Standard / Seven Pairs: Jing acts as any tile (wildcard)
- *   - Thirteen Misfits / Star Win: Jing counts as its own tile type (not a wildcard)
+ *   - Standard / Seven Pairs / Thirteen Misfits / Star Win: Jing acts as any tile (wildcard)
  */
 
 import { sortTypes, isHonor, isSuit, getRank, getHonorChowsContaining } from '../tiles';
@@ -234,30 +233,32 @@ export function sevenPairsDist(naturals: TileType[], jingCount: number): number 
  *   - All honor tiles are unique (no duplicate winds/dragons)
  *   - Within each suit, sorted adjacent ranks must have gap > 2
  *
- * Jing tiles in this context count as their natural tile type (not wildcards),
- * consistent with checkThirteenMisfits in hand.ts.
+ * Jing tiles act as wildcards and can be placed at any valid misfit position,
+ * so only natural (non-Jing) tiles are checked for conflicts. Multiple Jing
+ * tiles with the same or adjacent face values do NOT create conflicts.
  *
- * Distance = number of "conflicting" tiles that must be replaced:
- *   - Extra copies of the same honor tile
- *   - Suit tiles within rank 2 of another same-suit tile in the hand
+ * Distance = number of conflicting natural tiles that must be replaced:
+ *   - Extra copies of the same natural honor tile
+ *   - Natural suit tiles within rank 2 of another same-suit natural tile
  *
- * @returns 0 = tenpai (all 13 tiles satisfy misfit constraints, draw any misfit tile).
+ * @returns 0 = tenpai (all natural tiles satisfy misfit constraints).
  */
-export function thirteenMisfitsDist(hand: TileType[]): number {
+export function thirteenMisfitsDist(hand: TileType[], jingTypes: TileType[] = []): number {
+  const { naturals } = separateJing(hand, jingTypes);
   let conflicts = 0;
 
-  // Honor duplicates: each extra copy beyond 1 is a conflict
+  // Natural honor duplicates: each extra copy beyond 1 is a conflict
   const honorCounts = new Map<TileType, number>();
-  for (const t of hand) {
+  for (const t of naturals) {
     if (isHonor(t)) honorCounts.set(t, (honorCounts.get(t) ?? 0) + 1);
   }
   for (const cnt of honorCounts.values()) {
     conflicts += Math.max(0, cnt - 1);
   }
 
-  // Suit adjacency conflicts: tiles within rank 2 of another same-suit tile
+  // Natural suit adjacency conflicts: tiles within rank 2 of another same-suit natural tile
   for (const suit of ['m', 'p', 's'] as const) {
-    const ranks = hand
+    const ranks = naturals
       .filter((t) => !isHonor(t) && t[1] === suit)
       .map((t) => getRank(t)!)
       .sort((a, b) => a - b);
@@ -283,10 +284,12 @@ export function thirteenMisfitsDist(hand: TileType[]): number {
  *
  * Requires Thirteen Misfits + all 7 unique honor types present.
  * Distance = max(misfit conflicts, missing honor types).
+ * Jing tiles are excluded from the honor count (they act as wildcards).
  */
-export function starWinDist(hand: TileType[]): number {
-  const misfitDist = thirteenMisfitsDist(hand);
-  const uniqueHonors = new Set(hand.filter(isHonor));
+export function starWinDist(hand: TileType[], jingTypes: TileType[] = []): number {
+  const { naturals } = separateJing(hand, jingTypes);
+  const misfitDist = thirteenMisfitsDist(hand, jingTypes);
+  const uniqueHonors = new Set(naturals.filter(isHonor));
   const missingHonors = Math.max(0, 7 - uniqueHonors.size);
   // Both constraints must be satisfied; a single swap can fix one violation
   // in each category, so take the max as the lower-bound distance.
@@ -310,9 +313,8 @@ export function overallDist(hand: TileType[], jingTypes: TileType[]): number {
 
   const std = standardDist(naturals, jingCount);
   const pairs = sevenPairsDist(naturals, jingCount);
-  // Thirteen Misfits and Star Win treat jings as their tile type (not wildcards)
-  const misfits = thirteenMisfitsDist(hand);
-  const star = starWinDist(hand);
+  const misfits = thirteenMisfitsDist(hand, jingTypes);
+  const star = starWinDist(hand, jingTypes);
 
   return Math.min(std, pairs, misfits, star);
 }
