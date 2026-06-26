@@ -192,18 +192,24 @@ export class NanchangStack extends cdk.Stack {
     replayBucket.grantReadWrite(taskRole);
     avatarBucket.grantReadWrite(taskRole);
 
-    // Grant the ECS task role permission to invoke the Gemini relay Function URL (us-east-1).
-    // Supply the relay Lambda ARN after Phase 2 deployment:
-    //   cdk deploy --context geminiRelayArn=arn:aws:lambda:us-east-1:<acct>:function:gemini-relay
-    const geminiRelayArn = this.node.tryGetContext('geminiRelayArn') as string | undefined;
-    if (geminiRelayArn) {
-      taskRole.addToPrincipalPolicy(
-        new iam.PolicyStatement({
-          actions: ['lambda:InvokeFunctionUrl'],
-          resources: [geminiRelayArn],
-        }),
-      );
-    }
+    // Grant the ECS task role permission to invoke the Gemini relay (us-east-1).
+    // The relay is permanent infra, so its ARN is codified here (override via
+    // --context geminiRelayArn=... if it ever moves). Defaulting it means a plain
+    // `cdk deploy NanchangProd` always re-applies the grant — no context flag to
+    // forget (the missing-flag footgun that silently dropped this permission before).
+    //
+    // NOTE: this Function URL's IAM authorization checks `lambda:InvokeFunction`,
+    // NOT `lambda:InvokeFunctionUrl`. Granting only InvokeFunctionUrl yields a 403
+    // "Forbidden" from the Function URL front door. Both are granted for safety.
+    const geminiRelayArn =
+      (this.node.tryGetContext('geminiRelayArn') as string | undefined) ??
+      'arn:aws:lambda:us-east-1:948211576126:function:nanchang-gemini-relay';
+    taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction', 'lambda:InvokeFunctionUrl'],
+        resources: [geminiRelayArn],
+      }),
+    );
 
     // ── CloudFront Function: strip /api prefix ─────────────────────────────────
     // The NestJS API routes live at /auth/..., /users/..., etc. — no /api prefix.
@@ -267,10 +273,14 @@ export class NanchangStack extends cdk.Stack {
         JWT_EXPIRES_IN: '1h',
         JWT_REFRESH_EXPIRES_IN: '30d',
         VAPID_SUBJECT: 'mailto:r73inc@gmail.com',
-        // Gemini relay — set GEMINI_RELAY_URL after the us-east-1 relay is deployed
-        GEMINI_RELAY_URL: (this.node.tryGetContext('geminiRelayUrl') as string | undefined) ?? '',
+        // Gemini relay (us-east-1). URL codified so a plain `cdk deploy` keeps AI
+        // enabled — override via --context geminiRelayUrl=... if the relay moves.
+        GEMINI_RELAY_URL:
+          (this.node.tryGetContext('geminiRelayUrl') as string | undefined) ??
+          'https://igdju5p6pjswisbxhuyhb476he0yldiv.lambda-url.us-east-1.on.aws/',
         GEMINI_RELAY_REGION: 'us-east-1',
-        GEMINI_RELAY_MODEL: 'gemini-1.5-flash',
+        // gemini-1.5-* was retired by Google (404 "model not found"). 2.5-flash is current.
+        GEMINI_RELAY_MODEL: 'gemini-2.5-flash',
       },
       secrets: {
         JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
