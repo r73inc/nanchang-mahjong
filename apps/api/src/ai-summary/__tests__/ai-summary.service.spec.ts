@@ -153,8 +153,8 @@ const mockRelay = {
 
 const mockConfig = {
   get: jest.fn((key: string) => {
-    if (key === 'geminiRelay.model') return 'gemini-1.5-flash';
-    if (key === 'geminiRelay') return { model: 'gemini-1.5-flash', challengeWordCap: 400 };
+    if (key === 'geminiRelay.model') return 'gemini-2.5-flash';
+    if (key === 'geminiRelay') return { model: 'gemini-2.5-flash', challengeWordCap: 400 };
     return undefined;
   }),
 };
@@ -313,7 +313,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Great game!', zh: '好游戏！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-game',
         },
       });
@@ -433,7 +433,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Great game!', zh: '好游戏！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-game',
         },
       });
@@ -610,7 +610,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Epic challenge!', zh: '精彩挑战！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-challenge',
         },
       });
@@ -785,7 +785,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Great!', zh: '好！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-game',
         },
       });
@@ -861,7 +861,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Epic!', zh: '精彩！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-challenge',
         },
       });
@@ -928,7 +928,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Retry!', zh: '重试！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-game',
         },
       });
@@ -972,7 +972,7 @@ describe('AiSummaryService', () => {
         ok: true,
         data: {
           text: { en: 'Retry!', zh: '重试！' },
-          model: 'gemini-1.5-flash',
+          model: 'gemini-2.5-flash',
           promptVersion: 'v1-challenge',
         },
       });

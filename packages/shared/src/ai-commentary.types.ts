@@ -224,7 +224,7 @@ export interface ChallengeFactsDigest {
  * relay. Never send an oversized payload and rely on the Lambda returning 413.
  */
 export interface RelayGenerateRequest {
-  /** Gemini model id to invoke (e.g. 'gemini-1.5-flash'). */
+  /** Gemini model id to invoke (e.g. 'gemini-2.5-flash'). */
   model: string;
   /** Opaque version tag for auditing / A-B prompt comparison. */
   promptVersion: string;
