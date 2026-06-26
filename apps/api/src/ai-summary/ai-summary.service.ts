@@ -382,8 +382,10 @@ function formatClaims(claims: HandClaim[], nameForSeat: (seat: 0 | 1 | 2 | 3) =>
   return claims
     .map((c) => {
       const who = nameForSeat(c.claimerSeat);
-      const from = c.fromSeat !== undefined ? `${nameForSeat(c.fromSeat)}'s ` : '';
-      return `${who} ${claimVerb(c.type)} ${from}${c.tile}`;
+      const from = c.fromSeat !== undefined ? `${nameForSeat(c.fromSeat)}'s` : '';
+      // Assemble tokens and join with single spaces so an absent `from` never
+      // leaves a redundant double-space in the prompt text.
+      return [who, claimVerb(c.type), from, c.tile].filter(Boolean).join(' ');
     })
     .join('; ');
 }
