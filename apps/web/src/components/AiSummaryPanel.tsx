@@ -25,6 +25,13 @@ interface Props {
   onRequest: () => void;
   /** Optional label that appears above the panel, e.g. participant handle. */
   label?: string;
+  /**
+   * When true, an AI-admin holder may regenerate an already-done summary.
+   * Shows a "Regenerate" button beneath the existing text.
+   */
+  canRegenerate?: boolean;
+  isRegenerating?: boolean;
+  onRegenerate?: () => void;
 }
 
 export function AiSummaryPanel({
@@ -34,6 +41,9 @@ export function AiSummaryPanel({
   isRequesting,
   onRequest,
   label,
+  canRegenerate,
+  isRegenerating,
+  onRegenerate,
 }: Props) {
   const { t, lang } = useI18n();
   const [expanded, setExpanded] = useState(false);
@@ -83,12 +93,7 @@ export function AiSummaryPanel({
             <button
               onClick={onRequest}
               disabled={isRequesting}
-              className="w-full py-2.5 rounded-xl text-xs font-bold"
-              style={{
-                background: 'rgba(201,169,97,0.12)',
-                border: '1px solid rgba(201,169,97,0.35)',
-                color: '#c9a961',
-              }}
+              className="w-full py-2.5 rounded-xl text-xs font-bold bg-mj-gold/12 border border-mj-gold/35 text-mj-gold"
             >
               {isRequesting ? '…' : t('aiSummaryRequest')}
             </button>
@@ -107,7 +112,20 @@ export function AiSummaryPanel({
           )}
 
           {!isLoading && summary?.status === 'done' && summaryText && (
-            <p className="text-sm text-mj-bone/80 leading-relaxed">{summaryText}</p>
+            <>
+              <p className="text-sm text-mj-bone/80 leading-relaxed whitespace-pre-line">
+                {summaryText}
+              </p>
+              {canRegenerate && onRegenerate && (
+                <button
+                  onClick={onRegenerate}
+                  disabled={isRegenerating}
+                  className="mt-3 w-full py-2 rounded-xl text-xs font-bold bg-mj-gold/12 border border-mj-gold/35 text-mj-gold"
+                >
+                  {isRegenerating ? t('aiSummaryRegenerating') : t('aiSummaryRegenerate')}
+                </button>
+              )}
+            </>
           )}
 
           {!isLoading && summary?.status === 'failed' && (

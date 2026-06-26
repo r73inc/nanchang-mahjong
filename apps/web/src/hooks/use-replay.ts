@@ -39,6 +39,22 @@ export function useRequestGameSummary() {
   });
 }
 
+/**
+ * Regenerate an existing game summary. Requires the admin-ai-features permission
+ * (or admin role) — reuses the admin retry endpoint, which re-runs generation and
+ * overwrites the stored summary regardless of its current done/failed status.
+ */
+export function useRegenerateGameSummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (gameId: string) =>
+      api.post(`/admin/ai/jobs/game/${gameId}/retry`).then(() => undefined),
+    onSuccess: (_, gameId) => {
+      void qc.invalidateQueries({ queryKey: ['replay-summary', gameId] });
+    },
+  });
+}
+
 // ── Challenge replay ───────────────────────────────────────────────────────────
 
 export interface ChallengeReplayParticipant {
