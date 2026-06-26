@@ -103,7 +103,7 @@ curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
   --user "$(aws configure get aws_access_key_id):$(aws configure get aws_secret_access_key)" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemini-1.5-flash",
+    "model": "gemini-2.5-flash",
     "promptVersion": "v1",
     "systemInstruction": "You are a Nanchang Mahjong commentator. Reply only in the JSON format specified.",
     "userPrompt": "Summarise a short test game in 1 sentence.",
@@ -115,7 +115,7 @@ curl --aws-sigv4 "aws:amz:us-east-1:lambda" \
   }' \
   "$RELAY_URL"
 
-# Expected: {"text":{"en":"...","zh":"..."},"model":"gemini-1.5-flash","promptVersion":"v1"}
+# Expected: {"text":{"en":"...","zh":"..."},"model":"gemini-2.5-flash","promptVersion":"v1"}
 ```
 
 ---

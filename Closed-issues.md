@@ -6,6 +6,35 @@ For phases, planning, and roadmap work see `Plan-and-roadmap.md`.
 
 ---
 
+## (2026-06-25)
+
+### BUG-065 · AI commentary broken in production — relay returns 403, then 404 (two stacked bugs)
+
+**Symptom:** Every AI summary/challenge-review job failed in production. The admin retry endpoint returned `200 OK` (the job was re-enqueued), but the async generation failed server-side. ECS logs showed `WARN [AiSummaryService] AI ... failed ... [5xx] Relay HTTP 403: {"Message":"Forbidden. For troubleshooting Function URL authorization issues, see: .../urls-auth.html"}`. The browser network trace showed only the `200` from the retry endpoint, which misled an external analysis into blaming the frontend API base URL and a stale ECS task definition — both wrong (the `200` carried backend `x-ratelimit-*` headers, proving it reached NestJS; the service was already on the correct task-def revision).
+
+**Root cause — two independent bugs:**
+
+1. **Wrong IAM action on the task role.** The relay's CDK grant gave the ECS task role `lambda:InvokeFunctionUrl` on the relay function ARN. This Function URL's IAM authorization actually checks **`lambda:InvokeFunction`**. With only `InvokeFunctionUrl`, the Function URL front door returns a generic `403 Forbidden` (no CloudTrail event, never reaches Lambda code). The IAM policy _simulator_ reported "allowed" because it evaluated `InvokeFunctionUrl` against the policy literally — it does not model the Function URL's real authorization path. Empirically (by assuming the task role and calling the URL): `InvokeFunctionUrl` on the ARN → 403; `InvokeFunction` on the ARN → auth passes.
+
+2. **Retired Gemini model.** Once auth passed, the relay returned `404 {"errorCode":"404","message":"Gemini model not found"}`. The configured model `gemini-1.5-flash` (and the whole `gemini-1.5-*` family) had been retired by Google. Probing the relay: `gemini-1.5-*` → 404, `gemini-2.0-flash` → 429 (quota), **`gemini-2.5-flash` → 200** (works).
+
+**Diagnosis method (worth reusing):** Reproduced the exact production principal locally by temporarily adding the admin user to the task role's trust policy, `sts:AssumeRole` into `nanchang-ecs-task`, and signing the real Function URL request with those credentials. This isolated the failure to the role's IAM (not signing, not session-token handling, not clock skew — all of which were ruled out by getting `404` with admin/session-token creds). Trust policy was restored immediately after.
+
+**Fix:**
+
+- **Immediate (live, no redeploy):** added inline policy `relay-invoke-stopgap` to `nanchang-ecs-task` granting `lambda:InvokeFunction` (IAM changes apply at call time). Registered task-def revision 6 with `GEMINI_RELAY_MODEL=gemini-2.5-flash` and rolled the service onto it.
+- **Permanent (this PR):** `infra/aws/lib/nanchang-stack.ts` now grants `['lambda:InvokeFunction','lambda:InvokeFunctionUrl']`, sets `GEMINI_RELAY_MODEL=gemini-2.5-flash`, and **codifies the relay ARN + URL as defaults** (was gated behind `--context geminiRelayArn/geminiRelayUrl`, a missing-flag footgun in the same family as the removed `deployApi` flag — a context-less `cdk deploy` previously dropped the grant and blanked the URL). Config default and docs/fixtures updated to `gemini-2.5-flash`.
+
+**Key learnings:**
+
+1. **Lambda Function URLs with `AWS_IAM` auth can require `lambda:InvokeFunction`, not (only) `lambda:InvokeFunctionUrl`.** A `403 {"Message":"Forbidden..."}` from a Function URL is the front-door IAM/signature rejection — it never reaches Lambda code, so there's no Lambda log and no CloudTrail data event. When granting only `InvokeFunctionUrl` 403s, grant `InvokeFunction`.
+2. **The IAM policy simulator does not model Function URL authorization** — it can report "allowed" while the live call 403s. To get ground truth, assume the actual principal and make the real signed call.
+3. **A `200` on an async-job _enqueue_ endpoint says nothing about the job succeeding.** The real failure is in the background worker's logs, not the browser network tab. Don't diagnose async pipelines from the trigger response.
+4. **Pin third-party model IDs you can rotate via env/config.** Hosted model families (e.g. `gemini-1.5-*`) get retired; a dead model surfaces as a relay `404`, distinct from the IAM `403`.
+5. **Any infra value gated behind a CDK `--context` flag is a footgun** — a deploy that forgets the flag silently drops the resource/permission. Codify stable values as defaults (as was done for the CloudFront custom domain and the `deployApi` removal).
+
+---
+
 ## (2026-06-19)
 
 ### BUG-063 · "Game in progress" rejoin popup appears for games that no longer exist on the backend

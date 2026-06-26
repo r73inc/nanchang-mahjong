@@ -20,7 +20,7 @@ jest.mock('@aws-sdk/credential-providers', () => ({
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const VALID_REQUEST: RelayGenerateRequest = {
-  model: 'gemini-1.5-flash',
+  model: 'gemini-2.5-flash',
   promptVersion: 'v1-game',
   systemInstruction: 'You are a commentator.',
   userPrompt: 'Summarize this game.',
@@ -43,7 +43,7 @@ function buildClient(relayUrl: string): Promise<GeminiRelayClient> {
               return {
                 url: relayUrl,
                 region: 'us-east-1',
-                model: 'gemini-1.5-flash',
+                model: 'gemini-2.5-flash',
                 challengeWordCap: 400,
               };
             }
@@ -95,7 +95,7 @@ describe('GeminiRelayClient', () => {
     const client = await buildClient('https://abc.lambda-url.us-east-1.on.aws/');
     const responseBody = {
       text: { en: 'Great game!', zh: '好游戏！' },
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       promptVersion: 'v1-game',
     };
     global.fetch = jest.fn().mockResolvedValue({
