@@ -370,7 +370,7 @@ function formatWind(wind: SeatWind): string {
 }
 
 function claimVerb(type: HandClaim['type']): string {
-  return type === 'chow' ? 'chowed' : type === 'pung' ? 'punged' : 'konged';
+  return type === 'chow' ? 'chi' : type === 'pung' ? 'pung' : 'gang';
 }
 
 /**
@@ -401,7 +401,11 @@ function buildHandLine(
 
   if (hand.outcome === 'win' && hand.winner) {
     const howStr =
-      hand.winner.how === 'tsumo' ? 'self-draw' : hand.winner.how === 'kong' ? 'rob-kong' : 'ron';
+      hand.winner.how === 'tsumo'
+        ? 'self-draw'
+        : hand.winner.how === 'kong'
+          ? 'rob-gang'
+          : 'discard win';
     let detail = `${hand.winner.handle} won by ${howStr}`;
     if (hand.dealInSeat !== undefined) {
       const dealInHandle =
@@ -411,7 +415,7 @@ function buildHandLine(
     if (hand.specialHands.length > 0) detail += ` [${hand.specialHands.join(', ')}]`;
     if (hand.jingCount > 0)
       detail += ` • ${hand.jingCount} spirit tile${hand.jingCount > 1 ? 's' : ''} in hand`;
-    if (hand.hasRobKong) detail += ' • ROB-KONG';
+    if (hand.hasRobKong) detail += ' • ROB-GANG';
     line += ` | ${detail}`;
   } else if (hand.outcome === 'concede') {
     line += ' | concede (player surrendered)';
@@ -671,7 +675,12 @@ export class AiSummaryService {
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
       '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
       'NEVER call it 财神 ("god of wealth") or any other name.',
-      '(4) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      '(4) Use Chinese mahjong terminology exclusively:',
+      'chi (吃) for sequence claims, pung (碰) for triplet claims, gang (杠) for quads,',
+      'self-draw (自摸) when a player wins by drawing their own tile,',
+      "discard win (放炮/胡) when a player wins on an opponent's discard.",
+      'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
+      '(5) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
       'Length: a thorough breakdown of roughly 2–4 short paragraphs scaled to game length. Be substantive, not a one-line recap.',
     ].join(' ');
 
@@ -747,7 +756,12 @@ export class AiSummaryService {
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
       '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
       'NEVER call it 财神 ("god of wealth") or any other name.',
-      '(4) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      '(4) Use Chinese mahjong terminology exclusively:',
+      'chi (吃) for sequence claims, pung (碰) for triplet claims, gang (杠) for quads,',
+      'self-draw (自摸) when a player wins by drawing their own tile,',
+      "discard win (放炮/胡) when a player wins on an opponent's discard.",
+      'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
+      '(5) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
       `Length: a thorough multi-paragraph comparison (target ≤ ${wordCap} words). Be substantive, not a one-line recap.`,
     ].join(' ');
 
