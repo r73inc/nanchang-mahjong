@@ -93,12 +93,7 @@ export function AiSummaryPanel({
             <button
               onClick={onRequest}
               disabled={isRequesting}
-              className="w-full py-2.5 rounded-xl text-xs font-bold"
-              style={{
-                background: 'rgba(201,169,97,0.12)',
-                border: '1px solid rgba(201,169,97,0.35)',
-                color: '#c9a961',
-              }}
+              className="w-full py-2.5 rounded-xl text-xs font-bold bg-mj-gold/12 border border-mj-gold/35 text-mj-gold"
             >
               {isRequesting ? '…' : t('aiSummaryRequest')}
             </button>
@@ -125,12 +120,7 @@ export function AiSummaryPanel({
                 <button
                   onClick={onRegenerate}
                   disabled={isRegenerating}
-                  className="mt-3 w-full py-2 rounded-xl text-xs font-bold"
-                  style={{
-                    background: 'rgba(201,169,97,0.12)',
-                    border: '1px solid rgba(201,169,97,0.35)',
-                    color: '#c9a961',
-                  }}
+                  className="mt-3 w-full py-2 rounded-xl text-xs font-bold bg-mj-gold/12 border border-mj-gold/35 text-mj-gold"
                 >
                   {isRegenerating ? t('aiSummaryRegenerating') : t('aiSummaryRegenerate')}
                 </button>
