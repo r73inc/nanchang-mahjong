@@ -111,6 +111,22 @@ export type HandOutcome = 'win' | 'draw' | 'bust' | 'concede';
 /** How the winning player won their hand. */
 export type WinMethod = 'tsumo' | 'ron' | 'kong';
 
+/**
+ * A single intra-hand claim — a player taking another player's discard to form
+ * a meld (chow / pung / open kong). These are the turning points the commentary
+ * is asked to explain: who claimed what, from whom, and how it shifted tempo.
+ */
+export interface HandClaim {
+  /** Seat that made the claim. */
+  claimerSeat: 0 | 1 | 2 | 3;
+  /** Meld formed from the claim. ('kong' covers an open kong off a discard.) */
+  type: 'chow' | 'pung' | 'kong';
+  /** The claimed tile. */
+  tile: string;
+  /** Seat whose discard was claimed (the immediately-preceding discard). */
+  fromSeat?: 0 | 1 | 2 | 3;
+}
+
 /** Compact per-hand summary for the facts digest. */
 export interface GameHandDigest {
   handIndex: number;
@@ -133,6 +149,8 @@ export interface GameHandDigest {
   jingCount: number;
   hasRobKong: boolean;
   hasConcede: boolean;
+  /** Intra-hand claims (chow/pung/open-kong) in chronological order. */
+  claims: HandClaim[];
 }
 
 /** Seat-level player info included in every digest. */
@@ -179,6 +197,11 @@ export interface ChallengeHandDivergence {
     scoreSwing: number;
     specialHands: string[];
     jingCount: number;
+    /**
+     * Intra-hand claims in this participant's game. Seat 0 is always the human
+     * participant; seats 1–3 are bots (challenge games are 1 human + 3 bots).
+     */
+    claims: HandClaim[];
   }>;
 }
 

@@ -31,8 +31,16 @@ import {
   getSeatFromEvent,
 } from './components/PlaybackControls';
 import { AiSummaryPanel } from '../../components/AiSummaryPanel';
-import { useChallengeSummary, useRequestChallengeSummary } from '../../hooks/use-challenges';
-import { useGameSummary, useRequestGameSummary } from '../../hooks/use-replay';
+import {
+  useChallengeSummary,
+  useRequestChallengeSummary,
+  useRegenerateChallengeSummary,
+} from '../../hooks/use-challenges';
+import {
+  useGameSummary,
+  useRequestGameSummary,
+  useRegenerateGameSummary,
+} from '../../hooks/use-replay';
 
 // ── Glyphs & separators (module-level avoids i18next/no-literal-string) ───────
 
@@ -162,12 +170,17 @@ export function ChallengeReplayPage() {
   const [speed, setSpeed] = useState(1);
 
   // AI summary hooks
+  const canRegenerateAi =
+    currentUser?.role === 'admin' ||
+    (currentUser?.permissions?.includes('admin-ai-features') ?? false);
   const challengeSummary = useChallengeSummary(challengeId ?? '');
   const requestChallengeSummary = useRequestChallengeSummary();
+  const regenerateChallengeSummary = useRegenerateChallengeSummary();
   const activeGameId =
     participants.find((p) => p.sub === (viewedSub || participants[0]?.sub))?.gameId ?? '';
   const gameSummary = useGameSummary(activeGameId);
   const requestGameSummary = useRequestGameSummary();
+  const regenerateGameSummary = useRegenerateGameSummary();
 
   // Default to first participant once loaded
   useEffect(() => {
@@ -331,6 +344,9 @@ export function ChallengeReplayPage() {
           isError={challengeSummary.isError}
           isRequesting={requestChallengeSummary.isPending}
           onRequest={() => void requestChallengeSummary.mutate(challengeId ?? '')}
+          canRegenerate={canRegenerateAi}
+          isRegenerating={regenerateChallengeSummary.isPending}
+          onRegenerate={() => void regenerateChallengeSummary.mutate(challengeId ?? '')}
         />
 
         {/* Participant switcher */}
@@ -358,6 +374,9 @@ export function ChallengeReplayPage() {
             isRequesting={requestGameSummary.isPending}
             onRequest={() => void requestGameSummary.mutate(activeGameId)}
             label={t('aiSummaryPlayerBreakdown')}
+            canRegenerate={canRegenerateAi}
+            isRegenerating={regenerateGameSummary.isPending}
+            onRegenerate={() => void regenerateGameSummary.mutate(activeGameId)}
           />
         )}
 

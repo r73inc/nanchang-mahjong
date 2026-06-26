@@ -302,6 +302,34 @@ describe('AiSummaryService', () => {
       const digest = service.extractGameDigest(replay);
       expect(digest.hands[0].jingCount).toBeGreaterThan(0);
     });
+
+    it('extracts intra-hand claims with the seat whose discard was taken', () => {
+      const replay = makeReplay();
+      replay.hands[0].events = [
+        { kind: 'deal', seed: 42, hands: [[], [], [], []] },
+        { kind: 'jing_indicator', indicator: '1m', jingPrimary: '2m', jingSecondary: '3m' },
+        { kind: 'discard', seat: 0, tile: '5m' },
+        { kind: 'pung', seat: 2, tile: '5m' }, // seat 2 pungs seat 0's discard
+        { kind: 'discard', seat: 2, tile: '7p' },
+        {
+          kind: 'chow',
+          seat: 3,
+          tile: '7p',
+          sequence: ['6p', '7p', '8p'],
+        }, // seat 3 chows seat 2's discard
+        { kind: 'draw_game' },
+      ];
+      const digest = service.extractGameDigest(replay);
+      expect(digest.hands[0].claims).toEqual([
+        { claimerSeat: 2, type: 'pung', tile: '5m', fromSeat: 0 },
+        { claimerSeat: 3, type: 'chow', tile: '7p', fromSeat: 2 },
+      ]);
+    });
+
+    it('hands with no claims expose an empty claims array', () => {
+      const digest = service.extractGameDigest(makeReplay());
+      expect(digest.hands[1].claims).toEqual([]);
+    });
   });
 
   // ── generateGameSummary ────────────────────────────────────────────────────

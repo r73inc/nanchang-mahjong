@@ -42,7 +42,7 @@ export const configuration = () => ({
     url: process.env.GEMINI_RELAY_URL ?? '',
     region: process.env.GEMINI_RELAY_REGION ?? 'us-east-1',
     model: process.env.GEMINI_RELAY_MODEL ?? 'gemini-2.5-flash',
-    challengeWordCap: parseInt(process.env.GEMINI_CHALLENGE_WORD_CAP ?? '400', 10),
+    challengeWordCap: parseInt(process.env.GEMINI_CHALLENGE_WORD_CAP ?? '1200', 10),
   },
 
   /**

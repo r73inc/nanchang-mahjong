@@ -787,6 +787,8 @@
   "aiSummaryExpand": "展开 AI 点评",
   "aiSummaryCollapse": "收起 AI 点评",
   "aiSummaryPlayerBreakdown": "玩家详情",
+  "aiSummaryRegenerate": "重新生成",
+  "aiSummaryRegenerating": "重新生成中…",
 
   "adminAiQueueTitle": "AI 申请队列",
   "adminAiQueueEmpty": "暂无待处理申请。",
