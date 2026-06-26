@@ -46,6 +46,7 @@ import type {
   ChallengeFactsDigest,
   ChallengeHandDivergence,
   ChallengeDigestParticipant,
+  HandClaim,
 } from '@nanchang/shared';
 
 // ── Prompt versioning ─────────────────────────────────────────────────────────
@@ -119,6 +120,30 @@ function lastActionSeat(
     }
   }
   return undefined;
+}
+
+/**
+ * Extract every intra-hand claim (chow / pung / open kong off a discard) in
+ * chronological order. The claimed tile comes from the immediately-preceding
+ * discard, so `fromSeat` is the seat of the last discard before the claim.
+ * Concealed and added kongs are NOT claims (no discard taken) and are skipped.
+ */
+function extractHandClaims(events: GameEvent[]): HandClaim[] {
+  const claims: HandClaim[] = [];
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
+    if (ev.kind === 'pung' || ev.kind === 'chow' || ev.kind === 'kong_open') {
+      const type: HandClaim['type'] =
+        ev.kind === 'chow' ? 'chow' : ev.kind === 'pung' ? 'pung' : 'kong';
+      claims.push({
+        claimerSeat: ev.seat,
+        type,
+        tile: ev.tile,
+        fromSeat: lastActionSeat(events, i, 'discard'),
+      });
+    }
+  }
+  return claims;
 }
 
 function countJings(
@@ -268,6 +293,7 @@ function extractHandDigest(
     jingCount,
     hasRobKong,
     hasConcede: outcome === 'concede',
+    claims: extractHandClaims(events),
   };
 }
 
@@ -286,6 +312,7 @@ function extractChallengeHandMeta(
   scoreSwing: number;
   specialHands: string[];
   jingCount: number;
+  claims: HandClaim[];
 } {
   const delta = extractHandScoreDeltas(hand, endScores);
   const winIdx = hand.events.findIndex((e) => e.kind === 'win');
@@ -317,7 +344,13 @@ function extractChallengeHandMeta(
     }
   }
 
-  return { outcome, scoreSwing: delta[0], specialHands, jingCount };
+  return {
+    outcome,
+    scoreSwing: delta[0],
+    specialHands,
+    jingCount,
+    claims: extractHandClaims(hand.events),
+  };
 }
 
 // ── Prompt building ───────────────────────────────────────────────────────────
@@ -334,6 +367,27 @@ function formatWind(wind: SeatWind): string {
     north: 'North',
   };
   return map[wind] ?? wind;
+}
+
+function claimVerb(type: HandClaim['type']): string {
+  return type === 'chow' ? 'chowed' : type === 'pung' ? 'punged' : 'konged';
+}
+
+/**
+ * Render a hand's claims as a single human-readable line using player handles.
+ * `nameForSeat` resolves a seat index to a display name (real handle for a game,
+ * or "the player"/"a bot" for a challenge solo game).
+ */
+function formatClaims(claims: HandClaim[], nameForSeat: (seat: 0 | 1 | 2 | 3) => string): string {
+  return claims
+    .map((c) => {
+      const who = nameForSeat(c.claimerSeat);
+      const from = c.fromSeat !== undefined ? `${nameForSeat(c.fromSeat)}'s` : '';
+      // Assemble tokens and join with single spaces so an absent `from` never
+      // leaves a redundant double-space in the prompt text.
+      return [who, claimVerb(c.type), from, c.tile].filter(Boolean).join(' ');
+    })
+    .join('; ');
 }
 
 function buildHandLine(
@@ -363,6 +417,12 @@ function buildHandLine(
     line += ' | concede (player surrendered)';
   } else {
     line += ' | draw (wall exhausted)';
+  }
+
+  if (hand.claims.length > 0) {
+    const nameForSeat = (seat: 0 | 1 | 2 | 3) =>
+      players.find((p) => p.seat === seat)?.handle ?? `Seat ${seat}`;
+    line += `\n  Claims (turn-order shifts): ${formatClaims(hand.claims, nameForSeat)}`;
   }
 
   const swings = hand.scoreDeltas
@@ -530,7 +590,7 @@ export class AiSummaryService {
         const endScores: [number, number, number, number] =
           h + 1 < replay.hands.length ? replay.hands[h + 1].startingScores : replay.finalScores;
 
-        const { outcome, scoreSwing, specialHands, jingCount } = extractChallengeHandMeta(
+        const { outcome, scoreSwing, specialHands, jingCount, claims } = extractChallengeHandMeta(
           hand,
           endScores,
         );
@@ -543,6 +603,7 @@ export class AiSummaryService {
           scoreSwing,
           specialHands,
           jingCount,
+          claims,
         });
       }
 
@@ -598,13 +659,20 @@ export class AiSummaryService {
       .join('\n\n');
 
     const systemInstruction = [
-      'You are a lively Nanchang Mahjong match reporter and play-breakdown commentator.',
+      'You are a knowledgeable Nanchang Mahjong analyst writing a detailed post-game breakdown.',
       'Nanchang Mahjong is a regional tile game from Nanchang, Jiangxi, China.',
-      'Write engaging, accurate, personality-filled commentary based ONLY on the facts provided.',
+      'Write an informative, measured analysis based ONLY on the facts provided.',
+      'Favor concrete detail and insight over excitement, hype, or emotional language.',
+      'Focus on what happened INSIDE each hand and how it shaped the result:',
+      'who claimed a chow/pung/kong and from whom, how that shifted the turn order or tempo,',
+      'who dealt into the winner, who quietly built an advantage, and how spirit (Jing) tiles factored in.',
+      'Do NOT merely restate end-of-hand scores — explain the decisions and turning points that produced them.',
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
-      '(3) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields.',
-      'Each language: 3–12 sentences scaled to game length. Narrative, not a stat dump.',
+      '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
+      'NEVER call it 财神 ("god of wealth") or any other name.',
+      '(4) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      'Length: a thorough breakdown of roughly 2–4 short paragraphs scaled to game length. Be substantive, not a one-line recap.',
     ].join(' ');
 
     const userPrompt = [
@@ -653,6 +721,11 @@ export class AiSummaryService {
             if (o.jingCount > 0)
               line += ` • ${o.jingCount} spirit tile${o.jingCount > 1 ? 's' : ''}`;
             if (o.isWinner) line += ' ★';
+            if (o.claims.length > 0) {
+              // Seat 0 is the human participant; seats 1–3 are bots in a solo challenge game.
+              const nameForSeat = (seat: 0 | 1 | 2 | 3) => (seat === 0 ? o.handle : 'a bot');
+              line += `\n    Claims: ${formatClaims(o.claims, nameForSeat)}`;
+            }
             return line;
           })
           .join('\n');
@@ -661,12 +734,21 @@ export class AiSummaryService {
       .join('\n\n');
 
     const systemInstruction = [
-      'You are a lively Nanchang Mahjong Point Challenge commentator.',
-      'A Point Challenge gives all participants the same pre-determined deal; your job is to compare how they navigated it.',
+      'You are a knowledgeable Nanchang Mahjong Point Challenge analyst.',
+      'A Point Challenge gives all participants the SAME pre-determined deal; your job is to compare how each navigated identical tiles.',
+      'Write an informative, measured comparison based ONLY on the facts provided.',
+      'Favor concrete detail and insight over excitement, hype, or emotional language.',
+      'Focus on the DIVERGENCE points: on a given hand, who claimed a chow/pung/kong and who let the same tile pass,',
+      'how those different choices changed turn order and tempo, whether a claim handed a bot an advantage',
+      '(e.g. someone stole a pung that another participant left for a bot, who then won with it),',
+      'and how spirit (Jing) tiles were used differently.',
+      "Do NOT merely restate each participant's end-of-hand scores — explain the decisions that drove them apart.",
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
-      '(3) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields.',
-      `Each language: 3–8 sentences (target ≤ ${wordCap} words). Focus on divergence moments and drama, not a stat dump.`,
+      '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
+      'NEVER call it 财神 ("god of wealth") or any other name.',
+      '(4) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      `Length: a thorough multi-paragraph comparison (target ≤ ${wordCap} words). Be substantive, not a one-line recap.`,
     ].join(' ');
 
     const userPrompt = [
@@ -1155,9 +1237,7 @@ export class AiSummaryService {
    * Skips items that have a summary in any blocking status (requested, approved,
    * processing, done) or whose ConditionalExpression blocks a duplicate AIREQ.
    */
-  async backfillSummaries(
-    requestedBy: string,
-  ): Promise<{
+  async backfillSummaries(requestedBy: string): Promise<{
     game: { queued: number; skipped: number };
     challenge: { queued: number; skipped: number };
   }> {

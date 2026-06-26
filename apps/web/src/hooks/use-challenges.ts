@@ -98,6 +98,22 @@ export function useRequestChallengeSummary() {
   });
 }
 
+/**
+ * Regenerate an existing challenge summary. Requires the admin-ai-features
+ * permission (or admin role) — reuses the admin retry endpoint, which re-runs
+ * generation and overwrites the stored summary regardless of its status.
+ */
+export function useRegenerateChallengeSummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (challengeId: string) =>
+      api.post(`/admin/ai/jobs/challenge/${challengeId}/retry`).then(() => undefined),
+    onSuccess: (_, challengeId) => {
+      void qc.invalidateQueries({ queryKey: ['challenge-summary', challengeId] });
+    },
+  });
+}
+
 /** Decline a challenge invite. */
 export function useDeclineChallenge() {
   const qc = useQueryClient();

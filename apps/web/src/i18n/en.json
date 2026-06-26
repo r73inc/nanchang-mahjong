@@ -786,6 +786,8 @@
   "aiSummaryExpand": "Expand AI commentary",
   "aiSummaryCollapse": "Collapse AI commentary",
   "aiSummaryPlayerBreakdown": "Player breakdown",
+  "aiSummaryRegenerate": "Regenerate",
+  "aiSummaryRegenerating": "Regenerating…",
 
   "adminAiQueueTitle": "AI Request Queue",
   "adminAiQueueEmpty": "No pending requests.",

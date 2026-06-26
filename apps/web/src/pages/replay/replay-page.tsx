@@ -24,7 +24,11 @@ import {
   getSeatFromEvent,
 } from './components/PlaybackControls';
 import { AiSummaryPanel } from '../../components/AiSummaryPanel';
-import { useGameSummary, useRequestGameSummary } from '../../hooks/use-replay';
+import {
+  useGameSummary,
+  useRequestGameSummary,
+  useRegenerateGameSummary,
+} from '../../hooks/use-replay';
 import type { GameEvent, TileType } from '@nanchang/shared';
 
 // ── Glyphs & separators (module-level avoids i18next/no-literal-string) ───────
@@ -136,6 +140,10 @@ export function ReplayPage() {
     isError: summaryError,
   } = useGameSummary(gameId ?? '');
   const requestSummary = useRequestGameSummary();
+  const regenerateSummary = useRegenerateGameSummary();
+  const canRegenerate =
+    currentUser?.role === 'admin' ||
+    (currentUser?.permissions?.includes('admin-ai-features') ?? false);
 
   const timeline = useMemo(() => (payload ? buildOmniscientTimeline(payload) : []), [payload]);
 
@@ -286,6 +294,9 @@ export function ReplayPage() {
           isError={summaryError}
           isRequesting={requestSummary.isPending}
           onRequest={() => void requestSummary.mutate(gameId ?? '')}
+          canRegenerate={canRegenerate}
+          isRegenerating={regenerateSummary.isPending}
+          onRegenerate={() => void regenerateSummary.mutate(gameId ?? '')}
         />
 
         {/* Playback controls — step callout + scrubber only; transport is in fixed footer */}

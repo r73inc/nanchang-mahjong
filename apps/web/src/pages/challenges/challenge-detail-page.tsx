@@ -9,6 +9,7 @@ import {
   useMarkChallengeResultsViewed,
   useChallengeSummary,
   useRequestChallengeSummary,
+  useRegenerateChallengeSummary,
 } from '../../hooks/use-challenges';
 import { AiSummaryPanel } from '../../components/AiSummaryPanel';
 import { useAuthStore } from '../../stores/auth.store';
@@ -24,6 +25,10 @@ export function ChallengeDetailPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const mySub = useAuthStore((s) => s.user?.sub ?? '');
+  const currentUser = useAuthStore((s) => s.user);
+  const canRegenerateAi =
+    currentUser?.role === 'admin' ||
+    (currentUser?.permissions?.includes('admin-ai-features') ?? false);
 
   const { data: challenge, isLoading, isError } = useChallenge(challengeId!);
   const startGame = useStartChallengeGame();
@@ -35,6 +40,7 @@ export function ChallengeDetailPage() {
     isError: aiSummaryError,
   } = useChallengeSummary(challengeId!);
   const requestAiSummary = useRequestChallengeSummary();
+  const regenerateAiSummary = useRegenerateChallengeSummary();
 
   const [confirmDecline, setConfirmDecline] = useState(false);
 
@@ -161,6 +167,9 @@ export function ChallengeDetailPage() {
             isError={aiSummaryError}
             isRequesting={requestAiSummary.isPending}
             onRequest={() => void requestAiSummary.mutate(challengeId!)}
+            canRegenerate={canRegenerateAi}
+            isRegenerating={regenerateAiSummary.isPending}
+            onRegenerate={() => void regenerateAiSummary.mutate(challengeId!)}
           />
         )}
 
