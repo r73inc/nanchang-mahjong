@@ -241,10 +241,10 @@ export function sevenPairsDist(naturals: TileType[], jingCount: number): number 
  *   - Extra copies of the same natural honor tile
  *   - Natural suit tiles within rank 2 of another same-suit natural tile
  *
- * @returns 0 = tenpai (all natural tiles satisfy misfit constraints).
+ * @param naturals  Pre-separated non-Jing tiles (call separateJing upstream).
+ * @returns 0 = Hu / complete hand (all natural tiles satisfy misfit constraints).
  */
-export function thirteenMisfitsDist(hand: TileType[], jingTypes: TileType[] = []): number {
-  const { naturals } = separateJing(hand, jingTypes);
+export function thirteenMisfitsDist(naturals: TileType[]): number {
   let conflicts = 0;
 
   // Natural honor duplicates: each extra copy beyond 1 is a conflict
@@ -285,10 +285,11 @@ export function thirteenMisfitsDist(hand: TileType[], jingTypes: TileType[] = []
  * Requires Thirteen Misfits + all 7 unique honor types present.
  * Distance = max(misfit conflicts, missing honor types).
  * Jing tiles are excluded from the honor count (they act as wildcards).
+ *
+ * @param naturals  Pre-separated non-Jing tiles (call separateJing upstream).
  */
-export function starWinDist(hand: TileType[], jingTypes: TileType[] = []): number {
-  const { naturals } = separateJing(hand, jingTypes);
-  const misfitDist = thirteenMisfitsDist(hand, jingTypes);
+export function starWinDist(naturals: TileType[]): number {
+  const misfitDist = thirteenMisfitsDist(naturals);
   const uniqueHonors = new Set(naturals.filter(isHonor));
   const missingHonors = Math.max(0, 7 - uniqueHonors.size);
   // Both constraints must be satisfied; a single swap can fix one violation
@@ -313,8 +314,8 @@ export function overallDist(hand: TileType[], jingTypes: TileType[]): number {
 
   const std = standardDist(naturals, jingCount);
   const pairs = sevenPairsDist(naturals, jingCount);
-  const misfits = thirteenMisfitsDist(hand, jingTypes);
-  const star = starWinDist(hand, jingTypes);
+  const misfits = thirteenMisfitsDist(naturals);
+  const star = starWinDist(naturals);
 
   return Math.min(std, pairs, misfits, star);
 }
