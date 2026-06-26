@@ -276,12 +276,14 @@ describe('Engine·hand-eval — non-winning hands', () => {
     expect(isWinningHand(hand, NO_JINGS)).toBe(false);
   });
 
-  it('rejects thirteen misfits where jing tile creates a gap of exactly 2', () => {
-    // jing = '3m'. Face value gives 1m,3m — gap is 2, not > 2 → invalid
+  it('accepts thirteen misfits where jing tile face value would create a gap ≤ 2 (jing is a wildcard)', () => {
+    // jing = '3m'. As a wildcard, 3m represents any valid tile (e.g. 4m or 9m),
+    // NOT its face value. Naturals: 1m, 7m (gap 6 ✓); 2p, 6p; 3s, 7s; all 7 honors.
+    // All natural tiles are valid → hand is a winning Thirteen Misfits by tsumo.
     const JING3M: TileType = '3m';
     const hand: TileType[] = [
       '1m',
-      '3m',
+      '3m', // jing — wildcard, does NOT force a 1m/3m gap of 2
       '7m',
       '2p',
       '6p',
@@ -295,7 +297,8 @@ describe('Engine·hand-eval — non-winning hands', () => {
       'fa',
       'bai',
     ];
-    expect(isWinningHand(hand, [JING3M])).toBe(false);
+    expect(isWinningHand(hand, [JING3M], true)).toBe(true);
+    expect(isWinningHand(hand, [JING3M], false)).toBe(false); // tsumo only
   });
 
   it('rejects thirteen misfits with duplicate honor', () => {
@@ -514,6 +517,92 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
     ];
     expect(isWinningHand(hand, [JING1S], true)).toBe(true);
     expect(isWinningHand(hand, [JING1S], false)).toBe(false); // ron not allowed
+  });
+
+  it('thirteen misfits with multiple same-face-value jings is valid (BUG regression)', () => {
+    // jings = ['7p', '8p'] (adjacent dots, gap 1). Player holds 7p×2 + 8p×1 = 3 wilds.
+    // Old code: 7p,7p gap=0 and 7p,8p gap=1 both ≤ 2 → incorrectly rejected.
+    // New code: naturals only — no dot conflicts; wildcards fill valid positions.
+    // Naturals: 1m,4m | 1p,4p | 1s,5s,9s | east,south,west,north — all valid ✓
+    const hand: TileType[] = [
+      '1m',
+      '4m',
+      '1p',
+      '4p',
+      '7p',
+      '7p',
+      '8p', // all three are jings
+      '1s',
+      '5s',
+      '9s',
+      'east',
+      'south',
+      'west',
+      'north',
+    ];
+    expect(isWinningHand(hand, ['7p', '8p'], true)).toBe(true);
+    expect(isWinningHand(hand, ['7p', '8p'], false)).toBe(false); // tsumo only
+  });
+
+  it('thirteen misfits with adjacent jing types as the only dots is valid', () => {
+    // jings = ['7p', '8p']. Hand has one 7p and one 8p jing in dots.
+    // Old code: gap(8p - 7p) = 1 ≤ 2 → rejected. New code: no natural dots → no conflicts.
+    const hand: TileType[] = [
+      '1m',
+      '4m',
+      '8m',
+      '7p',
+      '8p', // both jings — appear adjacent at face value but are wildcards
+      '2s',
+      '6s',
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      'bai',
+    ];
+    expect(isWinningHand(hand, ['7p', '8p'], true)).toBe(true);
+    expect(isWinningHand(hand, ['7p', '8p'], false)).toBe(false); // tsumo only
+  });
+
+  it('thirteen misfits is invalid when natural tiles have gap ≤ 2 (wildcards cannot fix this)', () => {
+    // 1m and 3m are both natural — gap 2, not > 2. No wildcard can fix a natural conflict.
+    const hand: TileType[] = [
+      '1m',
+      '3m', // natural conflict — gap 2
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s',
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      'bai',
+    ];
+    expect(isWinningHand(hand, [], true)).toBe(false);
+    // Also invalid when an unrelated jing is present — natural conflict still there
+    const hand2: TileType[] = [
+      '1m',
+      '3m', // still a natural conflict
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      '9p', // 9p is jing
+    ];
+    expect(isWinningHand(hand2, ['9p'], true)).toBe(false);
   });
 
   it('seven pairs wins when a jing completes the 7th pair', () => {
