@@ -3835,6 +3835,7 @@ function buildHandAnnouncement(
   reveal: HandRevealPayload,
   snapshot: ClientGameState,
   t: ReturnType<typeof useI18n>['t'],
+  ended: GameEndedPayload | null,
 ): { title: string; subtitle?: string; isViewer: boolean } {
   const viewerSeat = snapshot.viewerSeat;
 
@@ -3846,9 +3847,20 @@ function buildHandAnnouncement(
         : t('handRevealResultDraw');
 
   if (reveal.isLastHand) {
-    const finals = snapshot.seats.map((s, i) => s.score + reveal.spiritDeltas[i]);
-    const winnerSeat = finals.indexOf(Math.max(...finals));
-    const isViewer = viewerSeat !== null && winnerSeat === viewerSeat;
+    // Prefer the authoritative finalScores from game:ended when available.
+    // Fall back to snapshot + spiritDeltas (snapshot has the post-win-payment
+    // scores; spiritDeltas adds the spirit settlement to get final totals).
+    let winnerSeat: number;
+    let isViewer: boolean;
+    if (ended) {
+      const sorted = [...ended.finalScores].map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s);
+      winnerSeat = sorted[0].i;
+      isViewer = viewerSeat !== null && ended.placement[viewerSeat] === 1;
+    } else {
+      const finals = snapshot.seats.map((s, i) => s.score + reveal.spiritDeltas[i]);
+      winnerSeat = finals.indexOf(Math.max(...finals));
+      isViewer = viewerSeat !== null && winnerSeat === viewerSeat;
+    }
     return {
       title: isViewer
         ? t('gameWinnerPopupYou')
@@ -3864,6 +3876,7 @@ function buildHandAnnouncement(
       title: isViewer
         ? t('gameWinnerPopupYou')
         : t('gameWinnerPopupOther', snapshot.seats[reveal.winnerSeat].seatName),
+      subtitle: handResultLine,
       isViewer,
     };
   }
@@ -4066,7 +4079,7 @@ export function GamePage() {
     isDealer || (dealerIsBot && viewerSeat !== null && viewerSeat === firstHumanSeat);
   const isHuman = viewerSeat !== null && !snapshot.seats[viewerSeat]?.isBot;
   const announcement = announcingReveal
-    ? buildHandAnnouncement(announcingReveal, snapshot, t)
+    ? buildHandAnnouncement(announcingReveal, snapshot, t, ended)
     : null;
 
   return (

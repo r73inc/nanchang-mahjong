@@ -623,7 +623,7 @@ export class AiSummaryService {
     const model = this.config.get('geminiRelay.model', { infer: true });
 
     const playerList = digest.players
-      .map((p) => `  Seat ${p.seat}: ${p.handle}${p.isBot ? ' (bot)' : ''}`)
+      .map((p) => `  ${p.handle}${p.isBot ? ' (bot)' : ''}`)
       .join('\n');
 
     const rankList = [...digest.players]
@@ -680,16 +680,16 @@ export class AiSummaryService {
       'self-draw (自摸) when a player wins by drawing their own tile,',
       "discard win (放炮) when a player wins on an opponent's discard.",
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
-      '(5) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      '(5) Always refer to players by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
+      '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
       'Length: a thorough breakdown of roughly 2–4 short paragraphs scaled to game length. Be substantive, not a one-line recap.',
     ].join(' ');
 
     const userPrompt = [
       '=== NANCHANG MAHJONG GAME SUMMARY ===',
-      `Game ID: ${digest.gameId}`,
       `Players:\n${playerList}`,
       `Settings: ${digest.settings.rounds} rounds, ${digest.settings.terminationType} termination, starting score ${digest.settings.startingScore}${digest.settings.ruleTopBottomJing ? ', spirit flip rule active' : ''}`,
-      `Duration: ${digest.hands.length} hand${digest.hands.length !== 1 ? 's' : ''} | ${digest.startedAt} → ${digest.endedAt}`,
+      `Duration: ${digest.hands.length} hand${digest.hands.length !== 1 ? 's' : ''}`,
       `Result: ${digest.result}`,
       `Final standings:\n${rankList}`,
       '',
@@ -731,8 +731,14 @@ export class AiSummaryService {
               line += ` • ${o.jingCount} spirit tile${o.jingCount > 1 ? 's' : ''}`;
             if (o.isWinner) line += ' ★';
             if (o.claims.length > 0) {
-              // Seat 0 is the human participant; seats 1–3 are bots in a solo challenge game.
-              const nameForSeat = (seat: 0 | 1 | 2 | 3) => (seat === 0 ? o.handle : 'a bot');
+              // Seat 0 is the human participant; seats 1–3 are the three bot opponents.
+              const BOT_NAMES: Record<1 | 2 | 3, string> = {
+                1: 'East bot',
+                2: 'South bot',
+                3: 'West bot',
+              };
+              const nameForSeat = (seat: 0 | 1 | 2 | 3) =>
+                seat === 0 ? o.handle : BOT_NAMES[seat as 1 | 2 | 3];
               line += `\n    Claims: ${formatClaims(o.claims, nameForSeat)}`;
             }
             return line;
@@ -761,13 +767,13 @@ export class AiSummaryService {
       'self-draw (自摸) when a player wins by drawing their own tile,',
       "discard win (放炮) when a player wins on an opponent's discard.",
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
-      '(5) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      '(5) Always refer to players and bots by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
+      '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
       `Length: a thorough multi-paragraph comparison (target ≤ ${wordCap} words). Be substantive, not a one-line recap.`,
     ].join(' ');
 
     const userPrompt = [
       '=== NANCHANG MAHJONG POINT CHALLENGE ===',
-      `Challenge ID: ${digest.challengeId}`,
       `Participants: ${digest.participants.length} | Hands played: ${digest.numHands}`,
       '',
       'Final standings:',
