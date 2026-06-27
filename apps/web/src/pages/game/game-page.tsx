@@ -1150,8 +1150,8 @@ function HandRevealScreen({
             </GoldButton>
           ) : (
             <>
-              {/* Force-final toggle — actual host only, not on the last hand */}
-              {isActualHost && !handReveal.isLastHand && (
+              {/* Force-final toggle — actual host only, not on the last hand, not in challenge mode */}
+              {isActualHost && !handReveal.isLastHand && !snapshot.isChallenge && (
                 <button
                   onClick={() => onSetFinalHand?.(!snapshot.forcedFinalNextHand)}
                   className="w-full py-2.5 rounded-full font-semibold text-xs"
@@ -1172,11 +1172,14 @@ function HandRevealScreen({
               )}
 
               {/* Badge shown to all players when host has queued a forced final */}
-              {!isActualHost && snapshot.forcedFinalNextHand && !handReveal.isLastHand && (
-                <p className="text-[11px] font-semibold text-mj-gold/80 tracking-wide">
-                  {t('handRevealForceFinalBadge')}
-                </p>
-              )}
+              {!isActualHost &&
+                snapshot.forcedFinalNextHand &&
+                !handReveal.isLastHand &&
+                !snapshot.isChallenge && (
+                  <p className="text-[11px] font-semibold text-mj-gold/80 tracking-wide">
+                    {t('handRevealForceFinalBadge')}
+                  </p>
+                )}
 
               {/* Ready / waiting */}
               {isHuman && !iAmReady ? (

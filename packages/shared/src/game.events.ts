@@ -224,6 +224,8 @@ export interface ClientGameState {
    * final one of the session. Toggleable until the next hand starts.
    */
   forcedFinalNextHand?: boolean;
+  /** True when this game belongs to a Point Challenge. Clients hide the force-final UI when set. */
+  isChallenge?: boolean;
 }
 
 // ── Pre-game & hand-reveal payloads ──────────────────────────────────────────

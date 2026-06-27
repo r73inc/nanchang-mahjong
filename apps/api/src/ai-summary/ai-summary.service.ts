@@ -616,7 +616,13 @@ export class AiSummaryService {
       }
     }
 
-    return { challengeId, participants, numHands, divergence };
+    // Extract bot names from the first available replay (all participants face the same bots).
+    const firstReplay = available[0]?.replay;
+    const botNames: [string, string, string] | undefined = firstReplay?.seatNames
+      ? [firstReplay.seatNames[1], firstReplay.seatNames[2], firstReplay.seatNames[3]]
+      : undefined;
+
+    return { challengeId, participants, numHands, divergence, botNames };
   }
 
   buildGameRequest(digest: GameFactsDigest): RelayGenerateRequest {
@@ -667,9 +673,15 @@ export class AiSummaryService {
       'Nanchang Mahjong is a regional tile game from Nanchang, Jiangxi, China.',
       'Write an informative, measured analysis based ONLY on the facts provided.',
       'Favor concrete detail and insight over excitement, hype, or emotional language.',
-      'Focus on what happened INSIDE each hand and how it shaped the result:',
-      "who chi/pung/gang'd a tile and from whom, how that shifted the turn order or tempo,",
-      'who dealt into the winner, who quietly built an advantage, and how spirit (Jing) tiles factored in.',
+      'Structure your analysis as follows:',
+      '(A) A brief opening sentence naming the overall winner and the margin of victory.',
+      '(B) A hand-by-hand breakdown — for EVERY hand, explain what happened inside it:',
+      "who chi/pung/gang'd which tile and from whom, how that changed turn order or tempo,",
+      'who dealt into the winning discard and why it mattered, whether a Jing tile was pivotal,',
+      'and what the momentum shift meant for the running scores.',
+      'Name specific players for every action — never say "a player" or leave it anonymous.',
+      '(C) A closing paragraph on momentum: which hand was the turning point, which player held the',
+      'lead longest, and whether any comeback or collapse defined the final standings.',
       'Do NOT merely restate end-of-hand scores — explain the decisions and turning points that produced them.',
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
@@ -682,7 +694,7 @@ export class AiSummaryService {
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
       '(5) Always refer to players by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
       '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
-      'Length: a thorough breakdown of roughly 2–4 short paragraphs scaled to game length. Be substantive, not a one-line recap.',
+      'Length: a thorough multi-paragraph breakdown scaled to game length — one paragraph per 2–3 hands minimum. Never write a one-line recap.',
     ].join(' ');
 
     const userPrompt = [
@@ -731,14 +743,9 @@ export class AiSummaryService {
               line += ` • ${o.jingCount} spirit tile${o.jingCount > 1 ? 's' : ''}`;
             if (o.isWinner) line += ' ★';
             if (o.claims.length > 0) {
-              // Seat 0 is the human participant; seats 1–3 are the three bot opponents.
-              const BOT_NAMES: Record<1 | 2 | 3, string> = {
-                1: 'East bot',
-                2: 'South bot',
-                3: 'West bot',
-              };
+              // Seat 0 is the human participant; seats 1–3 are the shared bot opponents.
               const nameForSeat = (seat: 0 | 1 | 2 | 3) =>
-                seat === 0 ? o.handle : BOT_NAMES[seat as 1 | 2 | 3];
+                seat === 0 ? o.handle : (digest.botNames?.[seat - 1] ?? `Bot ${seat}`);
               line += `\n    Claims: ${formatClaims(o.claims, nameForSeat)}`;
             }
             return line;
