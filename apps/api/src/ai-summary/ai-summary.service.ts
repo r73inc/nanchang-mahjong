@@ -669,20 +669,18 @@ export class AiSummaryService {
       .join('\n\n');
 
     const systemInstruction = [
-      'You are a knowledgeable Nanchang Mahjong analyst writing a detailed post-game breakdown.',
+      'You are a knowledgeable Nanchang Mahjong analyst writing a post-game highlight reel, not a play-by-play log.',
       'Nanchang Mahjong is a regional tile game from Nanchang, Jiangxi, China.',
       'Write an informative, measured analysis based ONLY on the facts provided.',
       'Favor concrete detail and insight over excitement, hype, or emotional language.',
-      'Structure your analysis as follows:',
-      '(A) A brief opening sentence naming the overall winner and the margin of victory.',
-      '(B) A hand-by-hand breakdown — for EVERY hand, explain what happened inside it:',
-      "who chi/pung/gang'd which tile and from whom, how that changed turn order or tempo,",
-      'who dealt into the winning discard and why it mattered, whether a Jing tile was pivotal,',
-      'and what the momentum shift meant for the running scores.',
-      'Name specific players for every action — never say "a player" or leave it anonymous.',
-      '(C) A closing paragraph on momentum: which hand was the turning point, which player held the',
-      'lead longest, and whether any comeback or collapse defined the final standings.',
-      'Do NOT merely restate end-of-hand scores — explain the decisions and turning points that produced them.',
+      'DO NOT recap every hand. Instead, select only the moments that mattered:',
+      '— the decisive win that swung the lead,',
+      '— a costly deal-in that handed an opponent a big score,',
+      '— a clever claim (chi/pung/gang) that changed tempo,',
+      '— a special hand (Seven Pairs, Thirteen Misfits) or heavy Jing usage,',
+      '— the turning point where the final standings were effectively decided.',
+      'Skip hands that were routine draws or small unremarkable wins.',
+      'Always name the players involved — never say "a player" or leave an action anonymous.',
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
       '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
@@ -694,7 +692,7 @@ export class AiSummaryService {
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
       '(5) Always refer to players by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
       '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
-      'Length: a thorough multi-paragraph breakdown scaled to game length — one paragraph per 2–3 hands minimum. Never write a one-line recap.',
+      'Length: 2–3 tight paragraphs. First sentence names the winner and margin. Body covers the key highlights. Final sentence states who controlled the game.',
     ].join(' ');
 
     const userPrompt = [
@@ -760,11 +758,13 @@ export class AiSummaryService {
       'A Point Challenge gives all participants the SAME pre-determined deal; your job is to compare how each navigated identical tiles.',
       'Write an informative, measured comparison based ONLY on the facts provided.',
       'Favor concrete detail and insight over excitement, hype, or emotional language.',
-      "Focus on the DIVERGENCE points: on a given hand, who chi/pung/gang'd a tile and who let the same tile pass,",
-      'how those different choices changed turn order and tempo, whether a claim handed a bot an advantage',
-      '(e.g. someone stole a pung that another participant left for a bot, who then won with it),',
-      'and how spirit (Jing) tiles were used differently.',
-      "Do NOT merely restate each participant's end-of-hand scores — explain the decisions that drove them apart.",
+      'DO NOT recap every hand. Focus only on the moments where participants diverged in a meaningful way:',
+      '— a hand where one participant won and another drew or lost on the same deal,',
+      '— a claim (chi/pung/gang) that one participant made while another let the same tile pass,',
+      '— a costly deal-in that handed a bot a win when a different participant avoided it,',
+      '— special hands or heavy Jing usage that separated the scores.',
+      'Skip hands where all participants had similar unremarkable results.',
+      'Always explain WHY a divergence mattered — who benefited, by how much, and how it shifted the standings.',
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
       '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
@@ -776,7 +776,7 @@ export class AiSummaryService {
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
       '(5) Always refer to players and bots by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
       '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
-      `Length: a thorough multi-paragraph comparison (target ≤ ${wordCap} words). Be substantive, not a one-line recap.`,
+      `Length: 2–4 paragraphs of highlights only (target ≤ ${wordCap} words). First sentence names the winner. Body covers only the divergence moments that mattered. Final sentence states what separated the top finisher from the rest.`,
     ].join(' ');
 
     const userPrompt = [
