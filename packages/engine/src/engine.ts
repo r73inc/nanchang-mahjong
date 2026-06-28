@@ -12,7 +12,7 @@
  *   - Instant Kong payouts and Spirit settlements are applied inside the engine
  *     so the score on SeatState always reflects the full game ledger.
  */
-import { buildWall, typeOf, sortTypes, stepAbove } from './tiles';
+import { buildWall, typeOf, sortTypes, stepAbove, isHonor } from './tiles';
 import { seededShuffle, mulberry32 } from './prng';
 import { rollDice, DICE_SALT } from './dice';
 import {
@@ -344,10 +344,14 @@ export class GameEngine {
     const { naturals, jingCount } = separateJing(fullHand, this.jingTypes);
     if (checkSevenPairs(naturals, jingCount)) return 'seven_pairs';
 
-    // Must be Thirteen Misfits — check for Seven Star variant (all 7 unique honors present)
-    const HONORS: TileType[] = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai'];
-    const hasAllHonors = HONORS.every((h) => fullHand.includes(h));
-    return hasAllHonors ? 'seven_star_thirteen' : 'thirteen_misfits';
+    // Must be Thirteen Misfits — check for Seven Star variant (all 7 honor types filled).
+    // A non-honor Jing wildcard can substitute for a missing honor tile, so we compare
+    // the count of natural unique honors against the 7 required, then check if the gap
+    // can be covered by available wildcards. This handles the case where, e.g., Jing='3m'
+    // and the player holds only 6 literal honors — the wildcard fills the 7th honor slot.
+    const naturalHonors = new Set(naturals.filter(isHonor));
+    const missingHonors = Math.max(0, 7 - naturalHonors.size);
+    return missingHonors <= jingCount ? 'seven_star_thirteen' : 'thirteen_misfits';
   }
 
   // ── Deal ─────────────────────────────────────────────────────────────────────

@@ -283,15 +283,18 @@ export function thirteenMisfitsDist(naturals: TileType[]): number {
  * Distance to Ting for Seven Star Thirteen Misfits (七星十三烂).
  *
  * Requires Thirteen Misfits + all 7 unique honor types present.
- * Distance = max(misfit conflicts, missing honor types).
- * Jing tiles are excluded from the honor count (they act as wildcards).
+ * Distance = max(misfit conflicts, unfillable missing honor types).
+ * Wildcards (jings) can substitute for missing honor tiles, so the effective
+ * honor gap is reduced by the available jing count before taking the max.
  *
- * @param naturals  Pre-separated non-Jing tiles (call separateJing upstream).
+ * @param naturals   Pre-separated non-Jing tiles (call separateJing upstream).
+ * @param jingCount  Number of wildcard (Jing) tiles in the hand.
  */
-export function starWinDist(naturals: TileType[]): number {
+export function starWinDist(naturals: TileType[], jingCount = 0): number {
   const misfitDist = thirteenMisfitsDist(naturals);
   const uniqueHonors = new Set(naturals.filter(isHonor));
-  const missingHonors = Math.max(0, 7 - uniqueHonors.size);
+  // Wildcards can fill honor slots — reduce missing count by available jings.
+  const missingHonors = Math.max(0, 7 - uniqueHonors.size - jingCount);
   // Both constraints must be satisfied; a single swap can fix one violation
   // in each category, so take the max as the lower-bound distance.
   return Math.max(misfitDist, missingHonors);
@@ -315,7 +318,7 @@ export function overallDist(hand: TileType[], jingTypes: TileType[]): number {
   const std = standardDist(naturals, jingCount);
   const pairs = sevenPairsDist(naturals, jingCount);
   const misfits = thirteenMisfitsDist(naturals);
-  const star = starWinDist(naturals);
+  const star = starWinDist(naturals, jingCount);
 
   return Math.min(std, pairs, misfits, star);
 }

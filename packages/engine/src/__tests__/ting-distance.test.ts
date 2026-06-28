@@ -393,6 +393,47 @@ describe('starWinDist', () => {
     ];
     expect(starWinDist(hand)).toBeGreaterThanOrEqual(2);
   });
+
+  it('returns 0 when a non-honor wildcard fills the missing 7th honor slot', () => {
+    // 6 unique natural honors (no 'bai') + suit tiles (all isolated) + 1 wildcard.
+    // The wildcard fills the 'bai' slot → all 7 honor positions covered → dist = 0.
+    const naturals: TileType[] = [
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa', // 6 honors
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s', // 7 suit tiles (all gaps > 2)
+    ];
+    expect(starWinDist(naturals, 1)).toBe(0);
+  });
+
+  it('returns 1 when wildcard count is not enough to fill all missing honors', () => {
+    // 5 unique natural honors (no 'bai', no 'north') + 0 wildcards → gap of 2
+    const naturals: TileType[] = [
+      'east',
+      'south',
+      'west',
+      'zhong',
+      'fa', // 5 honors
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s', // 7 suit tiles (all gaps > 2)
+    ];
+    // 1 wildcard covers one missing honor; 1 still missing → dist = 1
+    expect(starWinDist(naturals, 1)).toBe(1);
+  });
 });
 
 // ── overallDist ───────────────────────────────────────────────────────────────
