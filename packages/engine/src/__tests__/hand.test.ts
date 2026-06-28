@@ -130,7 +130,7 @@ describe('Engine·hand-eval — standard winning shapes', () => {
 
   it('Engine·hand-eval-thirteen-misfits: valid misfit hand (Seven Star variant)', () => {
     // m: 1,4,7 (gaps 3,3 ✓); p: 2,6 (gap 4 ✓); s: 3,7 (gap 4 ✓); all 7 honors unique ✓
-    // isSelfDraw=true: Thirteen Misfits is only valid by self-draw.
+    // Thirteen Misfits is "concealed only" but can be won by self-draw OR discard claim.
     const hand: TileType[] = [
       '1m',
       '4m',
@@ -148,8 +148,9 @@ describe('Engine·hand-eval — standard winning shapes', () => {
       'bai',
     ];
     expect(isWinningHand(hand, NO_JINGS, true)).toBe(true);
-    // Ron (isSelfDraw=false) must NOT recognise this as a winning hand.
-    expect(isWinningHand(hand, NO_JINGS, false)).toBe(false);
+    // Ron (isSelfDraw=false) is also valid — "concealed only" means no open melds,
+    // not self-draw only.
+    expect(isWinningHand(hand, NO_JINGS, false)).toBe(true);
   });
 
   it('honor chow hand: east-south-west chow + three pungs + pair', () => {
@@ -298,7 +299,7 @@ describe('Engine·hand-eval — non-winning hands', () => {
       'bai',
     ];
     expect(isWinningHand(hand, [JING3M], true)).toBe(true);
-    expect(isWinningHand(hand, [JING3M], false)).toBe(false); // tsumo only
+    expect(isWinningHand(hand, [JING3M], false)).toBe(true); // ron also valid
   });
 
   it('rejects thirteen misfits with duplicate honor', () => {
@@ -492,7 +493,7 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
       'bai',
     ];
     expect(isWinningHand(hand, [JING4M], true)).toBe(true);
-    expect(isWinningHand(hand, [JING4M], false)).toBe(false); // ron not allowed
+    expect(isWinningHand(hand, [JING4M], false)).toBe(true); // ron also valid
   });
 
   it('seven-star thirteen misfits wins when a jing tile sits in a valid misfit position', () => {
@@ -516,7 +517,7 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
       'bai',
     ];
     expect(isWinningHand(hand, [JING1S], true)).toBe(true);
-    expect(isWinningHand(hand, [JING1S], false)).toBe(false); // ron not allowed
+    expect(isWinningHand(hand, [JING1S], false)).toBe(true); // ron also valid
   });
 
   it('thirteen misfits with multiple same-face-value jings is valid (BUG regression)', () => {
@@ -541,7 +542,7 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
       'north',
     ];
     expect(isWinningHand(hand, ['7p', '8p'], true)).toBe(true);
-    expect(isWinningHand(hand, ['7p', '8p'], false)).toBe(false); // tsumo only
+    expect(isWinningHand(hand, ['7p', '8p'], false)).toBe(true); // ron also valid
   });
 
   it('thirteen misfits with adjacent jing types as the only dots is valid', () => {
@@ -564,7 +565,7 @@ describe('Engine·hand-eval — wildcard (Jing) hands', () => {
       'bai',
     ];
     expect(isWinningHand(hand, ['7p', '8p'], true)).toBe(true);
-    expect(isWinningHand(hand, ['7p', '8p'], false)).toBe(false); // tsumo only
+    expect(isWinningHand(hand, ['7p', '8p'], false)).toBe(true); // ron also valid
   });
 
   it('thirteen misfits is invalid when natural tiles have gap ≤ 2 (wildcards cannot fix this)', () => {
