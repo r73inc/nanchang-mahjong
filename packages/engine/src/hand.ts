@@ -337,12 +337,15 @@ export function decomposeConcealed(hand: TileType[], jingTypes: TileType[]): Dec
 
 /**
  * True if `hand` (exactly 14 TileTypes) is a winning hand.
- * Handles: standard 4-meld+pair, Seven Pairs, Thirteen Misfits.
+ * Handles: standard 4-meld+pair, Seven Pairs, Thirteen Misfits, Seven Star Thirteen Misfits.
  *
- * @param isSelfDraw - Pass `true` when evaluating a self-drawn tile (tsumo).
- *   Thirteen Misfits (十三烂) is only a valid winning hand by self-draw —
- *   passing `false` (or omitting) correctly excludes it from ron evaluations
- *   so the "Hu" button is never offered when an opponent discards.
+ * Thirteen Misfits (十三烂) and Seven Star Thirteen Misfits (七星十三烂) require a fully
+ * concealed hand (no open melds) but can be won by self-draw OR by claiming a discard.
+ * The "concealed" constraint is enforced by the caller (canWin uses decomposeConcealed
+ * instead of this function when openMeldTiles.length > 0).
+ *
+ * @param isSelfDraw - Retained for caller clarity (e.g. Heavenly/Earthly win detection
+ *   in game.service.ts). Does not affect Thirteen Misfits eligibility.
  */
 export function isWinningHand(
   hand: TileType[],
@@ -358,11 +361,12 @@ export function isWinningHand(
   const { naturals, jingCount } = separateJing(hand, jingTypes);
   if (checkSevenPairs(naturals, jingCount)) return true;
 
-  // Thirteen Misfits — self-draw only (Nanchang rule).
-  // Wildcards fill any remaining valid misfit positions; only naturals are
-  // checked against the gap > 2 / unique-honor constraints.
-  if (isSelfDraw && checkThirteenMisfits(naturals, jingCount)) return true;
+  // Thirteen Misfits (and Seven Star variant) — concealed hand only, but winnable
+  // by self-draw OR discard claim. Wildcards fill any remaining valid misfit positions;
+  // only naturals are checked against the gap > 2 / unique-honor constraints.
+  if (checkThirteenMisfits(naturals, jingCount)) return true;
 
+  void isSelfDraw; // parameter kept for caller clarity; see JSDoc above
   return false;
 }
 

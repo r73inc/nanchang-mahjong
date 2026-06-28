@@ -67,6 +67,7 @@ export function toClientSnapshot(
   preGameReadySeats: readonly (0 | 1 | 2 | 3)[] | null = null,
   handEndReadySeats: readonly (0 | 1 | 2 | 3)[] | null = null,
   forcedFinalNextHand = false,
+  isChallenge = false,
 ): ClientGameState {
   const seats = state.seats.map((seat, i): ClientSeatState => {
     const isOwnSeat = viewerSeat === i;
@@ -108,5 +109,6 @@ export function toClientSnapshot(
     preGameReadySeats: preGameReadySeats ? [...preGameReadySeats] : null,
     handEndReadySeats: handEndReadySeats ? [...handEndReadySeats] : null,
     forcedFinalNextHand,
+    ...(isChallenge ? { isChallenge: true } : {}),
   };
 }

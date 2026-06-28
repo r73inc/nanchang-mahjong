@@ -142,6 +142,27 @@ describe('canWin', () => {
     const hand: TileType[] = ['4m', '4m', '5m', '5m', '6m'];
     expect(canWin(hand, '6m', NO_JINGS, openMeldTiles)).toBe(false);
   });
+
+  it('recognises a Thirteen Misfits win off a discarded tile (ron)', () => {
+    // 13-tile hand waiting for 'bai' to complete Seven Star Thirteen Misfits.
+    // Another player discards 'bai' → canWin must return true (isSelfDraw=false default).
+    const hand: TileType[] = [
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s',
+    ];
+    expect(canWin(hand, 'bai', NO_JINGS)).toBe(true);
+  });
 });
 
 // ── canPung ───────────────────────────────────────────────────────────────────
