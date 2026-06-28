@@ -1298,6 +1298,9 @@ export class GameService {
     const seat = session.getSeat(userId);
     if (seat === undefined) return this.emitError(socket, 'NOT_IN_GAME');
 
+    // Challenge games always play all configured hands; force-final is not allowed.
+    if (session.challengeId) return this.emitError(socket, 'INVALID_PHASE');
+
     // Must be in the hand-reveal screen (pendingHandEnd is set).
     if (!session.pendingHandEnd) return this.emitError(socket, 'INVALID_PHASE');
 
@@ -2576,6 +2579,7 @@ export class GameService {
       preGameReadySeats as (0 | 1 | 2 | 3)[] | null,
       handEndReadySeats as (0 | 1 | 2 | 3)[] | null,
       session.forcedFinalNextHand,
+      !!session.challengeId,
     );
     this.server.to(socketId).emit('game:snapshot', { state: snapshot });
   }

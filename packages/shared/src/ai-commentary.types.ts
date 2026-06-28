@@ -224,6 +224,8 @@ export interface ChallengeFactsDigest {
   numHands: number;
   /** Hand-by-hand divergence across participants (same deal, different decisions). */
   divergence: ChallengeHandDivergence[];
+  /** Display names of the three bot opponents shared by all participants (seats 1–3). */
+  botNames?: [string, string, string];
 }
 
 // ── Gemini relay contract (provider-agnostic) ─────────────────────────────────
