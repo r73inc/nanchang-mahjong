@@ -616,14 +616,20 @@ export class AiSummaryService {
       }
     }
 
-    return { challengeId, participants, numHands, divergence };
+    // Extract bot names from the first available replay (all participants face the same bots).
+    const firstReplay = available[0]?.replay;
+    const botNames: [string, string, string] | undefined = firstReplay?.seatNames
+      ? [firstReplay.seatNames[1], firstReplay.seatNames[2], firstReplay.seatNames[3]]
+      : undefined;
+
+    return { challengeId, participants, numHands, divergence, botNames };
   }
 
   buildGameRequest(digest: GameFactsDigest): RelayGenerateRequest {
     const model = this.config.get('geminiRelay.model', { infer: true });
 
     const playerList = digest.players
-      .map((p) => `  Seat ${p.seat}: ${p.handle}${p.isBot ? ' (bot)' : ''}`)
+      .map((p) => `  ${p.handle}${p.isBot ? ' (bot)' : ''}`)
       .join('\n');
 
     const rankList = [...digest.players]
@@ -663,14 +669,18 @@ export class AiSummaryService {
       .join('\n\n');
 
     const systemInstruction = [
-      'You are a knowledgeable Nanchang Mahjong analyst writing a detailed post-game breakdown.',
+      'You are a knowledgeable Nanchang Mahjong analyst writing a post-game highlight reel, not a play-by-play log.',
       'Nanchang Mahjong is a regional tile game from Nanchang, Jiangxi, China.',
       'Write an informative, measured analysis based ONLY on the facts provided.',
       'Favor concrete detail and insight over excitement, hype, or emotional language.',
-      'Focus on what happened INSIDE each hand and how it shaped the result:',
-      "who chi/pung/gang'd a tile and from whom, how that shifted the turn order or tempo,",
-      'who dealt into the winner, who quietly built an advantage, and how spirit (Jing) tiles factored in.',
-      'Do NOT merely restate end-of-hand scores — explain the decisions and turning points that produced them.',
+      'DO NOT recap every hand. Instead, select only the moments that mattered:',
+      '— the decisive win that swung the lead,',
+      '— a costly deal-in that handed an opponent a big score,',
+      '— a clever claim (chi/pung/gang) that changed tempo,',
+      '— a special hand (Seven Pairs, Thirteen Misfits) or heavy Jing usage,',
+      '— the turning point where the final standings were effectively decided.',
+      'Skip hands that were routine draws or small unremarkable wins.',
+      'Always name the players involved — never say "a player" or leave an action anonymous.',
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
       '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
@@ -680,16 +690,16 @@ export class AiSummaryService {
       'self-draw (自摸) when a player wins by drawing their own tile,',
       "discard win (放炮) when a player wins on an opponent's discard.",
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
-      '(5) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
-      'Length: a thorough breakdown of roughly 2–4 short paragraphs scaled to game length. Be substantive, not a one-line recap.',
+      '(5) Always refer to players by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
+      '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      'Length: 2–3 tight paragraphs. First sentence names the winner and margin. Body covers the key highlights. Final sentence states who controlled the game.',
     ].join(' ');
 
     const userPrompt = [
       '=== NANCHANG MAHJONG GAME SUMMARY ===',
-      `Game ID: ${digest.gameId}`,
       `Players:\n${playerList}`,
       `Settings: ${digest.settings.rounds} rounds, ${digest.settings.terminationType} termination, starting score ${digest.settings.startingScore}${digest.settings.ruleTopBottomJing ? ', spirit flip rule active' : ''}`,
-      `Duration: ${digest.hands.length} hand${digest.hands.length !== 1 ? 's' : ''} | ${digest.startedAt} → ${digest.endedAt}`,
+      `Duration: ${digest.hands.length} hand${digest.hands.length !== 1 ? 's' : ''}`,
       `Result: ${digest.result}`,
       `Final standings:\n${rankList}`,
       '',
@@ -731,8 +741,9 @@ export class AiSummaryService {
               line += ` • ${o.jingCount} spirit tile${o.jingCount > 1 ? 's' : ''}`;
             if (o.isWinner) line += ' ★';
             if (o.claims.length > 0) {
-              // Seat 0 is the human participant; seats 1–3 are bots in a solo challenge game.
-              const nameForSeat = (seat: 0 | 1 | 2 | 3) => (seat === 0 ? o.handle : 'a bot');
+              // Seat 0 is the human participant; seats 1–3 are the shared bot opponents.
+              const nameForSeat = (seat: 0 | 1 | 2 | 3) =>
+                seat === 0 ? o.handle : (digest.botNames?.[seat - 1] ?? `Bot ${seat}`);
               line += `\n    Claims: ${formatClaims(o.claims, nameForSeat)}`;
             }
             return line;
@@ -747,11 +758,13 @@ export class AiSummaryService {
       'A Point Challenge gives all participants the SAME pre-determined deal; your job is to compare how each navigated identical tiles.',
       'Write an informative, measured comparison based ONLY on the facts provided.',
       'Favor concrete detail and insight over excitement, hype, or emotional language.',
-      "Focus on the DIVERGENCE points: on a given hand, who chi/pung/gang'd a tile and who let the same tile pass,",
-      'how those different choices changed turn order and tempo, whether a claim handed a bot an advantage',
-      '(e.g. someone stole a pung that another participant left for a bot, who then won with it),',
-      'and how spirit (Jing) tiles were used differently.',
-      "Do NOT merely restate each participant's end-of-hand scores — explain the decisions that drove them apart.",
+      'DO NOT recap every hand. Focus only on the moments where participants diverged in a meaningful way:',
+      '— a hand where one participant won and another drew or lost on the same deal,',
+      '— a claim (chi/pung/gang) that one participant made while another let the same tile pass,',
+      '— a costly deal-in that handed a bot a win when a different participant avoided it,',
+      '— special hands or heavy Jing usage that separated the scores.',
+      'Skip hands where all participants had similar unremarkable results.',
+      'Always explain WHY a divergence mattered — who benefited, by how much, and how it shifted the standings.',
       'Rules: (1) Never reference Japanese/Riichi, Hong Kong, or any other Mahjong variant.',
       '(2) No minimum-fan requirement — every valid hand wins unconditionally.',
       '(3) The wildcard/spirit tile is called "Jing" in English and MUST be written 精 (or 精牌) in Chinese.',
@@ -761,13 +774,13 @@ export class AiSummaryService {
       'self-draw (自摸) when a player wins by drawing their own tile,',
       "discard win (放炮) when a player wins on an opponent's discard.",
       'NEVER use Japanese terms: Ron, Tsumo, Pon, Kan, or Riichi.',
-      '(5) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
-      `Length: a thorough multi-paragraph comparison (target ≤ ${wordCap} words). Be substantive, not a one-line recap.`,
+      '(5) Always refer to players and bots by their name — NEVER use seat numbers, seat labels, technical IDs, or any software/engineering terminology.',
+      '(6) Output MUST be a JSON object with "en" (English) and "zh" (Chinese) fields conveying the same content.',
+      `Length: 2–4 paragraphs of highlights only (target ≤ ${wordCap} words). First sentence names the winner. Body covers only the divergence moments that mattered. Final sentence states what separated the top finisher from the rest.`,
     ].join(' ');
 
     const userPrompt = [
       '=== NANCHANG MAHJONG POINT CHALLENGE ===',
-      `Challenge ID: ${digest.challengeId}`,
       `Participants: ${digest.participants.length} | Hands played: ${digest.numHands}`,
       '',
       'Final standings:',
