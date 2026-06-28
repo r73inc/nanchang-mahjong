@@ -1600,3 +1600,152 @@ describe('Engine·BUG-059-german-detection', () => {
     expect(winEvent!.paymentResult.flatBonusPerLoser).toBe(0);
   });
 });
+
+// ── Seven Star Thirteen Misfits detection ─────────────────────────────────────
+
+describe('Engine·seven-star-thirteen-misfits', () => {
+  it('declareWin detects seven_star_thirteen when all 7 honor tiles are natural (no wildcards)', () => {
+    // Hand: 7 unique honors + 7 suit tiles (all gaps > 2) = 14 tiles.
+    // Jing types are set to suit tiles absent from the hand so no wildcards fire.
+    // Expected: handType = 'seven_star_thirteen', payout multiplier = 4.
+    const g = startedGame(42);
+    const winHand: TileType[] = [
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      'bai',
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s',
+    ];
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: winHand, openMelds: [], score: 0 };
+    for (let i = 1; i < 4; i++) {
+      patchedSeats[i] = { ...g.state.seats[i], hand: [], openMelds: [], score: 0 };
+    }
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        dealerSeat: 3,
+        jingPrimary: '5p' as TileType, // absent from winHand → no wildcards
+        jingSecondary: '8p' as TileType,
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+    const finished = engine.declareWin(0);
+    const winEvent = finished.events.find((e: GameEvent) => e.kind === 'win') as
+      | { kind: 'win'; handType: string; paymentResult: WinPaymentResult }
+      | undefined;
+    expect(winEvent).toBeDefined();
+    expect(winEvent!.handType).toBe('seven_star_thirteen');
+    // Seven Star multiplier (×4) applied; seat 0 is non-dealer → each of 3 losers pays ×2×4=8
+    expect(winEvent!.paymentResult.totalMultiplier).toBe(4);
+  });
+
+  it('declareWin detects seven_star_thirteen when a non-honor Jing wildcard fills the 7th honor slot', () => {
+    // Jing = '3m' (a suit tile wildcard). Player holds 6 natural honors (east–fa) + the
+    // '3m' wildcard which fills the 'bai' slot, completing all 7 honor positions.
+    // naturals: east, south, west, north, zhong, fa, 1m, 4m, 7m, 2p, 6p, 3s, 7s (13 tiles)
+    // wildcards: 3m (1 tile) → total 14 tiles, qualifies as Seven Star.
+    const g = startedGame(42);
+    const winHand: TileType[] = [
+      '3m', // Jing wildcard filling 'bai' honor slot
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa',
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '3s',
+      '7s',
+    ];
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: winHand, openMelds: [], score: 0 };
+    for (let i = 1; i < 4; i++) {
+      patchedSeats[i] = { ...g.state.seats[i], hand: [], openMelds: [], score: 0 };
+    }
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        dealerSeat: 3,
+        jingPrimary: '3m' as TileType, // '3m' is the wildcard
+        jingSecondary: '4m' as TileType, // secondary; 4m IS in hand but at face value
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+    const finished = engine.declareWin(0);
+    const winEvent = finished.events.find((e: GameEvent) => e.kind === 'win') as
+      | { kind: 'win'; handType: string; paymentResult: WinPaymentResult }
+      | undefined;
+    expect(winEvent).toBeDefined();
+    expect(winEvent!.handType).toBe('seven_star_thirteen');
+    expect(winEvent!.paymentResult.totalMultiplier).toBe(4);
+  });
+
+  it('declareWin classifies as thirteen_misfits (not seven_star) when 7th honor is missing and no wildcard available', () => {
+    // 6 natural honors (no 'bai') + 8 suit tiles — no wildcards available to fill the gap.
+    // Should win as Thirteen Misfits (×2), not Seven Star (×4).
+    const g = startedGame(42);
+    const winHand: TileType[] = [
+      'east',
+      'south',
+      'west',
+      'north',
+      'zhong',
+      'fa', // 6 honors (no bai)
+      '1m',
+      '4m',
+      '7m',
+      '2p',
+      '6p',
+      '1s',
+      '5s',
+      '9s', // 8th suit tile to fill 14
+    ];
+    const patchedSeats = [...g.state.seats] as GameState['seats'];
+    patchedSeats[0] = { ...g.state.seats[0], hand: winHand, openMelds: [], score: 0 };
+    for (let i = 1; i < 4; i++) {
+      patchedSeats[i] = { ...g.state.seats[i], hand: [], openMelds: [], score: 0 };
+    }
+    // @ts-expect-error — private constructor
+    const engine = new GameEngine(
+      {
+        ...g.state,
+        phase: 'playing',
+        currentSeat: 0,
+        dealerSeat: 3,
+        jingPrimary: '5p' as TileType, // absent from winHand → no wildcards
+        jingSecondary: '8p' as TileType,
+        seats: patchedSeats,
+      },
+      g.events,
+    );
+    const finished = engine.declareWin(0);
+    const winEvent = finished.events.find((e: GameEvent) => e.kind === 'win') as
+      | { kind: 'win'; handType: string; paymentResult: WinPaymentResult }
+      | undefined;
+    expect(winEvent).toBeDefined();
+    expect(winEvent!.handType).toBe('thirteen_misfits');
+    expect(winEvent!.paymentResult.totalMultiplier).toBe(2);
+  });
+});
